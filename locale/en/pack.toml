@@ -3405,11 +3405,11 @@ help = "remove the explicit type argument list"
 
 [diagnostics.SEM011.issues.failable_call_requires_handler]
 message = "failable call requires a ⇥ declaring context, a local handler, or a {capta} trap"
-help = "handle the call with {fac}/cape, capture it with {capta}, or declare a function ⇥"
+help = "handle the call with {fac}/{cape}, capture its error with {capta}, or declare the caller's error channel with `⇥ E`"
 
 [diagnostics.SEM011.issues.failable_conversio_requires_handler]
 message = "failable conversion from {source} to {target} requires a '⊥' default, a ⇥ declaring context, a local handler, or a {capta} trap"
-help = "add a '⊥' default, handle it with {fac}/cape or {capta}, or declare a function ⇥; the {incipit} body is exempt"
+help = "add a '⊥' default, handle it with {fac}/{cape} or {capta}, or declare the function's error channel as `⇥ E`; the {incipit} body is exempt"
 
 [diagnostics.SEM011.issues.explicit_union_type_arg_unsupported]
 message = "an explicit type argument cannot be a `∪` hole"
@@ -3425,11 +3425,11 @@ help = "convert both operands to the same {modulus} width, or keep both operands
 
 [diagnostics.SEM011.issues.textus_literal_too_long]
 message = "{textus} literal exceeds its declared capacity of {capacity}"
-help = "shorten the {textus}<{magnitudo} N> literal to fit its declared capacity, or use unbounded {textus}"
+help = "increase the {textus}<{magnitudo} N> capacity or shorten the literal; use unbounded {textus} if no capacity is needed"
 
 [diagnostics.SEM011.issues.glyph_operands_unsupported]
 message = "operator {op} does not apply to these operand types"
-help = "use the pinned built-in families: · on vectors/matrices, × on 3-vectors, ⊗ on vectors, ⊙ on identical vector/matrix/tensor shapes"
+help = "use · for compatible vector, matrix, or tensor contractions; × for 3-vectors; ⊗ for two vectors; or ⊙ for equal-shaped aggregates"
 
 [diagnostics.SEM011.issues.glyph_scalar_operand]
 message = "a {kind} {op} takes two aggregates"
@@ -3437,7 +3437,7 @@ help = "with a scalar write `*` or `/`"
 
 [diagnostics.SEM011.issues.glyph_static_shape_required]
 message = "operator {op} requires statically known shapes"
-help = "use literal vector widths or matrix/tensor shapes; shape-generic overload is deferred to Phase 2"
+help = "give both operands concrete compile-time shapes, such as literal vector widths or tensor dimensions"
 
 [diagnostics.SEM011.issues.glyph_op_numeric_element_required]
 message = "operator {op} requires numeric element types"
@@ -3453,19 +3453,19 @@ help = "contract the inner dimension: vector widths must match and matrix column
 
 [diagnostics.SEM011.issues.glyph_cross_width_mismatch]
 message = "operator {op} operands have different widths"
-help = "cross both operands at the same width"
+help = "give both operands the same width, and use width 3 for ×"
 
 [diagnostics.SEM011.issues.glyph_cross_width_three_required]
 message = "operator {op} requires 3-vector operands"
-help = "× is pinned to 3-vectors in Phase 1; the 7-vector convention is deferred"
+help = "use × only with two width-3 vectors; use ⊙ for an elementwise product"
 
 [diagnostics.SEM011.issues.glyph_hadamard_shapes_mismatch]
 message = "operator {op} requires identical operand shapes"
-help = "use `↦` to reshape the operands to identical shapes before applying {op}"
+help = "make the operands of {op} the same shape; reshape one with `.reshape(...)` when their element counts match"
 
 [diagnostics.SEM011.issues.glyph_transpose_operands_unsupported]
 message = "ᵀ applies only to tensor values"
-help = "apply ᵀ to a tensor value"
+help = "apply postfix ᵀ only to a rank-2 tensor or matrix"
 
 [diagnostics.SEM011.issues.glyph_transpose_rank1_no_row_column_distinction]
 message = "rank-1 transpose has no row/column distinction"
@@ -3493,7 +3493,7 @@ help = "pass arguments whose specialized types, shapes, layouts, and modes match
 
 [diagnostics.SEM011.issues.nucleum_fragment_throw_caller]
 message = "@ {nucleum} {fragment} call of a throwing kernel needs a caller that declares `⇥ text`"
-help = "declare `⇥ text` on the calling kernel: the callee's constant throws become throw sites of the caller"
+help = "declare `⇥ {textus}` on the calling kernel so the callee's constant throws can propagate through it"
 
 [diagnostics.SEM011.issues.nucleum_fragment_cycle]
 message = "@ {nucleum} {fragment} call cycle{?cycle|: |}{?chain|: |}"
@@ -3529,15 +3529,15 @@ help = "choose one of the allowed type arguments for this generic parameter"
 
 [diagnostics.SEM011.issues.signature_extent_bare_value_name]
 message = "value parameter {param} cannot occupy a signature extent"
-help = "declare a `<size {param}>` generic parameter and use it in the figura, or spell the lift `size {param}` where a runtime lift is intended"
+help = "use a `<{magnitudo} N>` generic parameter in the shape, or spell `{magnitudo} {param}` where a runtime extent is intended"
 
 [diagnostics.SEM011.issues.generic_type_arg_sort]
 message = "generic parameter {param} expects {expected}, but the positional argument has the other kind"
-help = "match each explicit generic argument to the declared sort of the parameter it binds"
+help = "use {magnitudo} before a size argument, and leave type arguments unmarked"
 
 [diagnostics.SEM011.issues.gpu_builtin_device_function_required]
 message = "GPU builtin call is only valid inside device functions"
-help = "call GPU builtins only inside @ nucleum or @ nucleum fragment functions"
+help = "call GPU builtins only inside @ {nucleum} or @ {nucleum} {fragment} functions"
 
 [diagnostics.SEM011.issues.gpu_builtin_type_args]
 message = "GPU builtin call does not accept type arguments"
@@ -3557,7 +3557,7 @@ help = "use integer operands for this operator"
 
 [diagnostics.SEM011.issues.instans_ordering_operands_required]
 message = "incompatible instant operands"
-help = "compare instant values with instant values"
+help = "compare two {instans} values"
 
 [diagnostics.SEM011.issues.json_duplicate_key]
 message = "duplicate JSON key \"{key}\""
