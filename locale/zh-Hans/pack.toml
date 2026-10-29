@@ -4346,18 +4346,23 @@ help = "声明 `{implendum} Sink<T>`，并包含 `{functio} sink(T res) → vacu
 message = "内核 `{kernel}` 在 {device} 设备上串行运行"
 
 [diagnostics.INFO001.issues.single_lane]
+message = "内核 `{kernel}` 在单个车道上运行"
 help = "当每个车道应处理一个项目时，使用 `@ {nucleum}` 函数，配合 `{itera}` 循环和 `{filum}` 子句。"
 
 [diagnostics.INFO001.issues.not_split]
+message = "内核 `{kernel}` 只在 {partitions} 个分区中的一个上运行：{reason}"
 help = "检查原因：拆分需要线性车道网格、车道范围，以及限制在各自车道范围内的写入。"
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "内核 `{kernel}`：能否拆分到 {partitions} 个分区取决于运行时形状"
 help = "选择运行时形状，使车道网格与其写入具有匹配范围，以便可预测地拆分。"
 
 [diagnostics.INFO001.issues.whole_call]
+message = "内核 `{kernel}` 作为一次顺序调用在一个 CPU 工作线程上运行"
 help = "对于相互独立的逐项工作，使用 `@ {nucleum}` 函数，配合 `{itera}` 循环和 `{filum}` 子句。"
 
 [diagnostics.INFO001.issues.not_placed]
+message = "内核 `{kernel}` 未放置到 {device} 设备上：{reason}"
 help = "检查原因，并使用所选设备支持的内核形式。"
 
 [diagnostics.INFO001.issues.avoidable_sync]

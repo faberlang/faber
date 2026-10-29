@@ -4358,18 +4358,23 @@ help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink
 message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
 
 [diagnostics.INFO001.issues.single_lane]
+message = "เคอร์เนล `{kernel}` ทำงานบนเลนเดียว"
 help = "ใช้ฟังก์ชัน `@ {nucleum}` พร้อมลูป `{itera}` และส่วน `{filum}` เมื่อแต่ละเลนควรจัดการหนึ่งรายการ"
 
 [diagnostics.INFO001.issues.not_split]
+message = "เคอร์เนล `{kernel}` ทำงานบนพาร์ติชันเดียวจาก {partitions} พาร์ติชัน: {reason}"
 help = "ตรวจสอบเหตุผล: การแยกต้องมีกริดเลนเชิงเส้น ช่วงของเลน และการเขียนที่จำกัดอยู่ในช่วงของแต่ละเลน"
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "เคอร์เนล `{kernel}`: การแบ่งไปยัง {partitions} พาร์ติชันขึ้นอยู่กับรูปร่างขณะรันไทม์"
 help = "เลือกรูปร่างขณะทำงานที่ทำให้กริดเลนและการเขียนมีช่วงตรงกัน เพื่อให้แบ่งได้อย่างคาดเดาได้"
 
 [diagnostics.INFO001.issues.whole_call]
+message = "เคอร์เนล `{kernel}` ทำงานเป็นการเรียกแบบลำดับครั้งเดียวบน CPU worker หนึ่งตัว"
 help = "สำหรับงานแยกอิสระต่อรายการ ให้ใช้ฟังก์ชัน `@ {nucleum}` พร้อมลูป `{itera}` และส่วน `{filum}`"
 
 [diagnostics.INFO001.issues.not_placed]
+message = "เคอร์เนล `{kernel}` ไม่ได้ถูกวางบนอุปกรณ์ {device}: {reason}"
 help = "ตรวจสอบเหตุผลและใช้รูปแบบเคอร์เนลที่อุปกรณ์ที่เลือกสนับสนุน"
 
 [diagnostics.INFO001.issues.avoidable_sync]

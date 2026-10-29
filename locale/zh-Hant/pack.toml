@@ -4343,18 +4343,23 @@ help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacu
 message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
 
 [diagnostics.INFO001.issues.single_lane]
+message = "內核 `{kernel}` 在單一車道上執行"
 help = "若每個通道都應處理一個項目，請使用 `@ {nucleum}` 函式搭配 `{itera}` 迴圈和 `{filum}` 子句。"
 
 [diagnostics.INFO001.issues.not_split]
+message = "內核 `{kernel}` 只在 {partitions} 個分區中的一個上執行：{reason}"
 help = "檢查原因：分割需要線性通道網格、通道範圍，以及限制在各通道範圍內的寫入。"
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "內核 `{kernel}`：能否拆分到 {partitions} 個分區取決於執行時形狀"
 help = "選擇執行期形狀，讓通道網格與其寫入具有相符範圍，以便可預測地分割。"
 
 [diagnostics.INFO001.issues.whole_call]
+message = "內核 `{kernel}` 作為一次循序呼叫在一個 CPU 工作執行緒上執行"
 help = "若要獨立處理每個項目，請使用 `@ {nucleum}` 函式搭配 `{itera}` 迴圈和 `{filum}` 子句。"
 
 [diagnostics.INFO001.issues.not_placed]
+message = "內核 `{kernel}` 未放置到 {device} 裝置上：{reason}"
 help = "檢查原因，並使用所選裝置支援的核心形式。"
 
 [diagnostics.INFO001.issues.avoidable_sync]

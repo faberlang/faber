@@ -4490,18 +4490,23 @@ help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum �
 message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
 
 [diagnostics.INFO001.issues.single_lane]
+message = "النواة `{kernel}` تعمل على مسار واحد"
 help = "استخدم دالة `@ {nucleum}` مع حلقة `{itera}` وبند `{filum}` عندما ينبغي لكل خيط معالجة عنصر."
 
 [diagnostics.INFO001.issues.not_split]
+message = "النواة `{kernel}` تعمل على قسم واحد من {partitions} أقسام: {reason}"
 help = "تحقق من السبب: يتطلب التقسيم شبكة خيوط خطية، ونطاقًا للخيط، وحصر الكتابات في نطاق كل خيط."
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "النواة `{kernel}`: انقسامها على {partitions} أقسام يعتمد على الأشكال وقت التشغيل"
 help = "اختر أشكالًا وقت التشغيل تمنح شبكة الخيوط وكتابتها نطاقات متطابقة لضمان تقسيم متوقع."
 
 [diagnostics.INFO001.issues.whole_call]
+message = "النواة `{kernel}` تعمل كاستدعاء تسلسلي واحد على عامل CPU واحد"
 help = "للعمل المستقل لكل عنصر، استخدم دالة `@ {nucleum}` مع حلقة `{itera}` وبند `{filum}`."
 
 [diagnostics.INFO001.issues.not_placed]
+message = "النواة `{kernel}` غير موضوعة على الجهاز {device}: {reason}"
 help = "تحقق من السبب واستخدم صيغة نواة يدعمها الجهاز المحدد."
 
 [diagnostics.INFO001.issues.avoidable_sync]
