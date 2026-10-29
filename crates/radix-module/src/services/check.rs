@@ -97,7 +97,10 @@ pub fn source_declares_locale(name: &str, source: &str) -> bool {
     crate::driver::peel_raw_source(name, source)
         .ok()
         .and_then(|peeled| {
-            crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
+            crate::program::compile::frontmatter_locale_pack_from_frontmatter(
+                &crate::driver::Config::default(),
+                peeled.frontmatter.as_ref(),
+            )
         })
         .is_some()
 }
@@ -125,9 +128,12 @@ fn check_source_deferring_locale(
     // en-surface corpus depends on it: without the pack, `const`, `fn`, and
     // `import from …` spellings do not lex as keywords and check fails at
     // parse with no diagnostics of substance.
-    let declared_pack = code_pack
-        .map(ToOwned::to_owned)
-        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref()));
+    let declared_pack = code_pack.map(ToOwned::to_owned).or_else(|| {
+        crate::program::compile::frontmatter_locale_pack_from_frontmatter(
+            &crate::driver::Config::default(),
+            peeled.frontmatter.as_ref(),
+        )
+    });
     let mut resolved_pack = match declared_pack {
         Some(pack) => Some(pack),
         None => match crate::driver::default_code_pack(&crate::driver::Config::default()) {

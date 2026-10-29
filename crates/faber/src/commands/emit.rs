@@ -386,6 +386,7 @@ pub(super) fn package_analysis_config(
     let config = radix::driver::Config::default()
         .with_target(command.target)
         .with_output_mode(command.output_mode)
+        .with_locale_pack_loader(faber_cli::package::embedded_locale_pack_loader())
         .with_dev_locale_root();
     let config = match &command.module_name {
         Some(name) => config.with_module_name(Some(name.clone())),
