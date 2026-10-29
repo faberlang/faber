@@ -667,6 +667,67 @@ fn conversion_registry_rejects_duplicate_builtin_pair() {
 
 #[cfg(feature = "hir-fhir")]
 #[test]
+fn resolver_snapshot_orders_import_state_independently_of_insertion_order() {
+    use radix_hir_fhir::artifact::{FileInterfaceSnapshot, NominalKind};
+    use radix_types::TypeId;
+
+    fn resolver_with_order(reversed: bool) -> Resolver {
+        let mut snapshot = Resolver::new().to_snapshot();
+        snapshot.namespace_exports = vec![
+            (LexSymbol(8), vec![LexSymbol(4), LexSymbol(2)]),
+            (LexSymbol(3), vec![LexSymbol(9), LexSymbol(1)]),
+        ];
+        snapshot.file_interfaces = vec![
+            (
+                LexSymbol(8),
+                FileInterfaceSnapshot {
+                    exports: Vec::new(),
+                    unavailable: Vec::new(),
+                    const_values: Vec::new(),
+                },
+            ),
+            (
+                LexSymbol(3),
+                FileInterfaceSnapshot {
+                    exports: Vec::new(),
+                    unavailable: Vec::new(),
+                    const_values: Vec::new(),
+                },
+            ),
+        ];
+        snapshot.used_namespaces = vec![LexSymbol(8), LexSymbol(3), LexSymbol(5)];
+        snapshot.imported_nominal_types = vec![
+            ((NominalKind::Interface, LexSymbol(7)), TypeId(17)),
+            ((NominalKind::Struct, LexSymbol(9)), TypeId(19)),
+            ((NominalKind::Enum, LexSymbol(2)), TypeId(12)),
+        ];
+        snapshot.ambiguous_imported_nominal_types = vec![
+            (NominalKind::Interface, LexSymbol(7)),
+            (NominalKind::Struct, LexSymbol(9)),
+            (NominalKind::Enum, LexSymbol(2)),
+        ];
+
+        if reversed {
+            snapshot.namespace_exports.reverse();
+            for (_, members) in &mut snapshot.namespace_exports {
+                members.reverse();
+            }
+            snapshot.file_interfaces.reverse();
+            snapshot.used_namespaces.reverse();
+            snapshot.imported_nominal_types.reverse();
+            snapshot.ambiguous_imported_nominal_types.reverse();
+        }
+        Resolver::from_snapshot(snapshot)
+    }
+
+    assert_eq!(
+        resolver_with_order(false).to_snapshot(),
+        resolver_with_order(true).to_snapshot()
+    );
+}
+
+#[cfg(feature = "hir-fhir")]
+#[test]
 fn resolver_snapshot_round_trips_imported_json_opt_in() {
     use radix_hir_fhir::artifact::{FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot};
     use radix_types::TypeId;
