@@ -876,13 +876,15 @@ pub struct SimdgroupMatMulFacts {
 /// plan. Plan-level gates: the multi-row law (`m > 1` with the canonical
 /// `(tile, tile)` workgroup), the rank-2 law (`batch == 1` — a batched
 /// plan keeps the scalar cooperative-tile body and its batch decomposition),
-/// `k` a tile multiple (the direct device
-/// `simdgroup_load` path admits no K tail), f32 operands, and `m` NOT a
-/// tile multiple — the recipe exists for the padded-FMA partial-band class
-/// (the prefill `M = 36` family); tile-multiple shapes have no padding
-/// class and keep the frozen canonical scalar body. Backend-local
-/// declarations (strided/chunked/gathered operand windows, launch output
-/// windows) are checked at the emitter and fall back to the scalar body.
+/// `k` a tile multiple (the direct device `simdgroup_load` path admits no
+/// K tail), f32 operands, and `n` under the projection-class cap. Every
+/// `m` is admitted — the full output bands take the zero-barrier direct
+/// device loads and the `m`/`n` tail bands the guarded float4 staging
+/// path (tile-multiple square and tall GEMMs are the Whisper-encoder
+/// class; the prefill `M = 36` family keeps its partial-band staging).
+/// Backend-local declarations (strided/chunked/gathered operand windows,
+/// launch output windows) are checked at the emitter and fall back to the
+/// scalar body.
 #[must_use]
 pub fn simdgroup_matmul_admission(plan: &MatMulPlan) -> Option<SimdgroupMatMulFacts> {
     if plan.tile != MATMUL_TILE
@@ -903,16 +905,12 @@ pub fn simdgroup_matmul_admission(plan: &MatMulPlan) -> Option<SimdgroupMatMulFa
 }
 
 /// The extent half of the simdgroup admission: multi-row, `k` a nonzero tile
-/// multiple, `m` a partial band, `n` under the projection-class cap. Shared
+/// multiple, `n` under the projection-class cap. Shared
 /// by [`simdgroup_matmul_admission`] (literal plans) and
 /// [`matmul_class_for_extents`] (run-time extents) so the two cannot drift.
 fn simdgroup_extents_admitted(m: u64, k: u64, n: u64) -> bool {
     let tile = u64::from(MATMUL_TILE);
-    m > 1
-        && k != 0
-        && k.is_multiple_of(tile)
-        && !m.is_multiple_of(tile)
-        && n <= SIMDGROUP_MATMUL_MAX_N
+    m > 1 && k != 0 && k.is_multiple_of(tile) && n <= SIMDGROUP_MATMUL_MAX_N
 }
 
 /// The matmul class the literal path selects for these extents (design note
