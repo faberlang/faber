@@ -40,8 +40,8 @@ use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
     MirBuiltinEdgePolicy, MirCallee, MirCollectionOp, MirConstant, MirConversion,
     MirConversionFlavor, MirEdgePolicy, MirFunctionId, MirGradientOp, MirIntrinsic, MirLiftOp,
-    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProvider,
-    MirProviderKind, MirRuntimeCall, MirSermoOp, MirShapeCheck, MirShapeExpr, MirType,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProjection,
+    MirProvider, MirProviderKind, MirRuntimeCall, MirSermoOp, MirShapeCheck, MirShapeExpr, MirType,
     MirTypeCheckOp, MirValueId,
 };
 use radix_runtime_contract::tensor::{
@@ -4846,27 +4846,97 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let MirOperand::Place(place) = operand else {
             return Ok(None);
         };
-        if !place.projections.is_empty() {
-            return Ok(None);
-        }
         let Some(frame) = self.frames.last() else {
             return Ok(None);
         };
         let Some(slots) = self.prepared.slot_types.get(&frame.function) else {
             return Ok(None);
         };
-        let ty = match &place.base {
+        let mut ty = match &place.base {
             MirPlaceBase::Local(id) => slots.local_ty(*id),
             MirPlaceBase::Temp(id) => slots.temp_ty(*id),
         };
-        let Some(ty) = ty else {
+        let Some(mut ty_id) = ty.take() else {
             return Ok(None);
         };
-        let capacity = match self.types.get(ty) {
+        for projection in &place.projections {
+            let mut payload = ty_id;
+            loop {
+                payload = self.types.peel_access_marker(payload).1;
+                match self.types.get(payload) {
+                    Type::Alias(_, inner) => payload = *inner,
+                    _ => break,
+                }
+            }
+            ty_id = match projection {
+                MirProjection::Field(field) => {
+                    let def = match self.types.get(payload) {
+                        Type::Struct(def) => *def,
+                        Type::Applied(base, _) => match self.types.get(*base) {
+                            Type::Struct(def) => *def,
+                            _ => return Ok(None),
+                        },
+                        _ => return Ok(None),
+                    };
+                    let Some(field_ty) = self
+                        .context
+                        .struct_fields
+                        .get(&def)
+                        .and_then(|fields| fields.get(field))
+                    else {
+                        return Ok(None);
+                    };
+                    field_ty.semantic_id()
+                }
+                MirProjection::VariantField { variant, field } => {
+                    let Some(field_ty) = self
+                        .context
+                        .variant_fields
+                        .get(variant)
+                        .and_then(|fields| fields.get(field))
+                    else {
+                        return Ok(None);
+                    };
+                    field_ty.semantic_id()
+                }
+                MirProjection::Index(MirOperand::Constant(MirConstant::Int(position)))
+                | MirProjection::ProvenIndex(MirOperand::Constant(MirConstant::Int(position)))
+                    if let Type::Tuple(parts) = self.types.get(payload) =>
+                {
+                    let Ok(position) = usize::try_from(*position) else {
+                        return Ok(None);
+                    };
+                    let Some(part) = parts.get(position) else {
+                        return Ok(None);
+                    };
+                    *part
+                }
+                MirProjection::Index(_) | MirProjection::ProvenIndex(_) => {
+                    match radix_mir::ty::index_projection_result_ty(
+                        MirType::semantic(payload),
+                        self.types,
+                    ) {
+                        Ok(projected) => projected.semantic_id(),
+                        Err(_) => return Ok(None),
+                    }
+                }
+                MirProjection::SharedCell => payload,
+                _ => return Ok(None),
+            };
+        }
+        let capacity = match self.types.get(ty_id) {
             Type::BoundedArray { capacity, .. }
             | Type::BoundedQueue { capacity, .. }
             | Type::BoundedStack { capacity, .. }
             | Type::BoundedOcteti { capacity } => *capacity,
+            Type::RangedArray {
+                max: Some(capacity),
+                ..
+            } => {
+                return usize::try_from(*capacity).map(Some).map_err(|_| {
+                    RunnerError::internal(span, "bounded collection capacity does not fit runner")
+                });
+            }
             _ => return Ok(None),
         };
         let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {

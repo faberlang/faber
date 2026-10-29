@@ -304,7 +304,29 @@ impl Lowerer<'_> {
         let Some(frame) = self.form_frames.pop() else {
             return ty_id;
         };
-        let mut form = Self::complete_type_form(ty, base_ty, frame);
+        let union_form_children = if matches!(ty.kind, TypeExprKind::Union(_))
+            && matches!(self.types.get(base_ty), Type::Option(_))
+        {
+            let children = frame
+                .args
+                .iter()
+                .filter_map(|arg| match arg {
+                    radix_hir::HirTypeFormArg::Type(child)
+                        if !matches!(
+                            self.types.get(child.ty),
+                            Type::Primitive(Primitive::Nihil)
+                        ) =>
+                    {
+                        Some(arg.clone())
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            (children.len() == 1).then_some(children)
+        } else {
+            None
+        };
+        let mut form = Self::complete_type_form(ty, base_ty, frame, union_form_children);
         // Access and nullable modifiers wrap the authored carrier. Keep
         // its name and generic children beneath each semantic wrapper.
         for wrapper_ty in [marked_ty, ty_id] {
@@ -342,6 +364,7 @@ impl Lowerer<'_> {
         expr: &TypeExpr,
         ty: TypeId,
         frame: super::TypeFormFrame,
+        union_form_children: Option<Vec<radix_hir::HirTypeFormArg>>,
     ) -> radix_hir::HirTypeForm {
         let head = match &expr.kind {
             TypeExprKind::Infer | TypeExprKind::FieldListHole => radix_hir::HirTypeFormHead::Infer,
@@ -352,9 +375,8 @@ impl Lowerer<'_> {
             },
         };
         let mut args = match &expr.kind {
-            TypeExprKind::Func(_) | TypeExprKind::Union(_) | TypeExprKind::Intersection(_) => {
-                Vec::new()
-            }
+            TypeExprKind::Func(_) | TypeExprKind::Intersection(_) => Vec::new(),
+            TypeExprKind::Union(_) => union_form_children.unwrap_or_default(),
             _ => frame.args,
         };
         // Range endpoints and the inclusive/exclusive glyph do not contribute

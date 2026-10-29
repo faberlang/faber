@@ -59,4 +59,10 @@ main {
     print xs.any(int x ∴ watch(x))
     let int ∪ none seen ← xs.find(int x ∴ watch(x))
     print seen
+
+    # Optional elements keep one optional result shape. A found none and no
+    # matching element both print none; a matching value prints the value.
+    let list<int ∪ none> optional_values ← [null, 7]
+    print optional_values.find((int ∪ none x) → bool ∴ true)
+    print optional_values.find((int ∪ none x) → bool ∴ x ≢ null)
 }

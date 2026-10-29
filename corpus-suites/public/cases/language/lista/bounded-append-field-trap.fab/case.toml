@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/lista/bounded-append-field-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/bounded-append-field-trap.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true

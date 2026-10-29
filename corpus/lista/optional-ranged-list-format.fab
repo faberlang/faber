@@ -1,0 +1,16 @@
++++
+term = "optional ranged list type formatting"
+kind = "concept"
+grammar = ["fab_file", "program", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "union_type", "block_stmt", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "Formatting an optional bounded list preserves the authored length range."
+syntax = "list<int, size 0…3> ∪ none"
+related = ["list<T, size lo…hi>", "format"]
+locale = "en"
++++
+fn show(list<int, size 0…3> ∪ none xs) → void {
+    print xs
+}
+
+main {}
