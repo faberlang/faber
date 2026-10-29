@@ -250,10 +250,11 @@ fn bounded_lista_hole_solves_from_literal_witness() {
 }
 
 #[test]
-fn explicit_bounded_lista_literal_checks_capacity() {
+fn explicit_bounded_lista_literal_uses_capacity_as_its_maximum() {
     assert_accepts_la("incipit { sit lista<numerus, magnitudo 2> xs ← [1, 2] }");
+    assert_accepts_la("incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2] }");
     assert_rejects_with_issue_la(
-        "incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2] }",
+        "incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2, 3, 4] }",
         "incompatible_tensor_index",
     );
 }
