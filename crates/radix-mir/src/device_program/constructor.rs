@@ -918,7 +918,10 @@ impl<'a> KernelBuilder<'a> {
                     )
                     .map_err(|detail| DeviceProgramBuildError::KernelAbi {
                         function: function.id,
-                        detail,
+                        detail: format!(
+                            "{detail}; {}",
+                            lane_kernel_call_context(function, self.program, self.interner)
+                        ),
                     })?
                     .or_else(|| single_lane_plan(function, self.validation))
                     .unwrap_or(CollectionKernelPlan::Elementwise),
@@ -2074,12 +2077,117 @@ fn semantic_facts(
     }
 }
 
+fn lane_kernel_call_context(
+    function: &MirFunction,
+    program: &crate::MirProgram,
+    interner: &Interner,
+) -> String {
+    let kernel_name = function
+        .name
+        .map(|name| interner.resolve(name).to_owned())
+        .unwrap_or_else(|| format!("function {}", function.id.0));
+    let targets_kernel = |callee: &MirCallee| match callee {
+        MirCallee::Function(id)
+        | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => *id == function.id,
+        MirCallee::Definition { source, .. } => function.source == Some(*source),
+        MirCallee::Closure(closure) => closure.function == function.id,
+        MirCallee::Value(_) => false,
+    };
+    let mut call_sites = Vec::new();
+    for caller in &program.functions {
+        let caller_name = caller
+            .name
+            .map(|name| interner.resolve(name).to_owned())
+            .unwrap_or_else(|| format!("function {}", caller.id.0));
+        for block in &caller.blocks {
+            for statement in &block.statements {
+                let MirStatementKind::Call { callee, .. } = &statement.kind else {
+                    continue;
+                };
+                if targets_kernel(callee) {
+                    call_sites.push(format!(
+                        "`{kernel_name}` called from `{caller_name}` at bytes {}..{}",
+                        statement.span.start, statement.span.end
+                    ));
+                }
+            }
+            if let crate::MirTerminatorKind::TryCall { callee, .. } = &block.terminator.kind
+                && targets_kernel(callee)
+            {
+                call_sites.push(format!(
+                    "`{kernel_name}` called from `{caller_name}` at bytes {}..{}",
+                    block.terminator.span.start, block.terminator.span.end
+                ));
+            }
+        }
+    }
+    if call_sites.is_empty() {
+        format!("kernel `{kernel_name}`")
+    } else {
+        call_sites.join("; ")
+    }
+}
+
+/// Recover the lane-domain parameter from lane-form MIR when the carried
+/// metadata is absent (for example, after a same-module device-call
+/// composition). The generated domain extent and source-element load share
+/// the Lane parameter's span, so this retains the exact source identity rather
+/// than guessing from the first readable tensor resource.
+fn inferred_lane_domain_local(function: &MirFunction) -> Option<MirLocalId> {
+    let lane = function
+        .params
+        .iter()
+        .find(|param| param.mode == MirParamMode::Lane)?;
+    let aliases = crate::abi::ParameterAliases::new(function);
+    let mut candidates = BTreeSet::new();
+    for statement in function.blocks.iter().flat_map(|block| &block.statements) {
+        let MirStatementKind::Assign { value, .. } = &statement.kind else {
+            continue;
+        };
+        if value.span != lane.span {
+            continue;
+        }
+        match &value.kind {
+            crate::MirValueKind::TensorExtent { tensor, .. } => {
+                if let MirOperand::Place(place) = tensor
+                    && place.projections.is_empty()
+                    && let crate::MirPlaceBase::Local(local) = &place.base
+                {
+                    candidates.insert(aliases.resolve(*local));
+                }
+            }
+            crate::MirValueKind::Operand(MirOperand::Place(place)) => {
+                let is_lane_read = place.projections.iter().any(|projection| {
+                    matches!(
+                        projection,
+                        crate::MirProjection::Index(MirOperand::Place(index))
+                            if index.projections.is_empty()
+                                && matches!(&index.base, crate::MirPlaceBase::Local(local)
+                                    if aliases.resolve(*local) == lane.local)
+                    )
+                });
+                if is_lane_read && let crate::MirPlaceBase::Local(local) = &place.base {
+                    candidates.insert(aliases.resolve(*local));
+                }
+            }
+            _ => {}
+        }
+    }
+    if candidates.len() == 1 {
+        candidates.into_iter().next()
+    } else {
+        None
+    }
+}
+
 /// The lane-form plan of a function (gpu-reset C4-1), selected by structure:
 /// a [`MirParamMode::Lane`] parameter plus a written tensor resource. Its
-/// domain is the exact source local carried by lane-form lowering, resolved
-/// through single-assignment parameter aliases to the matching ABI resource.
-/// `Ok(None)` for a function with no Lane parameter; a Lane function with no
-/// carried source, no written resource, or an unranked source fails closed.
+/// domain is the exact source local carried by lane-form lowering, or is
+/// recovered from the generated lane-domain extent/source-element read when
+/// metadata was lost, then resolved through single-assignment parameter aliases
+/// to the matching ABI resource. `Ok(None)` for a function with no Lane
+/// parameter; a Lane function with no recoverable source, no written resource,
+/// or an unranked source fails closed.
 fn lane_grid_plan(
     function: &MirFunction,
     signature: &MirKernelSignature,
@@ -2126,6 +2234,7 @@ fn lane_grid_plan(
         }));
     }
     let lane_domain_local = lane_domain_local
+        .or_else(|| inferred_lane_domain_local(function))
         .map(|local| crate::abi::ParameterAliases::new(function).resolve(local))
         .ok_or_else(|| "lane kernel has no carried lane-domain source identity".to_owned())?;
     let Some((source_resource, source)) = resources

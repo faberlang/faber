@@ -2051,7 +2051,23 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
         shader_stage: Some(MirKernelShaderStage::Compute),
         span: span(),
     };
-    let validated = validated(&types, vec![function]);
+    let caller = device_function(
+        2,
+        &mut interner,
+        "orchestrate",
+        &[
+            (20, "other", other_tensor),
+            (21, "src", tensor),
+            (22, "dst", tensor),
+        ],
+        &[20, 21, 22],
+        vec![host_call(1, &[20, 21, 22])],
+        None,
+        Vec::new(),
+        vacuum,
+        false,
+    );
+    let validated = validated(&types, vec![function, caller]);
 
     // The ABI signature synthesis accepts the shape: inputs, output, builtin.
     let signature =
@@ -2064,11 +2080,7 @@ fn lane_grid_plan_is_selected_for_the_lane_form_shape() {
     assert_eq!(signature.builtin_inputs.len(), 1);
     assert_eq!(signature.builtin_inputs[0].local, MirLocalId(3));
 
-    let mut metadata = fixture_metadata(&validated.program().functions);
-    metadata
-        .get_mut(&MirFunctionId(1))
-        .expect("source kernel metadata")
-        .lane_domain_local = Some(MirLocalId(1));
+    let metadata = fixture_metadata(&validated.program().functions);
 
     let (program, _semantics, _steps) = build_device_program(
         &validated,
@@ -2677,6 +2689,168 @@ fn lane_form_with_two_mut_outputs_binds_every_resource_at_its_declared_position(
     assert_eq!(signature.extra_outputs[0].source_local, Some(MirLocalId(2)));
     assert_eq!(signature.builtin_inputs.len(), 1);
     assert_eq!(signature.dispatch_size.x, 8);
+
+    let (program, _semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("two outputs over the read-only lane domain materialize");
+    assert_eq!(program.kernels.len(), 1);
+    assert_eq!(
+        program.kernels[0].plan,
+        CollectionKernelPlan::LaneGrid {
+            source_resource: 1,
+            rank: 1
+        }
+    );
+    assert_eq!(program.kernels[0].resources[1].buffer.name, "dom");
+    assert_eq!(
+        program.kernels[0].resources[1].access,
+        MirKernelResourceAccess::Read
+    );
+    assert_eq!(
+        program.kernels[0].resources[0].access,
+        MirKernelResourceAccess::Write
+    );
+    assert_eq!(
+        program.kernels[0].resources[2].access,
+        MirKernelResourceAccess::Write
+    );
+}
+
+/// If the exact source cannot be reconstructed, the build error points to the
+/// lane kernel and the call site that requested it rather than an earlier
+/// kernel in the launch chain.
+#[test]
+fn missing_lane_domain_error_names_the_kernel_and_call_site() {
+    use crate::MirValueKind;
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let float = f32(&mut types);
+    let u32t = u32_ty(&mut types);
+    let vacuum = vacuum_ty(&mut types);
+    let lane = MirOperand::Place(MirPlace::local(MirLocalId(2)));
+    let output = MirPlace {
+        base: crate::MirPlaceBase::Local(MirLocalId(1)),
+        projections: vec![crate::MirProjection::Index(lane)],
+    };
+    let kernel = MirFunction {
+        id: MirFunctionId(1),
+        source: Some(DefId(1)),
+        name: Some(interner.intern("missing_domain_kernel")),
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: Some(interner.intern("unused_domain")),
+                ty: tensor,
+                mode: MirParamMode::Ref,
+                span: span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: Some(interner.intern("out")),
+                ty: tensor,
+                mode: MirParamMode::MutRef,
+                span: span(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: Some(interner.intern("lane")),
+                ty: u32t,
+                mode: MirParamMode::Lane,
+                span: span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor,
+                mutable: false,
+                span: span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: tensor,
+                mutable: true,
+                span: span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: u32t,
+                mutable: false,
+                span: span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![lane_assign(
+                output,
+                0,
+                MirValueKind::Operand(MirOperand::Constant(crate::MirConstant::Float(1.0))),
+                float,
+            )],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: span(),
+            },
+            span: span(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: span(),
+    };
+    let caller = device_function(
+        2,
+        &mut interner,
+        "same_module_caller",
+        &[(10, "domain", tensor), (11, "out", tensor)],
+        &[10, 11],
+        vec![host_call(1, &[10, 11])],
+        None,
+        Vec::new(),
+        vacuum,
+        false,
+    );
+    let validated = validated(&types, vec![kernel, caller]);
+    let error = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect_err("an unused domain input cannot be guessed as the lane source");
+    let rendered = error.to_string();
+    assert!(
+        matches!(
+            &error,
+            super::DeviceProgramBuildError::KernelAbi { function, .. }
+                if *function == MirFunctionId(1)
+        ),
+        "the error belongs to the selected lane kernel: {error:?}"
+    );
+    assert!(rendered.contains("missing_domain_kernel"), "{rendered}");
+    assert!(rendered.contains("same_module_caller"), "{rendered}");
+    assert!(rendered.contains("bytes 0..0"), "{rendered}");
+    assert!(
+        rendered.contains("lane kernel has no carried lane-domain source identity"),
+        "{rendered}"
+    );
 }
 
 /// A single-lane kernel `name(tensor x, mut tensor y)`: both slots carry the
