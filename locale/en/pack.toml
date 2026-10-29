@@ -4397,7 +4397,7 @@ help = "use `{publica}` for explicit export intent or `{privata}` for file-priva
 
 [diagnostics.SEM018.issues.conflicting_lane]
 message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
-help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+help = "Keep one `@ radix lane` annotation, choosing `\"air\"`, `\"mir\"`, or `\"hir-direct\"` on a top-level {functio}."
 
 [diagnostics.SEM018.issues.missing_directive]
 message = "@ radix requires a directive such as `lane`"
@@ -4429,15 +4429,15 @@ help = "use `@ radix typus T in string {lista}<b8>` or braced `{radix_typus_brac
 
 [diagnostics.SEM018.issues.unknown_directive]
 message = "unknown @ radix directive; expected `lane`"
-help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+help = "Use a supported directive: `@ radix lane \"air\"`, `@ radix backward \"name\"` on an AIR-lane {functio}, or `@ radix contract \"ordering\"` on an {implendum}."
 
 [diagnostics.SEM018.issues.radix_contract_role_missing]
 message = "@ radix contract requires one role string"
-help = "write `@ radix contract \"ordering\"` on the {implendum}"
+help = "Use `@ radix contract \"ordering\"`, `@ radix contract \"closing\"`, or `@ radix contract \"sinking\"` on an {implendum}."
 
 [diagnostics.SEM018.issues.radix_contract_unknown_role]
 message = "unknown @ radix contract role '{role}'; expected 'ordering'"
-help = "write `@ radix contract \"ordering\"` on the {implendum}"
+help = "Use `@ radix contract \"ordering\"`, `@ radix contract \"closing\"`, or `@ radix contract \"sinking\"` on an {implendum}."
 
 [diagnostics.SEM018.issues.radix_contract_placement]
 message = "@ radix contract is only valid on an {implendum}"
@@ -4453,11 +4453,11 @@ help = "declare `{implendum} Closable` with the single method `{functio} close()
 
 [diagnostics.SEM018.issues.radix_contract_sinking_shape]
 message = "the sinking contract must declare exactly `sink(T) → vacuum ⇥ E` and `flush() → vacuum ⇥ E` over one type parameter"
-help = "declare `{implendum} Sink<T>` with `{functio} sink(T res) → vacuum ⇥ E` and `{functio} flush() → vacuum ⇥ E`"
+help = "declare `{implendum} Sink<T>` with `{functio} sink(T res) → {vacuum} ⇥ E` and `{functio} flush() → {vacuum} ⇥ E`"
 
 [diagnostics.SEM018.issues.radix_contract_duplicate]
 message = "a second {implendum} claims the ordering contract"
-help = "import or declare exactly one ordering contract"
+help = "Use only one contract for each compiler role; remove the extra declaration or import."
 
 [diagnostics.SEM018.issues.unknown_lane]
 message = "unknown @ radix lane '{lane}'; expected 'air', 'mir', or 'hir-direct'"
@@ -4465,23 +4465,23 @@ help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"h
 
 [diagnostics.SEM018.issues.unsupported_placement]
 message = "@ radix lane is only supported on top-level {functio} declarations, not on {placement}"
-help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+help = "Put `@ radix lane \"air\"` on a top-level {functio}; put `@ radix backward \"name\"` on a top-level AIR-lane {functio}."
 
 [diagnostics.SEM018.issues.commune_on_non_union]
 message = "`@ commune` is only valid on union shared fields"
-help = "declare shared fields in a union `@ commune` region"
+help = "Declare shared fields in a union's `@ shared` region."
 
 [diagnostics.SEM018.issues.annotatio_misplaced]
 message = "`@ annotation` is only valid immediately before a {genus} declaration{?placement|, not on |}"
-help = "write `@ annotation` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+help = "Put bare `@ annotation` immediately before a top-level {genus} declaration."
 
 [diagnostics.SEM018.issues.annotatio_invalid_marker]
 message = "invalid `@ annotation` marker{?detail|: |}"
-help = "write `@ annotation` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+help = "Use bare `@ annotation` or `@ annotation {{ target = {functio} }` immediately before a top-level {genus}."
 
 [diagnostics.SEM018.issues.annotatio_duplicate_marker]
 message = "a {genus} declares `@ annotation` more than once"
-help = "write `@ annotation` with a braced payload that sets target to {functio}, immediately before a {genus} declaration"
+help = "Keep one `@ annotation` marker immediately before a top-level {genus}."
 
 [diagnostics.SEM018.issues.annotatio_unknown_target]
 message = "unknown `@ annotation` target{?target|: |}"
@@ -4509,11 +4509,11 @@ help = "match the braced payload fields to the contract {genus} field schema"
 
 [diagnostics.SEM018.issues.annotatio_duplicate_field]
 message = "field `{field}` is given more than once in the annotation payload"
-help = "match the braced payload fields to the contract {genus} field schema"
+help = "Give each field only once in the payload, and use names declared by the contract {genus}."
 
 [diagnostics.SEM018.issues.annotatio_missing_field]
 message = "annotation contract{?contract| `|`} requires field `{field}`"
-help = "match the braced payload fields to the contract {genus} field schema"
+help = "Add every required field from the contract schema to the braced payload."
 
 [diagnostics.SEM018.issues.annotatio_invalid_payload]
 message = "annotation field `{field}` has an invalid payload; expected {expected}"
@@ -4525,15 +4525,15 @@ help = "apply this contract only to {functio} declarations"
 
 [diagnostics.SEM018.issues.json_annotation_unsupported_site]
 message = "json annotation is not valid at this site"
-help = "move the annotation to a supported site"
+help = "Put `@ json` on a {genus}, or use `@ json {{ name = \"wire_name\" }` on one of its fields."
 
 [diagnostics.SEM018.issues.json_field_annotation_option]
 message = "json field annotation option is not recognised"
-help = "use a supported json field option"
+help = "On a field, use only `@ json {{ name = \"wire_name\" }` to set its JSON name."
 
 [diagnostics.SEM018.issues.json_field_annotation_outside_json_genus]
 message = "json field annotation outside a json genus"
-help = "mark the enclosing genus as json"
+help = "Put `@ json` immediately before the enclosing {genus} declaration."
 
 [diagnostics.SEM018.issues.json_field_nomen_empty]
 message = "json field name is empty"
@@ -4549,7 +4549,7 @@ help = "use a json-serialisable field type"
 
 [diagnostics.SEM018.issues.json_genus_map_key_not_textus]
 message = "json map key is not text"
-help = "use text as the map key type"
+help = "Use {textus} as the map key type."
 
 [diagnostics.SEM018.issues.json_genus_nested_requires_json]
 message = "nested genus is not marked json"
