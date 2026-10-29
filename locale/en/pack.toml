@@ -4553,11 +4553,11 @@ help = "use text as the map key type"
 
 [diagnostics.SEM018.issues.json_genus_nested_requires_json]
 message = "nested genus is not marked json"
-help = "mark the nested genus as json"
+help = "add `@ {json}` to the nested `{genus}` declaration"
 
 [diagnostics.SEM018.issues.union_conversio_misplaced]
 message = "union conversion annotation is misplaced"
-help = "place the conversion annotation on a supported declaration"
+help = "declare a top-level function for the conversion and put `@ {conversio}` on it"
 
 [diagnostics.SEM019]
 message = "conflicting visibility annotations"
@@ -4577,7 +4577,7 @@ help = "use a `mut` binding to allow reassignment, or remove the extra assignmen
 
 [diagnostics.SEM020.issues.assignment_to_commune_field]
 message = "assignment to commune field"
-help = "commune fields are read-only through the union projection"
+help = "Shared fields are read-only through a union. Build a replacement value with the updated field and assign it to a mutable binding."
 
 [diagnostics.SEM020.issues.assignment_to_fixum_field]
 message = "assignment to {sit} field '{field}'"
@@ -4589,7 +4589,7 @@ help = "a {fixum} member is a compile-time constant of the type and is never sto
 
 [diagnostics.SEM020.issues.union_member_not_varia]
 message = "union field '{member}' is not {varia} in: {members}"
-help = "a write through a union needs the field declared {varia} in every member, or narrow the receiver (`est M`, `discerne`)"
+help = "declare the field `{varia}` in every union member, or narrow the value with `{est} M` or `{discerne}` first"
 
 [diagnostics.SEM020.issues.immutable_second_assignment]
 message = "second assignment to immutable binding"
@@ -4605,7 +4605,7 @@ help = "declare `{binding}` with `mut` so it can be changed in place, or call a 
 
 [diagnostics.SEM020.issues.copy_into_target_immutable]
 message = "'⇇' needs writable tensor storage on its left"
-help = "write into a mutable local or a mut parameter; a constant, a fixum binding, or a non-mut parameter cannot be written"
+help = "write into a `{varia}` tensor local, a `{varia}` parameter, or a tensor field of a writable value; a `{fixum}` binding or a non-`{varia}` parameter cannot be written"
 
 [diagnostics.SEM020.issues.mut_argument_not_writable]
 message = "argument {position}{?binding| (`|`)} is passed to a `mut` parameter but is not a writable place"
@@ -4617,7 +4617,7 @@ help = "assign to a valid lvalue"
 
 [diagnostics.SEM021.issues.invalid_assignment_target]
 message = "invalid assignment target"
-help = "assign to a valid lvalue"
+help = "use a writable binding, field, or element as the assignment target"
 
 [diagnostics.SEM030]
 message = "break outside breakable context"
@@ -4625,7 +4625,7 @@ help = "use '{rumpe}' inside {dum}, {itera}, {fac}, {meus}, or {tuus}"
 
 [diagnostics.SEM030.issues.break_outside_breakable]
 message = "{keyword} outside {context}"
-help = "use '{rumpe}' inside {dum}, {itera}, {fac}, {meus}, or {tuus}"
+help = "use `{rumpe}` inside a loop or a `{fac}` block"
 
 [diagnostics.SEM031]
 message = "continue outside loop"
@@ -4653,7 +4653,7 @@ help = "add a return statement or make the return type '{vacuum}'"
 
 [diagnostics.SEM033.issues.redde_requires_return_type]
 message = "{keyword} requires an explicit normal return type"
-help = "add a return statement or make the return type '{vacuum}'"
+help = "add an explicit `→ T` return type to the function signature, or remove the `{redde}` statement"
 
 [diagnostics.SEM040]
 message = "non-exhaustive match"
@@ -4685,15 +4685,15 @@ help = "remove the duplicate pattern"
 
 [diagnostics.SEM042.issues.duplicate_variant]
 message = "duplicate pattern"
-help = "remove the duplicate pattern"
+help = "merge this variant's work into its existing `{casu}` arm"
 
 [diagnostics.SEM042.issues.duplicate_literal]
 message = "duplicate case value{?value| |}"
-help = "remove the duplicate pattern"
+help = "merge this case's work into the existing arm for that value"
 
 [diagnostics.SEM042.issues.duplicate_type_pattern]
 message = "duplicate type pattern"
-help = "remove the repeated type pattern"
+help = "remove the repeated type arm or merge its work into the first one"
 
 [diagnostics.SEM043]
 message = "omnia requires an enum scrutinee"
@@ -4701,11 +4701,11 @@ help = "use `omnia` only with a single enum scrutinee"
 
 [diagnostics.SEM043.issues.enum_scrutinee]
 message = "'{keyword}' requires an enum scrutinee"
-help = "use `omnia` only with a single enum scrutinee"
+help = "use `{discerne} {omnia}` only with a single enum scrutinee"
 
 [diagnostics.SEM043.issues.single_enum_scrutinee]
 message = "'{keyword}' requires a single enum scrutinee"
-help = "use `omnia` only with a single enum scrutinee"
+help = "use `{discerne} {omnia}` with exactly one enum scrutinee"
 
 [diagnostics.SEM044]
 message = "omnia forbids catchall arms"
@@ -4725,15 +4725,15 @@ help = "avoid using a value after it has been moved"
 
 [diagnostics.SEM050.issues.use_after_own]
 message = "this name was given away as `own` and is used later"
-help = "pass `copy` to keep using the name"
+help = "make a copy before passing the value as `own` if you need the original afterward"
 
 [diagnostics.SEM050.issues.moved_in_loop]
 message = "this value is moved on every iteration of the loop"
-help = "pass `copy`, or move a value created inside the loop"
+help = "make a fresh copy inside the loop for each iteration, or create the value there before moving it"
 
 [diagnostics.SEM050.issues.moved_name_captured_by_closure]
 message = "this closure captured a name that was given away before the call"
-help = "call the closure before the move, or pass `copy`"
+help = "call the closure before moving the captured value, or make a copy for the closure to capture"
 
 [diagnostics.SEM051]
 message = "borrow of moved value"
@@ -4749,19 +4749,19 @@ help = "avoid overlapping mutable borrows"
 
 [diagnostics.SEM052.issues.mutable_borrow_conflict]
 message = "mutable borrow{?name| of '|'} conflicts with existing borrow"
-help = "avoid overlapping mutable borrows"
+help = "end existing borrows before taking a mutable borrow"
 
 [diagnostics.SEM052.issues.shared_borrow_conflict]
 message = "shared borrow{?name| of '|'} conflicts with mutable borrow"
-help = "avoid overlapping mutable borrows"
+help = "wait for the mutable borrow to end before taking a shared borrow"
 
 [diagnostics.SEM052.issues.use_while_mutably_borrowed]
 message = "use{?name| of '|'} while mutably borrowed"
-help = "avoid overlapping mutable borrows"
+help = "wait for the mutable borrow to end before using the value"
 
 [diagnostics.SEM052.issues.write_while_borrowed]
 message = "write{?name| to '|'} while borrowed"
-help = "avoid overlapping mutable borrows"
+help = "wait for every borrow to end before writing to the value"
 
 [diagnostics.SEM053]
 message = "cannot move out"
@@ -4769,7 +4769,7 @@ help = "use a reference or clone instead of moving"
 
 [diagnostics.SEM053.issues.cannot_move_while_borrowed]
 message = "cannot move out while borrowed"
-help = "use a reference or clone instead of moving"
+help = "finish using the borrow before moving the value"
 
 [diagnostics.SEM054]
 message = "lifetime mismatch"
