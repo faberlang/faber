@@ -1066,24 +1066,34 @@ impl super::FaberCodegen<'_> {
                         writer.write(" ");
                     }
                 }
-                let parenthesized = !lexical_body && params.len() != 1;
+                let rendered_params: Vec<_> = params
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, param)| {
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Def(param.def_id),
+                            slot: HirTypeSlot::ClosureParameter(
+                                self.slot_ordinal(idx, "closure parameter count"),
+                            ),
+                        };
+                        self.type_to_faber_at(&site, param.ty, names, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error))
+                    })
+                    .collect();
+                // WHY: the parser's compact-closure lookahead cannot distinguish an
+                // unparenthesized union annotation from the enclosing argument
+                // expression. A parenthesized signature makes the closure claim
+                // explicit before `∪` is reached.
+                let union_typed = rendered_params.iter().any(|ty| ty.contains('∪'));
+                let parenthesized = !lexical_body && (params.len() != 1 || union_typed);
                 if parenthesized {
                     writer.write("(");
                 }
-                for (idx, param) in params.iter().enumerate() {
+                for (idx, (param, rendered)) in params.iter().zip(&rendered_params).enumerate() {
                     if idx > 0 {
                         writer.write(", ");
                     }
-                    let site = HirTypeSite {
-                        owner: HirOwnerRef::Def(param.def_id),
-                        slot: HirTypeSlot::ClosureParameter(
-                            self.slot_ordinal(idx, "closure parameter count"),
-                        ),
-                    };
-                    let rendered = self
-                        .type_to_faber_at(&site, param.ty, names, surface)
-                        .unwrap_or_else(|error| self.record_type_emission_error(error));
-                    writer.write(&rendered);
+                    writer.write(rendered);
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(param.name));
                     self.write_sponte_marker(param.sponte, surface, writer);
