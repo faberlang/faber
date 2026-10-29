@@ -135,6 +135,7 @@ fn device_section_builder(
             ptx_target: super::device::ptx_target_for(None),
             cuda_libdevice: cuda_libdevice.as_deref(),
             repeating_steps: step_count,
+            device_function_metadata: &lowered.device_function_metadata,
         },
     )?;
     Ok(Some(section))
