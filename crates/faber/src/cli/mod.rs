@@ -447,7 +447,7 @@ pub struct BuildArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Code locale used to select a package-local locale pack.
+    /// Code locale used to read source and select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
     pub locale: Option<String>,
 
