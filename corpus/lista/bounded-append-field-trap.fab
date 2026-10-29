@@ -1,0 +1,20 @@
++++
+term = "list<T, size N>"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "genus_decl", "genus_member", "field_decl", "typed_constructor", "field_list", "field_init", "field_key", "assignment", "expr_stmt", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "Appending through a genus field at bounded capacity traps before the projected list is changed."
+syntax = "box.items.append(value)"
+related = ["lista", "appende", "genus"]
+locale = "en"
++++
+class Box {
+    mut list<int, size 2> items
+}
+
+main {
+    mut Box box ← Box { items = [1, 2] }
+    print "before"
+    box.items.append(3)
+    print "after"
+}

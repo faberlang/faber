@@ -1,0 +1,18 @@
++++
+term = "list<T, size N>"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "type_argument", "array_literal", "assignment", "expr_stmt", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "Appending through a list index at bounded capacity traps before the projected list is changed."
+syntax = "rows[i].append(value)"
+related = ["lista", "appende", "[]"]
+locale = "en"
++++
+# A projected append to a full bounded list must trap, just like a direct
+# append. The message is the bounded collection capacity trap.
+main {
+    mut list<list<int, size 2>> rows ← [[1, 2]]
+    print "before"
+    rows[0].append(3)
+    print "after"
+}
