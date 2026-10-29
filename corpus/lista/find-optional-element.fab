@@ -1,7 +1,7 @@
 +++
 term = "reperta over optional elements"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "union_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "comparison", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "concrete_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "comparison", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "list"
 summary = "List search over optional elements: find returns one optional, so a found none and no match both read none."
 syntax = "<lista>.find(<predicate>)"
