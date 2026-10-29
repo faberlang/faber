@@ -1222,6 +1222,49 @@ main {}
 }
 
 #[test]
+fn wide_intermediate_in_its_own_64_bit_type_is_native_on_metal_only() {
+    // The masked sum is 33 bits wide and the expression is an `i64`: the
+    // 64-bit lane is the expression's own type, so Metal computes it in a
+    // `long` and admits it; WGSL and AMD have no 64-bit lane and refuse it.
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn sum(i64 left, i64 right) → i64 {
+    return (left ∧ 4294967295) + (right ∧ 4294967295)
+}
+
+@ kernel
+@ public
+fn narrow(u32 left, u32 right) → u32 {
+    return ((left ∧ 16777215) * (right ∧ 16777215)) / 1048576
+}
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let metal = target_row(&fixture, "sum", Target::MirMetal);
+    assert!(metal.admitted, "{:?}", metal.failures);
+    for target in [Target::MirWgsl, Target::MirAmd] {
+        let row = target_row(&fixture, "sum", target);
+        assert!(!row.admitted, "{target:?} admitted a 64-bit lane");
+    }
+    // A narrow expression holding a 48-bit intermediate needs a widening no
+    // emitter performs: every row, Metal included, refuses it by name.
+    for target in Target::DEVICE_TARGETS {
+        let row = target_row(&fixture, "narrow", target);
+        assert!(
+            row.failures.iter().any(|failure| matches!(
+                failure,
+                KernelRequirementFailure::UnsupportedIntegerWidth { .. }
+            )),
+            "{target:?}: {:?}",
+            row.failures
+        );
+    }
+}
+
+#[test]
 fn signed_gather_coordinates_fit_the_address_envelope() {
     let fixture = analyze_en(
         r"

@@ -572,7 +572,7 @@ impl<'a> DeviceSafeClassifier<'a> {
                 )
                 | MirLayoutKind::Void
                 | MirLayoutKind::Never => {}
-                MirLayoutKind::Scalar(MirScalarLayout::I64)
+                MirLayoutKind::Scalar(MirScalarLayout::I64 | MirScalarLayout::U64)
                     if self.in_lane_form_function || self.in_single_lane_function => {}
                 // gpu-reset Q02: a narrow field read in place. A lane-form
                 // kernel that reads a record-element view (or a genus
@@ -669,6 +669,8 @@ impl<'a> DeviceSafeClassifier<'a> {
                     | MirScalarLayout::F32
                     | MirScalarLayout::I32
                     | MirScalarLayout::U32
+                    | MirScalarLayout::I64
+                    | MirScalarLayout::U64
                     | MirScalarLayout::U8
             ) {
                 self.record_layout(format!("kernel device view element {}", element.spelling()));

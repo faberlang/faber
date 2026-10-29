@@ -919,7 +919,7 @@ fn analyze_kernel(
 /// One requirement row per device target from the facts a body produced.
 fn target_rows(
     failures: &[KernelRequirementFailure],
-    wide_intermediates: &[(Span, KernelValueRange)],
+    wide_intermediates: &[(Span, KernelValueRange, bool)],
     widths: &[KernelWidthRequirement],
     conditions: &[KernelExtentCondition],
     trapping_stores: &[KernelTrappingStore],
@@ -934,11 +934,14 @@ fn target_rows(
                 target_failures.push(KernelRequirementFailure::RecursiveCall);
             }
             // An exact intermediate beyond the portable 32-bit envelope needs
-            // a 64-bit lane. No device emitter computes one yet (the emitters
-            // are the follow-on units of the 2026-10-28 ruling), and a 32-bit
-            // lane would silently wrap it, so every target refuses it by name
-            // in its row. A target drops this loop when its emitter lands.
-            for (span, range) in wide_intermediates {
+            // a 64-bit lane, and a 32-bit lane would silently wrap it. A
+            // target whose emitter carries 64-bit integers computes one that
+            // is its expression's own type natively (`long` / `ulong`); every
+            // other intermediate, and every other target, refuses by name.
+            for (span, range, native) in wide_intermediates {
+                if *native && target.supports_wide_kernel_values() {
+                    continue;
+                }
                 target_failures.push(KernelRequirementFailure::UnsupportedIntegerWidth {
                     span: *span,
                     width: wide_lane_width(range),
@@ -1541,9 +1544,13 @@ struct BodyFacts<'a> {
     has_signed_coordinate_input: bool,
     failures: Vec<KernelRequirementFailure>,
     /// Exact intermediates inside the 64-bit range but beyond the portable
-    /// 32-bit envelope. They need a 64-bit lane, which no device emitter
-    /// computes yet, so each target row refuses them by name.
-    wide_intermediates: Vec<(Span, KernelValueRange)>,
+    /// 32-bit envelope. They need a 64-bit lane. The flag is whether the
+    /// expression's own type is that lane (an `i64` or `u64` result holding a
+    /// value of its own range): such an intermediate is computed natively by
+    /// a target that carries 64-bit integers. Any other (a narrower type, or a
+    /// wrapping word observed beyond its carrier) needs a widening that no
+    /// emitter performs yet, so each target row refuses it by name.
+    wide_intermediates: Vec<(Span, KernelValueRange, bool)>,
     conditions: Vec<KernelExtentCondition>,
     trapping_stores: Vec<KernelTrappingStore>,
     widths: Vec<KernelWidthRequirement>,
@@ -1590,7 +1597,7 @@ impl BodyFacts<'_> {
                     AbstractRange::exact(1),
                 );
                 if let Some(ty) = inc_dec.target.ty {
-                    self.check_value_intermediate(stmt.span, value.clone());
+                    self.check_value_intermediate(stmt.span, value.clone(), Some(ty));
                     let stored = self.check_store(stmt.span, ty, value);
                     if let HirExpressionKind::Path(def_id) = inc_dec.target.kind {
                         self.ranges.insert(def_id, stored);
@@ -1672,13 +1679,13 @@ impl BodyFacts<'_> {
         match &expr.kind {
             HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => {
                 let range = AbstractRange::exact(i128::from(*value));
-                self.check_value_intermediate(expr.span, range.clone());
+                self.check_value_intermediate(expr.span, range.clone(), expr.ty);
                 range
             }
             HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
                 let range = crate::passes::const_int_value(expr)
                     .map_or_else(AbstractRange::unknown, AbstractRange::exact);
-                self.check_value_intermediate(expr.span, range.clone());
+                self.check_value_intermediate(expr.span, range.clone(), expr.ty);
                 range
             }
             HirExpressionKind::Path(def_id) => self.path_range(*def_id, expr.ty),
@@ -1727,7 +1734,7 @@ impl BodyFacts<'_> {
                     unary_range(*op, input)
                 };
                 if is_integer_value_type(expr.ty, self.types) && modular_ty.is_none() {
-                    self.check_value_intermediate(expr.span, output.clone());
+                    self.check_value_intermediate(expr.span, output.clone(), expr.ty);
                 }
                 if *op == HirUnOp::Neg && is_d64_type(expr.ty, self.types) {
                     self.check_d64_intermediate(expr);
@@ -1742,7 +1749,7 @@ impl BodyFacts<'_> {
                         && let Some(carrier) = modular_carrier_bounds(expr.ty, self.types)
                     {
                         let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
-                        self.check_value_intermediate_in(expr.span, exact, carrier);
+                        self.check_value_intermediate_in(expr.span, exact, carrier, None);
                     }
                 }
                 let left = self.evaluate(lhs);
@@ -1841,7 +1848,7 @@ impl BodyFacts<'_> {
                     && is_integer_value_type(expr.ty, self.types)
                     && modular_ty.is_none()
                 {
-                    self.check_value_intermediate(expr.span, output.clone());
+                    self.check_value_intermediate(expr.span, output.clone(), expr.ty);
                 }
                 if matches!(
                     op,
@@ -2065,7 +2072,7 @@ impl BodyFacts<'_> {
                     let range = ranges
                         .get(index)
                         .map_or_else(AbstractRange::unknown, |range| self.range_binding(range));
-                    self.check_value_intermediate(body.span, range.clone());
+                    self.check_value_intermediate(body.span, range.clone(), None);
                     self.ranges.insert(*def_id, range);
                     self.range_only_bindings.insert(*def_id);
                 }
@@ -2156,7 +2163,7 @@ impl BodyFacts<'_> {
                     .unwrap_or_else(AbstractRange::unknown);
                     let modular_ty = expr.ty.filter(|ty| is_modular_type(Some(*ty), self.types));
                     if modular_ty.is_none() || method_name == "divisa" {
-                        self.check_value_intermediate(expr.span, result.clone());
+                        self.check_value_intermediate(expr.span, result.clone(), expr.ty);
                     }
                     return if let Some(ty) = modular_ty {
                         AbstractRange::from_type(ty, self.types)
@@ -2483,7 +2490,7 @@ impl BodyFacts<'_> {
         // binder has the interval's bounds, not a tensor element's range.
         if matches!(iter.kind, HirExpressionKind::Intervallum { .. }) {
             let range = self.range_binding(iter);
-            self.check_value_intermediate(iter.span, range.clone());
+            self.check_value_intermediate(iter.span, range.clone(), None);
             self.ranges.insert(binding, range);
             self.range_only_bindings.insert(binding);
             self.visit_block_stateful(body);
@@ -2576,7 +2583,7 @@ impl BodyFacts<'_> {
                     && let Some(carrier) = modular_carrier_bounds(expr.ty, self.types)
                 {
                     let exact = unary_range(*op, self.peek_range(operand));
-                    self.check_value_intermediate_in(expr.span, exact, carrier);
+                    self.check_value_intermediate_in(expr.span, exact, carrier, None);
                 }
             }
             HirExpressionKind::Binary(op, lhs, rhs) => {
@@ -2588,7 +2595,7 @@ impl BodyFacts<'_> {
                 ) && let Some(carrier) = modular_carrier_bounds(expr.ty, self.types)
                 {
                     let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
-                    self.check_value_intermediate_in(expr.span, exact, carrier);
+                    self.check_value_intermediate_in(expr.span, exact, carrier, None);
                 }
             }
             _ => {}
@@ -2763,8 +2770,14 @@ impl BodyFacts<'_> {
     /// name). Ranges that name launch extents or arrive with signed
     /// coordinates describe addressing, which stays on the 32-bit device
     /// envelope.
-    fn check_value_intermediate(&mut self, span: Span, range: AbstractRange) {
-        self.check_value_intermediate_in(span, range, (DEVICE_INTEGER_MIN, DEVICE_INTEGER_MAX));
+    fn check_value_intermediate(&mut self, span: Span, range: AbstractRange, ty: Option<TypeId>) {
+        let own = ty.and_then(|ty| type_range(ty, self.types));
+        self.check_value_intermediate_in(
+            span,
+            range,
+            (DEVICE_INTEGER_MIN, DEVICE_INTEGER_MAX),
+            own.as_ref(),
+        );
     }
 
     /// [`Self::check_value_intermediate`] with the narrow-lane bounds outside
@@ -2774,6 +2787,7 @@ impl BodyFacts<'_> {
         span: Span,
         range: AbstractRange,
         (narrow_min, narrow_max): (i128, i128),
+        own: Option<&KernelValueRange>,
     ) {
         let Some(bounds) = range.0.as_ref() else {
             self.check_intermediate(span, range);
@@ -2810,7 +2824,13 @@ impl BodyFacts<'_> {
         } else if !fits(narrow_min, narrow_max)
             && let Some(range) = range.0
         {
-            self.wide_intermediates.push((span, range));
+            let native = own.is_some_and(|own| {
+                matches!(
+                    (constant(&own.minimum), constant(&own.maximum)),
+                    (Some(low), Some(high)) if fits(low, high)
+                )
+            });
+            self.wide_intermediates.push((span, range, native));
         }
     }
 

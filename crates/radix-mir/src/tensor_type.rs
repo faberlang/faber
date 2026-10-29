@@ -104,6 +104,8 @@ pub(crate) fn is_kernel_element_layout(layout: MirScalarLayout) -> bool {
             | MirScalarLayout::F32
             | MirScalarLayout::I32
             | MirScalarLayout::U32
+            | MirScalarLayout::I64
+            | MirScalarLayout::U64
             | MirScalarLayout::U8
     )
 }
