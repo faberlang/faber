@@ -806,6 +806,10 @@ mod private_helper_link_tests;
 mod stats_route_tests;
 
 #[cfg(test)]
+#[path = "routes_test.rs"]
+mod routes_tests;
+
+#[cfg(test)]
 #[path = "device_matrix_test.rs"]
 mod device_matrix_tests;
 

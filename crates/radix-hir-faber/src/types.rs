@@ -445,6 +445,14 @@ impl super::FaberCodegen<'_> {
             HirTypeFormHead::Named { def_id, path } => {
                 self.named_form_to_faber(form, *def_id, path, names, surface)
             }
+            HirTypeFormHead::ImportedAlias { path } => {
+                Self::expect_no_form_args(form)?;
+                Ok(path
+                    .iter()
+                    .map(|segment| self.interner.resolve(*segment))
+                    .collect::<Vec<_>>()
+                    .join("."))
+            }
             HirTypeFormHead::Semantic(level) => {
                 self.semantic_form_to_faber(form, *level, names, surface)
             }

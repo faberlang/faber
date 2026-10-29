@@ -670,6 +670,56 @@ impl FunctionBuilder<'_> {
         }
     }
 
+    /// The place of a record tensor element read with a coordinate bracket
+    /// (`t[[i]]` over `tensor<Genus, …>`), as the decoded copy a `TensorGet`
+    /// returns: the host tensor bracket is the `TensorGet` op, never an
+    /// `Index` projection (validate refuses that for tensors). While an
+    /// assignment target is lowered, the element is recorded so the caller
+    /// stores it back after the field store (see `element_writebacks`).
+    /// `None` is "not this case"; `Some(None)` is a lowering failure.
+    fn lower_record_tensor_element_place(
+        &mut self,
+        object: &HirExpression,
+        index: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<Option<MirPlace>> {
+        if self.is_device_lowering()
+            || !object
+                .ty
+                .is_some_and(|ty| radix_semantic::tensor_bracket::is_coordinate_bracket_receiver(self.types, ty))
+            || matches!(index.kind, HirExpressionKind::Intervallum { .. })
+            || tensor_bracket_index_has_range(index)
+        {
+            return None;
+        }
+        let ty = expr.ty?;
+        if !matches!(self.normalized_type(self.types.peel_access_marker(ty).1), Type::Struct(..)) {
+            return None;
+        }
+        // The receiver and the coordinates are evaluated once, outside any
+        // enclosing target's write-back collection.
+        let collecting = self.element_writebacks.take();
+        let operands = self
+            .lower_expr_value(object)
+            .and_then(|receiver| Some((receiver, self.lower_tensor_index_list_operand(index)?)));
+        self.element_writebacks = collecting;
+        let Some((receiver, index_list)) = operands else {
+            return Some(None);
+        };
+        let ty = MirType::semantic(ty);
+        let value = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorGet),
+            vec![receiver.clone(), index_list.clone()],
+            ty,
+            expr.span,
+        );
+        let element = self.materialize_operand_place(value, ty, expr.span);
+        if let Some(writebacks) = self.element_writebacks.as_mut() {
+            writebacks.push(ElementWriteback { receiver, index: index_list, element: element.clone() });
+        }
+        Some(Some(element))
+    }
+
     pub(super) fn lower_projectable_place(&mut self, expr: &HirExpression) -> Option<MirPlace> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
@@ -712,6 +762,9 @@ impl FunctionBuilder<'_> {
                 Some(place)
             }
             HirExpressionKind::Index(object, index) => {
+                if let Some(result) = self.lower_record_tensor_element_place(object, index, expr) {
+                    return result;
+                }
                 let mut place = self.lower_projectable_place(object)?;
                 let projection = self.lower_index_projection(&place, object.ty, index, expr.id)?;
                 place.projections.push(projection);

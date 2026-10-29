@@ -131,8 +131,7 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
     let baseline = run_faber_test(dir.path(), &[]);
     assert!(
         baseline.status.success(),
-        "unstatsed test failed: {:?}",
-        baseline
+        "unstatsed test failed: {baseline:?}"
     );
 
     let file_dir = tempfile::tempdir().expect("create stats output directory");
@@ -141,8 +140,7 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
     let file_only = run_faber_test(dir.path(), &["--stats-file", file_arg]);
     assert!(
         file_only.status.success(),
-        "file-only stats test failed: {:?}",
-        file_only
+        "file-only stats test failed: {file_only:?}"
     );
     assert_eq!(
         normalize_report(&file_only.stdout),
@@ -161,7 +159,7 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
     let dual_file = file_dir.path().join("dual.json");
     let dual_arg = dual_file.to_str().expect("UTF-8 dual stats path");
     let dual = run_faber_test(dir.path(), &["--stats", "--stats-file", dual_arg]);
-    assert!(dual.status.success(), "dual stats test failed: {:?}", dual);
+    assert!(dual.status.success(), "dual stats test failed: {dual:?}");
     let (prefix, stdout_artifact) = framed_artifact(&dual.stdout);
     assert_eq!(
         normalize_report(&prefix),
@@ -192,8 +190,14 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
         .find(|case| case.name == "parked")
         .expect("parked case");
     assert_eq!(parked.status, "skipped");
-    assert!(parked.functions.is_empty());
-    assert!(parked.intrinsics.is_empty());
+    assert_eq!(
+        parked.functions,
+        [] as [super::run_stats::FunctionMetadata; 0]
+    );
+    assert_eq!(
+        parked.intrinsics,
+        [] as [super::run_stats::IntrinsicMetadata; 0]
+    );
 }
 
 #[test]
@@ -225,8 +229,7 @@ fn list_with_stats_is_refused_without_artifact() {
     );
     assert!(
         !output.status.success(),
-        "list + stats must refuse: {:?}",
-        output
+        "list + stats must refuse: {output:?}"
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
@@ -251,7 +254,7 @@ fn list_with_stats_is_refused_without_artifact() {
 fn unstatsed_test_emits_no_marker() {
     let (dir, _) = write_package("plain");
     let output = run_faber_test(dir.path(), &[]);
-    assert!(output.status.success(), "plain test failed: {:?}", output);
+    assert!(output.status.success(), "plain test failed: {output:?}");
     assert!(
         !output
             .stdout

@@ -617,7 +617,21 @@ impl<'a> LaneIndexProof<'a> {
             rest,
             [MirProjection::Index(_) | MirProjection::ProvenIndex(_)]
         );
-        if !vector_lane && !vector_index {
+        // A record-element tensor read in place: one field of the element,
+        // then optionally an element of a fixed-array field or a lane of a
+        // vector field. The tensor coordinate is the only index checked here;
+        // a run-time fixed-array index is its own site (below).
+        let record_field = matches!(
+            rest,
+            [MirProjection::Field(_)]
+                | [
+                    MirProjection::Field(_),
+                    MirProjection::Index(_)
+                        | MirProjection::ProvenIndex(_)
+                        | MirProjection::VectorLane(_)
+                ]
+        );
+        if !vector_lane && !vector_index && !record_field {
             return None;
         }
         let MirPlaceBase::Local(local) = &place.base else {
@@ -720,6 +734,18 @@ impl MirVisitor for VectorIndexPlaces<'_, '_> {
             {
                 self.found.push(index.clone());
             }
+            // An element of a fixed-array record field: the run-time index is
+            // compared with the field's literal capacity, the same fatal
+            // identity as a register-vector index. A literal inside the
+            // capacity is proven by value; a checker-proven coordinate
+            // (`ProvenIndex`) needs no site.
+            if let (Some(base_ty), MirProjection::Index(index)) = (ty, projection)
+                && let Some(capacity) = fixed_array_capacity(base_ty, self.validation)
+                && !literal_in_capacity(index, capacity)
+                && !self.found.contains(index)
+            {
+                self.found.push(index.clone());
+            }
             ty = ty.and_then(|base_ty| projected_index_type(base_ty, projection, self.validation));
         }
         crate::visit::walk_place(self, place);
@@ -734,6 +760,9 @@ fn projected_index_type(
     projection: &MirProjection,
     validation: &MirValidationContext<'_>,
 ) -> Option<MirType> {
+    if let MirProjection::Field(name) = projection {
+        return record_field_type(ty, *name, validation);
+    }
     if !matches!(
         projection,
         MirProjection::Index(_) | MirProjection::ProvenIndex(_) | MirProjection::VectorLane(_)
@@ -744,11 +773,57 @@ fn projected_index_type(
     loop {
         match validation.types.get(ty.semantic_id()) {
             Type::Alias(_, target) => ty = MirType::semantic(*target),
-            Type::Tensor(element, _) | Type::Vector(element, _) => {
+            Type::Tensor(element, _)
+            | Type::Vector(element, _)
+            | Type::BoundedArray { element, .. } => {
                 return Some(MirType::semantic(*element));
             }
             _ => return None,
         }
+    }
+}
+
+/// The declared type of field `name` of the genus `ty`.
+fn record_field_type(
+    ty: MirType,
+    name: radix_lexer::Symbol,
+    validation: &MirValidationContext<'_>,
+) -> Option<MirType> {
+    let mut ty = ty;
+    loop {
+        match validation.types.get(ty.semantic_id()) {
+            Type::Alias(_, target) => ty = MirType::semantic(*target),
+            Type::Struct(def_id) => {
+                return validation.struct_fields.get(def_id)?.get(&name).copied();
+            }
+            _ => return None,
+        }
+    }
+}
+
+/// The literal capacity of a fixed-array (`list<T, size N>`) type.
+fn fixed_array_capacity(ty: MirType, validation: &MirValidationContext<'_>) -> Option<u64> {
+    let mut ty = ty;
+    loop {
+        match validation.types.get(ty.semantic_id()) {
+            Type::Alias(_, target) => ty = MirType::semantic(*target),
+            Type::BoundedArray { capacity, .. } => {
+                return match validation.types.get_index(*capacity) {
+                    IndexExpr::Literal(count) => Some(*count),
+                    _ => None,
+                };
+            }
+            _ => return None,
+        }
+    }
+}
+
+/// Whether `index` is an integer literal inside `[0, capacity)`.
+fn literal_in_capacity(index: &MirOperand, capacity: u64) -> bool {
+    match index {
+        MirOperand::Constant(MirConstant::Int(n)) => u64::try_from(*n).is_ok_and(|n| n < capacity),
+        MirOperand::Constant(MirConstant::UInt(n)) => *n < capacity,
+        _ => false,
     }
 }
 
