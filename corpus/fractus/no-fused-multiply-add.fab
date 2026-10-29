@@ -1,0 +1,25 @@
++++
+term = "f64"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "additive_expr", "multiplicative_expr"]
+category = "arithmetic"
+summary = "An f64 product is rounded before a surrounding subtraction, rather than fused into one operation."
+syntax = "f64"
+related = ["f32", "f64"]
+locale = "en"
++++
+# =============================================================================
+# f64 — products round before a surrounding addition or subtraction
+# =============================================================================
+#
+# These factors multiply exactly to 1 - 2^-54. The nearest f64 product is 1,
+# so separate multiplication and subtraction return zero. A fused multiply-
+# subtract retains the low product bit and instead returns 2^-54.
+
+main {
+    let f64 a ← 1.0
+    let f64 b ← 1.000000007450580596923828125
+    let f64 c ← 0.999999992549419403076171875
+    let f64 result ← a - b * c
+    print result ¶ ".17e"
+}
