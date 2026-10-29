@@ -1,10 +1,9 @@
 +++
 term = "wrapping<u64> to int"
-explains = ["wrapping<u64>"]
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "cast_expr", "conversio_expr", "bitwise_and_expr", "shift_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
 category = "arithmetic"
-canonical = false
+canonical = true
 summary = "A 64-bit word reduced by a remainder, mask, shift or quotient converts to int exactly."
 syntax = "(<wrapping<u64>> % m) ↦ int"
 related = ["wrapping", "int", "↦"]

@@ -1,13 +1,11 @@
 +++
-term = "elif"
-explains = ["elif", "else"]
+term = "si"
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "si_stmt", "arm", "secus_clause", "else_arm", "itera_stmt", "elige_stmt", "casu_elige_clause", "ceterum_clause", "assignment", "place", "comparison", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "branch"
 canonical = false
 summary = "An elif or else arm that binds a local inside a loop body leaves the rest of the iteration running."
 syntax = "if <cond> { let … } elif <cond> { let … } else { let … }"
-aliases = ["if", "else if"]
 related = ["si", "sin", "secus", "itera"]
 locale = "en"
 +++
