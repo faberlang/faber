@@ -91,7 +91,7 @@ impl BoundKey {
         }
     }
 
-    fn live_length_source(&self) -> Option<(DefId, u32)> {
+    pub(super) fn live_length_source(&self) -> Option<(DefId, u32)> {
         match self {
             Self::LiveLength { source, version } => Some((*source, *version)),
             _ => None,
