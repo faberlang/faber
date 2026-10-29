@@ -513,7 +513,7 @@ help = "Write `locale` as a quoted string, for example `locale = \"en\"`."
 
 [diagnostics.LOCALE003.issues.unresolved]
 message = "reader locale did not resolve for this source"
-help = "Select a configured reader locale with frontmatter or `--locale`."
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
 
 [diagnostics.LOCALE004]
 message = "identifier '{identifier}' mixes scripts: {scripts}"
@@ -597,7 +597,7 @@ help = "use a supported escape sequence or escape the backslash"
 
 [diagnostics.LEX003.issues.unknown_escape]
 message = "unknown escape `\\{escape}`; a literal escapes only its own delimiter, backslash, n, t, r and u{{...}"
-help = "Use a supported escape (`\\\\`, `\\n`, `\\t`, `\\r`, `\\u{...}`, or the literal's delimiter), or remove the backslash."
+help = "remove the backslash, or write `\\\\` for a backslash"
 
 [diagnostics.LEX004]
 message = "unexpected character"
@@ -705,7 +705,7 @@ help = "add let or mut before the binding name"
 
 [diagnostics.PARSE001.issues.itera_de_requires_fixum]
 message = "itera de bindings are always fixed; use {expected}"
-help = "use `let` for a `{de}` binder; this mode binds map keys, not mutable elements"
+help = "de binds an index or key, not a mutable element; use the let form"
 
 [diagnostics.PARSE001.issues.duplicate_rest_pattern]
 message = "rest pattern already specified"
@@ -757,7 +757,7 @@ help = "use `not is` for identity negation"
 
 [diagnostics.PARSE001.issues.closure_body_start]
 message = "expected ':' or block body after closure parameters"
-help = "use `: expression` for an expression body, or `{ ... }` for a block body"
+help = "add : for an expression body or a block body"
 
 [diagnostics.PARSE001.issues.ad_ascii_route]
 message = "expected ascii literal route after '{ad}'"
@@ -997,7 +997,7 @@ help = "choose one of the active locale's reduction operators after `{reducta} {
 
 [diagnostics.PARSE010.issues.size_requires_const]
 message = "a `{size_param}` declaration is always a constant; a bare `{size_param}` cannot start a declaration"
-help = "write `{fixum} {size_param} name ← value` for a run-time size or `{fixum} {size_param} name = literal` for a static size"
+help = "write `{suggestion}`"
 
 [diagnostics.PARSE010.issues.size_is_write_once]
 message = "a `{size_param}` declaration is write-once; {varia} cannot declare one"
@@ -1101,7 +1101,7 @@ help = "use `@ {expected}` for this file's reader locale"
 
 [diagnostics.PARSE018.issues.annotatio_unknown_target]
 message = "unknown `@ annotation` target"
-help = "use `target = {functio}`; a function is the supported target"
+help = "use `target = {functio}` in v1"
 
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "a declaration carries more than one `@ nucleum` annotation"
@@ -1197,7 +1197,7 @@ help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.constructor_store_position_only]
 message = "type-expression constructors are allowed only at store positions"
-help = "bind the constructor first, then pass its name: `{sit} tf32[2, 3] a ← tf32[2, 3] {}`"
+help = "bind the constructor first: let tf32[2, 3] a ← the type tf32[2, 3] followed by empty braces"
 
 [diagnostics.PARSE030.issues.constructor_requires_empty_braces]
 message = "the typed zero of a type is written `Type` followed by empty braces; the bare type form is retired"
@@ -1277,7 +1277,7 @@ help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a va
 
 [diagnostics.PARSE030.issues.praefixum_expression_form_retired]
 message = "`{praefixum}(expression)` is retired"
-help = "write a constant initializer as `{fixum} T NAME = {praefixum} { … {redde} value }`"
+help = "write a constant: `{fixum} T NAME = {praefixum}` followed by a block that ends in `{redde}` value"
 
 [diagnostics.PARSE030.issues.default_with_propagation]
 message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
@@ -1297,7 +1297,7 @@ help = "use ad 'route' (opener) ↦ T without a block"
 
 [diagnostics.PARSE030.issues.closure_block_body]
 message = "closure block body must use '{fac}'"
-help = "use a closure block body after ∴ as `{fac} { ... }`"
+help = "write the compact closure body after ∴ as {fac_body}"
 
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure {fac} body cannot use '{dum}'"
@@ -1465,7 +1465,7 @@ help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.name_not_variant]
 message = "name does not refer to a variant"
-help = "use a variant declared by this {discretio}"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_identifier]
 message = "unknown identifier"
@@ -1481,11 +1481,11 @@ help = "use a label declared in the {ratio} type; its fields are fixed by the ty
 
 [diagnostics.SEM001.issues.unknown_variant]
 message = "unknown variant"
-help = "use a variant declared by the {discretio}{?members| (|)}{?suggestion|; did you mean |?}"
+help = "declare the variable before use{?members| (|)}{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.unknown_variant_fields]
 message = "unknown variant fields"
-help = "check the selected variant's payload declaration and use its declared fields"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
 
 [diagnostics.SEM001.issues.variant_ambiguous]
 message = "variant name is ambiguous across in-scope unions"
@@ -1525,7 +1525,7 @@ help = "use one bare marker (`ms`, `us`, or `ns`), without brackets or parameter
 
 [diagnostics.SEM002.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
-help = "export the type with `@ {publica}` in its {regio}, or import the type directly"
+help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
 message = "qualified type prefix must name a namespace"
@@ -1545,7 +1545,7 @@ help = "use a type exported by the named {regio}, or import that type directly"
 
 [diagnostics.SEM002.issues.unknown_struct]
 message = "unknown struct"
-help = "construct a declared {genus} type, or import its declaration before constructing it"
+help = "declare the type or import it"
 
 [diagnostics.SEM002.issues.unknown_type]
 message = "unknown type"
@@ -1701,7 +1701,7 @@ help = "check the import path"
 
 [diagnostics.SEM006.issues.kernel_glob_reexport]
 message = "`{path}` glob imports cannot be re-exported"
-help = "Remove `@ {publica}`; a `faber:*` import cannot be re-exported"
+help = "remove the publica marker"
 
 [diagnostics.SEM006.issues.kernel_glob_named_alias]
 message = "`{path}` must be imported as a named glob alias"
@@ -1737,7 +1737,7 @@ help = "use at most one hole in an import path"
 
 [diagnostics.SEM006.issues.import_parent_traversal]
 message = "import path traverses to a parent directory"
-help = "Use a relative path that stays inside the package root"
+help = "import from inside the package root"
 
 [diagnostics.SEM006.issues.import_positional_hole]
 message = "positional hole in import path"
@@ -1749,7 +1749,7 @@ help = "Use a relative path (`./file`), provider path (`provider:module`), or de
 
 [diagnostics.SEM006.issues.import_unknown_template]
 message = "unknown import template"
-help = "Use a declared template after `§`, such as `§src/path`"
+help = "use a declared import template"
 
 [diagnostics.SEM006.issues.selective_import_missing_member]
 message = "selective import names a member the module does not export"
@@ -1777,7 +1777,7 @@ help = "Initialize the pattern with a value, e.g. `{sit} [a, b] ← values`"
 
 [diagnostics.SEM008.issues.array_destructuring_not_expanded]
 message = "array destructuring should be expanded before statement lowering"
-help = "Use array destructuring in a binding initializer, e.g. `{sit} [a, b] ← values`"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
 message = "atomic requires compiler-owned syntax; use atomic<T>"
@@ -1789,7 +1789,7 @@ help = "Put the bound on each `{functio}` type parameter that needs it; a `{genu
 
 [diagnostics.SEM008.issues.iuncta_union_type_arg_unsupported]
 message = "iuncta element type argument ∪ is unsupported"
-help = "Use `_` for an inferred element or spell out the union, such as `iuncta<A ∪ B>`"
+help = "use _ for a monomorphic hole or a concrete union type"
 
 [diagnostics.SEM008.issues.radix_typus_bounded_param]
 message = "@ radix typus cannot constrain a type parameter that already has an {implet} bound"
@@ -1853,7 +1853,7 @@ help = "start the range at 0, or use a signed width such as i32"
 
 [diagnostics.SEM008.issues.ranged_policy_width_unsupported]
 message = "a ranged store policy needs a bounded integer width"
-help = "use an integer width such as `u8` or `i32`; float and decimal widths cannot be ranged, and `inf` only accepts `-∞…∞`"
+help = "use an integer width such as u8 or i32; float, decimal and inf widths take no range yet"
 
 [diagnostics.SEM008.issues.nucleum_ranged_policy_not_built]
 message = "a kernel cannot use a ranged store policy yet ({site}); a kernel applies no range"
@@ -1893,15 +1893,15 @@ help = "write `{vector}<f32, {magnitudo} 4>` for four lanes; the shorthand `vf32
 
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' conflicts with written posture '{written_posture}'"
-help = "use one matching posture word (`fiet`, `fiunt` or `fient`) and remove any conflicting `@ {futura}` or `@ {cursor}` annotation"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.comment_without_owner]
 message = "comment has no lowered statement or item to attach to"
-help = "move the comment before a statement or item that remains in the source"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.conversio_signature]
 message = "a `@ conversion` function must take exactly one parameter and declare exactly one return type"
-help = "write `@ {conversio} {functio} name(Source) → Destination` with exactly one parameter and one return type"
+help = "write `functio name(Source) → Destination` for the conversion pair"
 
 [diagnostics.SEM008.issues.copia_arity]
 message = "set requires one type parameter"
@@ -1913,7 +1913,7 @@ help = "use `{promissum}<T>` with one result type"
 
 [diagnostics.SEM008.issues.cursor_arity]
 message = "cursor requires one type parameter"
-help = "use `{cursor}<T>` with one item type"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
@@ -1925,7 +1925,7 @@ help = "use `{stack}<T>` or `{stack}<T, {magnitudo} N>`"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "match {casu} requires a pattern"
-help = "add a `{casu}` arm with a pattern to the `{discerne}` statement"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.discerne_pattern_count]
 message = "match pattern count must match subject count"
@@ -1937,7 +1937,7 @@ help = "give `{discerne}` at least one value to match"
 
 [diagnostics.SEM008.issues.ego_outside_method]
 message = "ego used outside method context"
-help = "move this into a `{genus}` method, or replace `ego` with an instance parameter in the free function"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.elige_case_value_shape]
 message = "{elige} case value must be a literal or enum variant"
