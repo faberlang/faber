@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 473,
-    "analyzable": 556
+    "capable": 478,
+    "analyzable": 561
   },
   "terms": [
     {
@@ -486,8 +486,8 @@
     {
       "term": "list<T, size lo‥hi>",
       "rule": "operator-group",
-      "capable": 0,
-      "analyzable": 3
+      "capable": 1,
+      "analyzable": 4
     },
     {
       "term": "list<b8>",
@@ -552,8 +552,8 @@
     {
       "term": "mori",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 6,
+      "analyzable": 6
     },
     {
       "term": "named-holes",
@@ -1080,8 +1080,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 31,
-      "analyzable": 44
+      "capable": 32,
+      "analyzable": 45
     },
     {
       "term": "⇇",
