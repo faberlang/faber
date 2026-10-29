@@ -1005,7 +1005,7 @@ help = "write `{fixum} {size_param} <name> ← value`; the binding never reassig
 
 [diagnostics.PARSE010.issues.size_static_requires_literal]
 message = "the static `=` form of a `{size_param}` declaration requires a natural-number literal"
-help = "write a literal after `=`, or store a runtime value with `←`"
+help = "write a natural-number literal after `=`, or store a run-time value with `←`"
 
 [diagnostics.PARSE010.issues.binding_marker_moved_to_value]
 message = "the `{marker}` marker no longer goes on the binding; it goes on the value"
@@ -1041,7 +1041,7 @@ help = "move type parameters before {size_param} parameters"
 
 [diagnostics.PARSE016.issues.removed_vel_generic_default]
 message = "'{keyword}' is the runtime optional-value spelling and is not valid in generic lists"
-help = "declare a generic default with {replacement}"
+help = "use `=` followed by a type or natural-number literal for the generic default"
 
 [diagnostics.PARSE016.issues.generic_default_not_trailing]
 message = "generic parameter {parameter} follows a defaulted parameter and must also declare a default"
@@ -1049,11 +1049,11 @@ help = "give {parameter} a default or move it before the first defaulted paramet
 
 [diagnostics.PARSE016.issues.generic_default_missing_value]
 message = "generic parameter {parameter} is missing a default value after '='"
-help = "expected {expected}"
+help = "write a type after `=` for a type parameter, or a natural-number literal after `=` for a `{magnitudo}` parameter"
 
 [diagnostics.PARSE016.issues.generic_default_wrong_class]
 message = "default for {sort} generic parameter {parameter} must be {expected}"
-help = "replace the default with {expected}"
+help = "write a type after `=` for a type parameter, or a natural-number literal after `=` for a `{magnitudo}` parameter"
 
 [diagnostics.PARSE017]
 message = "invalid modifier"
@@ -1065,7 +1065,7 @@ help = "add an annotation name after '@'"
 
 [diagnostics.PARSE018.issues.invalid_modifier]
 message = "invalid @ {annotation} modifier"
-help = "use a supported @ {annotation} modifier"
+help = "use a supported modifier for this annotation"
 
 [diagnostics.PARSE018.issues.empty_radix_typus_domain]
 message = "@ radix typus domain requires at least one allowed type"
@@ -1073,15 +1073,15 @@ help = "list at least one allowed type after in"
 
 [diagnostics.PARSE018.issues.expected_annotation_ident]
 message = "expected {context}"
-help = "add '{expected}' in this annotation position"
+help = "add the required keyword here, using this file's reader locale"
 
 [diagnostics.PARSE018.issues.unexpected_annotation_token]
 message = "unexpected token after {context}"
-help = "remove the trailing annotation token"
+help = "finish the annotation before the declaration; move the declaration to a new line or remove extra annotation text"
 
 [diagnostics.PARSE018.issues.nucleum_lane_removed]
 message = "the @ {nucleum} lane binding '{name}' was removed; a kernel never names its lane"
-help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i] {filum} f {fixum} v`"
+help = "bind the iteration coordinate with `{apud}` on a `{filum}` loop: `{itera} {ex} t {apud} [i] {filum} f {sit} v`"
 
 [diagnostics.PARSE018.issues.ad_annotation_route]
 message = "`@ {ad}` requires a single-quoted ASCII route"
@@ -1101,11 +1101,11 @@ help = "use `@ {expected}` for this file's reader locale"
 
 [diagnostics.PARSE018.issues.annotatio_unknown_target]
 message = "unknown `@ annotation` target"
-help = "use `target = {functio}` in v1"
+help = "use `target = {functio}`; a function is the supported target"
 
 [diagnostics.PARSE018.issues.duplicate_nucleum]
 message = "a declaration carries more than one `@ nucleum` annotation"
-help = "keep a single nucleum annotation"
+help = "keep a single `@ {nucleum}` annotation"
 
 [diagnostics.PARSE018.issues.duplicate_nucleum_tier]
 message = "the `@ {nucleum}` annotation names more than one tier"
@@ -1145,7 +1145,7 @@ help = "write the handler before the condition: {fac} … {cape} … {dum} …"
 
 [diagnostics.PARSE020.issues.fac_modifier_redundant]
 message = "a '{fac}' block takes one modifier word, not '{omnia}' and '{machina}' together"
-help = "'{machina}' already delivers every fault once at the block's exit; drop '{omnia}'"
+help = "keep only one modifier: `{omnia}` or `{machina}`"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "a comma no longer separates '{discerne}' subjects"
@@ -1197,7 +1197,7 @@ help = "check expression syntax"
 
 [diagnostics.PARSE030.issues.constructor_store_position_only]
 message = "type-expression constructors are allowed only at store positions"
-help = "bind the constructor first: let tf32[2, 3] a ← the type tf32[2, 3] followed by empty braces"
+help = "bind the constructor first, then pass its name: `{sit} tf32[2, 3] a ← tf32[2, 3] {}`"
 
 [diagnostics.PARSE030.issues.constructor_requires_empty_braces]
 message = "the typed zero of a type is written `Type` followed by empty braces; the bare type form is retired"
@@ -1205,7 +1205,7 @@ help = "write the zero as the type followed by empty braces"
 
 [diagnostics.PARSE030.issues.retired_null_value_spelling]
 message = "'nihil' is not the null value; the null value is '{replacement}'"
-help = "write '{replacement}' for the null value; 'nihil' names only the null type"
+help = "write '{replacement}' for the null value; '{nihil}' names only the null type"
 
 [diagnostics.PARSE030.issues.comparison_ascii_retired]
 message = "the ASCII `{operator}` is not a comparison operator; comparison is spelled `{glyph}`"
@@ -1225,15 +1225,15 @@ help = "write `{replacement}` for `{glyph}`; every negation glyph has the same n
 
 [diagnostics.PARSE030.issues.itera_source_sort_reduce_unbound]
 message = "a sort or reduce expression cannot be a loop source"
-help = "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys const x`"
+help = "bind it to a name first, then loop over the name: `let list<int> ys ← sort via asc from xs`, then `for from ys let x`"
 
 [diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
 message = "use ⊥ for a conversion default"
-help = "use ⊥; vel is nullish coalescing only"
+help = "use ⊥; `{vel}` is only for nullish coalescing"
 
 [diagnostics.PARSE030.issues.conversio_via_missing_hint]
 message = "`via` needs a convert hint after it"
-help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are Hex, Bin, Oct, Be, Le, and Code"
+help = "add a valid hint after `via`, for example `x ↦ u32 via Hex`"
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "a convert hint is not a type argument"
