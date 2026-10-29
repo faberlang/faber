@@ -169,16 +169,14 @@ impl FunctionLower<'_, '_> {
         self.trap_if(outside, trap_text::NUMERUS_OVERFLOW)
     }
 
-    /// A wide value as the `i64` carrier, trapping when an exact signed value
-    /// does not fit; a `u64` literal may use all of the carrier's bit patterns.
+    /// A wide value as the `i64` carrier, trapping when it does not fit; an
+    /// `i64` value stays.
     pub(super) fn narrow(&mut self, value: Value) -> Lowered<Value> {
         if !self.is_wide(value) {
             return Ok(value);
         }
-        if self.u64_constants.contains(&value) {
-            // `MirConstant::UInt` is a u64 value. Its high-bit values travel
-            // through the i64 CLIF carrier as their two's-complement bit pattern.
-            return Ok(self.builder.ins().ireduce(types::I64, value));
+        if self.huge.contains(&value) {
+            return Err(Decline::new("integer constant beyond i64"));
         }
         let low = self.builder.ins().ireduce(types::I64, value);
         let back = self.builder.ins().sextend(types::I128, low);
