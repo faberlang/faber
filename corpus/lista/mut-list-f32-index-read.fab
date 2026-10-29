@@ -1,0 +1,26 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "member_suffix", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A mutable list parameter is read by an int variable index inside floating-point arithmetic, using a checked trapping access."
+syntax = "fn add_at(mut list<f32> values, int index) → f32 { return values[index] + (0.5 ∷ f32) }"
+related = ["mut-list-param-index", "reads-three-ways", "index-oob-trap"]
+locale = "en"
++++
+# A mutable f32 list parameter read inside arithmetic.
+#
+# The indexed read must use a checked `get(index as usize)` and preserve the
+# list-index trap. This also exercises a variable index in a larger floating-
+# point expression, rather than a standalone integer-list read.
+
+fn add_at(mut list<f32> values, int index) → f32 {
+    return values[index] + (0.5 ∷ f32)
+}
+
+main {
+    mut list<f32> samples ← [1.0, 2.0]
+    mut int index ← 1
+    print add_at(mut samples, index)
+}
