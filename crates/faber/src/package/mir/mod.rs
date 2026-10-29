@@ -838,6 +838,11 @@ fn session_dispatcher(
             .with_arg("code", "E_DEVICE_NONE_ADMITTED".to_owned()),
         ]);
     }
+    // Owned slabs are CUDA spanning only. The plan lays out only the roles the
+    // spanning runtime can launch, so it must read the image before the
+    // dispatcher takes its parts.
+    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned)
+        .then(|| super::device::placement_plan(lowered, &image, |role| role.launchable()));
     let interner = validated
         .validation()
         .interner
@@ -965,6 +970,9 @@ fn session_dispatcher(
             | super::device::DeviceImageBackend::CudaSpanned
     ) {
         dispatcher.borrow_mut().set_span(lane_ranges, slab_origins);
+    }
+    if let Some(plan) = placement {
+        dispatcher.borrow_mut().set_placement(plan);
     }
     dispatcher.borrow_mut().set_backward_functions(backward);
     super::device::install_fault_sites(&fault_sites, |entry, sites| {

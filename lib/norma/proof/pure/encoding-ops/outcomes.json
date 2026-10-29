@@ -6,12 +6,6 @@
       "diagnostic_contains": "package_target_unsupported",
       "reason": "C has no package emit path yet: `faber emit -t c` fails closed on this package with the `package_target_unsupported` issue before any leaf or bits gate runs, so no C code is produced and the encoding-ops proof is never lowered. The C build and run recipe arrives with the first carried leaf; re-measure this row then."
     },
-    "ts": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "ts_trap_expression_unsupported",
-      "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
-    },
     "llvm": {
       "outcome": "known-fail",
       "phase": "build",

@@ -1077,16 +1077,19 @@ fn print_device_advice(
 ) {
     let mut advice = Vec::new();
     let mut audit = Vec::new();
+    let mut placement = Vec::new();
     let mut failures = Vec::new();
     for unit in lowering_units(config, input_path) {
         match super::mir::with_check_lowered_package_mir(config, &unit, |lowered| {
             let rows = super::device::split_advice(lowered, device, partitions)?;
             let syncs = super::device::span_audit(lowered, device, partitions)?;
-            Ok((rows, syncs))
+            let table = super::device::placement_table(lowered, device, partitions)?;
+            Ok((rows, syncs, table))
         }) {
-            Ok(Ok((rows, syncs))) => {
+            Ok(Ok((rows, syncs, table))) => {
                 advice.extend(rows);
                 audit.extend(syncs);
+                placement.extend(table);
             }
             Ok(Err(errors)) | Err(errors) => failures.extend(errors),
         }
@@ -1099,6 +1102,8 @@ fn print_device_advice(
     advice.dedup();
     audit.sort();
     audit.dedup();
+    placement.sort();
+    placement.dedup();
     let file = input_path.display().to_string();
     let diagnostics: Vec<_> = advice
         .iter()
@@ -1127,6 +1132,13 @@ fn print_device_advice(
     } else {
         for diag in &diagnostics {
             eprintln!("{}", radix::module::diagnostics::render_plain(diag));
+        }
+    }
+    // The placement table is a table, not a diagnostic: one line per tensor.
+    if !placement.is_empty() {
+        eprintln!("placement ({partitions} partitions):");
+        for line in &placement {
+            eprintln!("  {line}");
         }
     }
 }

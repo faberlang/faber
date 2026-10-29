@@ -75,13 +75,13 @@ pub fn decode(bytes: &[u8]) -> Result<HirArtifact, HirArtifactError> {
     }
 
     // Payload interpretation begins only after the version prefix is accepted.
-    let artifact: HirArtifact = postcard::from_bytes(bytes).map_err(|e| {
-        if matches!(e, postcard::Error::DeserializeUnexpectedEnd) {
-            HirArtifactError::TruncatedArtifact
-        } else {
-            HirArtifactError::Malformed(e)
-        }
-    })?;
+    let (artifact, rest) = postcard::take_from_bytes::<HirArtifact>(bytes).map_err(to_error)?;
+    if !rest.is_empty() {
+        return Err(HirArtifactError::MalformedSnapshot {
+            kind: "artifact",
+            detail: format!("{} trailing byte(s) after postcard unit", rest.len()),
+        });
+    }
 
     // U2.3: Referential-integrity gate. Validate every arena index before
     // returning Ok — no codegen touch after a DanglingIndex (CSO E8).
