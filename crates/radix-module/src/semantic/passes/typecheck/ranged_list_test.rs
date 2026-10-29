@@ -118,6 +118,17 @@ main {
 }
 
 #[test]
+fn a_zero_based_range_accepts_each_literal_length_through_its_maximum() {
+    for (name, literal) in [("empty", "[]"), ("short", "[1, 2]"), ("full", "[1, 2, 3]")] {
+        assert_accepts(&format!("main {{ let list<int, size 0…3> {name} ← {literal}\n print {name} }}"));
+    }
+    refused(
+        "main { let list<int, size 0…3> too_many ← [1, 2, 3, 4]\n print too_many }",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
 fn a_literal_outside_the_range_is_refused_at_compile_time() {
     refused(
         "main { let list<int, size 2‥5> a ← [1]\n print a }",

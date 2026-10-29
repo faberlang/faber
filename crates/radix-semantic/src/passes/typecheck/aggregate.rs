@@ -641,7 +641,25 @@ impl TypeChecker<'_> {
             // bounded cell keeps that cell's capacity instead of becoming an
             // exact zero-length witness that no capacity-N cell accepts.
             Some(capacity) if elements.is_empty() => Some(capacity),
-            Some(capacity) => literal_capacity.or(Some(capacity)),
+            Some(capacity) => {
+                // A bounded list's number is its maximum length, not a
+                // required literal length. Preserve the declared capacity for
+                // a statically known literal that fits; an oversized literal
+                // keeps its exact witness so the ordinary assignment check
+                // refuses it by name.
+                let literal_fits = literal_length.is_some_and(|length| {
+                    let capacity = self.resolve_index(capacity);
+                    matches!(
+                        self.types.get_index(capacity),
+                        IndexExpr::Literal(maximum) if length as u64 <= *maximum
+                    )
+                });
+                if literal_fits {
+                    Some(capacity)
+                } else {
+                    literal_capacity.or(Some(capacity))
+                }
+            }
             None => literal_capacity,
         };
 
