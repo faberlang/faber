@@ -175,7 +175,7 @@ fn is_word(text: &str) -> bool {
 ///
 /// Bare prose words are left exactly as written: several identities are
 /// ordinary English words, so a bare word cannot be told from an identifier.
-/// A span's leading article (`an `itera``) is made to agree with its new
+/// A span's leading article (an `itera`) is made to agree with its new
 /// spelling.
 pub(crate) fn rewrite_prose(text: &str, words: &BTreeMap<String, String>) -> String {
     let mut out = String::with_capacity(text.len());
