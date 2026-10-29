@@ -1,0 +1,43 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "additive_expr", "assignment", "expression", "literal", "nota_stmt"]
+category = "class"
+canonical = false
+summary = "A record built in a callee and appended or index-stored into a list keeps its fields, including a list field."
+syntax = "fn fill(int n) → list<H> { hs[1] ← build(n) }"
+related = ["genus", "lista", "functio"]
+locale = "en"
++++
+# A record returned by a callee is appended to a list and index-stored into it, then read
+# back. The callee's frame is gone by the time of the read, so the list must own the
+# record, including the list field it carries.
+
+class H {
+    mut list<int> values
+    mut int n
+}
+
+fn build(int n) → H {
+    mut list<int> v ← empty
+    for range 0‥n let i {
+        v.append(i * 10)
+    }
+    return H { values = v, n = n }
+}
+
+fn fill(int n) → list<H> {
+    mut list<H> hs ← empty
+    hs.append(build(1))
+    hs.append(build(1))
+    hs[1] ← build(n)
+    return hs
+}
+
+main {
+    let list<H> first ← fill(3)
+    let list<H> second ← fill(1)
+    print first[1].values[2] + first[1].n
+    print first[1].values.length()
+    print second[1].values.length()
+}

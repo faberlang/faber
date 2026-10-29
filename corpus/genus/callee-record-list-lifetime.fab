@@ -1,0 +1,37 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "class"
+canonical = false
+summary = "A record returned from a callee keeps its fields when stored in a list that outlives the caller."
+syntax = "fn make_list(int seed) → list<Punctum> { return [make_punctum(seed)] }"
+related = ["genus", "lista", "functio"]
+locale = "en"
++++
+# A returned record stored in a returned list remains valid after its creator exits.
+# The second call reuses the creator's stack frame, so the first list must own its
+# record value rather than retain a pointer into that frame.
+
+class Punctum {
+    mut int x = 0
+    mut int y = 0
+}
+
+fn make_punctum(int seed) → Punctum {
+    return Punctum { x = seed, y = seed + 1 }
+}
+
+fn make_list(int seed) → list<Punctum> {
+    return [make_punctum(seed)]
+}
+
+main {
+    let list<Punctum> first ← make_list(10)
+    let list<Punctum> second ← make_list(20)
+
+    print first[0].x
+    print first[0].y
+    print second[0].x
+    print second[0].y
+}
