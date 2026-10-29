@@ -273,7 +273,7 @@ fn scan_tensor_element_count(
 /// count channel exactly like the decomposed elementwise emission signature
 /// ([`crate::device_program_plans::append_runtime_extent_count_channel`]).
 /// Without the channel the Metal emitter refuses the kernel fail-closed
-/// (`mir_metal_runtime_shaped_elementwise_extent_missing`). TensorAdd and
+/// (`mir_metal_runtime_shaped_elementwise_extent_missing`). `TensorAdd` and
 /// friends are collection ops, but they carry NO dispatch contract — the
 /// contract-bearing kernels (reduction, matmul, transpose, ...) stay static
 /// per the U2 non-goals. Lane-form and sequential single-lane bodies are
