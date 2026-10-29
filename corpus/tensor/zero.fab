@@ -36,8 +36,8 @@ main {
     let tf32[2, 3] grid ← tf32[2, 3] {}
     print grid.shape()
     print grid[[1, 2]]
-    let tensor<vector<f32, 4>, [2]> lanes ← tensor<vector<f32, 4>, [2]> {}
+    let tensor<vector<f32, size 4>, [2]> lanes ← tensor<vector<f32, size 4>, [2]> {}
     print lanes.shape()
-    let vector<f32, 4> v ← vector<f32, 4> {}
+    let vector<f32, size 4> v ← vector<f32, size 4> {}
     print v[3]
 }

@@ -1,0 +1,15 @@
++++
+term = "mori"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "iace_stmt", "iace_expr", "expression", "literal", "nota_stmt"]
+category = "error"
+summary = "An abort reason with the ERR001 fault code exits with sysexits class 66."
+syntax = "mori <expression>"
+related = ["mori", "adfirma"]
+locale = "en"
++++
+# Coded fault reasons keep the runner's IO-fault exit class (66).
+main {
+    print "before"
+    panic "ERR001 missing"
+}

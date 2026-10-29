@@ -179,10 +179,13 @@ impl FragmentDefinitionChecker<'_> {
     fn check_stmt(&mut self, stmt: &HirStatement) {
         match &stmt.kind {
             HirStatementKind::Local(local) => self.check_local(local),
-            HirStatementKind::Redde(Some(expr)) | HirStatementKind::Expr(expr) => {
+            HirStatementKind::Redde(Some(expr))
+            | HirStatementKind::ReddeFilum(Some(expr))
+            | HirStatementKind::Expr(expr) => {
                 self.check_expr(expr);
             }
             HirStatementKind::Redde(None)
+            | HirStatementKind::ReddeFilum(None)
             | HirStatementKind::Rumpe
             | HirStatementKind::Perge
             | HirStatementKind::Tacet => {}

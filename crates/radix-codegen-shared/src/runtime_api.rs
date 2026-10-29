@@ -855,9 +855,14 @@ pub const SERMO_READ_TEXT: RuntimeItem = sermo_row("read_text", RuntimeKind::Fn)
 /// `sermo.read_text_result`: the non-trapping text reader, `(string, error)`; a
 /// terminal `error` frame is a `*FrameFault` (Go).
 pub const SERMO_READ_TEXT_RESULT: RuntimeItem = sermo_row("read_text_result", RuntimeKind::Fn);
-/// `sermo.fault_record`: the `{kind, path}` crossing record of a failed read, the
-/// dynamic value a `valor ↦ E` conversion row takes (Go).
-pub const SERMO_FAULT_RECORD: RuntimeItem = sermo_row("fault_record", RuntimeKind::Fn);
+/// `sermo.fault_record`: the `{kind, path}` crossing record of a failed
+/// materialization (Go and TypeScript).
+pub const SERMO_FAULT_RECORD: RuntimeItem = RuntimeItem {
+    ns: Namespace::Sermo,
+    name: "fault_record",
+    kind: RuntimeKind::Fn,
+    targets: SERMO_GO_TS,
+};
 pub const SERMO_READ_NUMERUS: RuntimeItem = sermo_row("read_numerus", RuntimeKind::Fn);
 pub const SERMO_DRAIN: RuntimeItem = sermo_row("drain", RuntimeKind::Fn);
 /// Typed conversation readers (Go): the trapping form and the `_result` form

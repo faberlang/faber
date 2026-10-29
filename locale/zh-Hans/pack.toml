@@ -101,6 +101,7 @@ axis = "轴"
 lege = "读取"
 lineam = "行"
 omnia = "全部"
+machina = "设备"
 scriptum = "格式化"
 sparge = "展开"
 ut = "作为"
@@ -149,6 +150,8 @@ brevis = "简"
 descriptio = "描述"
 longum = "详"
 lane = "车道"
+laxus = "宽松"
+intutus = "不安全"
 ubique = "全局"
 annotatio = "注解"
 versio = "版本"
@@ -199,7 +202,7 @@ instans = "时刻"
 objectum = "对象"
 quidlibet = "任意"
 lista = "列表"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "映射"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "账本"
@@ -749,6 +752,22 @@ help = "对该文件的读取器语言环境使用 `@ {expected}`"
 message = "一个声明携带了多个 `@ nucleum` annotation"
 help = "只保留一个 nucleum annotation"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "`@ {nucleum}` annotation 指定了多个层级"
+help = "写 `{laxus}` 或 `{intutus}`，或什么都不写以使用默认层级"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` 不是 kernel 层级"
+help = "层级为 `{laxus}` 和 `{intutus}`；什么都不写则为默认层级"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` 不接受层级"
+help = "fragment 沿用组合它的 kernel 的层级；请把层级写在那个 kernel 上"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "kernel 层级需要 kernel 函数"
+help = "把层级写在 `@ {nucleum}` 函数声明上，或删除它"
+
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "`@ nucleum` fragment 与图形 fragment annotation 冲突"
 help = "移除其中一个 fragment annotation"
@@ -768,6 +787,10 @@ help = "使用 {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "在 '{fac}' 循环中，'{cape}' 必须位于 '{dum}' 之前"
 help = "将处理器写在条件之前：{fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "'{fac}' 块只接受一个修饰词，不能同时使用 '{omnia}' 和 '{machina}'"
+help = "'{machina}' 已在块结束时统一交付所有故障；去掉 '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "逗号不再用于分隔 '{discerne}' 的主体"
@@ -843,7 +866,7 @@ help = "把提示紧写在 via 之后，例如 `x ↦ u32 via Hex`；提示有 H
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "转换提示不是类型参数"
-help = "把提示写成目标之后的 via 子句：`u32 via Le`、`ascii<8> via Hex`、`littera via Code`"
+help = "把提示写成目标之后的 via 子句：`u32 via Le`、`ascii<{magnitudo} 8> via Hex`、`littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "转换提示不写在目标之后的尖括号中"
@@ -1289,6 +1312,14 @@ help = "把范围写在列表上，例如 {lista}<int, {magnitudo} 1…8>；它�
 message = "列表的元素个数写在 `{magnitudo}` 之后"
 help = "写 `{lista}<int, {magnitudo} 4>` 表示最多 4 个元素，或 `{lista}<int, {magnitudo} 1…8>` 表示一个范围；裸范围限定的是值，不是个数"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "容量写在 `{magnitudo}` 之后"
+help = "写 `{queue}<int, {magnitudo} 4>`、`{stack}<int, {magnitudo} 4>`、`{textus}<{magnitudo} 8>` 或 `{ascii}<{magnitudo} 8>` 表示最多这么多的容量；裸数字不是容量"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "向量的通道数写在 `{magnitudo}` 之后"
+help = "写 `{vector}<f32, {magnitudo} 4>` 表示四个通道；简写 `vf32[4]` 不变"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "可调用项的注解姿态“{annotation_posture}”与书写的姿态“{written_posture}”冲突"
 help = "修正用于 lowering 的 AST construct"
@@ -1315,11 +1346,11 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue 需要一个或两个类型参数"
-help = "使用 queue<T> 或 queue<T, N>"
+help = "使用 queue<T> 或 queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack 需要一个或两个类型参数"
-help = "使用 stack<T> 或 stack<T, N>"
+help = "使用 stack<T> 或 stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu 需要一个 pattern"
@@ -1487,7 +1518,7 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type 不能接受 parameters"
-help = "textus<N>、ascii<N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
+help = "textus<{magnitudo} N>、ascii<{magnitudo} N> 和 {lista}<b8, {magnitudo} N> 是已交付的有界形式"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace 未导出 qualified type"
@@ -1613,10 +1644,6 @@ help = "修正用于 lowering 的 AST construct"
 message = "width marker 不能接受 parameters"
 help = "修正用于 lowering 的 AST construct"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "nucleum kernel 中不支持 d64"
-help = "请使用受支持的 kernel value type"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "kernel integer extent {extent} 未被证明落在 portable range 内"
 help = "把 extent 限制在 portable integer range 内的取值"
@@ -1629,9 +1656,25 @@ help = "浮点 kernel 值请使用 f32"
 message = "宽度为 {width} 的 store 在 nucleum kernel 中可能 trap"
 help = "证明 store 在范围内，或改用 wrapping 或 saturating cell"
 
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "integer width {width} 超出受支持的 nucleum kernel width"
-help = "使用不超过 32 bits 的 integer width"
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "'{fac} {machina}' 区域不能包含另一个 '{fac} {machina}'"
+help = "只保留一个设备区域，并直接从中调用 kernel"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' 会离开 '{fac} {machina}' 区域；区域尚无退出词"
+help = "先结束区域再在其后决定，或把退出移到块外"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "在 '{fac} {machina}' 区域中直接写 lane 循环 ('{construct}') 尚未实现"
+help = "从区域中调用 kernel 来完成并行工作"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "'{fac} {machina}' 区域暂不能分配 tensor ({construct})"
+help = "在区域之前分配 tensor，再在区域内使用"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{fac} {machina}' 区域中的 '{construct}' 读取了设备上计算的值；设备端循环控制尚未实现"
+help = "条件、边界和标量实参只用区域之前已知的值，并在区域之后读取设备结果"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "kernel intermediate extent {extent} 超出 portable integer range"
@@ -2234,11 +2277,11 @@ message = "vector element 类型不匹配"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector 需要 element type 和 width；请使用 vector<T, N>"
+message = "vector 需要 element type 和 width；请使用 vector<T, 维度 N>"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector 需要 width；请使用 vector<T, 4> 或 vf32[4]"
+message = "vector 需要 width；请使用 vector<T, 维度 4> 或 vf32[4]"
 help = "使表达式类型与期望类型一致"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2480,6 +2523,10 @@ help = "移除显式 type argument 列表"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "需要 numeric lista elements"
 help = "为此 lista intrinsic 使用 numeric elements"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` 需要普通 list 接收者；有界或限定长度范围的 list 不能原地增长"
+help = "对无界 list 使用 extend，或用 `append` 逐个添加元素"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "带键的 `.已排序(键)` 方法已移除；请使用排序表达式"
@@ -2840,6 +2887,10 @@ help = "使用 chorda 或显式 byte conversion helpers"
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "从 {lista}<b8> 到 fractus 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"
+
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
+message = "记录 tensor 按记录的小端布局读取字节；请写 `via Le`，不要写 `via Be`"
+help = "写 {lista}<b8> ↦ tensor<Record, [n]> via Le；记录元素只有一种字节序，由其布局决定"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3709,6 +3760,7 @@ argminima = "最小值索引"
 continet = "包含"
 cumulata = "累积"
 decapita = "移除首项"
+extende = "扩展"
 filtrata = "过滤"
 immerge = "浸入"
 inversa = "求逆"
@@ -3858,7 +3910,19 @@ help = "`{rumpe}` 不能停止 `{filum}` 循环：各通道相互独立运行。
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` 不能离开 `{filum}` 循环"
-help = "`{redde}` 不能离开 `{filum}` 循环：各通道相互独立运行。要从各通道得到一个值，请用 `{reducta}`；要在某个界限处停止，请先算出该界限，再循环到该界限。"
+help = "`{redde} {filum}` 可从任意深度结束当前通道；`{perge}` 仅在通道顶层执行此操作。"
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` 仅在通道循环体内有效"
+help = "仅在 `{filum}` 循环体内使用 `{redde} {filum}`"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` 不接受值"
+help = "删除该值；各通道通过自己的存储传递结果"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "嵌套主体中的 `{redde} {filum}` 不能结束外层通道"
+help = "在通道主体本身使用，不要在嵌套闭包或归约主体中使用"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "归约体只能调用设备内建函数、片段和私有内核辅助函数：{reason}"
@@ -3870,177 +3934,234 @@ help = "保持项为纯：只写入归约体声明的局部变量，只调用不
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "类型实参后需要 '>'"
+help = "在类型实参后添加闭合符号 `>`。"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "函数类型的形参前需要 '('"
+help = "在参数类型前用 `(` 开始函数类型。"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "函数类型的形参后需要 ')'"
+help = "在 `→` 返回箭头前用 `)` 闭合参数列表。"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "函数返回类型前需要 '→'"
+help = "在参数列表和返回类型之间写 `→`。"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "数值包装类型名后需要 '<'"
+help = "使用裸宽度类型，例如 `i32` 或 `f32`；数字类型不再使用 `<...>`。"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "元组元素标签后需要 ':'"
+help = "用 `:` 分隔元组类型标签和类型，例如 `tuple<name: string>`。"
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "ratio 元素标签后需要 ':'"
+help = "用 `:` 分隔记录字段标签和类型，例如 `record<name: string>`。"
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "形状维度后需要 ']'"
+help = "用 `]` 闭合形状维度，例如 `tf32[2, 3]`。"
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "括号内的形状后需要 ')'"
+help = "用 `)` 闭合括号中的大小表达式，例如 `{magnitudo} (n + 1)`。"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "等定/等变绑定后需要 '←'"
+help = "在 `{figendum}` 或 `{variandum}` 绑定后，在 future 表达式前使用 `←`。"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "数组绑定模式需要以 '[' 开始"
+help = "用 `[` 开始数组绑定，例如 `{sit} [first, second] ← values`。"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "数组绑定模式需要以 ']' 结束"
+help = "用 `]` 闭合数组绑定，例如 `{sit} [first, second] ← values`。"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "对象绑定模式需要以花括号开始"
+help = "用 `{{` 开始对象绑定，例如 `{sit} {{ name } ← value`。"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "对象绑定模式需要以 '}' 结束"
+help = "用 `}` 闭合对象绑定，例如 `{sit} {{ name } ← value`。"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "函数声明参数前需要 '('"
+help = "在函数名后用圆括号写参数：`{functio} greet(string name)`。"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "函数声明参数后需要 ')'"
+help = "最后一个参数后闭合参数列表，例如 `{functio} greet(string name)`。"
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "类体后需要 '}'"
+help = "成员后闭合类，例如 `{genus} Name {{ {sit} int value }`。"
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "interface 主体需要以花括号开始"
+help = "用 `{{` 开始接口主体，例如 `{implendum} Name {{ {functio} method() }`。"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "interface method 参数前需要 '('"
+help = "用圆括号书写接口方法参数：`{functio} method(string name)`。"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "interface method 参数后需要 ')'"
+help = "最后一个参数后闭合方法参数列表：`{functio} method(string name)`。"
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "interface 主体后需要 '}'"
+help = "方法签名后闭合接口，例如 `{implendum} Name {{ {functio} method() }`。"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "type alias 值前需要 '='"
+help = "用 `=` 书写类型别名，例如 `{typus} Name = string`。"
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "schema 主体需要以花括号开始"
+help = "用 `{{` 开始架构主体，例如 `{schema} Name {{ {columna} int id }`。"
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "schema 主体后需要 '}'"
+help = "列后闭合架构，例如 `{schema} Name {{ {columna} int id }`。"
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "enum 主体需要以花括号开始"
+help = "用 `{{` 开始枚举主体，例如 `{ordo} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "enum 主体后需要 '}'"
+help = "在成员后闭合枚举，例如 `{ordo} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "union 主体需要以花括号开始"
+help = "用 `{{` 开始联合体主体，例如 `{discretio} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "union variant 字段后需要 '}'"
+help = "字段后闭合变体载荷，例如 `Circle {{ int radius }`。"
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "union 主体后需要 '}'"
+help = "在变体后闭合联合体，例如 `{discretio} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "import record 需要以花括号开始"
+help = "用 `{{` 开始导入记录，例如 `{importa} {{ {ex} = \"norma:console\" }`。"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "导入字段名后需要 '='"
+help = "用 `=` 分隔导入字段和值，例如 `{ex} = \"norma:console\"`。"
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "import record 字段后需要 '}'"
+help = "字段后闭合导入记录，例如 `{importa} {{ {ex} = \"norma:console\" }`。"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "probandum 主体需要以花括号开始"
+help = "开始测试套件主体时使用 `{{`，例如 `{probandum} \"suite\" {{`。"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "probandum 主体后需要 '}'"
+help = "测试和 setup 钩子后用 `}` 闭合测试套件。"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "注解字段需要以花括号开始"
+help = "字段请使用带花括号的注解，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "注解字段名后需要 '='"
+help = "用 `=` 分隔注解字段和值，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "注解字段后需要 '}'"
+help = "字段后闭合带花括号的注解，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "nucleum 注解字段需要以花括号开始"
+help = "使用带花括号的内核选项，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "nucleum 注解字段名后需要 '='"
+help = "用 `=` 分隔内核选项和值，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "nucleum 注解字段后需要 '}'"
+help = "字段后闭合带花括号的内核选项，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.block_start]
 message = "代码块需要以花括号开始"
+help = "在头部后开始代码块，例如 `{si} ready {{ {tacet} }`。"
 
 [diagnostics.PARSE001.issues.block_end]
 message = "代码块需要以 '}' 结束"
+help = "语句后用 `}` 闭合代码块。"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "泛型参数后需要 '>'"
+help = "用 `>` 闭合泛型参数列表，例如 `{functio} identity<T>(T value)`。"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "contract 类型实参后需要 '>'"
+help = "用 `>` 闭合契约的类型实参，例如 `Contract<Type>`。"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "'apud' 后需要 '['"
+help = "在 `{apud}` 后用方括号写迭代坐标，例如 `{itera} {ex} values {apud} [i] {sit} value`。"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "'apud' 坐标后需要 ']'"
+help = "名称后用 `]` 闭合坐标列表。"
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "需要 '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "reduction 运算符之后需要 reduction 源"
+help = "归约运算符后写 `{ex} source`。"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "需要 '{lege}' 或 '{lineam}'"
+help = "使用 `{lege}` 读取全部输入，或使用 `{lineam}` 读取一行。"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige 主体需要以花括号开始"
+help = "写 `{elige} value {{ ... }`，并在其中放置 `{casu}` 分支。"
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "elige 分支后需要 '}'"
+help = "在 `{casu}` 分支和可选的 `{ceterum}` 分支后闭合 `{elige}` 主体。"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "discerne 主体需要以花括号开始"
+help = "写 `{discerne} value {{ ... }`，并在其中放置 `{casu}` 模式分支。"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "discerne 分支后需要 '}'"
+help = "在 `{casu}` 分支和可选的 `{ceterum}` 分支后闭合 `{discerne}` 主体。"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "custodi 主体需要以花括号开始"
+help = "用 `{custodi} {{` 开始主体，并添加一个或多个 `{si}` 子句。"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "custodi 子句后需要 '}'"
+help = "在 `{custodi}` 的 `{si}` 子句后闭合主体。"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "条件值后需要 '✗'"
+help = "在 then 值和 else 值之间放置 `✗`。"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "调用参数后需要 ')'"
+help = "用 `)` 闭合调用的实参列表。"
 
 [diagnostics.PARSE001.issues.index_end]
 message = "索引表达式后需要 ']'"
+help = "用 `]` 闭合索引表达式。"
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "索引括号只接受一个表达式；分开的坐标不是按轴的槽位"
@@ -4048,99 +4169,131 @@ help = "把坐标写成带括号的列表，例如 m[[r, c]]"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "gradient selector 列表后需要 ']'"
+help = "列表项后用 `]` 闭合方括号选择器列表。"
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "optional 索引表达式后需要 ']'"
+help = "将可选索引写完整：`value?[index]`。"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "optional 调用参数后需要 ')'"
+help = "将可选调用写完整：`value?(arguments)`。"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "non-null 索引表达式后需要 ']'"
+help = "将非空索引写完整：`value![index]`。"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null 调用参数后需要 ')'"
+help = "将非空调用写完整：`value!(arguments)`。"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合构造器字段。"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "推断 constructor 元素后需要 ']'"
+help = "用 `]` 闭合推断构造器的元素列表。"
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "数组元素后需要 ']'"
+help = "元素后用 `]` 闭合列表字面量。"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "括号内的表达式后需要 ')'"
+help = "用 `)` 闭合括号表达式。"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "'ratio' 后需要 '<'"
+help = "在 `record` 后写带标签的类型实参，例如 `record<label: Type>`。"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "ratio 类型实参后需要 '>'"
+help = "在字段前用 `>` 闭合记录类型实参。"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "ratio 类型实参后需要花括号"
+help = "记录类型实参后，用 `{{` 开始字段。"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "ratio 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合记录字段。"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "typed constructor 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合带类型的构造器字段。"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "finge 字段后需要 '}'"
+help = "最后一个字段后用 `}` 闭合变体字段。"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "'iuncta' 后需要 '<'"
+help = "在 `{iuncta}` 后写元组类型实参，例如 `{iuncta}<T, U>`。"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "iuncta 类型实参后需要 '['"
+help = "类型实参后，用方括号写元组值列表。"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "iuncta 元素后需要 ']'"
+help = "元素后用 `]` 闭合元组值列表。"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "closure 参数后需要 ')'"
+help = "用 `)` 闭合参数列表，然后写可选签名和 `∴`。"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "closure 签名后需要 '∴'"
+help = "闭包签名后写 `∴`，再写表达式或 `{fac}` 代码块。"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "ad opener 后需要 ')'"
+help = "在可选的 opener 表达式的值后用 `)` 闭合。"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "参数标签后需要 ':'"
+help = "在模板调用中，用 `:` 分隔实参标签和值。"
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "computed key 后需要 ']'"
+help = "用 `]` 闭合计算字段键，然后写 `= value`。"
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "JSON key 后需要 ':'"
+help = "在每个带引号的 JSON 键和值之间放置 `:`。"
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "JSON object 后需要 '}'"
+help = "成员后用 `}` 闭合 JSON 对象。"
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "JSON array 后需要 ']'"
+help = "值后用 `]` 闭合 JSON 数组。"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "推断 constructor 字段后需要 '}'"
+help = "用 `}` 闭合推断构造器。"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "调用类型实参后需要 '>'"
+help = "在调用的 '(' 前用 '>' 闭合类型实参列表。"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "constructor 类型实参前需要 '<'"
+help = "在构造器的类型实参前添加 '<'。"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "constructor 类型实参后需要 '>'"
+help = "用 '>' 闭合构造器的类型实参列表。"
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "'scriptum' 后需要 '('"
+help = "用 '(' 开始 `{scriptum}` 调用。"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "scriptum 参数后需要 ')'"
+help = "参数后用 ')' 闭合 `{scriptum}` 调用。"
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
@@ -4204,5 +4357,26 @@ help = "声明 `{implendum} Sink<T>`，并包含 `{functio} sink(T res) → vacu
 [diagnostics.INFO001]
 message = "内核 `{kernel}` 在 {device} 设备上串行运行"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "内核 `{kernel}` 在单个车道上运行"
+help = "当每个车道应处理一个项目时，使用 `@ {nucleum}` 函数，配合 `{itera}` 循环和 `{filum}` 子句。"
+
+[diagnostics.INFO001.issues.not_split]
+message = "内核 `{kernel}` 只在 {partitions} 个分区中的一个上运行：{reason}"
+help = "检查原因：拆分需要线性车道网格、车道范围，以及限制在各自车道范围内的写入。"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "内核 `{kernel}`：能否拆分到 {partitions} 个分区取决于运行时形状"
+help = "选择运行时形状，使车道网格与其写入具有匹配范围，以便可预测地拆分。"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "内核 `{kernel}` 作为一次顺序调用在一个 CPU 工作线程上运行"
+help = "对于相互独立的逐项工作，使用 `@ {nucleum}` 函数，配合 `{itera}` 循环和 `{filum}` 子句。"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "内核 `{kernel}` 未放置到 {device} 设备上：{reason}"
+help = "检查原因，并使用所选设备支持的内核形式。"
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "内核 `{kernel}`：其跨 {partitions} 个分区的 {kind} 是可以避免的：{avoidable}（{reason}）"
+help = "根据审计原因查找依赖。尽可能让分区读写保持在各自车道内，并使用匹配的缓冲区布局。"

@@ -741,9 +741,16 @@ pub fn get_line_at_offset(source: &str, offset: usize) -> String {
 pub fn offset_to_line(source: &str, offset: usize) -> u32 {
     let offset = nearest_char_boundary(source, offset);
     let newlines = source[..offset].bytes().filter(|&b| b == b'\n').count();
-    let line = newlines.saturating_add(1);
-    let physical = source.lines().count().max(1);
-    u32::try_from(line.min(physical)).unwrap_or(u32::MAX)
+    // The line index only exceeds the physical line count when the offset sits
+    // past the final `\n`, which is the end of the source: step back one line
+    // there instead of counting every line of the file.
+    let past_last_line = offset == source.len() && source.ends_with('\n');
+    let line = if past_last_line {
+        newlines
+    } else {
+        newlines.saturating_add(1)
+    };
+    u32::try_from(line).unwrap_or(u32::MAX)
 }
 
 /// Snap a byte offset down to the nearest UTF-8 char boundary.

@@ -452,6 +452,10 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
             (entry.def_id, lane, backward)
         }));
 
+    // The kernel requirement wire carries no tier; the tier lives on the HIR
+    // annotations, so read it back from them before the HIR moves.
+    let kernel_tiers = crate::semantic::passes::kernel_requirements::declared_kernel_tiers(&artifact.hir, &interner);
+
     let provider_units = provider_units_live(artifact.provider_units)?;
     let tensor_edge_policies = map_tensor_edge_policy_table(artifact.tensor_edge_policies);
 
@@ -481,6 +485,7 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
     unit.provider_units = provider_units;
     unit.shape_obligations = map_shape_obligations(artifact.shape_obligations);
     unit.kernel_requirements = map_kernel_requirements(artifact.kernel_requirements);
+    unit.kernel_requirements.apply_tiers(&kernel_tiers);
     // Program display tokens follow the unit's code locale (schema v44):
     // restore the words the author's locale prints so a loaded unit does not
     // fall back to the Latin defaults.
@@ -505,6 +510,7 @@ fn map_kernel_requirements(
             .map(|kernel| live::KernelRequirement {
                 def_id: kernel.def_id,
                 name: kernel.name,
+                tier: radix_hir::KernelTier::Default,
                 target_reports: kernel
                     .target_reports
                     .into_iter()
@@ -565,6 +571,7 @@ fn map_kernel_requirements(
                     .collect(),
             })
             .collect(),
+        regions: Vec::new(),
     }
 }
 

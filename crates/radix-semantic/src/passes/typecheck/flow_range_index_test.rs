@@ -322,3 +322,173 @@ fn a_range_loop_past_the_extent_is_not_proven() {
     let source = "@ nucleum\nfunctio k(tensor<f32, [4]> src, varia tensor<f32, [4]> dst) → vacuum {\n    itera ab 0‥5 sit i {\n        dst[i] ← src[i]\n    }\n}";
     assert_eq!(tally(source), (0, 2));
 }
+
+// ── effects between a guard and its use ───────────────────
+//
+// A length fact dies at every effect that can change the length. The guard's
+// facts are rebuilt from syntax after the whole condition was checked, so an
+// effect that runs after the fact was read, inside the same condition or in
+// a loop around it, must take the fact with it.
+
+const SHRINKER: &str = "functio contrahe(varia lista<numerus> zs) → bivalens {\n    zs.detrahe()\n    redde verum\n}\n";
+
+fn with_shrinker(source: &str) -> String {
+    format!("{SHRINKER}{source}")
+}
+
+#[test]
+fn a_later_conjunct_that_mutates_the_list_kills_the_guard() {
+    let source = with_shrinker(
+        "functio f(varia lista<numerus> xs, numerus i) → numerus {
+    si i ≥ 0 et i ≺ xs.longitudo() et contrahe(varia xs) {
+        redde xs[i]
+    }
+    redde 0
+}",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_mutating_call_in_the_condition_kills_a_guard_before_it() {
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i",
+        "    si i ≥ 0 et i ≺ xs.longitudo() et g(1) ≡ 1 {\n        n ← xs[i]\n    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_mutating_intrinsic_in_a_later_conjunct_kills_the_guard() {
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i",
+        "    si i ≥ 0 et i ≺ xs.longitudo() et xs.detrahe() non est nihil {\n        n ← xs[i]\n    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_guard_after_the_last_effect_in_the_condition_still_proves() {
+    // The call runs first; the length is read after it, so the fact is fresh.
+    let source = with_shrinker(
+        "functio f(varia lista<numerus> xs, numerus i) → numerus {
+    si contrahe(varia xs) et i ≥ 0 et i ≺ xs.longitudo() {
+        redde xs[i]
+    }
+    redde 0
+}",
+    );
+    assert_eq!(proofs(&source), vec![true]);
+}
+
+#[test]
+fn a_disjunct_that_mutates_after_the_guard_kills_it() {
+    // `si not (A or B)` carries the else facts of both disjuncts.
+    let source = with_shrinker(
+        "functio f(varia lista<numerus> xs, numerus i) → numerus {
+    si non (i ≺ 0 aut i ≥ xs.longitudo() aut contrahe(varia xs)) {
+        redde xs[i]
+    }
+    redde 0
+}",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn pure_conjuncts_after_a_guard_keep_the_proof() {
+    // Reading the length again, or comparing integers, is not an effect.
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i, numerus j",
+        "    si i ≥ 0 et i ≺ xs.longitudo() et j ≥ 0 et xs.longitudo() ≻ 0 {\n        n ← xs[i]\n    }",
+    );
+    assert_eq!(proofs(&source), vec![true]);
+}
+
+#[test]
+fn a_while_that_empties_the_list_kills_the_proof_made_before_it() {
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i",
+        "    si i ≥ 0 et i ≺ xs.longitudo() {
+        dum xs.longitudo() ≻ 0 {
+            xs.detrahe()
+        }
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_while_that_calls_out_kills_the_proof_made_before_it() {
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i",
+        "    si i ≥ 0 et i ≺ xs.longitudo() {
+        dum n ≺ 3 {
+            n ← g(n)
+        }
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_while_that_only_reads_keeps_the_proof_made_before_it() {
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i",
+        "    si i ≥ 0 et i ≺ xs.longitudo() {
+        dum n ≺ xs.longitudo() {
+            n ← n + 1
+        }
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![true]);
+}
+
+#[test]
+fn a_range_loop_that_empties_the_list_kills_the_proof_made_before_it() {
+    let source = list_fn(
+        "varia lista<numerus> xs, numerus i",
+        "    si i ≥ 0 et i ≺ xs.longitudo() {
+        itera ab 0‥3 sit k {
+            xs.detrahe()
+        }
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_fact_proven_inside_a_loop_does_not_outlive_a_break() {
+    // The loop is left through `rumpe` before the length guard is reached on
+    // the other path, so the guard's fact is not true after the loop.
+    let source = list_fn(
+        "lista<numerus> xs, numerus i",
+        "    si i ≥ 0 {
+        itera ab 0‥3 sit k {
+            si i ≥ xs.longitudo() { rumpe }
+        }
+        n ← xs[i]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}
+
+#[test]
+fn a_loop_binding_assigned_in_the_body_loses_its_proof_after_the_loop() {
+    let source = list_fn(
+        "lista<numerus> xs, numerus i",
+        "    varia numerus j ← 0
+    si j ≺ xs.longitudo() {
+        dum n ≺ 3 {
+            j ← j + 5
+            n ← n + 1
+        }
+        n ← xs[j]
+    }",
+    );
+    assert_eq!(proofs(&source), vec![false]);
+}

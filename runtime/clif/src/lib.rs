@@ -3,8 +3,9 @@
 //!
 //! The C `main` is emitted into the program object (the LLVM route's
 //! pattern), so this archive never defines `main` and links cleanly as an
-//! rlib. The runtime captures argv, installs the program's output tokens,
-//! runs the program's `faber_clif_incipit`, flushes, and exits with the
+//! rlib. The emitted `main` hands the runtime the address of the program's
+//! `faber_clif_incipit`; the runtime captures argv, installs the program's
+//! output tokens, runs the incipit, flushes, and exits with the
 //! runner's codes (D5: the entry's own exit status, 0 unless `main exit` names
 //! one, and 1 on an uncaught failure or a trap).
 //! Display goes through `radix-runtime-contract`, the same helpers the MIR
@@ -24,10 +25,13 @@ mod ins;
 mod magnus;
 mod regex_program;
 mod regex_rt;
+mod symbols;
 // Public so the ABI layer (`crates/radix-mir-clif`) can reach it without an
 // export of its own: `-D warnings` treats an unreachable `pub` item in a
 // private module as dead code.
 pub mod sermo;
+
+pub use symbols::runtime_symbols;
 
 use std::collections::hash_map::DefaultHasher;
 use std::ffi::CStr;
@@ -41,11 +45,6 @@ use radix_runtime_contract::display::{display_bivalens, display_fractus};
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_runtime_contract::trap::text::{self as trap_text, window_inside};
 use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, trap_line};
-
-// The program's `incipit`, emitted into the linked object by the backend.
-unsafe extern "C" {
-    fn faber_clif_incipit() -> i32;
-}
 
 /// Process-global runtime state, written once by [`__faber_clif_v1_main`].
 struct Context {
@@ -118,20 +117,47 @@ fn emit(stream: i32, line: &str) {
     }
 }
 
-/// The runtime entry the emitted `main` shim calls.
-#[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_main(
-    argument_count: i32,
-    argument_values: *const *const c_char,
-) -> i32 {
-    let _ = CONTEXT.set(Context {
-        arguments: capture_arguments(argument_count, argument_values),
-    });
+/// The program's entry as the backend emits it: installs the output words,
+/// runs the program, and returns the process exit status.
+pub type Incipit = unsafe extern "C" fn() -> i32;
+
+/// Run a program: record its arguments, call its `incipit`, flush stdout and
+/// hand back the exit status. A trap or an uncaught failure never returns; it
+/// flushes and exits the process with its own status.
+///
+/// This is the one entry both routes share. A linked executable reaches it
+/// through the emitted C `main` ([`__faber_clif_v1_main`]); an in-process image
+/// (`faber run --target clif-jit`) calls it directly with the address of the
+/// JIT-compiled `incipit`, so the program owns the process exactly as it does
+/// when linked.
+///
+/// # Safety
+///
+/// `incipit` must be the `faber_clif_incipit` the backend emitted for the
+/// program: a `() -> i32` function in the C calling convention that stays
+/// callable for the duration of the call.
+pub unsafe fn run_program(arguments: Vec<String>, incipit: Incipit) -> i32 {
+    let _ = CONTEXT.set(Context { arguments });
     // The entry hands back the process exit status (`main exit <expr>`), 0
     // when it returns nothing.
-    let status = unsafe { faber_clif_incipit() };
+    let status = unsafe { incipit() };
     flush();
     status
+}
+
+/// The runtime entry the emitted `main` shim calls.
+///
+/// # Safety
+///
+/// `argument_values` addresses `argument_count` C strings (or is null) and
+/// `incipit` is the program's emitted `faber_clif_incipit`.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn __faber_clif_v1_main(
+    argument_count: i32,
+    argument_values: *const *const c_char,
+    incipit: Incipit,
+) -> i32 {
+    unsafe { run_program(capture_arguments(argument_count, argument_values), incipit) }
 }
 
 /// Install the program's output tokens: true, false, none, tuple.
@@ -325,6 +351,14 @@ pub struct List {
 
 const TAG_INT: i32 = 0;
 const TAG_FLOAT: i32 = 1;
+/// A float cell of declared `f32` width: same payload law as [`TAG_FLOAT`],
+/// rendered at single precision.
+const TAG_FLOAT32: i32 = 18;
+
+/// A float cell tag: `f64` or the `f32` carrier.
+const fn is_float_tag(tag: i32) -> bool {
+    tag == TAG_FLOAT || tag == TAG_FLOAT32
+}
 const TAG_BOOL: i32 = 2;
 const TAG_TEXT: i32 = 3;
 const TAG_BITS: i32 = 4;
@@ -387,8 +421,10 @@ fn list_new_from(items: Vec<(i32, i64)>) -> *mut List {
 
 /// Display one element; text elements are quoted as the runner quotes them.
 fn element_text(tag: i32, bits: i64) -> String {
+    let float = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
     match tag {
-        TAG_FLOAT => display_fractus(f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()))),
+        TAG_FLOAT => display_fractus(float),
+        TAG_FLOAT32 => display_fractus(float as f32),
         TAG_BOOL => display_bivalens(bits != 0, tokens()).to_owned(),
         TAG_TEXT => format!("{:?}", text_str(unsafe { text_bytes(bits as *const u8) })),
         TAG_CHAR => format!(
@@ -541,7 +577,7 @@ fn map_key_hash(tag: i32, bits: i64) -> Option<u64> {
     tag.hash(&mut hasher);
     match tag {
         TAG_INT | TAG_BOOL | TAG_BITS => bits.hash(&mut hasher),
-        TAG_FLOAT => {
+        tag if is_float_tag(tag) => {
             let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
             let normalized = if value == 0.0 { 0 } else { value.to_bits() };
             normalized.hash(&mut hasher);
@@ -1064,7 +1100,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_set(
 
 fn element_equal(tag: i32, left: i64, right: i64) -> bool {
     match tag {
-        TAG_FLOAT => {
+        tag if is_float_tag(tag) => {
             f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
                 == f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))
         }
@@ -1148,7 +1184,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_reversed(list: *const List) -> *mu
 
 fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
     match tag {
-        TAG_FLOAT => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
+        tag if is_float_tag(tag) => f64::from_bits(u64::from_ne_bytes(left.to_ne_bytes()))
             .total_cmp(&f64::from_bits(u64::from_ne_bytes(right.to_ne_bytes()))),
         TAG_TEXT | TAG_CHAR => unsafe {
             text_bytes(left as *const u8).cmp(text_bytes(right as *const u8))
@@ -2160,7 +2196,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
             } else {
                 bits < best_bits
             }
-        } else if tag == TAG_FLOAT && best_tag == TAG_FLOAT {
+        } else if is_float_tag(tag) && is_float_tag(best_tag) {
             let best = f64::from_bits(u64::from_ne_bytes(best_bits.to_ne_bytes()));
             let value = f64::from_bits(u64::from_ne_bytes(bits.to_ne_bytes()));
             if best.is_nan() {
@@ -2658,7 +2694,7 @@ pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
 fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
     let payload = match tag {
         TAG_OPT => return (tag, bits),
-        TAG_INT | TAG_FLOAT | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
+        TAG_INT | TAG_FLOAT | TAG_FLOAT32 | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
         TAG_LIST => {
             let list = unsafe { list_ref(bits as *const List) };
             let items = list

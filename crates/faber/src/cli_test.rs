@@ -640,7 +640,7 @@ fn cli_parses_check_flags_and_multiple_inputs() {
     let check = Cli::try_parse_from([
         "faber",
         "check",
-        "--diagnostics",
+        "--no-diagnostics",
         "--permissive",
         "--package",
         "main.fab",
@@ -650,10 +650,15 @@ fn cli_parses_check_flags_and_multiple_inputs() {
     let Some(crate::cli::Command::Check(args)) = check.command else {
         panic!("expected check subcommand");
     };
-    assert!(args.diagnostics);
+    assert!(args.no_diagnostics);
     assert!(args.permissive);
     assert!(args.package);
     assert_eq!(args.input, vec!["main.fab", "other.fab"]);
+
+    assert!(
+        Cli::try_parse_from(["faber", "check", "--diagnostics"]).is_err(),
+        "--diagnostics is removed rather than kept as an alias"
+    );
 }
 
 #[test]

@@ -1,0 +1,21 @@
++++
+term = "bounded collection push"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "typed_constructor", "field_list", "field_init", "field_key", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A bounded list field checks its capacity when append is called through a field projection."
+syntax = "box.values.append(value)"
+related = ["list<T, size N>", "append"]
+locale = "en"
++++
+class Box {
+    mut list<int, size 1> values
+}
+
+main {
+    mut Box box ← Box { values = [1] }
+    print "before"
+    box.values.append(2)
+    print "after"
+}

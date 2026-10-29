@@ -1,0 +1,20 @@
++++
+locale = "en"
+term = "extende-reject"
+kind = "reject"
+category = "list"
+grammar = ["fab_file", "program", "statement", "block_stmt", "incipit_stmt", "expr_stmt", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "argument_list", "argument", "call_expr", "call_suffix", "member_suffix", "expression", "literal"]
+canonical = false
+summary = "extend grows its receiver in place, so a bounded list receiver is refused at check time."
+no_expected = "rejects"
+diagnostic = "SEM011:extend_requires_plain_list"
++++
+
+# This exemplum intentionally fails to compile: a fixed-capacity list cannot
+# grow in place. Extend into a plain list, or append one element at a time
+# (the bounded append reports an overflow on the alternate channel).
+main {
+    mut list<int, size 2> small ← [1, 2]
+    let list<int> more ← [3, 4]
+    small.extend(more)
+}

@@ -101,6 +101,7 @@ axis = "अक्ष"
 lege = "पढ़ो"
 lineam = "पंक्ति"
 omnia = "सभी"
+machina = "उपकरण"
 scriptum = "लिखित"
 sparge = "फैलाओ"
 ut = "रूपमें"
@@ -149,6 +150,8 @@ brevis = "संक्षिप्त"
 descriptio = "विवरण"
 longum = "विस्तृत"
 lane = "लेन"
+laxus = "शिथिल"
+intutus = "असुरक्षित"
 ubique = "वैश्विक"
 annotatio = "टीका"
 versio = "संस्करण"
@@ -199,7 +202,7 @@ instans = "क्षण"
 objectum = "वस्तु"
 quidlibet = "कुछभी"
 lista = "सूची"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "तालिका"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "बही"
@@ -705,6 +708,22 @@ help = "इस फ़ाइल की reader locale के लिए `@ {expecte
 message = "एक घोषणा में एक से अधिक `@ nucleum` annotation हैं"
 help = "एक ही nucleum annotation रखें"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "`@ {nucleum}` एनोटेशन एक से अधिक स्तर बताता है"
+help = "`{laxus}` या `{intutus}` लिखें, या डिफ़ॉल्ट स्तर के लिए कुछ न लिखें"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` कर्नेल का स्तर नहीं है"
+help = "स्तर `{laxus}` और `{intutus}` हैं; डिफ़ॉल्ट स्तर के लिए कुछ न लिखें"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` कोई स्तर नहीं लेता"
+help = "खंड उस कर्नेल का स्तर अपनाता है जो उसे जोड़ता है; स्तर उसी कर्नेल पर लिखें"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "कर्नेल स्तर के लिए कर्नेल फ़ंक्शन चाहिए"
+help = "स्तर को `@ {nucleum}` फ़ंक्शन घोषणा पर लिखें, या हटा दें"
+
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "`@ nucleum` fragment ग्राफ़िक्स fragment annotation से टकराता है"
 help = "fragment annotation में से एक हटाएं"
@@ -724,6 +743,10 @@ help = "{replacement} उपयोग करें"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "'{fac}' लूप में '{cape}' को '{dum}' से पहले आना चाहिए"
 help = "हैंडलर को शर्त से पहले लिखें: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "'{fac}' ब्लॉक एक ही संशोधक शब्द लेता है, '{omnia}' और '{machina}' साथ नहीं"
+help = "'{machina}' ब्लॉक के अंत में सभी दोष एक बार पहले ही सौंप देता है; '{omnia}' हटाएँ"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "अब अल्पविराम '{discerne}' के विषयों को अलग नहीं करता"
@@ -799,7 +822,7 @@ help = "via के ठीक बाद संकेत का नाम लि�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "रूपांतरण संकेत कोई प्रकार तर्क नहीं है"
-help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "संकेत को लक्ष्य के बाद via उपवाक्य के रूप में लिखें: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "रूपांतरण संकेत लक्ष्य के बाद कोणीय कोष्ठकों में नहीं आता"
@@ -1257,6 +1280,14 @@ help = "रेंज सूची पर लिखें, जैसे {lista}<i
 message = "सूची की गिनती `{magnitudo}` के बाद लिखी जाती है"
 help = "अधिकतम 4 तत्वों के लिए `{lista}<int, {magnitudo} 4>` लिखें, या रेंज के लिए `{lista}<int, {magnitudo} 1…8>`; केवल रेंज मान को सीमित करती है, गिनती को नहीं"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "क्षमता `{magnitudo}` के बाद लिखी जाती है"
+help = "इतनी अधिकतम क्षमता के लिए `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` या `{ascii}<{magnitudo} 8>` लिखें; केवल संख्या क्षमता नहीं है"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "सदिश की लेन गिनती `{magnitudo}` के बाद लिखी जाती है"
+help = "चार लेन के लिए `{vector}<f32, {magnitudo} 4>` लिखें; संक्षिप्त रूप `vf32[4]` अपरिवर्तित है"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "callable annotation posture '{annotation_posture}' लिखे हुए posture '{written_posture}' से टकराता है"
 help = "lowering के लिए AST construct ठीक करें"
@@ -1283,11 +1314,11 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue को एक या दो type parameters चाहिए"
-help = "queue<T> या queue<T, N> का उपयोग करें"
+help = "queue<T> या queue<T, {magnitudo} N> का उपयोग करें"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack को एक या दो type parameters चाहिए"
-help = "stack<T> या stack<T, N> का उपयोग करें"
+help = "stack<T> या stack<T, {magnitudo} N> का उपयोग करें"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu के लिए pattern आवश्यक है"
@@ -1455,7 +1486,7 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type parameters स्वीकार नहीं कर सकता"
-help = "textus<N>, ascii<N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N>, और {lista}<b8, {magnitudo} N> shipped bounded forms हैं"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type namespace द्वारा export नहीं किया गया है"
@@ -1581,10 +1612,6 @@ help = "लोअरिंग के लिए AST संरचना ठीक 
 message = "width marker पैरामीटर स्वीकार नहीं कर सकता"
 help = "लोअरिंग के लिए AST संरचना ठीक करें"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "nucleum कर्नेल में d64 समर्थित नहीं है"
-help = "समर्थित कर्नेल मान प्रकार का उपयोग करें"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "कर्नेल पूर्णांक extent {extent} पोर्टेबल श्रेणी में फिट होना सिद्ध नहीं है"
 help = "extent को पोर्टेबल पूर्णांक श्रेणी के मानों तक सीमित करें"
@@ -1597,9 +1624,25 @@ help = "फ़्लोटिंग-पॉइंट कर्नेल मान
 message = "nucleum कर्नेल में चौड़ाई {width} का store trap कर सकता है"
 help = "सिद्ध करें कि store श्रेणी में है, या wrapping या saturating cell का उपयोग करें"
 
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "पूर्णांक चौड़ाई {width} समर्थित nucleum कर्नेल चौड़ाई से अधिक है"
-help = "32 बिट से अधिक चौड़ाई वाला पूर्णांक उपयोग न करें"
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "'{fac} {machina}' क्षेत्र में दूसरा '{fac} {machina}' नहीं हो सकता"
+help = "एक ही डिवाइस क्षेत्र रखें और उससे सीधे kernel बुलाएँ"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' '{fac} {machina}' क्षेत्र से बाहर जाता है; क्षेत्र में अभी निकास शब्द नहीं है"
+help = "क्षेत्र समाप्त करके उसके बाद निर्णय लें, या निकास को ब्लॉक के बाहर ले जाएँ"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "'{fac} {machina}' क्षेत्र में सीधे lane लूप ('{construct}') अभी बना नहीं है"
+help = "समानांतर काम के लिए क्षेत्र से kernel बुलाएँ"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "'{fac} {machina}' क्षेत्र अभी tensor आवंटित नहीं कर सकता ({construct})"
+help = "tensor को क्षेत्र से पहले आवंटित करें और अंदर उपयोग करें"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{fac} {machina}' क्षेत्र में '{construct}' डिवाइस पर गणना किया मान पढ़ता है; डिवाइस-पक्ष लूप नियंत्रण अभी बना नहीं है"
+help = "शर्तें, सीमाएँ और स्केलर तर्क क्षेत्र से पहले ज्ञात मानों तक रखें, और डिवाइस परिणाम क्षेत्र के बाद पढ़ें"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "कर्नेल intermediate extent {extent} पोर्टेबल पूर्णांक श्रेणी से अधिक है"
@@ -2202,11 +2245,11 @@ message = "vector तत्व का प्रकार मेल नहीं 
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, N> का उपयोग करें"
+message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, आकार N> का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector के लिए चौड़ाई आवश्यक है; vector<T, 4> या vf32[4] का उपयोग करें"
+message = "vector के लिए चौड़ाई आवश्यक है; vector<T, आकार 4> या vf32[4] का उपयोग करें"
 help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2448,6 +2491,10 @@ help = "स्पष्ट type argument सूची हटाएँ"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "numeric lista elements आवश्यक हैं"
 help = "इस lista intrinsic के लिए numeric elements का उपयोग करें"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` को सामान्य list रिसीवर चाहिए; bounded या length-ranged list अपनी जगह बढ़ नहीं सकती"
+help = "unbounded list में extend करें, या `append` से एक-एक element जोड़ें"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "कुंजी वाली `.क्रमबद्ध(कुंजी)` विधि हटा दी गई है; क्रमबद्ध करने वाले व्यंजक का उपयोग करें"
@@ -2808,6 +2855,10 @@ help = "chorda या स्पष्ट byte conversion helpers का उप�
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "{lista}<b8> से fractus में रूपांतरण निर्दिष्ट नहीं है (IEEE width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
+
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
+message = "रिकॉर्ड tensor अपने bytes को रिकॉर्ड के little-endian लेआउट में पढ़ता है; `via Le` लिखें, `via Be` नहीं"
+help = "{lista}<b8> ↦ tensor<Record, [n]> via Le लिखें; रिकॉर्ड तत्व का एक ही byte क्रम होता है, जो उसके लेआउट से तय होता है"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3677,6 +3728,7 @@ argminima = "argmin"
 continet = "शामिल"
 cumulata = "संचयी"
 decapita = "पहला_हटाओ"
+extende = "पीछे_मिलाओ"
 filtrata = "छानो"
 immerge = "डुबो"
 inversa = "व्युत्क्रम"
@@ -3826,7 +3878,19 @@ help = "`{rumpe}` `{filum}` लूप को रोक नहीं सकता
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता"
-help = "`{redde}` `{filum}` लूप से बाहर नहीं निकल सकता: लेन स्वतंत्र रूप से चलती हैं। लेनों से एक मान पाने के लिए `{reducta}` का उपयोग करें; किसी सीमा पर रुकने के लिए पहले सीमा की गणना करें और उसी तक लूप चलाएँ।"
+help = "`{redde} {filum}` किसी भी गहराई से इस लेन को समाप्त करता है, और `{perge}` ऐसा केवल लेन के शीर्ष स्तर पर करता है।"
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` केवल थ्रेड-लेन लूप के भीतर मान्य है"
+help = "इसे केवल `{filum}` लूप के शरीर के भीतर उपयोग करें"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` कोई मान नहीं लेता"
+help = "मान हटाएँ; लेन अपने स्टोर के माध्यम से परिणाम देती हैं"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "नेस्टेड बॉडी में `{redde} {filum}` बाहरी लेन समाप्त नहीं कर सकता"
+help = "इसे लेन बॉडी में उपयोग करें, नेस्टेड क्लोज़र या रिडक्शन बॉडी में नहीं"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "रिडक्शन का मुख्य भाग केवल डिवाइस इंट्रिंसिक, फ्रैगमेंट और निजी कर्नेल सहायकों को बुला सकता है: {reason}"
@@ -3838,150 +3902,198 @@ help = "पद को शुद्ध रखें: केवल उन स्�
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "प्रकार तर्कों के बाद '>' अपेक्षित है"
+help = "type arguments के बाद closing `>` जोड़ें"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "फ़ंक्शन प्रकार के मापदंडों से पहले '(' अपेक्षित है"
+help = "parameter types से पहले `(` से function type शुरू करें"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "फ़ंक्शन प्रकार के मापदंडों के बाद ')' अपेक्षित है"
+help = "return arrow `→` से पहले parameter list को `)` से बंद करें"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "फ़ंक्शन के वापसी प्रकार से पहले '→' अपेक्षित है"
+help = "parameter list और return type के बीच `→` लिखें"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "संख्यात्मक आवरण के नाम के बाद '<' अपेक्षित है"
+help = "`i32` या `f32` जैसे bare width type का उपयोग करें; numeric types अब `<...>` नहीं लेते"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "टपल तत्व के लेबल के बाद ':' अपेक्षित है"
+help = "tuple type label और उसके type के बीच `:` लगाएँ, जैसे `tuple<name: string>`।"
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "ratio तत्व के लेबल के बाद ':' अपेक्षित है"
+help = "record field label और उसके type के बीच `:` लगाएँ, जैसे `record<name: string>`।"
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "आकार के आयामों के बाद ']' अपेक्षित है"
+help = "shape dimensions को `]` से बंद करें, जैसे `tf32[2, 3]`।"
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "कोष्ठक में आकार के बाद ')' अपेक्षित है"
+help = "parenthesized size expression को `)` से बंद करें, जैसे `{magnitudo} (n + 1)`।"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "awaited binding के बाद '←' अपेक्षित है"
+help = "`{figendum}` या `{variandum}` binding के बाद, future expression से पहले `←` का उपयोग करें।"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "array binding pattern शुरू करने के लिए '[' अपेक्षित है"
+help = "`[` से array binding शुरू करें, जैसे `{sit} [first, second] ← values`।"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "array binding pattern समाप्त करने के लिए ']' अपेक्षित है"
+help = "array binding को `]` से बंद करें, जैसे `{sit} [first, second] ← values`।"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "object binding pattern के लिए एक opening brace अपेक्षित है"
+help = "`{{` से object binding शुरू करें, जैसे `{sit} {{ name } ← value`।"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "object binding pattern के लिए एक closing brace अपेक्षित है"
+help = "object binding को `}` से बंद करें, जैसे `{sit} {{ name } ← value`।"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "function declaration parameters से पहले '(' अपेक्षित है"
+help = "नाम के बाद parentheses में function parameters लिखें: `{functio} greet(string name)`।"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "function declaration parameters के बाद ')' अपेक्षित है"
+help = "अंतिम parameter के बाद parameter list बंद करें, जैसे `{functio} greet(string name)`।"
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "class body के बाद एक closing brace अपेक्षित है"
+help = "members के बाद class बंद करें, जैसे `{genus} Name {{ {sit} int value }`।"
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "interface body के लिए एक opening brace अपेक्षित है"
+help = "`{{` से interface body शुरू करें, जैसे `{implendum} Name {{ {functio} method() }`।"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "interface method parameters से पहले '(' अपेक्षित है"
+help = "interface method parameters को parentheses में लिखें: `{functio} method(string name)`।"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "interface method parameters के बाद ')' अपेक्षित है"
+help = "अंतिम parameter के बाद method parameter list बंद करें: `{functio} method(string name)`।"
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "interface body के बाद एक closing brace अपेक्षित है"
+help = "method signatures के बाद interface बंद करें, जैसे `{implendum} Name {{ {functio} method() }`।"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "type alias value से पहले '=' अपेक्षित है"
+help = "`=` से type alias लिखें, जैसे `{typus} Name = string`।"
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "schema body के लिए एक opening brace अपेक्षित है"
+help = "`{{` से schema body शुरू करें, जैसे `{schema} Name {{ {columna} int id }`।"
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "schema body के बाद एक closing brace अपेक्षित है"
+help = "columns के बाद schema बंद करें, जैसे `{schema} Name {{ {columna} int id }`।"
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "enum body के लिए एक opening brace अपेक्षित है"
+help = "`{{` से enum body शुरू करें, जैसे `{ordo} Name {{ First, Second }`।"
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "enum body के बाद एक closing brace अपेक्षित है"
+help = "members के बाद enum बंद करें, जैसे `{ordo} Name {{ First, Second }`।"
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "union body के लिए एक opening brace अपेक्षित है"
+help = "`{{` से union body शुरू करें, जैसे `{discretio} Name {{ First, Second }`।"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "union variant fields के बाद एक closing brace अपेक्षित है"
+help = "fields के बाद variant payload बंद करें, जैसे `Circle {{ int radius }`।"
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "union body के बाद एक closing brace अपेक्षित है"
+help = "variants के बाद union बंद करें, जैसे `{discretio} Name {{ First, Second }`।"
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "import record के लिए एक opening brace अपेक्षित है"
+help = "`{{` से import record शुरू करें, जैसे `{importa} {{ {ex} = \"norma:console\" }`।"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "import field name के बाद '=' अपेक्षित है"
+help = "import field और उसके value के बीच `=` लगाएँ, जैसे `{ex} = \"norma:console\"`।"
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "import record fields के बाद एक closing brace अपेक्षित है"
+help = "fields के बाद import record बंद करें, जैसे `{importa} {{ {ex} = \"norma:console\" }`।"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "probandum body के लिए एक opening brace अपेक्षित है"
+help = "`{{` से test suite body शुरू करें, जैसे `{probandum} \"suite\" {{`।"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "probandum body के बाद एक closing brace अपेक्षित है"
+help = "tests और setup hooks के बाद test suite को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "annotation fields के लिए एक opening brace अपेक्षित है"
+help = "fields के लिए braced annotation का उपयोग करें, जैसे `@{cli} {{ name = \"runner\" }`।"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "annotation field name के बाद '=' अपेक्षित है"
+help = "annotation field और उसके value के बीच `=` लगाएँ, जैसे `@{cli} {{ name = \"runner\" }`।"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "annotation fields के बाद एक closing brace अपेक्षित है"
+help = "fields के बाद braced annotation बंद करें, जैसे `@{cli} {{ name = \"runner\" }`।"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "nucleum annotation fields के लिए एक opening brace अपेक्षित है"
+help = "braced kernel options का उपयोग करें, जैसे `@{nucleum} {{ {fragment} = {verum} }`।"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "nucleum annotation field name के बाद '=' अपेक्षित है"
+help = "kernel option और उसके value के बीच `=` लगाएँ, जैसे `@{nucleum} {{ {fragment} = {verum} }`।"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "nucleum annotation fields के बाद एक closing brace अपेक्षित है"
+help = "fields के बाद braced kernel options बंद करें, जैसे `@{nucleum} {{ {fragment} = {verum} }`।"
 
 [diagnostics.PARSE001.issues.block_start]
 message = "block के लिए एक opening brace अपेक्षित है"
+help = "header के बाद block शुरू करें, जैसे `{si} ready {{ {tacet} }`।"
 
 [diagnostics.PARSE001.issues.block_end]
 message = "block समाप्त करने के लिए एक closing brace अपेक्षित है"
+help = "statements के बाद block को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "generic parameters के बाद '>' अपेक्षित है"
+help = "generic parameter list को `>` से बंद करें, जैसे `{functio} identity<T>(T value)`।"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "contract type arguments के बाद '>' अपेक्षित है"
+help = "contract के type arguments को `>` से बंद करें, जैसे `Contract<Type>`।"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "'apud' के बाद '[' अपेक्षित है"
+help = "`{apud}` के बाद iteration coordinates को brackets में रखें, जैसे `{itera} {ex} values {apud} [i] {sit} value`।"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "'apud' coordinates के बाद ']' अपेक्षित है"
+help = "नामों के बाद coordinate list को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "'{keyword}' अपेक्षित है"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "रिडक्शन संक्रिया के बाद रिडक्शन स्रोत अपेक्षित है"
+help = "reduction operator के बाद `{ex} source` लिखें।"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "'{lege}' या '{lineam}' अपेक्षित है"
+help = "सारा input पढ़ने के लिए `{lege}` या एक पंक्ति पढ़ने के लिए `{lineam}` का उपयोग करें।"
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "एक identifier अपेक्षित है"
@@ -4029,30 +4141,39 @@ help = "'=' के बाद integer या string लिखें"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige body के लिए एक opening brace अपेक्षित है"
+help = "अंदर `{casu}` cases के साथ `{elige} value {{ ... }` लिखें।"
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "elige cases के बाद एक closing brace अपेक्षित है"
+help = "`{casu}` cases और वैकल्पिक `{ceterum}` arm के बाद `{elige}` body बंद करें।"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "discerne body के लिए एक opening brace अपेक्षित है"
+help = "अंदर `{casu}` pattern arms के साथ `{discerne} value {{ ... }` लिखें।"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "discerne arms के बाद एक closing brace अपेक्षित है"
+help = "`{casu}` arms और वैकल्पिक `{ceterum}` arm के बाद `{discerne}` body बंद करें।"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "custodi body के लिए एक opening brace अपेक्षित है"
+help = "`{custodi} {{` से body शुरू करें और एक या अधिक `{si}` clauses जोड़ें।"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "custodi clauses के बाद एक closing brace अपेक्षित है"
+help = "`{si}` clauses के बाद `{custodi}` body बंद करें।"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "conditional value के बाद '✗' अपेक्षित है"
+help = "then value और else value के बीच `✗` रखें।"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "call arguments के बाद ')' अपेक्षित है"
+help = "call की argument list को `)` से बंद करें।"
 
 [diagnostics.PARSE001.issues.index_end]
 message = "index expression के बाद ']' अपेक्षित है"
+help = "index expression को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "index कोष्ठक एक ही व्यंजक लेता है; अलग-अलग निर्देशांक प्रति-अक्ष स्थान नहीं हैं"
@@ -4060,99 +4181,131 @@ help = "निर्देशांक को कोष्ठक में स�
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "gradient selectors के बाद ']' अपेक्षित है"
+help = "entries के बाद bracketed selector list को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "optional index expression के बाद ']' अपेक्षित है"
+help = "optional index को `value?[index]` के रूप में पूरा करें।"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "optional call arguments के बाद ')' अपेक्षित है"
+help = "optional call को `value?(arguments)` के रूप में पूरा करें।"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "non-null index expression के बाद ']' अपेक्षित है"
+help = "non-null index को `value![index]` के रूप में पूरा करें।"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "non-null call arguments के बाद ')' अपेक्षित है"
+help = "non-null call को `value!(arguments)` के रूप में पूरा करें।"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "constructor fields के बाद एक closing brace अपेक्षित है"
+help = "अंतिम field के बाद constructor fields को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "inferred constructor elements के बाद ']' अपेक्षित है"
+help = "inferred constructor की element list को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "array elements के बाद ']' अपेक्षित है"
+help = "तत्वों के बाद list literal को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "parenthesized expression के बाद ')' अपेक्षित है"
+help = "parenthesized expression को `)` से बंद करें।"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "'ratio' के बाद '<' अपेक्षित है"
+help = "`record` के बाद labeled type arguments लिखें, जैसे `record<label: Type>`।"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "ratio type arguments के बाद '>' अपेक्षित है"
+help = "fields से पहले record type arguments को `>` से बंद करें।"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "ratio type arguments के बाद एक opening brace अपेक्षित है"
+help = "record type arguments के बाद, उसके fields को `{{` से शुरू करें।"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "ratio fields के बाद एक closing brace अपेक्षित है"
+help = "अंतिम field के बाद record fields को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "typed constructor fields के बाद एक closing brace अपेक्षित है"
+help = "अंतिम field के बाद typed constructor fields को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "finge fields के बाद एक closing brace अपेक्षित है"
+help = "अंतिम field के बाद variant fields को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "'iuncta' के बाद '<' अपेक्षित है"
+help = "`{iuncta}` के बाद tuple type arguments लिखें, जैसे `{iuncta}<T, U>`।"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "iuncta type arguments के बाद '[' अपेक्षित है"
+help = "type arguments के बाद, tuple values की bracketed list लिखें।"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "iuncta elements के बाद ']' अपेक्षित है"
+help = "elements के बाद tuple value list को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "closure parameters के बाद ')' अपेक्षित है"
+help = "वैकल्पिक signature और `∴` से पहले parameter list को `)` से बंद करें।"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "closure signature के बाद '∴' अपेक्षित है"
+help = "closure signature के बाद `∴` लिखें और फिर expression या `{fac}` block लिखें।"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "'ad' opener के बाद ')' अपेक्षित है"
+help = "वैकल्पिक opener expression को उसके value के बाद `)` से बंद करें।"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "argument label के बाद ':' अपेक्षित है"
+help = "template call में argument label और उसके value के बीच `:` रखें।"
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "computed object key के बाद ']' अपेक्षित है"
+help = "`= value` लिखने से पहले computed field key को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "JSON key के बाद ':' अपेक्षित है"
+help = "हर quoted JSON key और उसके value के बीच `:` रखें।"
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "JSON object के बाद एक closing brace अपेक्षित है"
+help = "members के बाद JSON object को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "JSON array के बाद ']' अपेक्षित है"
+help = "values के बाद JSON array को `]` से बंद करें।"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "inferred constructor fields के बाद एक closing brace अपेक्षित है"
+help = "inferred constructor को `}` से बंद करें।"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "call type arguments के बाद '>' अपेक्षित है"
+help = "call के '(' से पहले type-argument list को '>' से बंद करें।"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "constructor type arguments से पहले '<' अपेक्षित है"
+help = "constructor के type arguments से पहले '<' जोड़ें।"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "constructor type arguments के बाद '>' अपेक्षित है"
+help = "constructor की type-argument list को '>' से बंद करें।"
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "'scriptum' के बाद '(' अपेक्षित है"
+help = "`{scriptum}` call को '(' से शुरू करें।"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "scriptum arguments के बाद ')' अपेक्षित है"
+help = "arguments के बाद `{scriptum}` call को ')' से बंद करें।"
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
@@ -4216,5 +4369,26 @@ help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E`
 [diagnostics.INFO001]
 message = "कर्नेल `{kernel}` {device} डिवाइस पर क्रमिक रूप से चलता है"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "कर्नेल `{kernel}` एक लेन पर चलता है"
+help = "जब हर lane को एक item संभालना हो, तो `@ {nucleum}` फ़ंक्शन में `{itera}` loop और `{filum}` clause का उपयोग करें।"
+
+[diagnostics.INFO001.issues.not_split]
+message = "कर्नेल `{kernel}` {partitions} विभाजनों में से एक पर चलता है: {reason}"
+help = "कारण देखें: splitting के लिए linear lane grid, lane range, और हर lane की range तक सीमित writes आवश्यक हैं।"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "कर्नेल `{kernel}`: यह {partitions} विभाजनों में बँटेगा या नहीं, यह रन-टाइम आकारों पर निर्भर है"
+help = "अनुमानित splitting के लिए ऐसे run-time shapes चुनें जिनमें lane grid और उसके writes की ranges मेल खाती हों।"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "कर्नेल `{kernel}` एक CPU वर्कर पर एक क्रमिक कॉल के रूप में चलता है"
+help = "स्वतंत्र per-item कार्य के लिए, `@ {nucleum}` फ़ंक्शन में `{itera}` loop और `{filum}` clause का उपयोग करें।"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "कर्नेल `{kernel}` {device} डिवाइस पर नहीं रखा गया: {reason}"
+help = "कारण देखें और चुने गए device द्वारा समर्थित kernel रूप का उपयोग करें।"
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "कर्नेल `{kernel}`: {partitions} विभाजनों के पार इसका {kind} टाला जा सकता है: {avoidable} ({reason})"
+help = "ऑडिट कारण का अनुसरण करके निर्भरता खोजें। विभाजित पठन और लेखन को lane-local रखें और जहाँ संभव हो, मेल खाते buffer layouts का उपयोग करें।"

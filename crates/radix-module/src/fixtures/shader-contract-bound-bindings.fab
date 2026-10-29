@@ -35,7 +35,7 @@ functio bound_matches(numerus group, numerus binding, textus source_name) → bi
 
 @ fragment
 functio shader_bound_bindings_fragment(shade.ZqTex tex, shade.ZqSampler samp) → vacuum {
-    sit vector<f32, 4> sampled ← shade.zq_sample(tex, samp, uv)
+    sit vector<f32, magnitudo 4> sampled ← shade.zq_sample(tex, samp, uv)
     out_color ← sampled
 }
 

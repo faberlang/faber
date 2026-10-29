@@ -523,6 +523,42 @@ fn witness_binds_type_and_capacity_params_from_bounded_arrays() {
 }
 
 #[test]
+fn witness_binds_the_element_param_from_a_ranged_list() {
+    let mut types = TypeTable::new();
+    let element_param = types.intern(Type::Param(Symbol(310)));
+    let expected = types.ranged_array(element_param, 1, None);
+    let element = f32_ty(&mut types);
+    let actual = types.ranged_array(element, 1, None);
+
+    let mut bindings = MirGenericBindings::default();
+    assert!(bind_generic_type_witness(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+    ));
+    let bound = bindings.get(&Symbol(310)).copied().expect("T bound");
+    assert!(types.equals(bound.semantic_id(), element));
+}
+
+#[test]
+fn witness_refuses_a_ranged_list_of_another_range() {
+    let mut types = TypeTable::new();
+    let element_param = types.intern(Type::Param(Symbol(311)));
+    let expected = types.ranged_array(element_param, 1, None);
+    let element = f32_ty(&mut types);
+    let actual = types.ranged_array(element, 2, None);
+
+    let mut bindings = MirGenericBindings::default();
+    assert!(!bind_generic_type_witness(
+        &types,
+        MirType::semantic(expected),
+        MirType::semantic(actual),
+        &mut bindings,
+    ));
+}
+
+#[test]
 fn union_mismatch_undoes_partial_shape_bindings() {
     let mut types = TypeTable::new();
     let element = f32_ty(&mut types);

@@ -705,6 +705,10 @@ reminders, not a second EBNF.
 - **Exemplar:** English device sources such as
   `corpus/vector/kernel.fab` use `@ kernel`
   (a la package would use `@ nucleum`); `references/locales.md` records the locale-diagnosis route.
+- **Kernel tiers:** `@ kernel` takes an optional tier word, `@ kernel relaxed` or
+  `@ kernel unsafe` (la `@ nucleum laxus` / `intutus`, provisional); `unsafe`
+  includes `relaxed`, and the default tier is IEEE-correct (`corpus/kernel/tier.fab`).
+  Tier words follow the file's locale like every other keyword.
 - **Wrong form:** Do not copy `@ nucleum` (la) into an `en` file, or mix `@ shared`
   with a locale's other annotation spellings. Resolve the pack before judging
   an annotation; see `references/locales.md`.

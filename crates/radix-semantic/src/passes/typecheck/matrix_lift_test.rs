@@ -213,7 +213,11 @@ fn the_extrema_lift_over_a_matrix() {
         accepts(&function(&format!("{M} a"), M, &format!("a {op} 1.0")));
         accepts(&function(&format!("{M} a, {M} b"), M, &format!("a {op} b")));
         rejects(
-            &function(&format!("{M} a, vector<f32, 3> v"), M, &format!("a {op} v")),
+            &function(
+                &format!("{M} a, vector<f32, magnitudo 3> v"),
+                M,
+                &format!("a {op} v"),
+            ),
             SemanticErrorKind::OperandTypesInvalid,
             "argument_type_mismatch",
         );
@@ -235,7 +239,7 @@ fn approximate_equality_waits_for_the_tensor_ruling_over_a_matrix() {
 
 #[test]
 fn a_matrix_beside_a_tensor_or_vector_keeps_its_own_rule() {
-    for peer in ["tensor<f32, [2, 3]> t", "vector<f32, 3> t"] {
+    for peer in ["tensor<f32, [2, 3]> t", "vector<f32, magnitudo 3> t"] {
         let result = analyze_source(&function(&format!("{M} a, {peer}"), M, "a * t"));
         assert!(!result.is_ok(), "{peer}: {:?}", result.diagnostics);
     }

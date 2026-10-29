@@ -2,9 +2,13 @@
 //!
 //! This pass records portable-device admission facts beside the typed HIR. It
 //! does not change Faber arithmetic or lower runtime checks. Exact integer
-//! intermediates must fit the device's 32-bit integer envelope. An implicit
-//! trapping store that is not proven safe remains an explicit option-F
-//! requirement.
+//! intermediates must fit the host's 64-bit integer intermediate range
+//! (ruling 17); a `d64` intermediate uses the 128-bit carrier and traps beyond
+//! it at run time (ruling 19(e)). The operator ruling of 2026-10-28 admits
+//! `i64`, `u64`, `wrapping<u64>`, `saturating<u64>` and `d64` as kernel values,
+//! so these widths are per-target capability facts in the report, never check
+//! errors. An implicit trapping store that is not proven safe remains an
+//! explicit option-F requirement.
 
 use crate::{
     NumericWidth, Primitive, ResolvedTensorEdgePolicy, Resolver, SemanticError, SemanticErrorKind,
@@ -15,7 +19,7 @@ use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirAnnotation, HirArrayElement, HirBinOp, HirBlock, HirExpression, HirExpressionKind,
     HirFunction, HirId, HirIncDecOp, HirItemKind, HirLocal, HirStatement, HirStatementKind,
-    HirUnOp,
+    HirUnOp, KernelTier,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_target::Target;
@@ -30,6 +34,23 @@ pub const DEVICE_TARGETS: [Target; 3] = Target::DEVICE_TARGETS;
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct KernelRequirementsReport {
     pub kernels: Vec<KernelRequirement>,
+    /// One row per `fac machina` (en `do device`) region of the module's host
+    /// code. A local fact: the module artifact and the FHIR wire read
+    /// `kernels` only.
+    pub regions: Vec<DeviceRegionRequirement>,
+}
+
+/// A `fac machina` region's requirement rows and the facts `faber check
+/// --device` prints for it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceRegionRequirement {
+    /// The block's source span (the report names it `do device`).
+    pub span: Span,
+    pub target_reports: Vec<KernelTargetRequirement>,
+    pub facts: super::device_region::RegionFacts,
+    /// Host syncs the block performs. Zero for every region that checks: a
+    /// device read at the top of the block is refused by name.
+    pub host_syncs: u32,
 }
 
 /// One kernel's inferred requirements and admission verdict for every device
@@ -38,6 +59,10 @@ pub struct KernelRequirementsReport {
 pub struct KernelRequirement {
     pub def_id: DefId,
     pub name: String,
+    /// The tier the author declared (`@ kernel relaxed` / `unsafe`). Under
+    /// the safe switch analysis already read it as the default tier, so this
+    /// is the tier the emitters will see.
+    pub tier: KernelTier,
     pub target_reports: Vec<KernelTargetRequirement>,
 }
 
@@ -123,6 +148,12 @@ pub enum KernelRequirementFailure {
     CalleeNotAdmitted {
         callee: DefId,
     },
+    /// The target's emitter does not carry this integer or `d64` width, or an
+    /// expression needs a lane of that width. A capability refusal by name
+    /// (never a check error): 64-bit integers and `d64` are kernel values
+    /// (ruling 2026-10-28). Metal carries them (`long` / `ulong` lanes, and
+    /// `d64` in a 128-bit carrier); WGSL and AMD refuse them until their
+    /// emitters emulate 64-bit lanes, and CUDA until its unit lands.
     UnsupportedIntegerWidth {
         span: Span,
         width: NumericWidth,
@@ -164,13 +195,10 @@ pub enum KernelRequirementFailure {
     },
 }
 
-/// Issue: an integer carrier wider than the portable 32-bit kernel envelope.
-pub const ISSUE_WIDE_INTEGER: &str = "nucleum_wide_integer";
-/// Issue: the decimal carrier `d64` is not a kernel value.
-pub const ISSUE_D64: &str = "nucleum_d64";
 /// Issue: `f64` is not a kernel value.
 pub const ISSUE_F64: &str = "nucleum_f64";
-/// Issue: an exact intermediate exceeds the portable integer envelope.
+/// Issue: an exact intermediate is provably beyond the 64-bit integer range
+/// or, for `d64`, a constant operation is provably beyond the 128-bit carrier.
 pub const ISSUE_WIDE_INTERMEDIATE: &str = "nucleum_wide_intermediate";
 /// Issue: an integer extent has no proof that it fits the envelope.
 pub const ISSUE_EXTENT_UNPROVEN: &str = "nucleum_extent_unproven";
@@ -189,8 +217,18 @@ pub const ISSUE_TRAPPING_STORE: &str = "nucleum_trapping_store";
 pub fn language_errors(report: &KernelRequirementsReport) -> Vec<SemanticError> {
     let mut errors = Vec::new();
     let mut seen: FxHashSet<(&'static str, u32, u32)> = FxHashSet::default();
-    for kernel in &report.kernels {
-        let Some(row) = kernel.target_reports.first() else {
+    let rows = report
+        .kernels
+        .iter()
+        .map(|kernel| kernel.target_reports.first())
+        .chain(
+            report
+                .regions
+                .iter()
+                .map(|region| region.target_reports.first()),
+        );
+    for row in rows {
+        let Some(row) = row else {
             continue;
         };
         for failure in &row.failures {
@@ -224,19 +262,6 @@ fn language_failure(
     widths: &[KernelWidthRequirement],
 ) -> Option<LanguageDiagnostic> {
     match failure {
-        KernelRequirementFailure::UnsupportedIntegerWidth { span, width } => match width {
-            NumericWidth::I64 | NumericWidth::U64 => Some(LanguageDiagnostic {
-                issue: ISSUE_WIDE_INTEGER,
-                span: *span,
-                args: vec![("width", width.faber_marker().to_string())],
-            }),
-            NumericWidth::D64 => Some(LanguageDiagnostic {
-                issue: ISSUE_D64,
-                span: *span,
-                args: vec![("width", width.faber_marker().to_string())],
-            }),
-            _ => None,
-        },
         KernelRequirementFailure::UnsupportedFloatWidth { span, width }
             if *width == NumericWidth::F64 =>
         {
@@ -276,6 +301,7 @@ fn language_failure(
         | KernelRequirementFailure::NegativeShiftCountPossible { .. }
         | KernelRequirementFailure::SaturatingLoweringDeferred { .. }
         | KernelRequirementFailure::TensorEdgePolicyDeferred { .. }
+        | KernelRequirementFailure::UnsupportedIntegerWidth { .. }
         | KernelRequirementFailure::UnsupportedFloatWidth { .. } => None,
     }
 }
@@ -302,7 +328,47 @@ fn extent_label(range: &KernelValueRange) -> String {
     "unknown".to_string()
 }
 
+/// The declared tier of every kernel function and kernel method of a module,
+/// keyed by definition. A kernel with no tier word maps to
+/// [`KernelTier::Default`].
+#[must_use]
+pub fn declared_kernel_tiers(
+    hir: &radix_hir::HirModule,
+    interner: &Interner,
+) -> FxHashMap<DefId, KernelTier> {
+    let mut tiers = FxHashMap::default();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(function) if function.is_kernel => {
+                tiers.insert(
+                    item.def_id,
+                    radix_hir::kernel_tier_of(&item.annotations, interner),
+                );
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    if method.func.is_kernel {
+                        tiers.insert(
+                            method.def_id,
+                            radix_hir::kernel_tier_of(&method.annotations, interner),
+                        );
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    tiers
+}
+
 impl KernelRequirementsReport {
+    /// Record each kernel's declared tier on its row.
+    pub fn apply_tiers(&mut self, tiers: &FxHashMap<DefId, KernelTier>) {
+        for kernel in &mut self.kernels {
+            kernel.tier = tiers.get(&kernel.def_id).copied().unwrap_or_default();
+        }
+    }
+
     #[must_use]
     pub fn kernel(&self, def_id: DefId) -> Option<&KernelRequirement> {
         self.kernels.iter().find(|kernel| kernel.def_id == def_id)
@@ -463,7 +529,26 @@ pub fn check(
         recursive_kernels,
         &callback_defs,
     );
-    KernelRequirementsReport { kernels }
+    let mut regions = Vec::new();
+    super::device_region::for_each_region(hir, &mut |body, depth, outer| {
+        // A nested region is refused by the legality pass; the outer row
+        // already covers its statements.
+        if depth == 0 {
+            regions.push(analyze_region(
+                body,
+                outer,
+                &facts,
+                &const_values,
+                resolver,
+                types,
+                interner,
+                tensor_edge_policies,
+            ));
+        }
+    });
+    let mut report = KernelRequirementsReport { kernels, regions };
+    report.apply_tiers(&declared_kernel_tiers(hir, interner));
+    report
 }
 
 /// Whether a kernel declaration carries the `publica` launch marker.
@@ -471,6 +556,21 @@ fn is_public_kernel(annotations: &[HirAnnotation], interner: &Interner) -> bool 
     annotations
         .iter()
         .any(|annotation| interner.resolve(annotation.family) == "publica")
+}
+
+/// The folded integer value of an imported `module.CONST` member, when the
+/// exporter folded it.
+fn imported_int_const(resolver: &Resolver, object: &HirExpression, member: Symbol) -> Option<i128> {
+    let HirExpressionKind::Path(module) = &object.kind else {
+        return None;
+    };
+    let namespace = resolver
+        .get_symbol(*module)
+        .filter(|namespace| namespace.kind == SymbolKind::Module)?;
+    match resolver.namespace_file_const_value_canonical(namespace.name, member)? {
+        crate::file_interface::InterfaceConstValue::Int(value) => Some(*value),
+        _ => None,
+    }
 }
 
 /// Exact integer value of a call argument used to seed an inlined private
@@ -796,6 +896,7 @@ fn analyze_kernel(
         expression_vectors: FxHashMap::default(),
         has_signed_coordinate_input: coordinate_ranges.is_some(),
         failures: Vec::new(),
+        wide_intermediates: Vec::new(),
         conditions: Vec::new(),
         trapping_stores: Vec::new(),
         widths: Vec::new(),
@@ -846,44 +947,138 @@ fn analyze_kernel(
     let conditions = dedupe(base.conditions);
     let trapping_stores = dedupe(base.trapping_stores);
     let failures = dedupe(base.failures);
+    let wide_intermediates = dedupe(base.wide_intermediates);
 
     KernelRequirement {
         def_id,
         name: interner.resolve(function.name).to_owned(),
-        target_reports: DEVICE_TARGETS
-            .iter()
-            .copied()
-            .map(|target| {
-                let mut target_failures = failures.clone();
-                if recursive {
-                    target_failures.push(KernelRequirementFailure::RecursiveCall);
+        tier: KernelTier::Default,
+        target_reports: target_rows(
+            &failures,
+            &wide_intermediates,
+            &widths,
+            &conditions,
+            &trapping_stores,
+            recursive,
+        ),
+    }
+}
+
+/// One requirement row per device target from the facts a body produced.
+fn target_rows(
+    failures: &[KernelRequirementFailure],
+    wide_intermediates: &[(Span, KernelValueRange, bool)],
+    widths: &[KernelWidthRequirement],
+    conditions: &[KernelExtentCondition],
+    trapping_stores: &[KernelTrappingStore],
+    recursive: bool,
+) -> Vec<KernelTargetRequirement> {
+    DEVICE_TARGETS
+        .iter()
+        .copied()
+        .map(|target| {
+            let mut target_failures = failures.to_vec();
+            if recursive {
+                target_failures.push(KernelRequirementFailure::RecursiveCall);
+            }
+            // An exact intermediate beyond the portable 32-bit envelope needs
+            // a 64-bit lane, and a 32-bit lane would silently wrap it. A
+            // target whose emitter carries 64-bit integers computes one that
+            // is its expression's own type natively (`long` / `ulong`); every
+            // other intermediate, and every other target, refuses by name.
+            for (span, range, native) in wide_intermediates {
+                if *native && target.supports_wide_kernel_values() {
+                    continue;
                 }
-                for requirement in &widths {
-                    if requirement.policy == KernelNumericPolicy::Saturating {
-                        target_failures.push(
-                            KernelRequirementFailure::SaturatingLoweringDeferred {
-                                span: requirement.span,
-                                width: requirement.width,
-                            },
-                        );
-                    }
-                    if !supports_width(target, requirement) {
-                        target_failures.push(width_failure(requirement));
-                    }
+                target_failures.push(KernelRequirementFailure::UnsupportedIntegerWidth {
+                    span: *span,
+                    width: wide_lane_width(range),
+                });
+            }
+            for requirement in widths {
+                if requirement.policy == KernelNumericPolicy::Saturating {
+                    target_failures.push(KernelRequirementFailure::SaturatingLoweringDeferred {
+                        span: requirement.span,
+                        width: requirement.width,
+                    });
                 }
-                let failures = dedupe(target_failures);
-                KernelTargetRequirement {
-                    target,
-                    admitted: failures.is_empty(),
-                    recursive,
-                    callees: Vec::new(),
-                    widths: widths.clone(),
-                    extent_conditions: conditions.clone(),
-                    trapping_stores: trapping_stores.clone(),
-                    failures,
+                if !supports_width(target, requirement) {
+                    target_failures.push(width_failure(requirement));
                 }
-            })
-            .collect(),
+            }
+            let failures = dedupe(target_failures);
+            KernelTargetRequirement {
+                target,
+                admitted: failures.is_empty(),
+                recursive,
+                callees: Vec::new(),
+                widths: widths.to_vec(),
+                extent_conditions: conditions.to_vec(),
+                trapping_stores: trapping_stores.to_vec(),
+                failures,
+            }
+        })
+        .collect()
+}
+
+/// Requirements of one `fac machina` region: the same body facts a kernel
+/// body gets, over the block's statements, with no parameters.
+fn analyze_region(
+    region: &super::device_region::RegionBody<'_>,
+    outer: &super::device_region::OuterNames,
+    facts: &TypeFacts,
+    const_values: &FxHashMap<DefId, i128>,
+    resolver: &Resolver,
+    types: &TypeTable,
+    interner: &Interner,
+    tensor_edge_policies: &TensorEdgePolicyTable,
+) -> DeviceRegionRequirement {
+    let mut base = BodyFacts {
+        types,
+        facts,
+        interner,
+        tensor_edge_policies,
+        const_values,
+        resolver,
+        ranges: FxHashMap::default(),
+        parameter_types: FxHashMap::default(),
+        parameter_aliases: FxHashMap::default(),
+        range_only_bindings: FxHashSet::default(),
+        coordinate_ranges: FxHashMap::default(),
+        expression_vectors: FxHashMap::default(),
+        has_signed_coordinate_input: false,
+        failures: Vec::new(),
+        wide_intermediates: Vec::new(),
+        conditions: Vec::new(),
+        trapping_stores: Vec::new(),
+        widths: Vec::new(),
+        return_type: None,
+    };
+    let region_facts = super::device_region::region_facts(resolver, types, outer, interner, region);
+    base.bind_captured_size_values(&region_facts.captured);
+    for statement in region.statements {
+        base.visit_statement_stateful(statement);
+    }
+    if let Some(tail) = region.tail {
+        base.evaluate(tail);
+    }
+    let widths = dedupe(base.widths);
+    let conditions = dedupe(base.conditions);
+    let trapping_stores = dedupe(base.trapping_stores);
+    let failures = dedupe(base.failures);
+    let wide_intermediates = dedupe(base.wide_intermediates);
+    DeviceRegionRequirement {
+        span: region.span,
+        target_reports: target_rows(
+            &failures,
+            &wide_intermediates,
+            &widths,
+            &conditions,
+            &trapping_stores,
+            false,
+        ),
+        facts: region_facts,
+        host_syncs: 0,
     }
 }
 
@@ -1171,7 +1366,7 @@ fn device_target_index(target: Target) -> usize {
 fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool {
     match requirement.primitive {
         Primitive::Numerus => {
-            let integer_width = matches!(
+            let narrow_integer = matches!(
                 requirement.width,
                 NumericWidth::I8
                     | NumericWidth::I16
@@ -1180,8 +1375,16 @@ fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool 
                     | NumericWidth::U16
                     | NumericWidth::U32
             );
+            let wide_integer = target.supports_wide_kernel_values()
+                && matches!(requirement.width, NumericWidth::I64 | NumericWidth::U64);
+            let integer_width = narrow_integer || wide_integer;
             match requirement.policy {
-                KernelNumericPolicy::Exact | KernelNumericPolicy::Saturating => integer_width,
+                KernelNumericPolicy::Exact => {
+                    integer_width
+                        || (target.supports_wide_kernel_values()
+                            && requirement.width == NumericWidth::D64)
+                }
+                KernelNumericPolicy::Saturating => integer_width,
                 KernelNumericPolicy::Wrapping => {
                     target.supports_wrapping_kernel_integers() && integer_width
                 }
@@ -1194,6 +1397,18 @@ fn supports_width(target: Target, requirement: &KernelWidthRequirement) -> bool 
             _ => false,
         },
         _ => false,
+    }
+}
+
+/// The 64-bit lane an out-of-envelope intermediate needs: unsigned when the
+/// range is non-negative and exceeds `i64`, signed otherwise.
+fn wide_lane_width(range: &KernelValueRange) -> NumericWidth {
+    let unsigned = constant(&range.minimum).is_some_and(|minimum| minimum >= 0)
+        && constant(&range.maximum).is_some_and(|maximum| maximum > i128::from(i64::MAX));
+    if unsigned {
+        NumericWidth::U64
+    } else {
+        NumericWidth::I64
     }
 }
 
@@ -1300,8 +1515,23 @@ fn propagate_callee_requirements(
     }
 }
 
+/// The portable 32-bit device envelope: tensor addressing, launch extents and
+/// the lane-coordinate carrier. A target without 64-bit lanes also refuses an
+/// exact integer intermediate beyond it.
 const DEVICE_INTEGER_MIN: i128 = -2_147_483_648;
 const DEVICE_INTEGER_MAX: i128 = 4_294_967_295;
+/// The host's 64-bit integer intermediate range (ruling 17): every exact
+/// integer intermediate must lie in it, on every target.
+const WIDE_INTEGER_MIN: i128 = -9_223_372_036_854_775_808;
+const WIDE_INTEGER_MAX: i128 = 18_446_744_073_709_551_615;
+/// Scale of a stored `d64`: an `i64` mantissa at 10⁻⁸.
+const D64_STORE_SCALE: u32 = 8;
+
+#[derive(Debug, Clone, Copy)]
+enum D64Constant {
+    Value(i128, u32),
+    Overflow,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct AbstractRange(Option<KernelValueRange>);
@@ -1323,6 +1553,35 @@ impl AbstractRange {
     }
 }
 
+fn is_d64_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
+    ty.is_some_and(|ty| {
+        matches!(
+            types.get(numeric_scalar_type(ty, types)),
+            Type::SizedNumeric(_, NumericWidth::D64)
+        )
+    })
+}
+
+fn decimal_constant(value: i128) -> D64Constant {
+    value
+        .checked_mul(10i128.pow(D64_STORE_SCALE))
+        .map_or(D64Constant::Overflow, |value| {
+            D64Constant::Value(value, D64_STORE_SCALE)
+        })
+}
+
+fn scale_d64_constant(value: i128, from: u32, to: u32) -> Option<i128> {
+    value.checked_mul(10i128.checked_pow(to.checked_sub(from)?)?)
+}
+
+fn normalize_d64_constant(mut value: i128, mut scale: u32) -> D64Constant {
+    while scale > D64_STORE_SCALE && value % 10 == 0 {
+        value /= 10;
+        scale -= 1;
+    }
+    D64Constant::Value(value, scale)
+}
+
 struct BodyFacts<'a> {
     types: &'a TypeTable,
     facts: &'a TypeFacts,
@@ -1338,6 +1597,14 @@ struct BodyFacts<'a> {
     expression_vectors: FxHashMap<HirId, Vec<AbstractRange>>,
     has_signed_coordinate_input: bool,
     failures: Vec<KernelRequirementFailure>,
+    /// Exact intermediates inside the 64-bit range but beyond the portable
+    /// 32-bit envelope. They need a 64-bit lane. The flag is whether the
+    /// expression's own type is that lane (an `i64` or `u64` result holding a
+    /// value of its own range): such an intermediate is computed natively by
+    /// a target that carries 64-bit integers. Any other (a narrower type, or a
+    /// wrapping word observed beyond its carrier) needs a widening that no
+    /// emitter performs yet, so each target row refuses it by name.
+    wide_intermediates: Vec<(Span, KernelValueRange, bool)>,
     conditions: Vec<KernelExtentCondition>,
     trapping_stores: Vec<KernelTrappingStore>,
     widths: Vec<KernelWidthRequirement>,
@@ -1368,6 +1635,11 @@ impl BodyFacts<'_> {
                     }
                 }
             }
+            HirStatementKind::ReddeFilum(value) => {
+                if let Some(value) = value {
+                    self.evaluate(value);
+                }
+            }
             HirStatementKind::IncDec(inc_dec) => {
                 let target_range = self.evaluate(&inc_dec.target);
                 let delta = match inc_dec.op {
@@ -1384,7 +1656,7 @@ impl BodyFacts<'_> {
                     AbstractRange::exact(1),
                 );
                 if let Some(ty) = inc_dec.target.ty {
-                    self.check_intermediate(stmt.span, value.clone());
+                    self.check_value_intermediate(stmt.span, value.clone(), Some(ty));
                     let stored = self.check_store(stmt.span, ty, value);
                     if let HirExpressionKind::Path(def_id) = inc_dec.target.kind {
                         self.ranges.insert(def_id, stored);
@@ -1466,13 +1738,13 @@ impl BodyFacts<'_> {
         match &expr.kind {
             HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => {
                 let range = AbstractRange::exact(i128::from(*value));
-                self.check_intermediate(expr.span, range.clone());
+                self.check_value_intermediate(expr.span, range.clone(), expr.ty);
                 range
             }
             HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
                 let range = crate::passes::const_int_value(expr)
                     .map_or_else(AbstractRange::unknown, AbstractRange::exact);
-                self.check_intermediate(expr.span, range.clone());
+                self.check_value_intermediate(expr.span, range.clone(), expr.ty);
                 range
             }
             HirExpressionKind::Path(def_id) => self.path_range(*def_id, expr.ty),
@@ -1521,7 +1793,10 @@ impl BodyFacts<'_> {
                     unary_range(*op, input)
                 };
                 if is_integer_value_type(expr.ty, self.types) && modular_ty.is_none() {
-                    self.check_intermediate(expr.span, output.clone());
+                    self.check_value_intermediate(expr.span, output.clone(), expr.ty);
+                }
+                if *op == HirUnOp::Neg && is_d64_type(expr.ty, self.types) {
+                    self.check_d64_intermediate(expr);
                 }
                 output
             }
@@ -1530,16 +1805,10 @@ impl BodyFacts<'_> {
                     self.check_observed_modular_intermediates(lhs);
                     self.check_observed_modular_intermediates(rhs);
                     if *op == HirBinOp::Div
-                        && let Some((carrier_min, carrier_max)) =
-                            modular_carrier_bounds(expr.ty, self.types)
+                        && let Some(carrier) = modular_carrier_bounds(expr.ty, self.types)
                     {
                         let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
-                        self.check_intermediate_with_bounds(
-                            expr.span,
-                            exact,
-                            carrier_min,
-                            carrier_max,
-                        );
+                        self.check_value_intermediate_in(expr.span, exact, carrier, None);
                     }
                 }
                 let left = self.evaluate(lhs);
@@ -1638,7 +1907,14 @@ impl BodyFacts<'_> {
                     && is_integer_value_type(expr.ty, self.types)
                     && modular_ty.is_none()
                 {
-                    self.check_intermediate(expr.span, output.clone());
+                    self.check_value_intermediate(expr.span, output.clone(), expr.ty);
+                }
+                if matches!(
+                    op,
+                    HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod
+                ) && is_d64_type(expr.ty, self.types)
+                {
+                    self.check_d64_intermediate(expr);
                 }
                 output
             }
@@ -1855,7 +2131,7 @@ impl BodyFacts<'_> {
                     let range = ranges
                         .get(index)
                         .map_or_else(AbstractRange::unknown, |range| self.range_binding(range));
-                    self.check_intermediate(body.span, range.clone());
+                    self.check_value_intermediate(body.span, range.clone(), None);
                     self.ranges.insert(*def_id, range);
                     self.range_only_bindings.insert(*def_id);
                 }
@@ -1946,7 +2222,7 @@ impl BodyFacts<'_> {
                     .unwrap_or_else(AbstractRange::unknown);
                     let modular_ty = expr.ty.filter(|ty| is_modular_type(Some(*ty), self.types));
                     if modular_ty.is_none() || method_name == "divisa" {
-                        self.check_intermediate(expr.span, result.clone());
+                        self.check_value_intermediate(expr.span, result.clone(), expr.ty);
                     }
                     return if let Some(ty) = modular_ty {
                         AbstractRange::from_type(ty, self.types)
@@ -2273,7 +2549,7 @@ impl BodyFacts<'_> {
         // binder has the interval's bounds, not a tensor element's range.
         if matches!(iter.kind, HirExpressionKind::Intervallum { .. }) {
             let range = self.range_binding(iter);
-            self.check_intermediate(iter.span, range.clone());
+            self.check_value_intermediate(iter.span, range.clone(), None);
             self.ranges.insert(binding, range);
             self.range_only_bindings.insert(binding);
             self.visit_block_stateful(body);
@@ -2363,11 +2639,10 @@ impl BodyFacts<'_> {
             HirExpressionKind::Unary(op, operand) => {
                 self.check_observed_modular_intermediates(operand);
                 if matches!(op, HirUnOp::Neg | HirUnOp::BitNot)
-                    && let Some((carrier_min, carrier_max)) =
-                        modular_carrier_bounds(expr.ty, self.types)
+                    && let Some(carrier) = modular_carrier_bounds(expr.ty, self.types)
                 {
                     let exact = unary_range(*op, self.peek_range(operand));
-                    self.check_intermediate_with_bounds(expr.span, exact, carrier_min, carrier_max);
+                    self.check_value_intermediate_in(expr.span, exact, carrier, None);
                 }
             }
             HirExpressionKind::Binary(op, lhs, rhs) => {
@@ -2376,11 +2651,10 @@ impl BodyFacts<'_> {
                 if matches!(
                     *op,
                     HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Shl | HirBinOp::Div
-                ) && let Some((carrier_min, carrier_max)) =
-                    modular_carrier_bounds(expr.ty, self.types)
+                ) && let Some(carrier) = modular_carrier_bounds(expr.ty, self.types)
                 {
                     let exact = binary_range(*op, self.peek_range(lhs), self.peek_range(rhs));
-                    self.check_intermediate_with_bounds(expr.span, exact, carrier_min, carrier_max);
+                    self.check_value_intermediate_in(expr.span, exact, carrier, None);
                 }
             }
             _ => {}
@@ -2481,6 +2755,16 @@ impl BodyFacts<'_> {
             HirExpressionKind::Path(def_id) => self.path_range(*def_id, expr.ty),
             HirExpressionKind::Literal(_) => crate::passes::const_int_value(expr)
                 .map_or_else(AbstractRange::unknown, AbstractRange::exact),
+            HirExpressionKind::Field(object, member) => {
+                imported_int_const(self.resolver, object, *member).map_or_else(
+                    || {
+                        expr.ty.map_or_else(AbstractRange::unknown, |ty| {
+                            AbstractRange::from_type(ty, self.types)
+                        })
+                    },
+                    AbstractRange::exact,
+                )
+            }
             HirExpressionKind::Unary(op, operand) => unary_range(*op, self.peek_range(operand)),
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 binary_range(*op, self.peek_range(lhs), self.peek_range(rhs))
@@ -2536,6 +2820,185 @@ impl BodyFacts<'_> {
 
     fn check_intermediate(&mut self, span: Span, range: AbstractRange) {
         self.check_intermediate_with_bounds(span, range, DEVICE_INTEGER_MIN, DEVICE_INTEGER_MAX);
+    }
+
+    /// An exact value intermediate: a result of integer arithmetic. It must lie
+    /// in the host's 64-bit intermediate range on every target; one beyond the
+    /// portable 32-bit envelope is also recorded, because it needs a 64-bit
+    /// lane that no device emitter computes yet (each target row refuses it by
+    /// name). Ranges that name launch extents or arrive with signed
+    /// coordinates describe addressing, which stays on the 32-bit device
+    /// envelope.
+    fn check_value_intermediate(&mut self, span: Span, range: AbstractRange, ty: Option<TypeId>) {
+        let own = ty.and_then(|ty| type_range(ty, self.types));
+        self.check_value_intermediate_in(
+            span,
+            range,
+            (DEVICE_INTEGER_MIN, DEVICE_INTEGER_MAX),
+            own.as_ref(),
+        );
+    }
+
+    /// [`Self::check_value_intermediate`] with the narrow-lane bounds outside
+    /// of which a 32-bit lane would wrap.
+    fn check_value_intermediate_in(
+        &mut self,
+        span: Span,
+        range: AbstractRange,
+        (narrow_min, narrow_max): (i128, i128),
+        own: Option<&KernelValueRange>,
+    ) {
+        let Some(bounds) = range.0.as_ref() else {
+            self.check_intermediate(span, range);
+            return;
+        };
+        if self.has_signed_coordinate_input || contains_shape(bounds) {
+            self.check_intermediate(span, range);
+            return;
+        }
+        let minimum = symbolic_bounds(&bounds.minimum);
+        let maximum = symbolic_bounds(&bounds.maximum);
+        let out_of_range = constant(&bounds.minimum).is_some_and(|value| value < WIDE_INTEGER_MIN)
+            || constant(&bounds.maximum).is_some_and(|value| value > WIDE_INTEGER_MAX)
+            || minimum
+                .minimum
+                .is_some_and(|value| value > WIDE_INTEGER_MAX)
+            || maximum
+                .maximum
+                .is_some_and(|value| value < WIDE_INTEGER_MIN);
+        if out_of_range {
+            if let Some(range) = range.0 {
+                self.failures
+                    .push(KernelRequirementFailure::IntermediateOutOfRange { span, range });
+            }
+            return;
+        }
+        let fits = |low: i128, high: i128| {
+            minimum.minimum.is_some_and(|value| value >= low)
+                && maximum.maximum.is_some_and(|value| value <= high)
+        };
+        if !fits(WIDE_INTEGER_MIN, WIDE_INTEGER_MAX) {
+            self.failures
+                .push(KernelRequirementFailure::UnsupportedIntegerRange { span });
+        } else if !fits(narrow_min, narrow_max)
+            && let Some(range) = range.0
+        {
+            let native = own.is_some_and(|own| {
+                matches!(
+                    (constant(&own.minimum), constant(&own.maximum)),
+                    (Some(low), Some(high)) if fits(low, high)
+                )
+            });
+            self.wide_intermediates.push((span, range, native));
+        }
+    }
+
+    /// A `d64` intermediate is admitted unless compile-time constants prove
+    /// that one of its carrier operations overflows. Bounds based on the full
+    /// stored `i64` range are deliberately not a refusal: the Metal helpers
+    /// propagate the carrier-overflow flag to the existing device fault slot.
+    fn check_d64_intermediate(&mut self, expr: &HirExpression) {
+        if !matches!(self.constant_d64(expr), Some(D64Constant::Overflow)) {
+            return;
+        }
+        self.failures
+            .push(KernelRequirementFailure::IntermediateOutOfRange {
+                span: expr.span,
+                range: KernelValueRange {
+                    minimum: KernelRangeExpr::Constant(-i128::MAX),
+                    maximum: KernelRangeExpr::Constant(i128::MAX),
+                },
+            });
+    }
+
+    /// Evaluate only the constant subset needed to prove a `d64` carrier
+    /// overflow. `None` means the expression depends on a run-time value (or
+    /// uses an operation not folded here); it must be checked by the device.
+    fn constant_d64(&self, expr: &HirExpression) -> Option<D64Constant> {
+        if !is_d64_type(expr.ty, self.types) {
+            return crate::passes::const_int_value(expr).map(|value| D64Constant::Value(value, 0));
+        }
+        match &expr.kind {
+            HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)) => {
+                Some(decimal_constant(i128::from(*value)))
+            }
+            HirExpressionKind::Literal(radix_hir::HirLiteral::BigInt(_)) => {
+                crate::passes::const_int_value(expr).map(decimal_constant)
+            }
+            HirExpressionKind::Literal(radix_hir::HirLiteral::FloatText { text, .. }) => {
+                let (mantissa, exponent) = radix_types::numeric_width::decimal_text_to_scaled(
+                    self.interner.resolve(*text),
+                )?;
+                let shift = exponent.checked_add(i32::try_from(D64_STORE_SCALE).ok()?)?;
+                let scaled = if shift >= 0 {
+                    mantissa.checked_mul(10i128.checked_pow(u32::try_from(shift).ok()?)?)?
+                } else {
+                    let divisor = 10i128.checked_pow(shift.unsigned_abs())?;
+                    if mantissa % divisor != 0 {
+                        return None;
+                    }
+                    mantissa / divisor
+                };
+                Some(D64Constant::Value(scaled, D64_STORE_SCALE))
+            }
+            HirExpressionKind::Literal(radix_hir::HirLiteral::Float(_)) => None,
+            HirExpressionKind::Unary(HirUnOp::Neg, operand) => match self.constant_d64(operand)? {
+                D64Constant::Value(value, scale) => value
+                    .checked_neg()
+                    .map_or(Some(D64Constant::Overflow), |value| {
+                        Some(D64Constant::Value(value, scale))
+                    }),
+                D64Constant::Overflow => Some(D64Constant::Overflow),
+            },
+            HirExpressionKind::Binary(op, lhs, rhs)
+                if matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul) =>
+            {
+                let lhs = self.constant_d64(lhs)?;
+                let rhs = self.constant_d64(rhs)?;
+                let (D64Constant::Value(lhs, lhs_scale), D64Constant::Value(rhs, rhs_scale)) =
+                    (lhs, rhs)
+                else {
+                    return Some(D64Constant::Overflow);
+                };
+                match op {
+                    HirBinOp::Add | HirBinOp::Sub => {
+                        let scale = lhs_scale.max(rhs_scale);
+                        let Some(lhs) = scale_d64_constant(lhs, lhs_scale, scale) else {
+                            return Some(D64Constant::Overflow);
+                        };
+                        let Some(rhs) = scale_d64_constant(rhs, rhs_scale, scale) else {
+                            return Some(D64Constant::Overflow);
+                        };
+                        let value = if *op == HirBinOp::Add {
+                            lhs.checked_add(rhs)
+                        } else {
+                            lhs.checked_sub(rhs)
+                        };
+                        Some(value.map_or(D64Constant::Overflow, |value| {
+                            normalize_d64_constant(value, scale)
+                        }))
+                    }
+                    HirBinOp::Mul => {
+                        let Some(scale) = lhs_scale.checked_add(rhs_scale) else {
+                            return Some(D64Constant::Overflow);
+                        };
+                        Some(lhs.checked_mul(rhs).map_or(D64Constant::Overflow, |value| {
+                            normalize_d64_constant(value, scale)
+                        }))
+                    }
+                    _ => None,
+                }
+            }
+            HirExpressionKind::Conversio { source, .. } => {
+                if is_d64_type(source.ty, self.types) {
+                    self.constant_d64(source)
+                } else {
+                    crate::passes::const_int_value(source).map(decimal_constant)
+                }
+            }
+            HirExpressionKind::Verte { source, .. } => self.constant_d64(source),
+            _ => None,
+        }
     }
 
     fn check_intermediate_with_bounds(
@@ -2679,6 +3142,31 @@ impl BodyFacts<'_> {
                     maximum: extent,
                 })),
             );
+        }
+    }
+
+    /// A captured `size` binding that a captured tensor's shape names reads as
+    /// that axis's symbolic extent, as a `size` type parameter does in a
+    /// kernel (the launch contract owns its value).
+    fn bind_captured_size_values(&mut self, captured: &[(DefId, TypeId)]) {
+        for (_, ty) in captured {
+            for axis in shape_dimensions(*ty, self.types) {
+                let IndexExpr::Runtime(radix_types::RuntimeExtentId::ScalarBinding(binding)) =
+                    self.types.get_index(axis)
+                else {
+                    continue;
+                };
+                let extent = KernelRangeExpr::Shape(axis);
+                self.ranges.insert(
+                    *binding,
+                    AbstractRange(Some(KernelValueRange {
+                        minimum: extent.clone(),
+                        maximum: extent,
+                    })),
+                );
+                // The binding is a launch-time extent, not an i64 cell.
+                self.range_only_bindings.insert(*binding);
+            }
         }
     }
 
@@ -3040,11 +3528,19 @@ fn is_modular_type(ty: Option<TypeId>, types: &TypeTable) -> bool {
     })
 }
 
+/// The narrow-lane carrier of a wrapping word whose exact intermediates are
+/// checked when an observer reads them. A wrapping word reduces once, at the
+/// store; the exact value in between lives in the host's 64-bit intermediate
+/// range (ruling 17), so an intermediate outside the word's own carrier needs
+/// a 64-bit lane. A 64-bit word has no narrower carrier.
 fn modular_carrier_bounds(ty: Option<TypeId>, types: &TypeTable) -> Option<(i128, i128)> {
     let ty = numeric_scalar_type(ty?, types);
     match types.get(ty) {
         Type::ModularWord(NumericWidth::I32) => Some((i128::from(i32::MIN), i128::from(i32::MAX))),
         Type::ModularWord(NumericWidth::U32) => Some((0, i128::from(u32::MAX))),
+        Type::ModularWord(NumericWidth::I64 | NumericWidth::U64) => {
+            Some((WIDE_INTEGER_MIN, WIDE_INTEGER_MAX))
+        }
         _ => None,
     }
 }
@@ -3207,6 +3703,24 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
             }
         }
         HirBinOp::Mod => {
+            // A non-negative numerator over a symbolic extent divisor (a
+            // captured `size` binding, a tensor axis) is bounded by the
+            // extent: a floored remainder by `d > 0` lies in `[0, d - 1]`.
+            // A zero divisor is a separate failure; it never yields a value.
+            if (constant(&rhs.minimum).is_none() || constant(&rhs.maximum).is_none())
+                && symbolic_bounds(&lhs.minimum)
+                    .minimum
+                    .is_some_and(|m| m >= 0)
+                && symbolic_bounds(&rhs.minimum)
+                    .minimum
+                    .is_some_and(|m| m >= 0)
+                && contains_shape(&rhs)
+            {
+                return AbstractRange(Some(KernelValueRange {
+                    minimum: KernelRangeExpr::Constant(0),
+                    maximum: subtract(rhs.maximum, KernelRangeExpr::Constant(1)),
+                }));
+            }
             let Some(divisor_min) = constant(&rhs.minimum) else {
                 return AbstractRange::unknown();
             };

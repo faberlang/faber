@@ -286,6 +286,29 @@ fn reperta_is_an_optional_predicate_search_row_beside_primus() {
 }
 
 #[test]
+fn extende_is_a_vacuum_list_join_row_beside_appende() {
+    let entry = lookup_method(IntrinsicReceiver::Lista, "extende", 1).expect("lista extende row");
+    assert_eq!(entry.params, &[IntrinsicParamKind::ElementArray]);
+    assert_eq!(entry.return_kind, IntrinsicReturnKind::Vacuum);
+    assert_eq!(entry.mir_kind, IntrinsicMirKind::ListExtend);
+    // The join is lowered element by element in MIR: it is neither a single
+    // collection op nor a higher-order closure row, and it mutates its receiver.
+    assert_eq!(mir_collection_op(entry), None);
+    assert_eq!(mir_atomic_op(entry), None);
+    assert!(!mir_is_higher_order_lista(entry));
+    assert!(is_mutating_receiver(entry));
+    // One signature, on lists only; `appende` (one element) is untouched.
+    assert!(lookup_method(IntrinsicReceiver::Lista, "extende", 0).is_none());
+    assert!(lookup_method(IntrinsicReceiver::Queue, "extende", 1).is_none());
+    assert!(lookup_method(IntrinsicReceiver::Copia, "extende", 1).is_none());
+    let appende = lookup_method(IntrinsicReceiver::Lista, "appende", 1).expect("appende row");
+    assert_eq!(
+        appende.mir_kind,
+        IntrinsicMirKind::Collection(MirCollectionOp::Append)
+    );
+}
+
+#[test]
 fn receivers_for_type_maps_semantic_families() {
     let mut types = radix_types::TypeTable::new();
     let element = types.intern(Type::Primitive(Primitive::Numerus));
@@ -314,13 +337,13 @@ fn receivers_for_type_maps_semantic_families() {
     );
     assert_eq!(
         lookup_method_for_type(&bounded_ascii, "longitudo", 0)
-            .expect("ascii<N>.longitudo")
+            .expect("ascii<magnitudo N>.longitudo")
             .faber_name,
         "longitudo"
     );
     assert_eq!(
         lookup_method_for_type(&bounded_textus, "appende", 1)
-            .expect("textus<N>.appende")
+            .expect("textus<magnitudo N>.appende")
             .faber_name,
         "appende"
     );

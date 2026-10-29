@@ -11,8 +11,15 @@
 //! Elements with a dense kind (f32 f64 i32 i64 u8 u32 u64) land in typed
 //! storage with no `Value` boxing. `i8`, `i16` and `u16` have no dense kind
 //! and decode natively into boxed `Values` (correct, slower).
+//!
+//! A fixed-layout genus element keeps the bytes as they are:
+//! the input `Vec<u8>` becomes the tensor's `DenseStorage::Record` rows with no
+//! per-element decode and no copy. A row reads back as a struct only when an
+//! element is read. The byte image is little-endian by the layout law; a
+//! wrong byte count is a named, recoverable conversion failure: overflow,
+//! misalignment, truncation or trailing bytes.
 
-use crate::dense::{DenseKind, DenseStorage, dense_kind_of_type};
+use crate::dense::{DenseKind, DenseStorage, RecordLayout, dense_kind_of_type};
 use crate::value::{TensorValue, Value};
 use crate::{Host, Runner, RunnerError};
 use radix_codegen_shared::hints::{self, EndianHint};
@@ -23,10 +30,21 @@ use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{NumericWidth, Type, TypeId, effective_width};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Stable issue for a target with run-time extents that arrived without its
 /// shape operand: lowering always supplies one, so this is an invariant break.
-const SHAPE_OPERAND_MISSING_ISSUE: &str = "octeti_tensor_shape_operand_missing";
+const SHAPE_OPERAND_MISSING_ISSUE: &str = "list_b8_to_tensor_shape_operand_missing";
+
+/// Stable issues of the record-element row. The first four are recoverable
+/// conversion failures (`⊥`, `fac/cape`, `⇥`); the last two are invariant
+/// breaks the checker and the layout law make unreachable from checked source.
+pub(crate) const RECORD_OVERFLOW_ISSUE: &str = "runner_list_b8_to_tensor_record_overflow";
+pub(crate) const RECORD_MISALIGNED_ISSUE: &str = "runner_list_b8_to_tensor_record_misaligned";
+pub(crate) const RECORD_TRUNCATED_ISSUE: &str = "runner_list_b8_to_tensor_record_truncated";
+pub(crate) const RECORD_TRAILING_ISSUE: &str = "runner_list_b8_to_tensor_record_trailing_bytes";
+const RECORD_LAYOUT_REFUSED_ISSUE: &str = "list_b8_to_tensor_record_layout_refused";
+const RECORD_BIG_ENDIAN_ISSUE: &str = "list_b8_to_tensor_record_big_endian";
 
 /// Elements that decode into boxed `Values` (no `DenseKind`).
 #[derive(Clone, Copy)]
@@ -85,7 +103,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     /// extents; a literal target reads its dims from the type instead.
     ///
     /// A wrong byte length is the recoverable `runner_conversion` failure with
-    /// issue `runner_octeti_tensor_length_mismatch` (`⊥`, `fac/cape`, `⇥`
+    /// issue `runner_list_b8_to_tensor_length_mismatch` (`⊥`, `fac/cape`, `⇥`
     /// route through [`Runner::recover_or_fail`] exactly like the scalar row).
     pub(crate) fn convert_octeti_to_tensor(
         &mut self,
@@ -110,6 +128,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 SHAPE_OPERAND_MISSING_ISSUE,
             ));
         };
+        if let Type::Struct(_) = self.types.get(self.resolve_conversion_target(element_ty)) {
+            return self
+                .convert_octeti_to_record_tensor(bytes, element_ty, shape, params, recovery, span);
+        }
         let Some(element) = self.octeti_tensor_element(element_ty) else {
             return Err(RunnerError::internal(
                 span,
@@ -140,6 +162,83 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             Element::Dense(kind) => decode_dense(kind, bytes, endian),
             Element::Boxed(element) => decode_boxed(element, &bytes, endian),
         };
+        let tensor = TensorValue::try_contiguous_typed(storage, shape).ok_or_else(|| {
+            RunnerError::internal(span, "tensor shape has unrepresentable strides")
+        })?;
+        Ok(Value::Tensor(Rc::new(RefCell::new(tensor))))
+    }
+
+    /// `octeti ↦ tensor<Record, [shape]> via Le`: the bytes become the tensor's
+    /// record rows as they are. The row width is `resolve_struct_layout`'s
+    /// size, so a layout the law refuses is an invariant break here (the
+    /// device gate and the dispatcher refuse the same genus by name).
+    fn convert_octeti_to_record_tensor(
+        &mut self,
+        bytes: Vec<u8>,
+        element_ty: TypeId,
+        shape: Vec<i64>,
+        params: &[Symbol],
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let endian = hints::endian_hint(params, |param| {
+            hints::classify(self.interner.resolve(*param))
+        });
+        if endian != Some(EndianHint::Le) {
+            return Err(RunnerError::internal_with_issue(
+                span,
+                "record tensor conversio needs a Le hint (record layouts are little-endian)",
+                RECORD_BIG_ENDIAN_ISSUE,
+            ));
+        }
+        let layout = RecordLayout::resolve(element_ty, self.context).map_err(|refusal| {
+            RunnerError::internal_with_issue(
+                span,
+                format!(
+                    "record tensor element has no fixed layout: {}",
+                    refusal.reason()
+                ),
+                RECORD_LAYOUT_REFUSED_ISSUE,
+            )
+        })?;
+        let size = layout.size();
+        let rows = shape.iter().try_fold(1_usize, |acc, dim| {
+            usize::try_from(*dim).ok().and_then(|d| acc.checked_mul(d))
+        });
+        let expected = rows.and_then(|rows| rows.checked_mul(size));
+        let failure = match expected {
+            None => Some((RECORD_OVERFLOW_ISSUE, "record tensor extent overflows")),
+            Some(_) if !bytes.len().is_multiple_of(size) => Some((
+                RECORD_MISALIGNED_ISSUE,
+                "record tensor bytes are not a whole number of rows",
+            )),
+            Some(expected) if bytes.len() < expected => Some((
+                RECORD_TRUNCATED_ISSUE,
+                "record tensor bytes are shorter than the shape",
+            )),
+            Some(expected) if bytes.len() > expected => Some((
+                RECORD_TRAILING_ISSUE,
+                "record tensor bytes are longer than the shape",
+            )),
+            Some(_) => None,
+        };
+        if let Some((issue, message)) = failure {
+            if let Some(recovery) = recovery {
+                return self.eval_recovery(recovery, span);
+            }
+            let mut error = RunnerError::conversion_with_issue(span, message, issue);
+            error.args = vec![
+                ("record_bytes".to_owned(), size.to_string()),
+                ("actual".to_owned(), bytes.len().to_string()),
+                (
+                    "expected".to_owned(),
+                    expected.map_or_else(|| "overflow".to_owned(), |n| n.to_string()),
+                ),
+            ];
+            return Err(error);
+        }
+        let storage = DenseStorage::from_record_bytes(Arc::new(layout), bytes)
+            .ok_or_else(|| RunnerError::internal(span, "record tensor bytes are misaligned"))?;
         let tensor = TensorValue::try_contiguous_typed(storage, shape).ok_or_else(|| {
             RunnerError::internal(span, "tensor shape has unrepresentable strides")
         })?;

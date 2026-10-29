@@ -41,8 +41,8 @@ The language is mechanical on purpose; the compiler should honor that.
 - Recovery is part of correctness. Malformed input produces diagnostics and
   forward motion, not a panic, a hang, or silently dropped structure.
 - Diagnostics are code-first: emit `code`, `issue` and named args, and leave
-  prose to the reader packs. The default CLI prints only the compact identity;
-  the message renders under `--diagnostics` or `faber explain`.
+  prose to the reader packs. The default CLI prints the message and help; `--no-diagnostics` selects the
+  compact identity, and `faber explain` provides catalog detail.
 - A new diagnostic issue is a catalog entry (`radix-semantic/src/catalog*.rs`)
   plus message and help rows in `locale/<id>/pack.toml`
   (`[diagnostics.CODE.issues.<issue>]`), `en` and `la` in the same change. The

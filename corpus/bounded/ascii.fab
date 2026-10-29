@@ -4,33 +4,33 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "text"
 canonical = false
-summary = "Bounded ascii<N>: byte capacity N; longitudo is len; equality ignores spare slots."
-syntax = "ascii<N>"
+summary = "Bounded ascii<size N>: byte capacity N; longitudo is len; equality ignores spare slots."
+syntax = "ascii<size N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua", "textus"]
 locale = "en"
 +++
 # =============================================================================
-# ascii<N> — bounded ASCII cord (BB-8R)
+# ascii<size N> — bounded ASCII cord (BB-8R)
 # =============================================================================
 #
-# Latin spelling: ascii<8>
-# English surface: ascii<8>
+# Latin spelling: ascii<size 8>
+# English surface: ascii<size 8>
 #
 # What this teaches:
-#   • `ascii<N>` is a distinct type from unbounded `ascii`.
+#   • `ascii<size N>` is a distinct type from unbounded `ascii`.
 #   • `longitudo` is runtime `len`, not capacity `N`.
 #   • Same prefix, independently constructed, compares equal (`≡`).
 #
 # Common mistakes:
-#   • Treating bare `ascii` as `ascii<64>` — capacity is not a language default.
+#   • Treating bare `ascii` as `ascii<size 64>` — capacity is not a language default.
 #   • Calling `capacitas` — `N` is the type, not a method.
 #
-# See also: lista<numerus, magnitudo N>, textus<N>, list<b8, size N>
+# See also: lista<numerus, magnitudo N>, textus<magnitudo N>, list<b8, size N>
 # =============================================================================
 
 main {
-    let ascii<8> a ← 'ab'
-    let ascii<8> b ← 'ab'
+    let ascii<size 8> a ← 'ab'
+    let ascii<size 8> b ← 'ab'
     let int n ← a.length()
     let bool vacant ← a.is_empty()
     print n

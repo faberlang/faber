@@ -14,6 +14,7 @@ use crate::expr::{Operand, Value};
 use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
 use crate::ty::{Inner, Ty, classify, returns};
+use handroll::FxHashSet;
 use radix_codegen_shared::CodegenError;
 use radix_hir::{DefId, HirExpression, HirStruct};
 use radix_lexer::Symbol;
@@ -293,7 +294,7 @@ impl Emitter<'_> {
         self.temps += 1;
         let mut body = format!("{c_name} *{target} = faber_alloc(faber_a, sizeof *{target}); ");
         let mut effect = false;
-        let mut assigned = Vec::with_capacity(fields.len());
+        let mut assigned = FxHashSet::default();
         for (symbol, value) in given {
             let name = self.names.resolve_symbol(*symbol).to_owned();
             let value: &HirExpression = value;
@@ -305,7 +306,7 @@ impl Emitter<'_> {
             let operand = self.field_value(value, field.ty)?;
             effect |= operand.effect;
             write!(body, "{target}->{} = {}; ", field.c_name, operand.text).ok();
-            assigned.push(name);
+            assigned.insert(name);
         }
         for field in &fields {
             if assigned.contains(&field.name) {

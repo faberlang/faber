@@ -345,7 +345,7 @@ pub fn classify_conversio_coverage(
         ConversioCoverageTarget::TypeScript => {
             // `octeti ↦ tensor via Le|Be` reads the bytes through a `DataView`
             // on TypeScript; its inverse `tensor ↦ octeti via Le|Be` declines
-            // by name (`ts_tensor_octeti_conversio_unsupported`). Go declines
+            // by name (`ts_tensor_to_list_b8_unsupported`). Go declines
             // both directions.
             if driver_modular_word_blocked(src, tgt)
                 || (src == ConversioTypeFamily::Tensor && tgt == ConversioTypeFamily::Octeti)

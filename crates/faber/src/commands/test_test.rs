@@ -116,7 +116,11 @@ fn package_analysis_failures_render_file_line_and_message() {
         .with_span(Span::new(42, 50))
         .with_source_line("    nomen missing");
     let check_line = radix::module::diagnostics::render_plain(&error);
-    let rendered = super::render_package_analysis_diagnostics(std::slice::from_ref(&error));
+    let rendered = super::render_package_analysis_diagnostics(
+        std::slice::from_ref(&error),
+        radix::services::DiagnosticMode::Normal,
+        None,
+    );
 
     assert_eq!(rendered, check_line);
     assert!(
@@ -160,7 +164,11 @@ fn package_analysis_repeated_warning_codes_collapse_to_a_count() {
         unique.clone(),
         error.clone(),
     ];
-    let rendered = super::render_package_analysis_diagnostics(&diagnostics);
+    let rendered = super::render_package_analysis_diagnostics(
+        &diagnostics,
+        radix::services::DiagnosticMode::Normal,
+        None,
+    );
 
     assert!(
         rendered.contains(&radix::module::diagnostics::render_plain(&error)),
@@ -457,7 +465,10 @@ targets = ["rust"]
     assert_eq!(json["census"]["blocked"].as_array().unwrap().len(), 1);
     assert_eq!(json["census"]["blocked"][0]["name"], "blocked");
     assert_eq!(json["census"]["blocked"][0]["gap"], gap);
-    assert!(!json["census"]["gaps"].as_array().unwrap().is_empty());
+    assert_ne!(
+        json["census"]["gaps"].as_array().unwrap(),
+        &[] as &[serde_json::Value]
+    );
 }
 
 #[test]
@@ -526,7 +537,7 @@ fn empty_selection_json_is_not_success_without_changing_exit_policy() {
         super::empty_run_exit_code(false),
         super::empty_run_exit_code(true)
     );
-    assert!(report.results.is_empty());
+    assert_eq!(report.results, [] as [proba::CaseResult; 0]);
     assert_eq!(json["success"], false);
     assert_eq!(super::empty_run_exit_code(false), 1);
     assert_eq!(super::empty_run_exit_code(true), 0);

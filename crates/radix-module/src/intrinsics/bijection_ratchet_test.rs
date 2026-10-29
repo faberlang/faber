@@ -320,6 +320,9 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         // Same-width swizzle mask (width 3 receiver).
         "Vector.swizzle/1" => (None, vec!["\"xyz\"".into()]),
         "Tensor.pone/2" | "Sparsa.pone/2" => (None, vec![idx, el]),
+        // The list join takes another list of the receiver's element type;
+        // the receiver itself is one (`xs.extend(xs)` is legal).
+        "Lista.extende/1" => (None, vec!["r".into()]),
         _ => return None,
     };
     Some((param, args))

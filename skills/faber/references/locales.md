@@ -253,7 +253,7 @@ library-member spellings for lexing and semantic resolution.
 
 The diagnostics locale selects message templates. On `faber`, use
 `--diagnostics-locale <id>` (`check`, `explain`, `emit`); when omitted, the
-code pack's templates render. Probe: `faber check f.fab --diagnostics
+code pack's templates render. Probe: `faber check f.fab
 --diagnostics-locale zh-Hans` renders `PARSE040` in Chinese for an `en` file.
 
 Never infer source syntax from the language of an error message. A Latin source

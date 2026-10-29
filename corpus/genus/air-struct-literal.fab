@@ -1,0 +1,32 @@
++++
+term = "air-struct-literal"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "typed_constructor", "field_list", "field_init", "field_key", "incipit_stmt", "nota_stmt", "expression"]
+category = "kernel"
+canonical = false
+summary = "An AIR-lane function returns a genus literal built from a parameter."
+syntax = "@ radix lane \"air\"; fn make(T x) → T { return T { field = x } }"
+related = ["radix", "genus"]
+locale = "en"
++++
+# =============================================================================
+# air-struct-literal — genus construction in an AIR-lane function.
+# =============================================================================
+#
+# The constructor in `make` is a source-level genus literal. Its HIR is a
+# `Verte` with object entries, which the AIR lowerer represents as a struct.
+#
+# See also: radix, genus
+# =============================================================================
+
+class Point { let int x }
+
+@ radix lane "air"
+fn make(int x) → Point {
+    return Point { x = x }
+}
+
+main {
+    let Point point ← make(42)
+    print point.x
+}

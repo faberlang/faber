@@ -3,8 +3,8 @@ term = "↦"
 kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "conversion"
-summary = "Rejected route: a bounded lista<T,magnitudo N> does not convert to a bounded textus<M>."
-syntax = "lista<T, magnitudo N> ↦ textus<M> — rejected for every T; convert to lista<b8|b16|b32> first, or show with the format string"
+summary = "Rejected route: a bounded lista<T,magnitudo N> does not convert to a bounded textus<magnitudo M>."
+syntax = "lista<T, magnitudo N> ↦ textus<magnitudo M> — rejected for every T; convert to lista<b8|b16|b32> first, or show with the format string"
 related = ["↦", "lista", "textus"]
 locale = "en"
 no_expected = "rejects"
@@ -17,7 +17,7 @@ ruling = "05ac0534"
 #
 # What this teaches:
 #   • A list of ints is not text: the element type does not say which
-#     encoding it is (UTF-8, UTF-16, UTF-32), so `list<int, size N> ↦ string<M>`
+#     encoding it is (UTF-8, UTF-16, UTF-32), so `list<int, size N> ↦ string<size M>`
 #     is refused at check time (operator ruling 05ac0534).
 #   • Say the meaning instead: convert to list<b8>, list<b16> or list<b32>
 #     first and then ↦ string (a decode that can fail), or show the list
@@ -30,6 +30,6 @@ ruling = "05ac0534"
 main {
     let list<int> base ← [1, 2]
     let list<int, size 8> raw ← base ↦ list<int, size 8>
-    let string<8> out ← raw ↦ string<8>
+    let string<size 8> out ← raw ↦ string<size 8>
     print out
 }

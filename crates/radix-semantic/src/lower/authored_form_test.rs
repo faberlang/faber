@@ -123,6 +123,37 @@ fn declared_forms_match_authored_spelling_and_canonical_witness() {
 }
 
 #[test]
+fn optional_union_preserves_authored_ranged_lista_form() {
+    let fixture = analyze_ok(concat!(
+        "functio show(lista<numerus, magnitudo 0…3> ∪ nihil xs) → vacuum {\n",
+        "    nota xs\n",
+        "}\n",
+    ));
+    let form = fixture
+        .result
+        .presentation
+        .authored_types
+        .iter()
+        .map(|authored| &authored.form)
+        .find(|form| matches!(fixture.result.types.get(form.ty), Type::Option(_)))
+        .expect("nullable list parameter form");
+    let child = single_type_child(form);
+    // `0…3` is the bounded list of capacity 3 semantically; only the authored
+    // form remembers that the author wrote a range.
+    assert!(matches!(
+        fixture.result.types.get(child.ty),
+        Type::BoundedArray { .. }
+    ));
+    assert!(
+        child.args.iter().any(|arg| matches!(arg, HirTypeFormArg::Range(range)
+            if matches!(range.lo, radix_hir::HirRangeBound::Literal(ref value) if value == "0")
+                && matches!(range.hi, radix_hir::HirRangeBound::Literal(ref value) if value == "3"))),
+        "the ranged-list child should keep its authored endpoints: {:?}",
+        child.args
+    );
+}
+
+#[test]
 fn tensor_forms_record_shape_children() {
     let fixture = analyze_ok(concat!(
         "functio probe() {\n",

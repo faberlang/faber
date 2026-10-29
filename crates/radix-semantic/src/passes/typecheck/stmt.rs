@@ -805,6 +805,11 @@ impl TypeChecker<'_> {
                 }
             }
             HirStatementKind::Redde(value) => self.check_return(value.as_mut(), stmt.span),
+            HirStatementKind::ReddeFilum(value) => {
+                if let Some(value) = value {
+                    self.check_expr(value);
+                }
+            }
             HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
             HirStatementKind::IncDec(inc_dec) => {
                 self.check_inc_dec(inc_dec.op, &mut inc_dec.target, stmt.span);

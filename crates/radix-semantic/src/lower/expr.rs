@@ -805,7 +805,7 @@ impl Lowerer<'_> {
         match (&ty.kind, self.types.get(claimed).clone()) {
             (radix_syntax::TypeExprKind::Vector(_, width), crate::Type::Vector(element, _)) => {
                 // The short sugar `vf32[4]` parses its width as a one-element
-                // bracket shape; the long form `vector<f32, 4>` as the bare
+                // bracket shape; the long form `vector<f32, size 4>` as the bare
                 // literal. Both spell the same width.
                 let width = match width {
                     radix_syntax::FiguraExpr::Tuple(dims) if dims.len() == 1 => &dims[0],
@@ -2467,9 +2467,9 @@ fn call_arg_unmarked_size_span(
     match arg {
         GenericArgExpr::Size(
             radix_syntax::FiguraExpr::Lift(_) | radix_syntax::FiguraExpr::Infer,
-        ) => None,
+        )
+        | GenericArgExpr::Range(_) => None,
         GenericArgExpr::Size(_) => Some(lowerer.current_span),
-        GenericArgExpr::Range(_) => None,
         GenericArgExpr::Type(ty) => {
             let name = call_arg_bare_name(arg)?;
             let is_natural =
@@ -2674,7 +2674,7 @@ fn generic_type_exprs(args: &[GenericArgExpr]) -> Option<Vec<TypeExpr>> {
 }
 
 /// Whether a `↦` target can carry a convert hint: the numeric families, the
-/// ascii format pack, `littera` (`Code`), the register windows (`vector<T, N>`
+/// ascii format pack, `littera` (`Code`), the register windows (`vector<T, size N>`
 /// and `octeti<N>` take `Be`/`Le`), or a generic parameter that a caller
 /// instantiates. Typecheck still decides which (source, target, hint) rows
 /// exist; this only rejects targets no row can ever carry a hint for.

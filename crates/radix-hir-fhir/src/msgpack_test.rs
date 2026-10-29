@@ -1398,3 +1398,140 @@ fn msgpack_i128_decode_fails_closed_on_other_shapes() {
         Err(MsgpackError::Truncated)
     ));
 }
+
+fn remove_named_field(value: &mut Value, field: &str) -> bool {
+    match value {
+        Value::Map(entries) => {
+            if let Some(index) = entries
+                .iter()
+                .position(|(key, _)| matches!(key, Value::Str(key) if key == field))
+            {
+                entries.remove(index);
+                return true;
+            }
+            entries
+                .iter_mut()
+                .any(|(_, child)| remove_named_field(child, field))
+        }
+        Value::Array(items) => items
+            .iter_mut()
+            .any(|child| remove_named_field(child, field)),
+        _ => false,
+    }
+}
+
+#[test]
+fn missing_store_contract_fields_are_not_silently_defaulted() {
+    use radix_hir::{
+        HirBlock, HirExpression, HirExpressionKind, HirId, HirItemKind, HirLiteral, HirLocal,
+        HirStatement, HirStatementKind, HirStoreKind, HirStoreSite,
+    };
+    use radix_lexer::Span;
+    let mut artifact = stub_artifact();
+    let store = HirStoreSite {
+        kind: HirStoreKind::AwaitBinding,
+        slot: Some(Symbol(0)),
+        inferred_from: None,
+        inferred_text: None,
+    };
+    let expression = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Conversio {
+            source: Box::new(HirExpression {
+                id: HirId(3),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(300)),
+                ty: None,
+                span: Span::default(),
+            }),
+            target: radix_hir::HirConversioTarget::Type(radix_types::TypeId(0)),
+            params: Vec::new(),
+            recovery: None,
+            route: None,
+            implicit: Some(store.clone()),
+        },
+        ty: None,
+        span: Span::default(),
+    };
+    let HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("function")
+    };
+    function.body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(HirLocal {
+                def_id: DefId(1),
+                name: Symbol(0),
+                ty: None,
+                init: Some(expression),
+                mutable: false,
+                is_await: false,
+                runtime_provided: false,
+                await_store: Some(store),
+                size_decl: false,
+                size_static: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    let bytes = encode_msgpack(&artifact).expect("encode");
+    assert_eq!(
+        decode_msgpack(&bytes).expect("explicit fields load"),
+        artifact
+    );
+    for field in ["implicit", "route", "await_store"] {
+        let mut value = parse(&bytes);
+        assert!(remove_named_field(&mut value, field));
+        let error = decode_msgpack(&reserialize(&value)).expect_err("required field");
+        assert!(
+            matches!(&error, MsgpackError::Decode(detail) if detail.contains(field)),
+            "{error:?}"
+        );
+    }
+}
+
+#[test]
+fn tuple_lengths_and_document_consumption_are_exact() {
+    let bytes = encode_msgpack(&stub_artifact()).unwrap();
+    let mut trailing = bytes.clone();
+    trailing.push(0);
+    assert!(matches!(
+        decode_msgpack(&trailing),
+        Err(MsgpackError::Decode(_))
+    ));
+
+    // Ordinary tuples, tuple structs, and enum tuple variants all use exact arity.
+    for len in [1, 3] {
+        let value = Value::Array(vec![Value::Uint(0); len]);
+        assert!(matches!(
+            <(u32, u32)>::deserialize(value),
+            Err(MsgpackError::Decode(_))
+        ));
+    }
+    #[derive(Serialize, Deserialize)]
+    struct Pair(u32, u32);
+    assert!(matches!(
+        Pair::deserialize(Value::Array(vec![Value::Uint(0); 3])),
+        Err(MsgpackError::Decode(_))
+    ));
+
+    let mut value = parse(&bytes);
+    // An Applied type has a two-element tuple payload. A third element must
+    // not disappear when serde's visitor has consumed its expected fields.
+    let types = at_mut(&mut value, &[Step::Key("types"), Step::Key("types")]).unwrap();
+    let Value::Array(types) = types else {
+        panic!("types arena")
+    };
+    types.push(Value::Map(vec![
+        (Value::Str("tag".into()), Value::Str("Applied".into())),
+        (
+            Value::Str("value".into()),
+            Value::Array(vec![Value::Uint(0), Value::Array(Vec::new()), Value::Nil]),
+        ),
+    ]));
+    assert!(matches!(
+        decode_msgpack(&reserialize(&value)),
+        Err(MsgpackError::Decode(_))
+    ));
+}

@@ -5,9 +5,9 @@
 //! the trailing `dum` condition (`fac omnia { … } cape err { … } dum cond`).
 
 use crate::parse;
-use crate::test_support::parse_ok;
+use crate::test_support::{assert_parse_error_issue_la, parse_ok};
 use radix_lexer::KeywordPack;
-use radix_syntax::StmtKind;
+use radix_syntax::{FacModifier, StmtKind};
 
 #[test]
 fn parses_fac_omnia_with_cape() {
@@ -21,7 +21,7 @@ fn parses_fac_omnia_with_cape() {
     let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
         panic!("expected fac statement");
     };
-    assert!(fac_stmt.omnia, "`omnia` marker must parse onto the fac");
+    assert_eq!(fac_stmt.modifier, FacModifier::Omnia);
     assert!(fac_stmt.catch.is_some());
     assert!(fac_stmt.while_.is_none());
 }
@@ -36,7 +36,7 @@ fn parses_plain_fac_without_omnia() {
     let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
         panic!("expected fac statement");
     };
-    assert!(!fac_stmt.omnia, "plain `fac` must not gain the marker");
+    assert_eq!(fac_stmt.modifier, FacModifier::None);
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn fac_omnia_dum_parses_with_marker_and_condition() {
     let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
         panic!("expected fac statement");
     };
-    assert!(fac_stmt.omnia, "marker must be recorded");
+    assert_eq!(fac_stmt.modifier, FacModifier::Omnia);
     assert!(fac_stmt.catch.is_some(), "handler must be recorded");
     assert!(fac_stmt.while_.is_some(), "dum condition must be recorded");
 }
@@ -70,6 +70,7 @@ impl KeywordPack for EnFacOmniaPack {
         match text {
             "do" => Some("fac"),
             "all" => Some("omnia"),
+            "device" => Some("machina"),
             "catch" => Some("cape"),
             "while" => Some("dum"),
             "pass" => Some("tacet"),
@@ -96,7 +97,7 @@ fn english_do_all_parses_through_the_same_flag() {
     let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
         panic!("expected fac statement");
     };
-    assert!(fac_stmt.omnia, "en `all` must set the same omnia flag");
+    assert_eq!(fac_stmt.modifier, FacModifier::Omnia);
     assert!(fac_stmt.catch.is_some());
 }
 
@@ -114,5 +115,48 @@ fn english_do_all_while_parses_through_the_same_flag() {
     let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
         panic!("expected fac statement");
     };
-    assert!(fac_stmt.omnia && fac_stmt.while_.is_some());
+    assert_eq!(fac_stmt.modifier, FacModifier::Omnia);
+    assert!(fac_stmt.while_.is_some());
+}
+
+#[test]
+fn parses_fac_machina_with_cape_and_dum() {
+    let result = parse_ok("fac machina { tacet } cape err { tacet } dum verum");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
+        panic!("expected fac statement");
+    };
+    assert_eq!(fac_stmt.modifier, FacModifier::Machina);
+    assert!(fac_stmt.catch.is_some() && fac_stmt.while_.is_some());
+}
+
+#[test]
+fn machina_stays_an_ordinary_identifier_outside_the_fac_slot() {
+    let result = parse_ok("sit numerus machina ← 1");
+    assert!(result.program.is_some());
+}
+
+#[test]
+fn two_fac_modifiers_are_refused_by_name_in_either_order() {
+    for source in [
+        "fac omnia machina { tacet }",
+        "fac machina omnia { tacet }",
+        "fac machina machina { tacet }",
+    ] {
+        assert_parse_error_issue_la(source, "fac_modifier_redundant");
+    }
+}
+
+#[test]
+fn english_do_device_parses_as_machina() {
+    let source = "do device { pass } catch err { pass } while true";
+    let lexed = radix_lexer::lex_with_locale_pack(source, &EnFacOmniaPack);
+    let result = parse(lexed);
+    assert!(result.success(), "{:?}", result.errors);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Fac(fac_stmt) = &program.statements[0].kind else {
+        panic!("expected fac statement");
+    };
+    assert_eq!(fac_stmt.modifier, FacModifier::Machina);
+    assert!(fac_stmt.catch.is_some() && fac_stmt.while_.is_some());
 }

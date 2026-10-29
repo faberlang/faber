@@ -16,7 +16,7 @@ fn rust_code(result: crate::CompileResult) -> String {
 #[test]
 fn bounded_textus_scalar_index_emits_o1_ascii_one() {
     let result = compile_and_get_result_la(
-        r"functio probe(textus<32> xs) → ascii<1> {
+        r"functio probe(textus<magnitudo 32> xs) → ascii<magnitudo 1> {
     redde xs[0]
 }
 
@@ -43,9 +43,9 @@ incipit {
 #[test]
 fn bounded_textus_conversions_follow_d7() {
     let diagnostics = analyze_and_get_diagnostics_la(
-        r"typus TextusOcto = textus<8>
+        r"typus TextusOcto = textus<magnitudo 8>
 
-functio bridges(textus<8> bounded, textus unbounded) → vacuum {
+functio bridges(textus<magnitudo 8> bounded, textus unbounded) → vacuum {
     sit textus widened ← bounded ↦ textus
     sit TextusOcto narrowed ← unbounded ↦ TextusOcto
     nota widened
@@ -67,7 +67,7 @@ incipit {
 #[cfg(feature = "hir-ts")]
 #[test]
 fn bounded_textus_is_carried_on_typescript() {
-    let source = r"functio probe(textus<32> xs) → ascii<1> {
+    let source = r"functio probe(textus<magnitudo 32> xs) → ascii<magnitudo 1> {
     redde xs[0]
 }
 
@@ -96,7 +96,7 @@ incipit {
 #[cfg(feature = "hir-go")]
 #[test]
 fn bounded_textus_is_carried_on_go() {
-    let source = r"functio probe(textus<32> xs) → ascii<1> {
+    let source = r"functio probe(textus<magnitudo 32> xs) → ascii<magnitudo 1> {
     redde xs[0]
 }
 

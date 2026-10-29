@@ -5,7 +5,7 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "redde_stmt", "expression"]
 category = "vector"
 summary = "vector type declarations: long form and vf32 sugar"
-syntax = "vector<T, N> | vf32[N]"
+syntax = "vector<T, size N> | vf32[N]"
 locale = "en"
 +++
 
@@ -14,18 +14,18 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Vector declaration — `vector<T, N>` long form and `vf32[N]` sugar syntax
+#   • Vector declaration — `vector<T, size N>` long form and `vf32[N]` sugar syntax
 #   • Register type — vectors are fixed-width register types, different from collection tensors
 #
 # Common mistakes:
-#   • confusing vector<T, N> (register type) with tensor<T, [N]> (collection type) — vector is a GPU register, not a collection
+#   • confusing vector<T, size N> (register type) with tensor<T, [N]> (collection type) — vector is a GPU register, not a collection
 #
 # See also: vector, vf32, gpu
 # =============================================================================
 
 
 
-fn takes(vector<f32, 4> v, vf32[4] w) → int {
+fn takes(vector<f32, size 4> v, vf32[4] w) → int {
     return 0
 }
 

@@ -4,42 +4,42 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "conversio_expr", "equality", "equality_tail", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
 category = "text"
 canonical = false
-summary = "Methods on a bounded ascii<N> receiver: query, transform, slice, split and replace."
-syntax = "ascii<N> a; a.starts_with(p) | a.replace(x, y) | a.split(sep)"
+summary = "Methods on a bounded ascii<size N> receiver: query, transform, slice, split and replace."
+syntax = "ascii<size N> a; a.starts_with(p) | a.replace(x, y) | a.split(sep)"
 related = ["ascii", "textus", "longitudo", "sectio"]
 locale = "en"
 +++
 # =============================================================================
-# ascii<N> — text methods on a bounded receiver
+# ascii<size N> — text methods on a bounded receiver
 # =============================================================================
 #
 # What this teaches:
-#   • A bounded `ascii<N>` receiver takes the whole text method surface:
+#   • A bounded `ascii<size N>` receiver takes the whole text method surface:
 #     length, is_empty, slice, uppercase, lowercase, trim, contains,
 #     starts_with, ends_with, replace and split.
 #   • Methods that return text return unbounded `string`; the receiver's
 #     capacity does not carry over to the result.
 #   • Text arguments may be ASCII values: an ASCII literal, a bare `ascii`
-#     value, or a one-letter `ascii<1>` value widen to `string` implicitly.
+#     value, or a one-letter `ascii<size 1>` value widen to `string` implicitly.
 #
 # Choice: implement, not reject. The checker already widens bare `ascii` and
-# `ascii<1>` to `string`, so those arguments are run on every target. A longer
-# bounded `ascii<N>` argument does not widen implicitly; it crosses with an
+# `ascii<size 1>` to `string`, so those arguments are run on every target. A longer
+# bounded `ascii<size N>` argument does not widen implicitly; it crosses with an
 # explicit `↦ string` (see conversio-ascii-textus.fab).
 #
 # Common mistakes:
-#   • Passing an `ascii<4>` value where a `string` argument is expected;
+#   • Passing an `ascii<size 4>` value where a `string` argument is expected;
 #     convert it first with `↦ string`.
 #   • Reading `slice` as clamping: a window outside the text is an error.
 #
-# See also: ascii<N>, string<N>, conversio-ascii-textus
+# See also: ascii<size N>, string<size N>, conversio-ascii-textus
 # =============================================================================
 
 main {
-    let ascii<16> a ← ' Hello '
+    let ascii<size 16> a ← ' Hello '
     let ascii prefix ← ' H'
-    let ascii<1> from ← 'l'
-    let ascii<1> into ← 'L'
+    let ascii<size 1> from ← 'l'
+    let ascii<size 1> into ← 'L'
 
     print a.length(), a.is_empty()
     print a.slice(1, 4)

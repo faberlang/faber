@@ -349,6 +349,7 @@ pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
         | IntrinsicMirKind::HigherOrderAll
         | IntrinsicMirKind::HigherOrderAny
         | IntrinsicMirKind::HigherOrderFind
+        | IntrinsicMirKind::ListExtend
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
@@ -368,6 +369,7 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
         | IntrinsicMirKind::HigherOrderAll
         | IntrinsicMirKind::HigherOrderAny
         | IntrinsicMirKind::HigherOrderFind
+        | IntrinsicMirKind::ListExtend
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce

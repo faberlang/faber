@@ -1,0 +1,28 @@
++++
+term = "d64 wasm store arithmetic"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "WASM stores d64 arithmetic in an i64 scale-10^8 carrier and rounds products half-even."
+syntax = "d64 product ← a * b"
+related = ["d64", "wasm", "scaled integer", "half-even"]
+locale = "en"
++++
+# d64 — the WASM scaled-integer carrier
+#
+# Values stored in d64 slots use an i64 carrier at scale 10^8. Addition and
+# subtraction preserve that scale; multiplication uses a 128-bit intermediate
+# and rounds half-even when the result is stored.
+
+main {
+    let d64 a ← 1.5
+    let d64 epsilon ← 0.00000001
+    let d64 sum ← a + epsilon
+    let d64 difference ← a - epsilon
+    let d64 product ← a * epsilon
+    print sum ≅ 1.50000001
+    print difference ≅ 1.49999999
+    # 1.5 × 10^-8 is a half-way value; half-even stores 2 × 10^-8.
+    print product ≅ 0.00000002
+}

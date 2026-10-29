@@ -392,6 +392,8 @@ fn compile_package_ts(
 /// Compile a package `.fab` entry to a native object through the interpreted
 /// merged package MIR.
 ///
+/// The configured [`radix_module::ClifEngine`] picks the object (for the linker)
+/// or the in-memory image (`clif-jit`); both run the same lowering.
 /// [`radix_mir_clif::emit_object`] runs the CLIF capability classifier itself,
 /// so a package shape outside the CLIF subset fails here with its named gap —
 /// the caller never classifies again.
@@ -407,22 +409,38 @@ pub fn compile_package_clif(
 ) -> CompileResult {
     let emitted =
         crate::mir::with_interpreted_lowered_package_mir(config, input, mir_seams, |lowered| {
-            radix_mir_clif::emit_object(&lowered.validated, &lowered.interner).map_err(|error| {
+            let declined = |error: radix_mir_clif::ClifError| {
                 vec![
                     crate::package_diagnostic_error(error.message)
                         .with_file(input.display().to_string())
                         .with_arg("issue", error.category)
                         .with_arg("shape", error.shape),
                 ]
-            })
+            };
+            match &config.clif_engine {
+                radix_module::ClifEngine::Object => {
+                    radix_mir_clif::emit_object(&lowered.validated, &lowered.interner)
+                        .map(|object| {
+                            radix_module::Output::ClifObject(radix_module::ClifObjectOutput {
+                                bytes: object.bytes,
+                            })
+                        })
+                        .map_err(declined)
+                }
+                radix_module::ClifEngine::Jit(runtime) => radix_mir_clif::emit_jit(
+                    &lowered.validated,
+                    &lowered.interner,
+                    &runtime.symbols(),
+                )
+                .map(|program| {
+                    radix_module::Output::ClifJit(radix_module::ClifJitOutput { program })
+                })
+                .map_err(declined),
+            }
         });
     match emitted {
-        Ok(Ok(object)) => CompileResult {
-            output: Some(radix_module::Output::ClifObject(
-                radix_module::ClifObjectOutput {
-                    bytes: object.bytes,
-                },
-            )),
+        Ok(Ok(output)) => CompileResult {
+            output: Some(output),
             diagnostics: Vec::new(),
         },
         Ok(Err(diagnostics)) | Err(diagnostics) => compile_failure(diagnostics).compile_result,

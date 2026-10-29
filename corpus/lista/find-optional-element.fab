@@ -1,0 +1,34 @@
++++
+term = "reperta over optional elements"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "concrete_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "comparison", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "List search over optional elements: find returns one optional, so a found none and no match both read none."
+syntax = "<lista>.find(<predicate>)"
+related = ["reperta", "quilibet", "omnia"]
+locale = "en"
++++
+# =============================================================================
+# reperta over optional elements — one optional result, never a nested one.
+# =============================================================================
+#
+# What this teaches:
+#   • `find` over `list<int ∪ none>` returns `int ∪ none`, the same shape it
+#     returns over `list<int>`. The result is not an optional of an optional.
+#   • A matching element that is itself `none` and a search that matches
+#     nothing both read `none`; the first matching `7` reads `7`.
+#
+# Common mistakes:
+#   • Expecting to tell "found a none" from "found nothing": the result type
+#     has one `none`, so it cannot.
+#
+# See also: reperta
+# =============================================================================
+
+main {
+    let list<int ∪ none> xs ← [null, 7]
+    let int ∪ none found ← xs.find((int ∪ none x) → bool ∴ true)
+    print found
+    let int ∪ none seven ← xs.find((int ∪ none x) → bool ∴ x ≢ null)
+    print seven
+}

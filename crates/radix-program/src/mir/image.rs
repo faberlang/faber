@@ -691,10 +691,13 @@ where
     } = payload;
     let program = match program {
         FmirImageProgram::Text { json } => serde_json::from_str(&json).map_err(|error| {
-            vec![mir_diag(
-                path,
-                format!("could not decode fmir-text MIR program: {error}"),
-            )]
+            vec![
+                mir_diag(
+                    path,
+                    format!("could not decode fmir-text MIR program: {error}"),
+                )
+                .with_arg("detail", error.to_string()),
+            ]
         })?,
         FmirImageProgram::Binary(program) => program,
     };
@@ -743,14 +746,16 @@ pub(super) fn fmir_image_decode_error(
                     "could not {} {} image: {detail}",
                     style.parse_verb, style.label
                 ),
-            )],
+            )
+            .with_arg("detail", detail)],
             None => vec![mir_diag(
                 path,
                 format!(
                     "could not {} {} image: {detail}",
                     style.parse_verb, style.label
                 ),
-            )],
+            )
+            .with_arg("detail", detail)],
         },
         FmirImageError::VersionMismatch { actual, expected } => vec![mir_issue_diag(
             path,
@@ -762,17 +767,23 @@ pub(super) fn fmir_image_decode_error(
         )
         .with_arg("actual", actual.to_string())
         .with_arg("expected", expected.to_string())],
-        FmirImageError::TargetMismatch { found: _, expected } => vec![mir_diag(
-            path,
-            format!("{} image target must be `{expected}`", style.label),
-        )],
+        FmirImageError::TargetMismatch { found, expected } => vec![
+            mir_diag(
+                path,
+                format!("{} image target must be `{expected}`", style.label),
+            )
+            .with_arg("found", found)
+            .with_arg("expected", expected),
+        ],
         FmirImageError::ToolchainMismatch { found, expected } => vec![mir_diag(
             path,
             format!(
                 "unsupported {} image toolchain {found}; expected {expected}",
                 style.label
             ),
-        )],
+        )
+        .with_arg("found", found)
+        .with_arg("expected", expected)],
         FmirImageError::ArtifactDigestMismatch {
             backend,
             field,
@@ -784,21 +795,28 @@ pub(super) fn fmir_image_decode_error(
                 "{} image device artifact `{backend}` digest `{field}` mismatch (stored {stored}, recomputed {computed})",
                 style.label
             ),
-        )],
+        )
+        .with_arg("backend", backend)
+        .with_arg("field", field)
+        .with_arg("stored", stored)
+        .with_arg("computed", computed)],
         FmirImageError::CompilerInputProvenance { backend, detail } => vec![mir_diag(
             path,
             format!(
                 "{} image device artifact `{backend}` provenance violation: {detail}",
                 style.label
             ),
-        )],
+        )
+        .with_arg("backend", backend)
+        .with_arg("detail", detail)],
         FmirImageError::NonAdmittedTargetFeature { feature } => vec![mir_diag(
             path,
             format!(
                 "{} image device artifact requires unknown target feature `{feature}`",
                 style.label
             ),
-        )],
+        )
+        .with_arg("feature", feature)],
         FmirImageError::TargetIdMismatch {
             backend,
             target,
@@ -809,28 +827,35 @@ pub(super) fn fmir_image_decode_error(
                 "{} image device artifact `{backend}` declares target `{target}`; expected `{expected}`",
                 style.label
             ),
-        )],
+        )
+        .with_arg("backend", backend)
+        .with_arg("target", target)
+        .with_arg("expected", expected)],
         FmirImageError::AbsentArtifactForSelection { selection } => vec![mir_diag(
             path,
             format!(
                 "{} image device selection `{selection}` names no declared artifact of that backend",
                 style.label
             ),
-        )],
+        )
+        .with_arg("selection", selection)],
         FmirImageError::ArtifactEncodingMismatch { backend, detail } => vec![mir_diag(
             path,
             format!(
                 "{} image device artifact `{backend}` payload-encoding mismatch: {detail}",
                 style.label
             ),
-        )],
+        )
+        .with_arg("backend", backend)
+        .with_arg("detail", detail)],
         FmirImageError::NonAdmittedArtifactBackend { backend } => vec![mir_diag(
             path,
             format!(
                 "{} image device artifact backend `{backend}` is not a compiled-in leaf",
                 style.label
             ),
-        )],
+        )
+        .with_arg("backend", backend)],
         // DDCP3-U0: artifact admission and selection-resolution failure
         // classes mapped to focused diagnostics (exact-match clean break).
         FmirImageError::ArtifactAbiVersionMismatch {
@@ -871,7 +896,8 @@ pub(super) fn fmir_image_decode_error(
                     style.label
                 ),
             )
-            .with_arg("backend", backend),
+            .with_arg("backend", backend)
+            .with_arg("detail", detail),
         ],
         FmirImageError::DuplicateRequiredFeature { feature } => vec![mir_issue_diag(
             path,
@@ -880,7 +906,8 @@ pub(super) fn fmir_image_decode_error(
                 "{} image device artifact declares target feature `{feature}` more than once — duplicate required features fail admission",
                 style.label
             ),
-        )],
+        )
+        .with_arg("feature", feature)],
         FmirImageError::DuplicateEntrypoint { entry } => vec![mir_issue_diag(
             path,
             "fmir_image_artifact_duplicate_entrypoint",
@@ -888,7 +915,8 @@ pub(super) fn fmir_image_decode_error(
                 "{} image device artifact declares entrypoint `{entry}` more than once — duplicate entrypoint identities fail admission",
                 style.label
             ),
-        )],
+        )
+        .with_arg("entry", entry)],
         FmirImageError::NonAdmittedSelectedBackend { backend } => vec![mir_issue_diag(
             path,
             "fmir_image_selected_backend_unsupported",
@@ -911,7 +939,8 @@ pub(super) fn fmir_image_decode_error(
             path,
             "fmir_image_device_program_invalid",
             format!("invalid device program in image: {detail}"),
-        )],
+        )
+        .with_arg("detail", detail)],
         FmirImageError::ExecutorPlanSectionVersionMismatch { actual, expected } => vec![
             mir_issue_diag(
                 path,
@@ -925,7 +954,8 @@ pub(super) fn fmir_image_decode_error(
             path,
             "fmir_image_executor_plan_section_invalid",
             format!("invalid executor-plan section in image: {detail}"),
-        )],
+        )
+        .with_arg("detail", detail)],
         // MD2-W1: the distributed execution section is admitted fail-closed
         // at load; each failure class maps to a focused diagnostic.
         FmirImageError::DistributedSectionVersionMismatch { actual, expected } => vec![
@@ -943,12 +973,14 @@ pub(super) fn fmir_image_decode_error(
             path,
             "fmir_image_distributed_section_invalid",
             format!("invalid distributed section in image: {detail}"),
-        )],
+        )
+        .with_arg("detail", detail)],
         FmirImageError::DistributedSectionEquivalenceMismatch { detail } => vec![mir_issue_diag(
             path,
             "fmir_image_distributed_section_equivalence_mismatch",
             format!("distributed plan mismatch in image: {detail}"),
-        )],
+        )
+        .with_arg("detail", detail)],
         FmirImageError::DistributedSectionHashMismatch {
             expected,
             recomputed,
@@ -958,7 +990,9 @@ pub(super) fn fmir_image_decode_error(
             format!(
                 "distributed section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"
             ),
-        )],
+        )
+        .with_arg("expected", expected)
+        .with_arg("recomputed", recomputed)],
         // GI4-2: the cadence/session section is admitted fail-closed with its
         // own version ratchet, independently of the device-program wire and
         // outer image versions.
@@ -975,7 +1009,8 @@ pub(super) fn fmir_image_decode_error(
             path,
             "fmir_image_session_section_invalid",
             format!("invalid session section in image: {detail}"),
-        )],
+        )
+        .with_arg("detail", detail)],
     }
 }
 

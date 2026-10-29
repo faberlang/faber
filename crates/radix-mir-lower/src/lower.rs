@@ -783,7 +783,7 @@ pub fn lower_analyzed_unit(
         }
         let functions = std::mem::take(&mut lowerer.functions);
         let closure_environments = std::mem::take(&mut lowerer.closure_environments);
-        let device_function_metadata = std::mem::take(&mut lowerer.device_function_metadata);
+        let mut device_function_metadata = std::mem::take(&mut lowerer.device_function_metadata);
         let lowering_interner = interner.clone();
         drop(lowerer);
         let mut program = MirProgram { functions };
@@ -806,6 +806,7 @@ pub fn lower_analyzed_unit(
                 &generic_templates,
             )?;
         }
+        attach_backend_refusals(unit, &program, &mut device_function_metadata);
         // The display tokens the file holding the unit prints through: its
         // own locale pack's words.
         let display_tokens = unit.display_tokens.clone();
@@ -830,6 +831,53 @@ pub fn lower_analyzed_unit(
         })
     } else {
         Err(lowering_errors)
+    }
+}
+
+/// Carry the per-target kernel requirement rows to the emit boundary: a
+/// kernel function (and every source-less closure it owns) whose row refuses a
+/// portable device backend records that backend in its metadata, so a package
+/// route that never sees the semantic report still refuses by name before it
+/// emits. A function with no row (a generic instance, an imported shape) stays
+/// unmarked here; its own unit's lowering marks it.
+fn attach_backend_refusals(
+    unit: AnalyzedModuleApplicationView<'_>,
+    program: &MirProgram,
+    metadata: &mut MirDeviceFunctionMetadataMap,
+) {
+    use radix_mir::device::{MirDeviceBackend, MirRefusedBackends};
+    use radix_target::Target;
+
+    if unit.kernel_requirements.kernels.is_empty() {
+        return;
+    }
+    let source_of: FxHashMap<MirFunctionId, DefId> = program
+        .functions
+        .iter()
+        .filter_map(|function| Some((function.id, function.source?)))
+        .collect();
+    for row in metadata.values_mut() {
+        let Some(requirement) = source_of
+            .get(&row.identity.parent)
+            .and_then(|def_id| unit.kernel_requirements.kernel(*def_id))
+        else {
+            continue;
+        };
+        let mut refused = MirRefusedBackends::default();
+        for report in requirement
+            .target_reports
+            .iter()
+            .filter(|report| !report.admitted)
+        {
+            let backend = match report.target {
+                Target::MirAmd => MirDeviceBackend::Amd,
+                Target::MirMetal => MirDeviceBackend::Metal,
+                Target::MirWgsl => MirDeviceBackend::Wgsl,
+                _ => continue,
+            };
+            refused = refused.with(backend);
+        }
+        row.refused_backends = refused;
     }
 }
 
@@ -1971,6 +2019,11 @@ impl<'a> MirLowerer<'a> {
                     },
                     origin: MirFunctionOrigin::Source,
                     lane_domain_local,
+                    refused_backends: radix_mir::device::MirRefusedBackends::default(),
+                    // The declared tier of the source kernel. The safe switch
+                    // already lowered it in analysis, so this is the
+                    // effective tier the emitters read.
+                    tier: radix_hir::kernel_tier_of(annotations, self.interner),
                 },
             );
         }
@@ -2742,6 +2795,15 @@ impl HirVisitor for TopLevelConstCollector<'_> {
 /// `current` is `None` after a terminator, `breakables` records `perge`/`rumpe`
 /// targets, and `handlers` records active alternate-exit handlers. Any attempt
 /// to keep emitting after a block is sealed becomes a lowering error.
+/// One record tensor element an assignment target reaches through: the
+/// receiver and coordinate list it was read with, and the decoded copy the
+/// target's field store mutates (see `FunctionBuilder::element_writebacks`).
+pub(crate) struct ElementWriteback {
+    receiver: MirOperand,
+    index: MirOperand,
+    element: MirPlace,
+}
+
 pub struct FunctionBuilder<'a> {
     types: &'a TypeTable,
     error_ty: Option<MirType>,
@@ -2794,6 +2856,12 @@ pub struct FunctionBuilder<'a> {
     closure_local_callees: FxHashMap<MirLocalId, MirClosureCallee>,
     captured_bindings: FxHashMap<DefId, MirPlace>,
     captured_binding_metadata: FxHashMap<DefId, (Symbol, MirType)>,
+    /// While an assignment target is lowered: the record tensor elements the
+    /// target's place reaches through. A record row decodes to a fresh value
+    /// on every read, so a store into one of its fields lands in that copy
+    /// and the store of the whole element back into the tensor finishes the
+    /// write. `None` outside an assignment target.
+    element_writebacks: Option<Vec<ElementWriteback>>,
     /// `var` locals of this body that closures capture and that are rebound
     /// somewhere: their storage is a shared cell (operator ruling 2026-09-24,
     /// unmarked closures share the enclosing scope).
@@ -2868,6 +2936,7 @@ impl<'a> FunctionBuilder<'a> {
             closure_local_callees: FxHashMap::default(),
             captured_bindings: FxHashMap::default(),
             captured_binding_metadata: FxHashMap::default(),
+            element_writebacks: None,
             shared_bindings: FxHashSet::default(),
             shared_cells: FxHashMap::default(),
             size_params: FxHashMap::default(),
@@ -3479,8 +3548,9 @@ impl<'a> FunctionBuilder<'a> {
         }
 
         let fallback_ty = self.expr_ty(rhs)?;
-        let (place, ty) = self.lower_assignment_place_with_fallback(lhs, fallback_ty)?;
+        let (place, ty, writebacks) = self.lower_assignment_place_writeback(lhs, fallback_ty)?;
         self.lower_expr_to_destination(rhs, place.clone(), ty)?;
+        self.flush_element_writebacks(writebacks, expr.span);
         Some(MirOperand::Place(place))
     }
 
@@ -3509,8 +3579,9 @@ impl<'a> FunctionBuilder<'a> {
             return self.lower_expr_value(expr);
         };
         let fallback_ty = self.expr_ty(source)?;
-        let (place, ty) = self.lower_assignment_place_with_fallback(target, fallback_ty)?;
+        let (place, ty, writebacks) = self.lower_assignment_place_writeback(target, fallback_ty)?;
         self.lower_conversio_assign_to_destination(source, recovery.as_deref(), place.clone(), ty, expr.span, expr)?;
+        self.flush_element_writebacks(writebacks, expr.span);
         Some(MirOperand::Place(place))
     }
 
@@ -3570,7 +3641,7 @@ impl<'a> FunctionBuilder<'a> {
         let Some(fallback_ty) = self.expr_ty(&inc_dec.target) else {
             return;
         };
-        let Some((place, ty)) = self.lower_assignment_place_with_fallback(&inc_dec.target, fallback_ty) else {
+        let Some((place, ty, writebacks)) = self.lower_assignment_place_writeback(&inc_dec.target, fallback_ty) else {
             return;
         };
         let bin_op = match inc_dec.op {
@@ -3613,6 +3684,7 @@ impl<'a> FunctionBuilder<'a> {
             value
         };
         self.assign(place, value, ty, span);
+        self.flush_element_writebacks(writebacks, span);
     }
 
     /// Whether `ty` is an integer slot whose policy a store applies: a
@@ -3658,7 +3730,59 @@ impl<'a> FunctionBuilder<'a> {
         )
     }
 
+    /// The place a mutation of `expr` writes, for a caller that cannot finish
+    /// a write-back. A target that reaches through a record tensor element
+    /// needs the whole element stored back after the write, so it is refused
+    /// by name here rather than written into a copy and lost.
     fn lower_assignment_place_with_fallback(
+        &mut self,
+        expr: &HirExpression,
+        fallback_ty: MirType,
+    ) -> Option<(MirPlace, MirType)> {
+        let (place, ty, writebacks) = self.lower_assignment_place_writeback(expr, fallback_ty)?;
+        if !writebacks.is_empty() {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "in-place mutation through a record tensor element is not lowered; assign the field or the whole element",
+            ));
+            return None;
+        }
+        Some((place, ty))
+    }
+
+    /// The place an assignment to `expr` writes, with the record tensor
+    /// elements it reaches through: the caller stores the written place and
+    /// then calls [`Self::flush_element_writebacks`].
+    fn lower_assignment_place_writeback(
+        &mut self,
+        expr: &HirExpression,
+        fallback_ty: MirType,
+    ) -> Option<(MirPlace, MirType, Vec<ElementWriteback>)> {
+        let outer = self.element_writebacks.replace(Vec::new());
+        let result = self.lower_assignment_place_inner(expr, fallback_ty);
+        let writebacks = std::mem::replace(&mut self.element_writebacks, outer).unwrap_or_default();
+        result.map(|(place, ty)| (place, ty, writebacks))
+    }
+
+    /// Store each element read for an assignment target back into its tensor
+    /// (`TensorSet`), after the target's field store.
+    fn flush_element_writebacks(&mut self, writebacks: Vec<ElementWriteback>, span: Span) {
+        let vacuum = MirType::semantic(self.types.primitive(Primitive::Vacuum));
+        for writeback in writebacks.into_iter().rev() {
+            self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::TensorSet),
+                vec![
+                    writeback.receiver,
+                    writeback.index,
+                    MirOperand::Place(writeback.element),
+                ],
+                vacuum,
+                span,
+            );
+        }
+    }
+
+    fn lower_assignment_place_inner(
         &mut self,
         expr: &HirExpression,
         fallback_ty: MirType,
@@ -4129,8 +4253,26 @@ impl<'a> FunctionBuilder<'a> {
             return Some(MirOperand::Constant(MirConstant::Int(i64::MIN)));
         }
         let op = mir_op;
-        let operand = self.lower_expr_value(operand)?;
-        let ty = self.expr_ty(expr)?;
+        let operand_expr = operand;
+        let mut operand = self.lower_expr_value(operand_expr)?;
+        let mut ty = self.expr_ty(expr)?;
+        if op == MirUnOp::Neg {
+            let operand_ty = self.expr_ty(operand_expr)?;
+            let (operand_marker, operand_payload) = self.types.peel_access_marker(operand_ty.semantic_id());
+            ty = MirType::semantic(self.types.peel_access_marker(ty.semantic_id()).1);
+            if operand_marker.is_some() {
+                // A marked scalar parameter is represented in HIR by its access
+                // type, while the MIR parameter local stores the numeric payload.
+                // Read that place into a payload-typed value before negating it;
+                // carrying the marker through to the unary result makes MIR see a
+                // non-numeric `ref`/`mut` type.
+                operand = self.assign_temp(
+                    MirValueKind::Operand(operand),
+                    MirType::semantic(operand_payload),
+                    operand_expr.span,
+                );
+            }
+        }
 
         Some(self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span))
     }
@@ -5103,16 +5245,21 @@ impl<'a> FunctionBuilder<'a> {
         operands_effect_free: bool,
         ty: MirType,
         span: Span,
-        build: impl FnOnce(&mut Self) -> Option<MirOptionChainLink>,
+        build: impl FnOnce(&mut Self, &MirOperand) -> Option<MirOptionChainLink>,
     ) -> Option<MirOperand> {
+        // WHY: a place operand would otherwise be read once by the nil test and
+        // again after effectful index/call operands. Capture the receiver now,
+        // before the guard and before those operands run.
+        let base = if let MirOperand::Place(place) = base {
+            let base_ty = MirType::semantic(base_ty?);
+            self.assign_temp(MirValueKind::Operand(MirOperand::Place(place.clone())), base_ty, span)
+        } else {
+            base.clone()
+        };
         let base_nullable = base_ty.is_some_and(|ty| self.types.nullable_inner(ty).is_some());
         if operands_effect_free || !base_nullable {
-            let link = build(self)?;
-            return Some(self.assign_temp(
-                MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }),
-                ty,
-                span,
-            ));
+            let link = build(self, &base)?;
+            return Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base, link }), ty, span));
         }
         let result = self.push_temp(ty, span);
         let result_place = MirPlace::temp(result);
@@ -5136,7 +5283,7 @@ impl<'a> FunctionBuilder<'a> {
         let absent_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);
 
         self.switch_to(present_id);
-        let link = build(self)?;
+        let link = build(self, &base)?;
         let chained = self.assign_temp(MirValueKind::Option(MirOptionOp::Chain { base: base.clone(), link }), ty, span);
         self.assign(result_place, chained, ty, span);
         let present_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), span);

@@ -75,6 +75,9 @@ mod lege_lineam_emit_test;
 mod trivia_test;
 
 #[cfg(test)]
+mod type_check_emit_test;
+
+#[cfg(test)]
 mod wrap_test;
 
 pub use module::{FaberCodegen, FaberOutput, empty_presentation};

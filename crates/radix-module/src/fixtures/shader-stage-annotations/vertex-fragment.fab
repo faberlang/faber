@@ -6,19 +6,19 @@ import from "zqstage:stage" stage
 
 class VertexOut {
     @ Position { }
-    mut vector<f32, 4> clip
-    mut vector<f32, 3> color
+    mut vector<f32, size 4> clip
+    mut vector<f32, size 3> color
 }
 
 @ Vertex { }
-fn project(vector<f32, 3> position, vector<f32, 3> color) → VertexOut {
-    let vector<f32, 4> clip ← [position[0], position[1], position[2], 1.0] ↦ vector<f32, 4>
+fn project(vector<f32, size 3> position, vector<f32, size 3> color) → VertexOut {
+    let vector<f32, size 4> clip ← [position[0], position[1], position[2], 1.0] ↦ vector<f32, size 4>
     let VertexOut result ← { clip = clip, color = color } ∷ VertexOut
     return result
 }
 
 @ Fragment { }
-fn shade(vector<f32, 3> color) → vector<f32, 4> {
-    let vector<f32, 4> result ← [color[0], color[1], color[2], 1.0] ↦ vector<f32, 4>
+fn shade(vector<f32, size 3> color) → vector<f32, size 4> {
+    let vector<f32, size 4> result ← [color[0], color[1], color[2], 1.0] ↦ vector<f32, size 4>
     return result
 }

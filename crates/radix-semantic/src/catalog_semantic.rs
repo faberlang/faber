@@ -315,11 +315,6 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         return Some("`break` cannot stop a `thread` loop: lanes run independently. To find the first match use `reduce via argmin …`; to stop at a cutoff, compute it first and loop to it.".to_owned());
     }
     if kind == SemanticErrorKind::TypeMismatch
-        && arg_value(args, "issue") == Some("return_in_thread_body")
-    {
-        return Some("`return` cannot leave a `thread` loop: lanes run independently. To get one value out of the lanes use `reduce`; to stop at a cutoff, compute it first and loop to it.".to_owned());
-    }
-    if kind == SemanticErrorKind::TypeMismatch
         && arg_value(args, "issue") == Some("nominal_ascription_not_provable")
     {
         return Some(
@@ -355,7 +350,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
             semantic_keyword_shadowing_help(args)
         }
         SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
-            Some("convert to textus<N> for O(1) indexing or iterate scalars".to_owned())
+            Some("convert to textus<size N> for O(1) indexing or iterate scalars".to_owned())
         }
         SemanticErrorKind::Warning(WarningKind::TypeTestMemberAbsent) => {
             Some("narrow with a member the union declares, or fix the tested type".to_owned())
@@ -379,7 +374,7 @@ fn semantic_missing_type_annotation_help(args: &[DiagnosticArg]) -> Option<Strin
     match arg_value(args, "issue")? {
         "cannot_infer_tensor_shape" => Some("provide a concrete tensor or sparsa shape".to_owned()),
         "bounded_capacity_unsolved" => {
-            Some("write a concrete N (ascii<8>) or give the hole a bounded witness".to_owned())
+            Some("write a concrete N (ascii<size 8>) or give the hole a bounded witness".to_owned())
         }
         "marker_width_unsolved" => {
             Some("write a concrete marker (i32) or give the hole a same-family witness".to_owned())
@@ -467,12 +462,13 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         "octeti_endian_width_mismatch" => {
             Some("use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64".to_owned())
         }
-        "octeti_to_tensor_unspecified" => Some("write bytes ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
-        "octeti_to_tensor_element_unsupported" | "tensor_to_octeti_element_unsupported" => {
+        "list_b8_to_tensor_unspecified" => Some("write bytes ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
+        "list_b8_to_tensor_element_unsupported" | "tensor_to_list_b8_element_unsupported" => {
             Some("use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type".to_owned())
         }
-        "tensor_to_octeti_unspecified" => Some("write tensor ↦ octeti via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
-        "octeti_to_tensor_length_mismatch" => {
+        "list_b8_to_tensor_record_big_endian" => Some("write bytes ↦ tensor<Record, [n]> via Le; a record element has one byte order, fixed by its layout".to_owned()),
+        "tensor_to_list_b8_unspecified" => Some("write tensor ↦ octeti via Le (or via Be); no other hint applies, and the hint is required for every element width".to_owned()),
+        "list_b8_to_tensor_length_mismatch" => {
             Some("size the byte window to product(shape) times the element width, or change the tensor shape".to_owned())
         }
         "float_to_integer_requires_rounding" => {
@@ -494,7 +490,7 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("drop the via clause; only numeric, ascii, littera, vector, and octeti<N> targets take a hint".to_owned())
         }
         "ascii_format_hint_not_capacity" => {
-            Some("write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width".to_owned())
+            Some("write ascii<size N> via Hex, ascii<size N> via Bin, or ascii<size N> via Oct with N as digit width".to_owned())
         }
         "ascii_pack_width_overflow" => {
             Some("increase N or convert the source to a width whose digit count fits".to_owned())
@@ -644,7 +640,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         WidthLowerIssue::RANGED_ARITY => {
             Some("write policy<W, lo‥hi>, such as saturating<u32, 0‥8>".to_owned())
         }
-        WidthLowerIssue::RANGED_EMPTY => Some(
+        WidthLowerIssue::RANGED_EMPTY | WidthLowerIssue::RANGED_LIST_EMPTY => Some(
             "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
         ),
         WidthLowerIssue::RANGED_OUTSIDE_WIDTH => Some(
@@ -655,9 +651,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         WidthLowerIssue::RANGED_LIST_BOUND_NOT_CONSTANT => Some(
             "write both ends as integer literals, such as list<int, size 1‥8>; a named or size end is not built yet".to_owned(),
-        ),
-        WidthLowerIssue::RANGED_LIST_EMPTY => Some(
-            "the low end must be below the high end of lo‥hi, or not above it for lo…hi".to_owned(),
         ),
         WidthLowerIssue::RANGED_LIST_BOUND_NEGATIVE => {
             Some("a length is a count: start the range at 0 or above".to_owned())
@@ -670,6 +663,12 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         ),
         WidthLowerIssue::LIST_COUNT_NEEDS_SIZE => Some(
             "write list<int, size 4> for at most 4 elements, or list<int, size 1…8> for a range; a bare range bounds a value, not a count".to_owned(),
+        ),
+        WidthLowerIssue::CAPACITY_NEEDS_SIZE => Some(
+            "write the capacity after size: queue<int, size 4>, stack<int, size 4>, string<size 8> or ascii<size 8>".to_owned(),
+        ),
+        WidthLowerIssue::VECTOR_WIDTH_NEEDS_SIZE => Some(
+            "write vector<f32, size 4> for four lanes; the shorthand vf32[4] is unchanged".to_owned(),
         ),
         "ranged_list_length_out_of_range" => Some(
             "give the literal a length inside the range, or build the list with `↦` and recover with `⊥`".to_owned(),
@@ -692,11 +691,11 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "ascii_literal_unescaped_control" => Some("escape control characters in ascii literals".to_owned()),
         "ascii_literal_too_long" => Some(
-            "shorten the ascii<N> literal to fit its declared capacity, or use unbounded ascii"
+            "shorten the ascii<size N> literal to fit its declared capacity, or use unbounded ascii"
                 .to_owned(),
         ),
         "textus_literal_too_long" => Some(
-            "shorten the textus<N> literal to fit its declared capacity, or use unbounded textus"
+            "shorten the textus<size N> literal to fit its declared capacity, or use unbounded textus"
                 .to_owned(),
         ),
         "boolean_operands_required" => Some("use bivalens operands for this operator".to_owned()),
@@ -767,7 +766,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
                 .to_owned(),
         ),
         "constructor_register_extent_requires_literal" => Some(
-            "a vector width or matrix extent in a constructor must be a literal, as in vector<f32, 4>"
+            "a vector width or matrix extent in a constructor must be a literal, as in vector<f32, size 4>"
                 .to_owned(),
         ),
         "constructor_affine_extent_unsupported" => Some(
@@ -789,6 +788,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),
+        "extend_requires_plain_list" => Some(
+            "extend into an unbounded list, or append one element at a time with append".to_owned(),
+        ),
         "numeric_lista_elements_required" => Some("use numeric elements for this lista intrinsic".to_owned()),
         "loop_collection_shape_change" => Some(
             "write a bracket store to update an element, or use a queue with while for a worklist".to_owned(),
@@ -1454,7 +1456,7 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         },
         WarningKind::UnboundedTextusIndex => DiagnosticSpec {
             code: "WARN022",
-            help: Some("convert to textus<N> for O(1) indexing or iterate scalars"),
+            help: Some("convert to textus<size N> for O(1) indexing or iterate scalars"),
         },
         WarningKind::TypeTestMemberAbsent => DiagnosticSpec {
             code: "WARN023",

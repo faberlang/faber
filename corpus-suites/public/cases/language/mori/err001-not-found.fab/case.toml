@@ -1,0 +1,20 @@
+version = 1
+id = "corpus/mori/err001-not-found.fab"
+group = "language"
+input_root = "corpus"
+input = "mori/err001-not-found.fab"
+category = "error"
+domain = "control"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 66
+stdout_contains = "before\n"
+check_only = false

@@ -2103,10 +2103,10 @@ fn parses_applied_generic_typed_constructor_with_size_argument() {
     let result = parse_ok(
         r"
 genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 3> lanes) → Gen<3> {
+functio facere(vector<f32, magnitudo 3> lanes) → Gen<3> {
     redde Gen<3> { lanes = lanes }
 }
 ",
@@ -2271,10 +2271,10 @@ fn parses_qualified_applied_generic_typed_constructor() {
     let result = parse_ok(
         r"
 genus Gen<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
-functio facere(vector<f32, 3> lanes) → Gen<3> {
+functio facere(vector<f32, magnitudo 3> lanes) → Gen<3> {
     redde pkg.Gen<3> { lanes = lanes }
 }
 ",

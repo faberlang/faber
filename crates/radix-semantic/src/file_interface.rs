@@ -347,6 +347,15 @@ pub enum InterfaceTypeSnapshot {
     Primitive(Primitive),
     TensorEdgePolicy(BuiltinTensorEdgePolicy),
     Array(Box<InterfaceTypeSnapshot>),
+    /// `list<T, size N>`; a bounded list of raw `b8` bits is the bounded byte
+    /// buffer and imports as `BoundedOcteti`.
+    BoundedArray(Box<InterfaceTypeSnapshot>, InterfaceIndexSnapshot),
+    /// `list<T, size lo…hi>` length range; `max` is `None` for no upper end.
+    RangedArray {
+        element: Box<InterfaceTypeSnapshot>,
+        min: u64,
+        max: Option<u64>,
+    },
     Queue(Box<InterfaceTypeSnapshot>),
     BoundedQueue(Box<InterfaceTypeSnapshot>, InterfaceIndexSnapshot),
     Stack(Box<InterfaceTypeSnapshot>),
@@ -748,6 +757,31 @@ fn snapshot_interface_type_inner(
         Type::Array(element) => Ok(InterfaceTypeSnapshot::Array(Box::new(
             snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
         ))),
+        Type::BoundedArray { element, capacity } => Ok(InterfaceTypeSnapshot::BoundedArray(
+            Box::new(snapshot_interface_type_inner(
+                *element,
+                types,
+                interner,
+                resolver,
+                module_identity,
+            )?),
+            snapshot_interface_index(*capacity, types, interner)?,
+        )),
+        Type::RangedArray { element, min, max } => Ok(InterfaceTypeSnapshot::RangedArray {
+            element: Box::new(snapshot_interface_type_inner(
+                *element,
+                types,
+                interner,
+                resolver,
+                module_identity,
+            )?),
+            min: *min,
+            max: *max,
+        }),
+        Type::BoundedOcteti { capacity } => Ok(InterfaceTypeSnapshot::BoundedArray(
+            Box::new(InterfaceTypeSnapshot::Bits(radix_types::BitsWidth::B8)),
+            snapshot_interface_index(*capacity, types, interner)?,
+        )),
         Type::Queue(element) => Ok(InterfaceTypeSnapshot::Queue(Box::new(
             snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
         ))),
@@ -1001,11 +1035,8 @@ fn snapshot_interface_type_inner(
         Type::Infer(_)
         | Type::InferUnion(_)
         | Type::MarkerHole { .. }
-        | Type::BoundedArray { .. }
-        | Type::RangedArray { .. }
         | Type::BoundedTextus { .. }
-        | Type::BoundedAscii { .. }
-        | Type::BoundedOcteti { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
+        | Type::BoundedAscii { .. } => Err(FileInterfaceError::InferenceTypeUnsupported),
         Type::Union(members) => members
             .iter()
             .map(|member| {
@@ -1172,6 +1203,15 @@ fn import_interface_type_inner(
         InterfaceTypeSnapshot::Array(element) => {
             let element = import_interface_type_inner(element, types, interner, resolver)?;
             Ok(types.array(element))
+        }
+        InterfaceTypeSnapshot::BoundedArray(element, capacity) => {
+            let element = import_interface_type_inner(element, types, interner, resolver)?;
+            let capacity = import_interface_index(capacity, types, interner)?;
+            Ok(types.bounded_array(element, capacity))
+        }
+        InterfaceTypeSnapshot::RangedArray { element, min, max } => {
+            let element = import_interface_type_inner(element, types, interner, resolver)?;
+            Ok(types.ranged_array(element, *min, *max))
         }
         InterfaceTypeSnapshot::Queue(element) => {
             let element = import_interface_type_inner(element, types, interner, resolver)?;

@@ -507,15 +507,12 @@ impl super::FaberCodegen<'_> {
                 // the block, not the enclosing loop. Dropping the keyword
                 // would change what `rumpe`/`perge` target (D8.9).
                 if let Some(kind) = block.breakable
-                    && matches!(
-                        kind,
-                        radix_hir::HirBreakableKind::Fac | radix_hir::HirBreakableKind::FacOmnia
-                    )
+                    && kind.is_scope()
                 {
                     writer.write(surface.contextual_keyword("fac"));
-                    if matches!(kind, radix_hir::HirBreakableKind::FacOmnia) {
+                    if let Some(modifier) = kind.fac_modifier_key() {
                         writer.write(" ");
-                        writer.write(surface.contextual_keyword("omnia"));
+                        writer.write(surface.contextual_keyword(modifier));
                     }
                     writer.write(" ");
                 }
@@ -1069,24 +1066,34 @@ impl super::FaberCodegen<'_> {
                         writer.write(" ");
                     }
                 }
-                let parenthesized = !lexical_body && params.len() != 1;
+                let rendered_params: Vec<_> = params
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, param)| {
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Def(param.def_id),
+                            slot: HirTypeSlot::ClosureParameter(
+                                self.slot_ordinal(idx, "closure parameter count"),
+                            ),
+                        };
+                        self.type_to_faber_at(&site, param.ty, names, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error))
+                    })
+                    .collect();
+                // WHY: the parser's compact-closure lookahead cannot distinguish an
+                // unparenthesized union annotation from the enclosing argument
+                // expression. A parenthesized signature makes the closure claim
+                // explicit before `∪` is reached.
+                let union_typed = rendered_params.iter().any(|ty| ty.contains('∪'));
+                let parenthesized = !lexical_body && (params.len() != 1 || union_typed);
                 if parenthesized {
                     writer.write("(");
                 }
-                for (idx, param) in params.iter().enumerate() {
+                for (idx, (param, rendered)) in params.iter().zip(&rendered_params).enumerate() {
                     if idx > 0 {
                         writer.write(", ");
                     }
-                    let site = HirTypeSite {
-                        owner: HirOwnerRef::Def(param.def_id),
-                        slot: HirTypeSlot::ClosureParameter(
-                            self.slot_ordinal(idx, "closure parameter count"),
-                        ),
-                    };
-                    let rendered = self
-                        .type_to_faber_at(&site, param.ty, names, surface)
-                        .unwrap_or_else(|error| self.record_type_emission_error(error));
-                    writer.write(&rendered);
+                    writer.write(rendered);
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(param.name));
                     self.write_sponte_marker(param.sponte, surface, writer);
@@ -1267,13 +1274,17 @@ impl super::FaberCodegen<'_> {
                     writer.write(")");
                 }
             }
-            HirExpressionKind::TypeCheck { positive, expr, ty } => {
+            HirExpressionKind::TypeCheck {
+                positive,
+                expr: operand,
+                ty,
+            } => {
                 // Precedence matches `HirBinOp::Is` (4) — both spell `est`
                 // and bind at the same relational level. Negation is the
                 // infix `<expr> non est <ty>` spelling; a prefix `non`
                 // re-parses as `(non expr) est ty` and fails the boolean
                 // operand gate.
-                self.write_expr_prec(expr, 4, names, surface, writer);
+                self.write_expr_prec(operand, 4, names, surface, writer);
                 writer.write(" ");
                 if !*positive {
                     writer.write(surface.contextual_keyword("non"));
@@ -1289,6 +1300,8 @@ impl super::FaberCodegen<'_> {
                     writer
                         .write(surface.type_surface(TypeBindingKind::Primitive(Primitive::Nihil)));
                 } else {
+                    // The target type occurrence belongs to this TypeCheck
+                    // node, rather than the operand's expression site.
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Hir(expr.id),
                         slot: HirTypeSlot::TypeCheckTarget,
@@ -1831,19 +1844,20 @@ impl super::FaberCodegen<'_> {
 
         // `fac omnia` rides the synthetic `Block` tail the same way
         // `write_fac_body` unwraps it; the handler keyword follows the body.
-        let omnia = body.statements.is_empty()
-            && matches!(
-                body.expr.as_deref().map(|expr| &expr.kind),
-                Some(HirExpressionKind::Block(inner))
-                    if matches!(
-                        inner.breakable,
-                        Some(radix_hir::HirBreakableKind::FacOmnia)
-                    )
-            );
+        let modifier = if body.statements.is_empty() {
+            match body.expr.as_deref().map(|expr| &expr.kind) {
+                Some(HirExpressionKind::Block(inner)) => inner
+                    .breakable
+                    .and_then(radix_hir::HirBreakableKind::fac_modifier_key),
+                _ => None,
+            }
+        } else {
+            None
+        };
         writer.write(surface.contextual_keyword("fac"));
-        if omnia {
+        if let Some(modifier) = modifier {
             writer.write(" ");
-            writer.write(surface.contextual_keyword("omnia"));
+            writer.write(surface.contextual_keyword(modifier));
         }
         writer.writeln(" {");
         writer.indented(|writer| {

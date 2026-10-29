@@ -3,8 +3,8 @@ term = "textus"
 kind = "reject"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
 category = "conversion"
-summary = "Decline: bounded textus<N> cannot convert directly to list<b8, size M>."
-syntax = "textus<N> ↦ list<b8, size M>"
+summary = "Decline: bounded textus<magnitudo N> cannot convert directly to list<b8, size M>."
+syntax = "textus<magnitudo N> ↦ list<b8, size M>"
 related = ["↦", "textus", "list<b8>"]
 locale = "en"
 +++
@@ -21,6 +21,6 @@ locale = "en"
 # Common mistakes:
 #   • treating UTF-8 encoding as a width-only conversion.
 
-fn encode(string<8> raw) → list<b8, size 8> {
+fn encode(string<size 8> raw) → list<b8, size 8> {
     return raw ↦ list<b8, size 8>
 }

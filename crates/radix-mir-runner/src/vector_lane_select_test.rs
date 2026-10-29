@@ -1,6 +1,6 @@
 //! Runner pins for the run-time lane select on a vector (`v[i]`).
 //!
-//! The checked-index law: an `Index` projection on a `vector<T, N>` fails
+//! The checked-index law: an `Index` projection on a `vector<T, size N>` fails
 //! exactly as the same projection on a `lista` does, so every pin compares the
 //! vector failure with the lista failure instead of naming a message.
 

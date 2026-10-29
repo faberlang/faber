@@ -1,0 +1,97 @@
++++
+term = "machina"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "fac_stmt", "fac_modifier", "cape_clause", "expression", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "kernel"
+summary = "Device-region legality: a nested region, an exit crossing out, a direct lane loop, an allocation, a device read, a host effect and a host call are named diagnostics."
+syntax = "do device { print \"x\" }"
+related = ["machina", "fac", "nucleum"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:fac_machina_nested"
++++
+# =============================================================================
+# do device — the region rejects what it cannot keep on the device
+# =============================================================================
+#
+# What this teaches:
+#   • each violation inside a `do device` block is a named diagnostic on the
+#     offending line, reported by `faber check` before any lowering runs; in
+#     order they are fac_machina_nested, nucleum_block_exit_crosses_boundary,
+#     nucleum_region_lane_loop_not_built, nucleum_region_alloc_not_built,
+#     nucleum_region_device_read_not_built, nucleum_host_effect and
+#     nucleum_host_call
+#   • a region nests no region and no handler, lets no `return`, `break` or
+#     `continue` cross its boundary, builds no tensor, writes no lane loop of
+#     its own, and reads no device value to steer host control
+#   • the host effects and host calls a kernel refuses are refused here too
+#
+# Common mistakes:
+#   • printing progress from inside the block — print after it
+#   • branching on a value just computed on the device
+#
+# See also: machina, nucleum
+# =============================================================================
+
+@ kernel
+@ public
+fn bump(tensor<f32, [4]> dom, mut tensor<f32, [4]> t, i32 step) → void {
+    for from dom at [i] thread lane let v {
+        t[[i]] ← v + (step ↦ f32)
+    }
+}
+
+fn host_double(f32 x) → f32 {
+    return x * 2.0
+}
+
+main {
+    mut tensor<f32, [4]> t ← tf32[4] {}
+    let tensor<f32, [4]> z ← tf32[4] {}
+
+    # 1. a nested region
+    do device {
+        do device {
+            bump(z, mut t, 1)
+        }
+    }
+
+    # 2. a break crossing out of the region
+    for range 0‥3 let j {
+        do device {
+            bump(z, mut t, 1)
+            break
+        }
+    }
+
+    # 3. a lane loop written in the block
+    do device {
+        for from z at [i] thread lane let v {
+            t[[i]] ← v
+        }
+    }
+
+    # 4. a tensor built in the block
+    do device {
+        let tensor<f32, [4]> w ← tf32[4] {}
+        bump(w, mut t, 1)
+    }
+
+    # 5. a condition on a value read from the device
+    do device {
+        bump(z, mut t, 1)
+        if t[[0]] ≻ 0.5 then bump(z, mut t, 2)
+    }
+
+    # 6. a host effect
+    do device {
+        print "x"
+        bump(z, mut t, 1)
+    }
+
+    # 7. a call to an ordinary function
+    do device {
+        let f32 q ← host_double(3.0)
+        bump(z, mut t, 1)
+    }
+}

@@ -28,6 +28,14 @@ mod ranged_policy_roundtrip_test;
 mod ranged_list_roundtrip_test;
 
 #[cfg(test)]
+#[path = "capacity_roundtrip_test.rs"]
+mod capacity_roundtrip_test;
+
+#[cfg(test)]
+#[path = "vector_width_roundtrip_test.rs"]
+mod vector_width_roundtrip_test;
+
+#[cfg(test)]
 #[path = "module_constant_roundtrip_test.rs"]
 mod module_constant_roundtrip_test;
 
@@ -59,6 +67,10 @@ mod frame_names_test;
 #[cfg(test)]
 #[path = "ad_annotation_roundtrip_test.rs"]
 mod ad_annotation_roundtrip_test;
+
+#[cfg(test)]
+#[path = "return_thread_roundtrip_test.rs"]
+mod return_thread_roundtrip_test;
 
 use crate::lexer::TokenKind;
 use crate::locale;

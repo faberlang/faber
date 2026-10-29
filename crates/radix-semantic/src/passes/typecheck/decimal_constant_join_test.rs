@@ -25,6 +25,21 @@ fn decimal_literal_beside_d64_joins() {
 }
 
 #[test]
+fn decimal_literal_in_mut_d64_parameter_matches_local_expectation() {
+    assert_accepts_la(
+        r#"
+functio local() {
+    varia d64 p ← 2.5
+    p ← p + 1.0
+}
+functio increment(varia d64 p) {
+    p ← p + 1.0
+}
+"#,
+    );
+}
+
+#[test]
 fn integer_constant_beside_d64_joins() {
     assert_accepts_la(&body("redde d + 1"));
     assert_accepts_la(&body("redde d * 2"));

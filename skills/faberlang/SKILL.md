@@ -56,9 +56,8 @@ The `radix` crate is a library only: it has no binary.
 
 `faber` carries single-file phase commands (`lex`, `parse`, `hir`, `mir`,
 `cli-ir`, `emit`), so most probes need only that binary. `faber -c '<source>'`
-and `faber repl` interpret one-liners. Read diagnostics with
-`faber check --diagnostics` or `faber explain <CODE>[.<issue>]`; the default
-output is the compact code-first identity.
+and `faber repl` interpret one-liners. Read diagnostics with the default expanded `faber check` output or
+`faber explain <CODE>[.<issue>]`; `--no-diagnostics` selects the compact code-first identity.
 
 `faber check --lower <file-or-package>` also lowers what it checked to MIR (the
 mid-level intermediate representation the runner executes) and runs the MIR

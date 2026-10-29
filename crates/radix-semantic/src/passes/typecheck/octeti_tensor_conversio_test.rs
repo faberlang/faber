@@ -7,9 +7,10 @@ use crate::test_support::{
 };
 use crate::{SemanticError, SemanticErrorKind};
 
-const UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
-const ELEMENT: &str = "octeti_to_tensor_element_unsupported";
-const LENGTH: &str = "octeti_to_tensor_length_mismatch";
+const UNSPECIFIED: &str = "list_b8_to_tensor_unspecified";
+const ELEMENT: &str = "list_b8_to_tensor_element_unsupported";
+const LENGTH: &str = "list_b8_to_tensor_length_mismatch";
+const RECORD_BIG_ENDIAN: &str = "list_b8_to_tensor_record_big_endian";
 const HANDLER: &str = "failable_conversio_requires_handler";
 
 fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
@@ -191,7 +192,7 @@ fn half_float_elements_are_unsupported() {
 #[test]
 fn vector_element_is_unsupported() {
     assert_rejects_with_issue_la(
-        "incipit { sit _ t ← |00 01 02 03| ↦ tensor<vector<f32, 4>, [2]> via Le }",
+        "incipit { sit _ t ← |00 01 02 03| ↦ tensor<vector<f32, magnitudo 4>, [2]> via Le }",
         ELEMENT,
     );
 }
@@ -260,8 +261,8 @@ fn other_non_hint_targets_still_reject_a_via_hint() {
 
 // --- inverse: tensor ↦ octeti via Be|Le -----------------------------------
 
-const TENSOR_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
-const TENSOR_ELEMENT: &str = "tensor_to_octeti_element_unsupported";
+const TENSOR_UNSPECIFIED: &str = "tensor_to_list_b8_unspecified";
+const TENSOR_ELEMENT: &str = "tensor_to_list_b8_element_unsupported";
 
 #[test]
 fn tensor_to_octeti_is_accepted_for_every_element_and_order_and_is_infallible() {
@@ -319,4 +320,43 @@ fn tensor_to_octeti_with_an_unsupported_element_is_declined_by_name() {
         TENSOR_ELEMENT,
     );
     assert_eq!(err.kind, SemanticErrorKind::ConversionInvalid);
+}
+
+// --- record (fixed-layout genus) elements -------------------
+
+/// A neutral fixed-layout record: one `f16` and a 32-slot `i8` array. The
+/// checker never reads the layout; the run-time conversion resolves it.
+const RECORD: &str = "genus Tabula {\n    varia f16 a\n    varia lista<i8, magnitudo 32> b\n}\n";
+
+fn record_read(shape: &str, hint: &str) -> String {
+    format!(
+        "{RECORD}functio w(lista<b8> b) → numerus ⇥ textus {{ sit _ t ← b ↦ tensor<Tabula, {shape}> via {hint}\n redde 1 }}"
+    )
+}
+
+#[test]
+fn record_element_is_accepted_with_literal_extents() {
+    // A run-time extent rides the same row; the runner tests cover its shape
+    // operand.
+    for shape in ["[4]", "[2, 3]"] {
+        assert_accepts_la(&record_read(shape, "Le"));
+    }
+}
+
+#[test]
+fn record_element_gets_no_static_length_check() {
+    // The record width lives in the layout law, not in the checker, so a
+    // static byte window of any length reaches the run-time check.
+    assert_accepts_la(&format!(
+        "{RECORD}incipit {{ sit _ t ← |00 01 02 03|[0‥4] ↦ tensor<Tabula, [4]> via Le }}"
+    ));
+}
+
+#[test]
+fn record_element_requires_the_little_endian_clause() {
+    assert_rejects_with_issue_la(
+        &format!("{RECORD}incipit {{ sit _ t ← |00 01 02 03| ↦ tensor<Tabula, [1]> }}"),
+        UNSPECIFIED,
+    );
+    assert_rejects_with_issue_la(&record_read("[4]", "Be"), RECORD_BIG_ENDIAN);
 }

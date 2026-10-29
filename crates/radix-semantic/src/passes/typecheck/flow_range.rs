@@ -91,7 +91,7 @@ impl BoundKey {
         }
     }
 
-    fn live_length_source(&self) -> Option<(DefId, u32)> {
+    pub(super) fn live_length_source(&self) -> Option<(DefId, u32)> {
         match self {
             Self::LiveLength { source, version } => Some((*source, *version)),
             _ => None,
@@ -247,10 +247,8 @@ impl IntRange {
 /// binding bound is the weakest, since it only restates the value's own name.
 fn usefulness(key: &BoundKey, lower: bool) -> u8 {
     match (key, lower) {
-        (BoundKey::Const(_), true) => 3,
-        (BoundKey::Axis(_) | BoundKey::LiveLength { .. }, true) => 2,
-        (BoundKey::Axis(_) | BoundKey::LiveLength { .. }, false) => 3,
-        (BoundKey::Const(_), false) => 2,
+        (BoundKey::Const(_), true) | (BoundKey::Axis(_) | BoundKey::LiveLength { .. }, false) => 3,
+        (BoundKey::Axis(_) | BoundKey::LiveLength { .. }, true) | (BoundKey::Const(_), false) => 2,
         (BoundKey::Binding(_), _) => 1,
     }
 }

@@ -195,7 +195,7 @@ fn vector_to_tensor_keeps_lanes_in_order() {
             Value::Float(3.0),
         ]))),
     )
-    .expect("vector<f32, 3> to tensor<f32, [3]>");
+    .expect("vector<f32, size 3> to tensor<f32, [3]>");
 
     let (shape, values) = tensor_shape_and_values(converted);
     assert_eq!(shape, vec![3]);

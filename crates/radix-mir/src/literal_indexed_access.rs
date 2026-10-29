@@ -442,6 +442,7 @@ fn terminator_reads_set(
             .any(|operand| operand_resolves_into(operand, aliases, slots)),
         MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable
-        | MirTerminatorKind::Return(None) => false,
+        | MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread => false,
     }
 }

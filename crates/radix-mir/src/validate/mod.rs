@@ -37,3 +37,7 @@ mod ref_param_tests;
 #[cfg(test)]
 #[path = "../validate_detach_test.rs"]
 mod detach_tests;
+
+#[cfg(test)]
+#[path = "intrinsic_test.rs"]
+mod intrinsic_tests;

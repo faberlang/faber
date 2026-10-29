@@ -195,3 +195,36 @@ fn format_faber_type_renders_intervallum_step_one_stays_bare() {
         "intervallum<numerus>"
     );
 }
+
+#[test]
+fn format_faber_type_spells_a_bounded_capacity_after_size() {
+    // Need: a printed type name carries the `size` marker the source
+    // must write (`ascii<size 1>` is the type of `'x'`); the `_` hole stays bare.
+    let interner = Interner::new();
+    let mut types = TypeTable::new();
+    let four = types.intern_index(IndexExpr::Literal(4));
+    let one = types.intern_index(IndexExpr::Literal(1));
+    let numerus = types.primitive(Primitive::Numerus);
+    let name = |_| "unused".to_owned();
+
+    let queue = types.bounded_queue(numerus, four);
+    let stack = types.bounded_stack(numerus, four);
+    let text = types.bounded_textus(four);
+    let ascii = types.bounded_ascii(one);
+    assert_eq!(
+        format_faber_type(queue, &types, &interner, &name),
+        "queue<numerus, size 4>"
+    );
+    assert_eq!(
+        format_faber_type(stack, &types, &interner, &name),
+        "stack<numerus, size 4>"
+    );
+    assert_eq!(
+        format_faber_type(text, &types, &interner, &name),
+        "textus<size 4>"
+    );
+    assert_eq!(
+        format_faber_type(ascii, &types, &interner, &name),
+        "ascii<size 1>"
+    );
+}

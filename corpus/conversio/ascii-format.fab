@@ -4,8 +4,8 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "labeled_type_argument", "width_type_sugar", "conversio_expr", "expression", "literal"]
 category = "conversion"
 canonical = false
-summary = "Fixed-width hex/bin/oct pack from numerus into ascii<N>."
-syntax = "<numerus> ↦ ascii<N> via Hex|Bin|Oct"
+summary = "Fixed-width hex/bin/oct pack from numerus into ascii<size N>."
+syntax = "<numerus> ↦ ascii<size N> via Hex|Bin|Oct"
 related = ["↦", "ascii", "numerus"]
 locale = "en"
 +++
@@ -14,21 +14,21 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • The type argument is capacity — `ascii<N> via Hex` zero-pads to N digits.
+#   • The type argument is capacity — `ascii<size N> via Hex` zero-pads to N digits.
 #   • The `via` clause is the format hint — Hex/Bin/Oct; lowercase emission.
 #   • Overflow, negatives, and floats fail closed (not shown here).
 #
 # Common mistakes:
-#   • `n ↦ ascii<Hex>` — a type argument is never a hint; write `ascii<N> via Hex`.
+#   • `n ↦ ascii<Hex>` — a type argument is never a hint; write `ascii<size N> via Hex`.
 #   • Expecting `-ff` or two's-complement blowout from a negative source.
 #
 # See also: ↦, ascii, numerus
 # =============================================================================
 
 
-# conversio — n ↦ ascii<N> via Hex|Bin|Oct
+# conversio — n ↦ ascii<size N> via Hex|Bin|Oct
 #
-# <numerus> ↦ ascii<N> via Hex|Bin|Oct
+# <numerus> ↦ ascii<size N> via Hex|Bin|Oct
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' 'ascii' '<' N '>' 'via' radix
@@ -43,13 +43,13 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for ascii format pack.
 
 main {
-    let ascii<2> hex ← 255 ↦ ascii<2> via Hex
-    let ascii<8> padded ← 37 ↦ ascii<8> via Hex
-    let ascii<8> bin ← 255 ↦ ascii<8> via Bin
-    let ascii<3> oct ← 255 ↦ ascii<3> via Oct
-    let ascii<2> inferred_hex ← 255 ↦ ascii<_> via Hex
-    let ascii<8> inferred_bin ← 255 ↦ ascii<_> via Bin
-    let ascii<3> inferred_oct ← 255 ↦ ascii<_> via Oct
+    let ascii<size 2> hex ← 255 ↦ ascii<size 2> via Hex
+    let ascii<size 8> padded ← 37 ↦ ascii<size 8> via Hex
+    let ascii<size 8> bin ← 255 ↦ ascii<size 8> via Bin
+    let ascii<size 3> oct ← 255 ↦ ascii<size 3> via Oct
+    let ascii<size 2> inferred_hex ← 255 ↦ ascii<_> via Hex
+    let ascii<size 8> inferred_bin ← 255 ↦ ascii<_> via Bin
+    let ascii<size 3> inferred_oct ← 255 ↦ ascii<_> via Oct
     print hex
     print padded
     print bin

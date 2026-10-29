@@ -1,0 +1,55 @@
++++
+term = "nucleum"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "nucleum_modifier", "nucleum_tier", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "kernel"
+canonical = false
+summary = "The Latin spellings of the kernel safety tiers: `@ nucleum`, `@ nucleum laxus` and `@ nucleum intutus`."
+syntax = "@ nucleum [laxus | intutus]"
+related = ["nucleum", "publica"]
+locale = "la"
++++
+# =============================================================================
+# nucleum — the kernel safety tiers (la)
+# =============================================================================
+#
+# What this teaches:
+#   • `@ nucleum` is the default tier; `@ nucleum laxus` (en `relaxed`) allows
+#     relaxed float math; `@ nucleum intutus` (en `unsafe`) includes `laxus`
+#     and also drops the index checks the compiler cannot prove
+#   • The tier words are the la reader spellings (provisional pending
+#     operator sign-off); an en file writes `relaxed` and `unsafe`, and the
+#     two never mix in one file
+#
+# Common mistakes:
+#   • writing the en word `relaxed` in a la file — the tier words follow the
+#     file's locale
+#
+# See also: nucleum, publica
+# =============================================================================
+
+@ nucleum
+@ publica
+functio scala_communis(f32 x) → f32 {
+    redde x * 2.0
+}
+
+@ nucleum laxus
+@ publica
+functio scala_laxa(f32 x) → f32 {
+    redde x * 2.0
+}
+
+@ nucleum intutus
+@ publica
+functio scala_intuta(f32 x) → f32 {
+    redde x * 2.0
+}
+
+functio numerus_graduum() → numerus {
+    redde 3
+}
+
+incipit {
+    nota numerus_graduum()
+}

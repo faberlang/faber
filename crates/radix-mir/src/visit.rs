@@ -375,6 +375,7 @@ pub fn walk_terminator<V: MirVisitor>(visitor: &mut V, terminator: &MirTerminato
             visitor.visit_operand(condition);
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -410,6 +411,7 @@ pub fn try_walk_terminator<V: FallibleMirVisitor>(
         MirTerminatorKind::Branch { condition, .. } => visitor.visit_operand(condition),
         MirTerminatorKind::Switch { value, .. } => visitor.visit_operand(value),
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => Ok(()),
     }
@@ -703,6 +705,7 @@ pub fn terminator_successors(kind: &MirTerminatorKind) -> Vec<MirBlockId> {
             successors
         }
         MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::ReturnError(_)
         | MirTerminatorKind::Unreachable => Vec::new(),
     }

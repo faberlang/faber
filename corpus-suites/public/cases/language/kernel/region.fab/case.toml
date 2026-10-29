@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/kernel/region.fab"
+group = "language"
+input_root = "corpus"
+input = "kernel/region.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true

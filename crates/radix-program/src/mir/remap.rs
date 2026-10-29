@@ -148,6 +148,7 @@ pub(super) fn remap_terminator_text_symbols(
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -200,7 +201,7 @@ pub(super) fn remap_place_text_symbols(
                 *field = remap_symbol(*field, source, target);
             }
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                remap_operand_text_symbols(operand, source, target)
+                remap_operand_text_symbols(operand, source, target);
             }
             MirProjection::ClosureCapture {
                 environment: _,

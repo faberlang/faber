@@ -1,0 +1,26 @@
++++
+term = "mori"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "si_stmt", "arm", "iace_stmt", "iace_expr", "redde_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "hole_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "conversio_expr", "cast_expr", "call_expr", "call_suffix", "member_suffix", "aut_expr", "comparison", "equality", "equality_tail", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "error"
+canonical = false
+summary = "A panic with a runtime text message prints the message and exits 70."
+syntax = "panic <expression>"
+related = ["mori", "cape"]
+locale = "en"
++++
+# =============================================================================
+# mori — A runtime text panic message is preserved by the host trap.
+# =============================================================================
+#
+# EXPECTED:
+#   stdout: before
+#   stderr: abort: boom
+#   exit: 70
+
+main {
+    let string reason ← "boom"
+    print "before"
+    panic reason
+    print "after"
+}

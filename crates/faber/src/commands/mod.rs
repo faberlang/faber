@@ -177,11 +177,11 @@ mod air_json {
     }
 }
 
-fn diagnostic_mode(enabled: bool) -> DiagnosticMode {
-    if enabled {
-        DiagnosticMode::Diagnostics
-    } else {
+fn diagnostic_mode(no_diagnostics: bool) -> DiagnosticMode {
+    if no_diagnostics {
         DiagnosticMode::Normal
+    } else {
+        DiagnosticMode::Diagnostics
     }
 }
 
@@ -255,11 +255,21 @@ pub fn run() {
     dispatch(command);
 }
 
+/// Refuse an in-memory engine (`clif-jit`) where an artifact is asked for:
+/// it compiles into the running process and has no output to write.
+fn reject_in_memory_engine(target: Option<crate::cli::FaberCliTarget>) {
+    if target.is_some_and(crate::cli::FaberCliTarget::is_in_memory_engine) {
+        eprintln!("error: clif-jit runs in memory; use --target clif to build an executable");
+        exit_status::exit_usage();
+    }
+}
+
 fn dispatch(command: Command) {
     let (flag, probe) = command.library_home_inputs();
     faber_cli::library::configure_library_home(flag.as_deref(), probe.as_deref());
     match command {
         Command::Build(args) => {
+            reject_in_memory_engine(args.target);
             reject_reader_locale_without_package(
                 args.locale.as_deref(),
                 std::slice::from_ref(&args.input),
@@ -282,9 +292,11 @@ fn dispatch(command: Command) {
                     deny_codes: args.deny,
                     locale: args.locale,
                     diagnostics_locale: args.diagnostics_locale,
+                    diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 },
                 args.format,
                 args.linter,
+                args.safe,
             );
         }
         Command::Corpus(args) => cmd_corpus(&args),
@@ -343,13 +355,14 @@ fn dispatch(command: Command) {
         Command::Mir(_) => exit_runner_feature_unavailable("mir"),
         Command::CliIr(args) => cmd_inspect_cli_ir(&args.input),
         Command::Emit(args) => {
+            reject_in_memory_engine(Some(args.target));
             let emit_command = EmitCommand {
                 input: args.input,
                 package: args.package,
                 target: args.target.to_radix(),
                 reflection: args.reflection,
                 output: args.output,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: args.locale,
                 diagnostics_locale: args.diagnostics_locale,
@@ -384,6 +397,7 @@ fn dispatch(command: Command) {
             }
         }
         Command::Convert(args) => cmd_convert(&convert::ConvertCommand {
+            diagnostic_mode: diagnostic_mode(args.no_diagnostics),
             paths: args.paths,
             to: args.to,
             from: args.from,
@@ -393,6 +407,7 @@ fn dispatch(command: Command) {
             stdin: args.stdin,
         }),
         Command::Format(args) => cmd_format(&format::FormatCommand {
+            diagnostic_mode: diagnostic_mode(args.no_diagnostics),
             paths: args.paths,
             check: args.check,
             stdout: args.stdout,
@@ -453,7 +468,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
                 permissive: args.permissive,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: None,
                 diagnostics_locale: args.diagnostics_locale,
@@ -469,7 +484,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
                 permissive: args.permissive,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: args.locale,
                 diagnostics_locale: args.diagnostics_locale,
@@ -490,7 +505,7 @@ fn cmd_check(args: crate::cli::CheckArgs) {
                 permissive: args.permissive,
                 deny_warnings: args.deny_warnings,
                 deny_codes: args.deny,
-                diagnostic_mode: diagnostic_mode(args.diagnostics),
+                diagnostic_mode: diagnostic_mode(args.no_diagnostics),
                 diagnostics_locale_pack: None,
                 locale: None,
                 diagnostics_locale: args.diagnostics_locale,

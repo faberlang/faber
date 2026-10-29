@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/operatores/modular-word-u64-to-int.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/modular-word-u64-to-int.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+check_only = true

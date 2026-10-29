@@ -117,14 +117,24 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
 /// figura, exactly as `normalize_size_arg` does for tensor shape arguments.
 fn record_named_size_args(presentation: &mut radix_hir::HirPresentation, types: &radix_types::TypeTable) {
     for authored in &mut presentation.authored_types {
-        if !matches!(authored.form.head, radix_hir::HirTypeFormHead::Named { .. }) {
-            continue;
-        }
-        let radix_types::Type::Applied(_, applied) = types.get(authored.form.ty) else {
-            continue;
-        };
+        record_named_size_args_in_form(&mut authored.form, types);
+    }
+}
+
+/// Align one form and every authored type child beneath it, so a size-generic
+/// application nested under another form (the `Box<3>` of `Box<3> ∪ none`)
+/// carries its size child like a root one does.
+fn record_named_size_args_in_form(form: &mut radix_hir::HirTypeForm, types: &radix_types::TypeTable) {
+    if matches!(form.head, radix_hir::HirTypeFormHead::Named { .. })
+        && let radix_types::Type::Applied(_, applied) = types.get(form.ty)
+    {
         let applied = applied.clone();
-        align_named_form_args(&mut authored.form, &applied);
+        align_named_form_args(form, &applied);
+    }
+    for arg in &mut form.args {
+        if let radix_hir::HirTypeFormArg::Type(child) = arg {
+            record_named_size_args_in_form(child, types);
+        }
     }
 }
 
@@ -762,3 +772,7 @@ fn cli_program_wire(p: &crate::cli::CliProgram) -> CliProgramWire {
         exit: p.exit.as_ref().map(cli_exit_wire),
     }
 }
+
+#[cfg(test)]
+#[path = "serialize_test.rs"]
+mod tests;

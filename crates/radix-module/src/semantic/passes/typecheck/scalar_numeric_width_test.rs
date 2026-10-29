@@ -519,21 +519,26 @@ fn metal_and_wgsl_reject_unimplemented_modular_widths_with_stable_issue() {
     // After the kernel-profile widening (need, 2026-10-16), the
     // sub-32-bit modular words (modulus<u8>/modulus<u16>, Wrapping policy)
     // are gate-admitted on the device leaves and fail later at the emitter
-    // carrier seam. u64 stays refused on every path through the named check
-    // diagnostic `nucleum_wide_integer` (need-2).
+    // carrier seam. Ruling 2026-10-28 admits u64 at check as well: it is a
+    // per-target capability fact: WGSL refuses it by name in its requirement
+    // row, and Metal's emitter refuses the wide scalar layout (never a check
+    // diagnostic).
     const WIDTHS: [&str; 1] = ["u64"];
     for width in WIDTHS {
         let source = format!(
             "@ nucleum\n@ publica\nfunctio wordAdd(modulus<{width}> value) → modulus<{width}> {{\n    redde value + 1\n}}\n"
         );
-        for target in [Target::MirMetal, Target::MirWgsl] {
+        for (target, issue) in [
+            (Target::MirMetal, "mir_metal_text_unsupported"),
+            (Target::MirWgsl, "kernel_target_requirements_not_met"),
+        ] {
             let result = test_support::compile_for_target_and_get_result_la(&source, target);
             assert!(!result.success(), "{target:?} unexpectedly accepted a modulus<{width}> kernel");
             assert!(
                 result.diagnostics.iter().any(|diagnostic| diagnostic
                     .args
                     .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "nucleum_wide_integer")),
+                    .any(|arg| arg.name == "issue" && arg.value == issue)),
                 "{target:?} modulus<{width}> diagnostics: {:?}",
                 result.diagnostics
             );

@@ -264,6 +264,29 @@ fn try_bind_generic_type_witness(
                     seen,
                 )
         }
+        (
+            Type::RangedArray {
+                element: expected_element,
+                min: expected_min,
+                max: expected_max,
+            },
+            Type::RangedArray {
+                element: actual_element,
+                min: actual_min,
+                max: actual_max,
+            },
+        ) => {
+            expected_min == actual_min
+                && expected_max == actual_max
+                && try_bind_generic_type_witness(
+                    types,
+                    *expected_element,
+                    *actual_element,
+                    generic_bindings,
+                    shape_bindings,
+                    seen,
+                )
+        }
         (Type::Map(expected_key, expected_value), Type::Map(actual_key, actual_value)) => {
             try_bind_generic_type_witness(
                 types,
@@ -2190,6 +2213,7 @@ fn rewrite_terminator_constants(
                 && cases.iter_mut().all(|case| rewrite(&mut case.value))
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => true,
     }

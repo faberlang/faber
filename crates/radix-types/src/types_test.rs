@@ -11,14 +11,16 @@ use crate::InstansPrecision;
 use crate::NumericWidth;
 use crate::TypeId;
 use crate::index::{
-    IndexArithmeticError, IndexExpr, IndexId, add_index_constant, compose_index_affine_constant,
-    divide_index_exact, evaluate_index_dimension, i64s_from_literal_index,
+    IndexArithmeticError, IndexExpr, IndexId, RuntimeExtentId, add_index_constant,
+    compose_index_affine_constant, divide_index_exact, evaluate_index_dimension,
+    i64s_from_literal_index,
 };
 use crate::{
     AccessMarker, AppliedArg, BuiltinTensorEdgePolicy, CollectionKind, FloatPolicy, FuncSig,
-    GenericParamDescriptor, GenericParamSort, ParamType, Primitive, SemanticGenericParamDefault,
-    SemanticMutability, SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
-    collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
+    GenericParamDescriptor, GenericParamSort, InferVar, IntPolicy, ParamType, Primitive,
+    SemanticGenericParamDefault, SemanticMutability, SemanticParamMode, TensorFamilyKind, Type,
+    TypeParamConstraint, TypeTable, collection_type_specs, is_atomic_element_type,
+    is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
     lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
 
@@ -125,13 +127,55 @@ fn access_marker_facts_intern_as_ref_wrappers() {
 
 #[test]
 fn scalar_carriers_reject_access_markers() {
-    let types = TypeTable::new();
-    let numerus = types.primitive(Primitive::Numerus);
-    let bivalens = types.primitive(Primitive::Bivalens);
-    let textus = types.primitive(Primitive::Textus);
-    assert!(types.is_scalar_for_access_marker(numerus));
-    assert!(types.is_scalar_for_access_marker(bivalens));
-    assert!(!types.is_scalar_for_access_marker(textus));
+    let mut types = TypeTable::new();
+    let scalar_primitives = [
+        Primitive::Numerus,
+        Primitive::Fractus,
+        Primitive::Bivalens,
+        Primitive::Nihil,
+        Primitive::Vacuum,
+        Primitive::Numquam,
+        Primitive::Instans,
+    ];
+    for primitive in scalar_primitives {
+        assert!(
+            types.is_scalar_for_access_marker(types.primitive(primitive)),
+            "{primitive:?} is scalar"
+        );
+    }
+    for primitive in [Primitive::Textus, Primitive::Ascii, Primitive::Octeti] {
+        assert!(
+            !types.is_scalar_for_access_marker(types.primitive(primitive)),
+            "{primitive:?} is not scalar for marker checks"
+        );
+    }
+
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let b8 = types.bits(BitsWidth::B8);
+    let modular = types.intern(Type::ModularWord(NumericWidth::U32));
+    let saturating = types.intern(Type::SaturatingWord(NumericWidth::U32));
+    let ranged = types.ranged_int(IntPolicy::Trapping, NumericWidth::I8, -4, 4);
+    let policy_float = types.intern(Type::PolicyFloat(FloatPolicy::Trapping, NumericWidth::F32));
+    let sized_instans = types.sized_instans(InstansPrecision::Millis);
+    let alias_i32 = types.intern(Type::Alias(DefId(77), i32));
+    for scalar in [
+        i32,
+        f32,
+        b8,
+        modular,
+        saturating,
+        ranged,
+        policy_float,
+        sized_instans,
+        alias_i32,
+    ] {
+        assert!(types.is_scalar_for_access_marker(scalar), "{scalar:?}");
+    }
+    let array = types.array(i32);
+    let inference_hole = types.intern(Type::Infer(InferVar(0)));
+    assert!(!types.is_scalar_for_access_marker(array));
+    assert!(!types.is_scalar_for_access_marker(inference_hole));
 }
 
 #[test]
@@ -1954,10 +1998,16 @@ fn bounded_forms_are_distinct_from_bare_primitives_and_each_other() {
     let lista = types.array(numerus);
     let octeti8 = types.bounded_octeti(n8);
 
-    assert!(!types.equals(ascii8, ascii), "ascii<8> ≠ ascii");
-    assert!(!types.equals(ascii8, ascii9), "ascii<8> ≠ ascii<9>");
-    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<64>");
-    assert!(!types.equals(textus4, textus), "textus<4> ≠ textus");
+    assert!(!types.equals(ascii8, ascii), "ascii<magnitudo 8> ≠ ascii");
+    assert!(
+        !types.equals(ascii8, ascii9),
+        "ascii<magnitudo 8> ≠ ascii<magnitudo 9>"
+    );
+    assert!(!types.equals(ascii, ascii64), "ascii ≠ ascii<magnitudo 64>");
+    assert!(
+        !types.equals(textus4, textus),
+        "textus<magnitudo 4> ≠ textus"
+    );
     assert!(
         !types.equals(lista8, lista),
         "lista<numerus, magnitudo 8> ≠ lista<numerus>"
@@ -2044,14 +2094,20 @@ fn bounded_ascii_one_assigns_to_textus_like_bare_ascii() {
     assert!(types.is_assignable(ascii, textus), "bare ascii → textus");
     assert!(
         types.is_assignable(ascii1, textus),
-        "ascii<1> → textus (D17 payload widening)"
+        "ascii<magnitudo 1> → textus (D17 payload widening)"
     );
     assert!(
         !types.is_assignable(ascii8, textus),
-        "ascii<8> reaches textus via ↦ conversio, not implicit widening"
+        "ascii<magnitudo 8> reaches textus via ↦ conversio, not implicit widening"
     );
-    assert!(!types.is_assignable(textus, ascii1), "textus ↛ ascii<1>");
-    assert!(types.is_assignable(ascii1, ascii), "ascii<1> → ascii (D17)");
+    assert!(
+        !types.is_assignable(textus, ascii1),
+        "textus ↛ ascii<magnitudo 1>"
+    );
+    assert!(
+        types.is_assignable(ascii1, ascii),
+        "ascii<magnitudo 1> → ascii (D17)"
+    );
 }
 
 #[test]
@@ -2314,4 +2370,241 @@ fn func_sig_params_differing_only_in_sponte_are_not_equal() {
     assert!(!types.equals(sponte_fn, defaulted_fn));
     let sponte_again = types.function(sig_of(true));
     assert!(types.equals(sponte_fn, sponte_again));
+}
+
+// --- Direct behavior coverage for type-table helpers with boundary paths ---
+
+#[test]
+fn record_holes_struct_lookup_and_unit_tuple_helpers() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let struct_id = types.intern(Type::Struct(DefId(900)));
+    assert_eq!(types.find_struct(DefId(900)), Some(struct_id));
+    assert_eq!(types.find_struct(DefId(901)), None);
+
+    assert_eq!(types.find_tuple(&[]), None);
+    let unit = types.unit();
+    assert!(matches!(types.get(unit), Type::Tuple(elements) if elements.is_empty()));
+    assert_eq!(types.find_tuple(&[]), Some(unit));
+    assert_eq!(types.unit(), unit, "unit is reused once interned");
+
+    let pair = types.tuple(vec![numerus, struct_id]);
+    assert_eq!(types.find_tuple(&[numerus, struct_id]), Some(pair));
+    assert_eq!(types.find_tuple(&[struct_id, numerus]), None);
+
+    let hole = types.intern(Type::Infer(InferVar(44)));
+    let other_hole = types.intern(Type::Infer(InferVar(45)));
+    let union_hole = types.intern(Type::InferUnion(InferVar(44)));
+    assert!(!types.is_default_record_hole(hole));
+    types.mark_default_record_hole(InferVar(44));
+    assert!(types.is_default_record_hole(hole));
+    assert!(!types.is_default_record_hole(other_hole));
+    assert!(
+        !types.is_default_record_hole(union_hole),
+        "the default-record marker applies only to an Infer hole"
+    );
+
+    assert_eq!(types.fresh_index_infer_var(), crate::index::IndexVar(0));
+    assert_eq!(types.fresh_index_infer_var(), crate::index::IndexVar(1));
+}
+
+#[test]
+fn ranged_array_constructor_normalizes_the_unbounded_and_capacity_edges() {
+    let mut types = TypeTable::new();
+    let textus = types.primitive(Primitive::Textus);
+    let unbounded = types.ranged_array(textus, 0, None);
+    assert!(matches!(types.get(unbounded), Type::Array(element) if *element == textus));
+
+    let explicit_capacity = types.intern_index(IndexExpr::Literal(4));
+    let zero_to_four = types.ranged_array(textus, 0, Some(4));
+    let bounded = types.bounded_array(textus, explicit_capacity);
+    assert!(matches!(types.get(zero_to_four), Type::BoundedArray { .. }));
+    assert!(types.equals(zero_to_four, bounded));
+
+    let positive_minimum = types.ranged_array(textus, 2, None);
+    let finite_range = types.ranged_array(textus, 2, Some(9));
+    assert!(matches!(
+        types.get(positive_minimum),
+        Type::RangedArray { element, min: 2, max: None } if *element == textus
+    ));
+    assert!(matches!(
+        types.get(finite_range),
+        Type::RangedArray { element, min: 2, max: Some(9) } if *element == textus
+    ));
+    assert!(!types.equals(positive_minimum, finite_range));
+}
+
+#[test]
+fn ranged_integer_constructors_normalize_full_widths_and_find_the_base() {
+    let mut types = TypeTable::new();
+    let full_trapping = types.ranged_int(IntPolicy::Trapping, NumericWidth::I8, -128, 127);
+    let full_wrapping = types.ranged_int(IntPolicy::Wrapping, NumericWidth::U8, 0, 255);
+    let full_saturating = types.ranged_int(IntPolicy::Saturating, NumericWidth::U8, 0, 255);
+    assert!(matches!(
+        types.get(full_trapping),
+        Type::SizedNumeric(Primitive::Numerus, NumericWidth::I8)
+    ));
+    assert!(matches!(
+        types.get(full_wrapping),
+        Type::ModularWord(NumericWidth::U8)
+    ));
+    assert!(matches!(
+        types.get(full_saturating),
+        Type::SaturatingWord(NumericWidth::U8)
+    ));
+    assert_eq!(types.ranged_int_parts(full_trapping), None);
+
+    let narrow = types.ranged_int(IntPolicy::Trapping, NumericWidth::I8, -5, 7);
+    let alias = types.intern(Type::Alias(DefId(902), narrow));
+    assert_eq!(
+        types.ranged_int_parts(narrow),
+        Some((IntPolicy::Trapping, NumericWidth::I8, -5, 7))
+    );
+    assert_eq!(
+        types.ranged_int_parts(alias),
+        types.ranged_int_parts(narrow)
+    );
+    assert_eq!(types.ranged_int_base_existing(narrow), full_trapping);
+    assert_eq!(types.ranged_int_base_existing(alias), full_trapping);
+    assert_eq!(types.ranged_int_base(narrow), full_trapping);
+    assert_eq!(types.ranged_int_base(alias), full_trapping);
+    assert_eq!(types.ranged_int_base_existing(full_trapping), full_trapping);
+
+    let wrapped_narrow = types.ranged_int(IntPolicy::Wrapping, NumericWidth::U8, 2, 20);
+    let saturated_narrow = types.ranged_int(IntPolicy::Saturating, NumericWidth::U8, 2, 20);
+    assert!(matches!(
+        types.get(types.ranged_int_base_existing(wrapped_narrow)),
+        Type::ModularWord(NumericWidth::U8)
+    ));
+    assert!(matches!(
+        types.get(types.ranged_int_base_existing(saturated_narrow)),
+        Type::SaturatingWord(NumericWidth::U8)
+    ));
+}
+
+#[test]
+fn indexed_type_equality_compares_expression_structure_recursively() {
+    let mut types = TypeTable::new();
+    let literal_a = types.intern_index(IndexExpr::Literal(8));
+    let literal_b = types.intern_index(IndexExpr::Literal(8));
+    let literal_other = types.intern_index(IndexExpr::Literal(9));
+    let parameter_a = types.intern_index(IndexExpr::Param(radix_lexer::Symbol(70)));
+    let parameter_b = types.intern_index(IndexExpr::Param(radix_lexer::Symbol(70)));
+    let parameter_other = types.intern_index(IndexExpr::Param(radix_lexer::Symbol(71)));
+    assert!(types.index_equals(literal_a, literal_b));
+    assert!(!types.index_equals(literal_a, literal_other));
+    assert!(types.index_equals(parameter_a, parameter_b));
+    assert!(!types.index_equals(parameter_a, parameter_other));
+
+    let runtime_a = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarParameter {
+        parameter: 2,
+    }));
+    let runtime_b = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarParameter {
+        parameter: 2,
+    }));
+    let runtime_other = types.intern_index(IndexExpr::Runtime(RuntimeExtentId::ScalarParameter {
+        parameter: 3,
+    }));
+    assert!(types.index_equals(runtime_a, runtime_b));
+    assert!(!types.index_equals(runtime_a, runtime_other));
+
+    let affine_a = types.intern_index(IndexExpr::Affine {
+        base: parameter_a,
+        offset: -1,
+    });
+    let affine_b = types.intern_index(IndexExpr::Affine {
+        base: parameter_b,
+        offset: -1,
+    });
+    let affine_other = types.intern_index(IndexExpr::Affine {
+        base: parameter_b,
+        offset: 1,
+    });
+    assert!(types.index_equals(affine_a, affine_b));
+    assert!(!types.index_equals(affine_a, affine_other));
+    let divide_a = types.intern_index(IndexExpr::Divide {
+        numerator: literal_a,
+        divisor: 2,
+    });
+    let divide_b = types.intern_index(IndexExpr::Divide {
+        numerator: literal_b,
+        divisor: 2,
+    });
+    let divide_other = types.intern_index(IndexExpr::Divide {
+        numerator: literal_b,
+        divisor: 4,
+    });
+    assert!(types.index_equals(divide_a, divide_b));
+    assert!(!types.index_equals(divide_a, divide_other));
+
+    let infer_a = types.intern_index(IndexExpr::Infer(crate::index::IndexVar(5)));
+    let infer_b = types.intern_index(IndexExpr::Infer(crate::index::IndexVar(5)));
+    let infer_other = types.intern_index(IndexExpr::Infer(crate::index::IndexVar(6)));
+    let unspecified_a = types.intern_index(IndexExpr::Unspecified);
+    let unspecified_b = types.intern_index(IndexExpr::Unspecified);
+    assert!(types.index_equals(infer_a, infer_b));
+    assert!(!types.index_equals(infer_a, infer_other));
+    assert!(types.index_equals(unspecified_a, unspecified_b));
+    assert!(!types.index_equals(unspecified_a, literal_a));
+
+    let tuple_a = types.intern_index(IndexExpr::Tuple(vec![literal_a, affine_a]));
+    let tuple_b = types.intern_index(IndexExpr::Tuple(vec![literal_b, affine_b]));
+    let tuple_reordered = types.intern_index(IndexExpr::Tuple(vec![affine_b, literal_b]));
+    let tuple_short = types.intern_index(IndexExpr::Tuple(vec![literal_b]));
+    assert!(types.index_equals(tuple_a, tuple_b));
+    assert!(!types.index_equals(tuple_a, tuple_reordered));
+    assert!(!types.index_equals(tuple_a, tuple_short));
+    assert!(!types.index_equals(tuple_a, parameter_a));
+}
+
+#[test]
+fn type_family_predicates_accept_only_the_documented_shapes() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let fractus = types.primitive(Primitive::Fractus);
+    let instans = types.primitive(Primitive::Instans);
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let sized_instans = types.sized_instans(InstansPrecision::Millis);
+
+    for accepted in [numerus, instans, i32, u32, i64, sized_instans] {
+        assert!(is_intervallum_bound_type(&types, accepted), "{accepted:?}");
+    }
+    for rejected in [fractus, types.primitive(Primitive::Textus)] {
+        assert!(!is_intervallum_bound_type(&types, rejected), "{rejected:?}");
+    }
+    assert!(is_atomic_element_type(&types, i32));
+    assert!(is_atomic_element_type(&types, u32));
+    for rejected in [numerus, i64, fractus, sized_instans] {
+        assert!(!is_atomic_element_type(&types, rejected), "{rejected:?}");
+    }
+
+    assert_eq!(types.first_saturating_word_width(), None);
+    let _first = types.intern(Type::SaturatingWord(NumericWidth::U16));
+    let _later = types.intern(Type::SaturatingWord(NumericWidth::I32));
+    assert_eq!(types.first_saturating_word_width(), Some(NumericWidth::U16));
+    let restored = TypeTable::from_snapshot(types.snapshot()).expect("snapshot");
+    assert_eq!(
+        restored.first_saturating_word_width(),
+        Some(NumericWidth::U16)
+    );
+}
+
+#[test]
+fn policy_spellings_keep_english_words_and_latin_identities_distinct() {
+    assert_eq!(IntPolicy::Trapping.word(), "trapping");
+    assert_eq!(IntPolicy::Wrapping.word(), "wrapping");
+    assert_eq!(IntPolicy::Saturating.word(), "saturating");
+    assert_eq!(IntPolicy::Trapping.latin(), "exactus");
+    assert_eq!(IntPolicy::Wrapping.latin(), "modulus");
+    assert_eq!(IntPolicy::Saturating.latin(), "saturatus");
+
+    for policy in BuiltinTensorEdgePolicy::ALL {
+        assert_eq!(
+            BuiltinTensorEdgePolicy::from_latin(policy.latin()),
+            Some(policy)
+        );
+    }
+    assert_eq!(BuiltinTensorEdgePolicy::from_latin("clamp"), None);
 }

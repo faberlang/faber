@@ -34,6 +34,7 @@ use crate::{
 };
 use crate::{MirLocalId, MirStructLayout, resolve_struct_layout};
 use handroll::FxHashMap;
+use radix_types::MirMathFunction;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 const SLUG_ABI: &str = "missing-abi-fact";
@@ -54,6 +55,11 @@ const SHAPE_KERNEL_HOST_TENSOR_STORAGE: &str = "kernel tensor storage/locus requ
 /// MLC-4: fail-closed sparse admission row — same spelling as the ABI gate.
 const SHAPE_KERNEL_SPARSE_STORAGE: &str = "kernel sparse tensor storage is not admitted";
 const SHAPE_DEVICE_PLACE_PROJECTION: &str = "device place projection";
+/// gpu-reset Q02: a narrow (`f16`, `i8`, `u8`) field value is loaded natively
+/// and converted, never computed on at its own width (math happens in the
+/// ether, the width applies at the store), so arithmetic on one is refused.
+pub(crate) const SHAPE_KERNEL_NARROW_ARITHMETIC: &str =
+    "kernel narrow scalar arithmetic (convert the f16/i8/u8 field value first)";
 /// C4-6b: genus (struct) kernel-parameter rows.
 const SHAPE_GENUS_PARAM: &str = "device genus parameter";
 const SHAPE_GENUS_PARAM_MUTABLE: &str = "device genus parameter: mutable (read-only only)";
@@ -293,6 +299,11 @@ struct DeviceSafeClassifier<'a> {
     /// (`blocks[i].f`, `blocks[i].f[j]`, `blocks[i].f.lane`) is the only
     /// admitted use.
     record_view_params: FxHashMap<MirLocalId, MirStructLayout>,
+    /// The narrow (`f16`, `i8`, `u8`) locals and temps of the lane-form
+    /// function under visit: values that may be moved and converted but never
+    /// computed on (see [`DeviceSafeClassifier::check_narrow_arithmetic`]).
+    narrow_locals: handroll::FxHashSet<MirLocalId>,
+    narrow_temps: handroll::FxHashSet<crate::MirTempId>,
     allows_structured_return_branch: bool,
     allows_structured_indexed_write_branch: bool,
     allows_structured_indexed_write_goto: bool,
@@ -365,6 +376,8 @@ impl<'a> DeviceSafeClassifier<'a> {
             reduction_terms: handroll::FxHashSet::default(),
             genus_params: FxHashMap::default(),
             record_view_params: FxHashMap::default(),
+            narrow_locals: handroll::FxHashSet::default(),
+            narrow_temps: handroll::FxHashSet::default(),
             allows_structured_return_branch: false,
             allows_structured_indexed_write_branch: false,
             allows_structured_indexed_write_goto: false,
@@ -434,6 +447,20 @@ impl<'a> DeviceSafeClassifier<'a> {
                 Type::Primitive(Primitive::Numerus | Primitive::Fractus)
                     | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
             )
+    }
+
+    /// The implicit store of a `d64` value into a `d64` cell (kernel-wide
+    /// types ruling 2026-10-28): the rounding, range check and fault the lane
+    /// emitters lower.
+    fn is_d64_store_conversion(&self, call: &MirRuntimeCall) -> bool {
+        let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
+            return false;
+        };
+        conversion.recovery.is_none()
+            && conversion.params.is_empty()
+            && call.args.len() == 1
+            && crate::is_d64_type(conversion.source_ty, self.types)
+            && crate::is_d64_type(conversion.target_ty, self.types)
     }
 
     fn is_plain_scalar_conversion(&self, call: &MirRuntimeCall) -> bool {
@@ -560,8 +587,21 @@ impl<'a> DeviceSafeClassifier<'a> {
                 )
                 | MirLayoutKind::Void
                 | MirLayoutKind::Never => {}
-                MirLayoutKind::Scalar(MirScalarLayout::I64)
-                    if self.in_lane_form_function || self.in_single_lane_function => {}
+                MirLayoutKind::Scalar(
+                    MirScalarLayout::I64 | MirScalarLayout::U64 | MirScalarLayout::D64,
+                ) if self.in_lane_form_function || self.in_single_lane_function => {}
+                // gpu-reset Q02: a narrow field read in place. A lane-form
+                // kernel that reads a record-element view (or a genus
+                // parameter) loads an `f16`, `i8` or `u8` field at its own
+                // width, natively (MSL `half`, `char`, `uchar`), and widens
+                // it where the source converts; nothing is emulated. The
+                // allowance is tied to such a kernel so no other kernel gains
+                // a narrow value type, and a target without the native load
+                // refuses the kernel by name in its own emitter.
+                MirLayoutKind::Scalar(
+                    MirScalarLayout::F16 | MirScalarLayout::I8 | MirScalarLayout::U8,
+                ) if self.in_lane_form_function
+                    && (!self.record_view_params.is_empty() || !self.genus_params.is_empty()) => {}
                 // Every other scalar is rejected by name — including `Magnus`
                 // (the unbounded `inf`, ruling 39(d)): "kernel scalar layout magnus".
                 MirLayoutKind::Scalar(scalar) => {
@@ -645,6 +685,9 @@ impl<'a> DeviceSafeClassifier<'a> {
                     | MirScalarLayout::F32
                     | MirScalarLayout::I32
                     | MirScalarLayout::U32
+                    | MirScalarLayout::I64
+                    | MirScalarLayout::U64
+                    | MirScalarLayout::D64
                     | MirScalarLayout::U8
             ) {
                 self.record_layout(format!("kernel device view element {}", element.spelling()));
@@ -664,6 +707,70 @@ impl<'a> DeviceSafeClassifier<'a> {
             // WHY: a resolved record element is admitted here; a refused one
             // is reported by the layout resolver's own reason.
             self.record_layout(format!("kernel device view element: {}", refusal.reason()));
+        }
+    }
+
+    fn is_narrow_ty(&self, ty: MirType) -> bool {
+        matches!(
+            self.layouts.layout_for_type(ty).map(|layout| layout.kind),
+            Ok(MirLayoutKind::Scalar(
+                MirScalarLayout::F16 | MirScalarLayout::I8 | MirScalarLayout::U8
+            ))
+        )
+    }
+
+    /// Whether an operand reads a narrow value: a narrow local or temp, or a
+    /// field read of a record-element view or genus parameter whose field
+    /// scalar is narrow.
+    fn is_narrow_operand(&self, operand: &MirOperand) -> bool {
+        match operand {
+            MirOperand::Temp(temp) => self.narrow_temps.contains(temp),
+            MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+                MirPlaceBase::Local(local) => self.narrow_locals.contains(&local),
+                MirPlaceBase::Temp(temp) => self.narrow_temps.contains(&temp),
+            },
+            MirOperand::Place(place) => {
+                let layout = self
+                    .record_view_base(place)
+                    .or_else(|| self.genus_param_base(place));
+                let field = place
+                    .projections
+                    .iter()
+                    .find_map(|projection| match projection {
+                        MirProjection::Field(name) => Some(*name),
+                        _ => None,
+                    });
+                layout.zip(field).is_some_and(|(layout, name)| {
+                    layout.fields.iter().any(|candidate| {
+                        candidate.name == name
+                            && matches!(
+                                candidate.element,
+                                MirDeviceViewElement::Scalar(
+                                    MirScalarLayout::F16
+                                        | MirScalarLayout::I8
+                                        | MirScalarLayout::U8
+                                )
+                            )
+                    })
+                })
+            }
+            MirOperand::Value(_) | MirOperand::Constant(_) => false,
+        }
+    }
+
+    /// Arithmetic on a narrow value is refused: the kernel loads and converts
+    /// it (`half` widening to f32 is exact, `char` to an integer is exact),
+    /// and does not compute at the narrow width.
+    fn check_narrow_arithmetic(&mut self, value: &MirValue) {
+        let narrow = match &value.kind {
+            MirValueKind::Unary { operand, .. } => self.is_narrow_operand(operand),
+            MirValueKind::Binary { lhs, rhs, .. } => {
+                self.is_narrow_operand(lhs) || self.is_narrow_operand(rhs)
+            }
+            _ => return,
+        };
+        if narrow || self.is_narrow_ty(value.ty) {
+            self.record_policy(SHAPE_KERNEL_NARROW_ARITHMETIC);
         }
     }
 
@@ -751,7 +858,7 @@ impl<'a> DeviceSafeClassifier<'a> {
     /// (`<base>_f<field>`), so it needs no memory layout and is admitted when
     /// every declared field type is itself a value type the lane form admits
     /// — `resolve_struct_layout` is not used here because a scalarized value
-    /// has no layout and A2's `Geo` (`vector<f32, 3>` fields) would be refused
+    /// has no layout and A2's `Geo` (`vector<f32, size 3>` fields) would be refused
     /// by the parameter layout law.
     fn check_genus_local_type(&mut self, ty: MirType) {
         let Type::Struct(def_id) = self.types.get(ty.semantic_id()).clone() else {
@@ -1112,7 +1219,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                     | MirCollectionOp::TensorFill
                                     | MirCollectionOp::TensorExpand
                                     | MirCollectionOp::TensorRelu
-                                    | MirCollectionOp::TensorGelu,
+                                    | MirCollectionOp::TensorGelu
+                                    // The math functions the Metal elementwise
+                                    // lane lowers per element (`t.sqrt()` /
+                                    // `t.exp()`); the other `MirMathFunction`
+                                    // members keep the named reject below.
+                                    | MirCollectionOp::TensorMath(MirMathFunction::Sqrt)
+                                    | MirCollectionOp::TensorMath(MirMathFunction::Exp),
                             )
                             | MirIntrinsic::FilumReduce(_)
                             | MirIntrinsic::Scan(_)
@@ -1128,7 +1241,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                 MirLiftOp::Add
                                 | MirLiftOp::Sub
                                 | MirLiftOp::Mul
-                                | MirLiftOp::Neg,
+                                | MirLiftOp::Neg
+                                // The float division lifts lower through the
+                                // same tensor-expr model (the TensorDiv arm's
+                                // semantics); the comparison and Mod lifts
+                                // keep the wildcard rejection below.
+                                | MirLiftOp::Div
+                                | MirLiftOp::TrueDiv,
                             ),
                         ..
                     },
@@ -1144,7 +1263,8 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // pair fails closed in its own emit gate.
             MirStatementKind::RuntimeCall { call, .. }
                 if (self.in_lane_form_function || self.in_single_lane_function)
-                    && self.is_plain_scalar_conversion(call) =>
+                    && (self.is_plain_scalar_conversion(call)
+                        || self.is_d64_store_conversion(call)) =>
             {
                 crate::visit::walk_stmt(self, stmt);
             }
@@ -1177,7 +1297,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             return;
         }
         match &terminator.kind {
-            MirTerminatorKind::Return(_) => crate::visit::walk_terminator(self, terminator),
+            MirTerminatorKind::Return(_) | MirTerminatorKind::ReturnThread => {
+                crate::visit::walk_terminator(self, terminator);
+            }
             // C4-2e: a structurizable lane-form kernel's acyclic Goto/Branch
             // edges are expressed by its region tree.
             //
@@ -1293,6 +1415,7 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             if !is_result_aggregation && !is_literal_get_alias && !admitted_tensor_unary {
                 self.check_device_type(value.ty);
             }
+            self.check_narrow_arithmetic(value);
             crate::visit::walk_value(self, value);
         }
     }
@@ -1455,6 +1578,18 @@ fn classify_structured_allowances(
             && crate::structurize::structurize_duplicating_tails(function).is_ok());
     classifier.genus_params = classifier.resolved_genus_params(function);
     classifier.record_view_params = classifier.resolved_record_view_params(function);
+    classifier.narrow_locals = function
+        .locals
+        .iter()
+        .filter(|local| classifier.is_narrow_ty(local.ty))
+        .map(|local| local.id)
+        .collect();
+    classifier.narrow_temps = function
+        .temps
+        .iter()
+        .filter(|temp| classifier.is_narrow_ty(temp.ty))
+        .map(|temp| temp.id)
+        .collect();
     let allows_structured_return_branch = is_structured_return_branch(function);
     let allows_structured_indexed_write_branch = is_structured_indexed_write_branch(function);
     let allows_structured_indexed_write_goto = is_structured_indexed_write_goto(function);

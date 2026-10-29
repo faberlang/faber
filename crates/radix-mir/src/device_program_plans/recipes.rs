@@ -1,6 +1,7 @@
 //! Recipe-op classification.
 
 use crate::{MirCollectionOp, MirUnOp};
+use radix_types::MirMathFunction;
 
 // ---------------------------------------------------------------------------
 // RECIPE CLASSIFICATION
@@ -28,6 +29,13 @@ pub(crate) fn is_elementwise_collection_op(op: MirCollectionOp) -> bool {
             | MirCollectionOp::TensorExpand
             | MirCollectionOp::TensorRelu
             | MirCollectionOp::TensorGelu
+            // The math functions the Metal elementwise lane lowers per
+            // element (`t.sqrt()` / `t.exp()` — the LayerNorm sqrt lane and
+            // the softmax/sigmoid exp lane as author-level calls). The other
+            // `MirMathFunction` members have no elementwise emitter arm and
+            // stay unplannable (the typed refusal above).
+            | MirCollectionOp::TensorMath(MirMathFunction::Sqrt)
+            | MirCollectionOp::TensorMath(MirMathFunction::Exp)
     )
 }
 

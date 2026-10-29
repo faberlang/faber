@@ -1,0 +1,23 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "fixum_decl", "array_literal", "itera_stmt", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
+category = "binding"
+summary = "A ref list parameter supports checked indexing and borrowed for-from iteration."
+syntax = "fn inspect(ref list<int> values, int i); values[i]; for from values let item { }"
+related = ["ref", "lista", "itera"]
+locale = "en"
++++
+# A borrowed list parameter supports both checked indexing and iteration.
+
+fn inspect(ref list<int> values, int i) → void {
+    print values[i]
+    for from values let item {
+        print item
+    }
+}
+
+main {
+    let list<int> numbers ← [5, 8, 13]
+    inspect(ref numbers, 1)
+}

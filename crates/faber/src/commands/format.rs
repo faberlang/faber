@@ -14,6 +14,7 @@ use std::path::{Path, PathBuf};
 /// Arguments for `faber format`.
 #[derive(Debug, Clone)]
 pub struct FormatCommand {
+    pub diagnostic_mode: radix::services::DiagnosticMode,
     pub paths: Vec<PathBuf>,
     pub check: bool,
     pub stdout: bool,
@@ -33,7 +34,7 @@ pub(super) fn effective_width(
     faber_cli::package::resolve_format_width(command.width, path).map_err(|diagnostic| {
         faber_cli::postprocess::print_diagnostics(
             &[(*diagnostic).clone()],
-            radix::services::DiagnosticMode::Normal,
+            command.diagnostic_mode,
             None,
         );
         exit_status::status_for_diagnostic(&diagnostic)
@@ -52,7 +53,7 @@ pub fn cmd_format(command: &FormatCommand) {
         }
         let path = Path::new("<stdin>");
         // No package context on stdin: only the flag applies.
-        match format_single_doc(path, &source, command.width) {
+        match format_single_doc(path, &source, command.width, command.diagnostic_mode) {
             Ok(formatted) => {
                 print!("{formatted}");
                 return;
@@ -107,7 +108,7 @@ pub fn cmd_format(command: &FormatCommand) {
                 continue;
             }
         };
-        let formatted = match format_single_doc(path, &source, width) {
+        let formatted = match format_single_doc(path, &source, width, command.diagnostic_mode) {
             Ok(formatted) => formatted,
             Err(status) => {
                 tally.refuse(status);
@@ -293,6 +294,7 @@ pub(super) fn convert_single_doc(
     to: &str,
     from: Option<&str>,
     source: &str,
+    diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     let name = path.display().to_string();
     let session = match format_session(path, from, source) {
@@ -300,7 +302,7 @@ pub(super) fn convert_single_doc(
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
                 &[(*diagnostic).clone()],
-                radix::services::DiagnosticMode::Normal,
+                diagnostic_mode,
                 None,
             );
             return Err(exit_status::status_for_diagnostic(&diagnostic));
@@ -311,7 +313,7 @@ pub(super) fn convert_single_doc(
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
                 &[(*diagnostic).clone()],
-                radix::services::DiagnosticMode::Normal,
+                diagnostic_mode,
                 None,
             );
             return Err(exit_status::status_for_diagnostic(&diagnostic));
@@ -324,8 +326,8 @@ pub(super) fn convert_single_doc(
         .any(radix::module::diagnostics::Diagnostic::is_error);
     faber_cli::postprocess::print_diagnostics(
         &result.diagnostics,
-        radix::services::DiagnosticMode::Normal,
-        None,
+        diagnostic_mode,
+        session.config.locale_pack.as_ref(),
     );
     if had_error {
         eprintln!(
@@ -359,6 +361,7 @@ pub(super) fn format_single_doc(
     _path: &Path,
     _source: &str,
     _width: Option<NonZeroU32>,
+    _diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     eprintln!("error: formatting requires a faber build with feature `hir-faber`");
     Err(exit_status::UNAVAILABLE)
@@ -370,6 +373,7 @@ pub(super) fn convert_single_doc(
     _to: &str,
     _from: Option<&str>,
     _source: &str,
+    _diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     eprintln!("error: reader-locale conversion requires a faber build with feature `hir-faber`");
     Err(exit_status::UNAVAILABLE)
@@ -386,6 +390,7 @@ pub(super) fn format_single_doc(
     path: &Path,
     source: &str,
     width: Option<NonZeroU32>,
+    diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     let name = path.display().to_string();
     let session = match format_session(path, None, source) {
@@ -393,7 +398,7 @@ pub(super) fn format_single_doc(
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
                 &[(*diagnostic).clone()],
-                radix::services::DiagnosticMode::Normal,
+                diagnostic_mode,
                 None,
             );
             return Err(exit_status::status_for_diagnostic(&diagnostic));
@@ -409,7 +414,7 @@ pub(super) fn format_single_doc(
             .with_code("LOCALE003")
             .with_arg("issue", "unresolved")
             .with_file(name)],
-            radix::services::DiagnosticMode::Normal,
+            diagnostic_mode,
             None,
         );
         return Err(exit_status::SOFTWARE);
@@ -422,8 +427,8 @@ pub(super) fn format_single_doc(
         .any(radix::module::diagnostics::Diagnostic::is_error);
     faber_cli::postprocess::print_diagnostics(
         &result.diagnostics,
-        radix::services::DiagnosticMode::Normal,
-        None,
+        diagnostic_mode,
+        Some(emit_pack),
     );
 
     let Some(output) = result.output else {

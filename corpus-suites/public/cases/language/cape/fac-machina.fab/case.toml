@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/cape/fac-machina.fab"
+group = "language"
+input_root = "corpus"
+input = "cape/fac-machina.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true

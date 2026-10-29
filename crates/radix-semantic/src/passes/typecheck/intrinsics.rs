@@ -29,6 +29,9 @@ const ISSUE_BITWISE_METHOD_REQUIRES_NUMERUS_RECEIVER: &str =
 const ISSUE_DENSATA_REQUIRES_SPARSA_RECEIVER: &str = "densata_requires_sparsa_receiver";
 const ISSUE_ARGUMENT_TYPE_MISMATCH: &str = "argument_type_mismatch";
 const ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED: &str = "numeric_lista_elements_required";
+/// The list join `extende` grows its receiver in place, so a fixed-capacity or
+/// length-ranged list (which `appende` reports on `⇥`) is refused by name.
+const ISSUE_EXTEND_REQUIRES_PLAIN_LIST: &str = "extend_requires_plain_list";
 const ISSUE_ORDINA_KEY_NOT_ORDERED: &str = "ordina_key_not_ordered";
 /// Need (ruling O2): the keyed `.sorted(key)` / `.ordinata(key)` is
 /// retired in favour of the sort expression.
@@ -459,7 +462,17 @@ pub(super) fn check_intrinsic_method_call(
     let ranged_removal = matches!(entry.faber_name, "decapita" | "detrahe")
         && matches!(resolved, Type::RangedArray { .. });
     let bounded_appende = bounded_appende || ranged_removal;
+    let plain_list_receiver = matches!(
+        resolved,
+        Type::Array(_) | Type::Primitive(Primitive::Octeti)
+    );
     let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
+
+    if matches!(entry.mir_kind, IntrinsicMirKind::ListExtend) && !plain_list_receiver {
+        checker.invalid_operand_types(ISSUE_EXTEND_REQUIRES_PLAIN_LIST, span);
+        checker.typecheck_call_arg_exprs(args);
+        return Some(checker.error_type);
+    }
 
     // The extrema twins are elementwise clamp methods on numeric lists. Keep
     // the element gate here with the method registry path so infix sugar and
@@ -632,6 +645,10 @@ pub(super) fn check_intrinsic_method_call(
 
     if matches!(entry.mir_kind, IntrinsicMirKind::HigherOrderSortBy) {
         return Some(check_sort_by_key(checker, entry, ctx.inner, args, span));
+    }
+
+    if matches!(entry.mir_kind, IntrinsicMirKind::ListExtend) {
+        return Some(check_list_extend(checker, ctx.inner, args, span));
     }
 
     // RX-5 (RD-5): a closure in the replacement slot selects the closure form;
@@ -1481,6 +1498,48 @@ fn check_matrix_transpone(checker: &mut TypeChecker<'_>, receiver_ty: TypeId) ->
         .types
         .intern_index(crate::IndexExpr::Tuple(vec![columns, rows]));
     checker.types.matrix_with_shape(element_ty, shape)
+}
+
+/// Typecheck `xs.extende(other)`: `other` is any list of the receiver's element
+/// type, including a fixed-capacity or length-ranged list (a bounded byte
+/// buffer `list<b8, size N>` carries `b8` elements). The call returns nothing.
+fn check_list_extend(
+    checker: &mut TypeChecker<'_>,
+    inner: Option<TypeId>,
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    let vacuum = checker.vacuum_type();
+    let Some(inner) = inner else {
+        return checker.error_type;
+    };
+    if args.len() != 1 {
+        checker.wrong_arity("wrong_number_of_arguments", span);
+        return checker.error_type;
+    }
+    let source_ty = checker.types.array(inner);
+    // A list literal takes its element type from the receiver (`xs.extend([])`);
+    // any other source keeps its own type, so a bounded list is not coerced.
+    let expected = matches!(args[0].expr.kind, HirExpressionKind::Array(_)).then_some(source_ty);
+    let arg_ty = checker.check_expr_with_expected(&mut args[0].expr, expected);
+    let resolved = checker.resolve_inferred_type(arg_ty);
+    let source_element = match checker.types.get(resolved).clone() {
+        Type::Array(element)
+        | Type::BoundedArray { element, .. }
+        | Type::RangedArray { element, .. } => Some(element),
+        Type::BoundedOcteti { .. } => Some(checker.types.bits(radix_types::BitsWidth::B8)),
+        _ => None,
+    };
+    if source_element.is_some_and(|element| checker.types.equals(element, inner)) {
+        return vacuum;
+    }
+    checker.unify_assign_issue(
+        arg_ty,
+        source_ty,
+        args[0].span,
+        ISSUE_ARGUMENT_TYPE_MISMATCH,
+    );
+    vacuum
 }
 
 /// Typecheck `vector.multiplicata(operand)`: same-shape peer multiply, or a

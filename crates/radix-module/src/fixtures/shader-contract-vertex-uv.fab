@@ -22,7 +22,7 @@ functio vertex_layout_matches(
 @ vertex
 functio shader_uv_vertex() → vacuum {
     sit f32 energy ← uv · uv
-    sit vector<f32, 3> shifted ↤ [energy, energy, energy]
+    sit vector<f32, magnitudo 3> shifted ↤ [energy, energy, energy]
     out_position ← shifted
 }
 

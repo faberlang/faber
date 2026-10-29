@@ -219,7 +219,7 @@ functio retenta(textus s, textus infimum sponte, textus supremum sponte) → tex
     redde s
 }
 
-functio go(ascii<8> bound) {
+functio go(ascii<magnitudo 8> bound) {
     nota retenta("hello", bound, 'z')
 }
 "#,
@@ -267,7 +267,7 @@ fn bounded_ascii_one_literals_ge_typechecks() {
 fn ascii_one_params_relational_typechecks() {
     accepts(&compile(
         r"
-functio after(ascii<1> left, ascii<1> right) → bivalens {
+functio after(ascii<magnitudo 1> left, ascii<magnitudo 1> right) → bivalens {
     redde left ≥ right
 }
 ",
@@ -289,7 +289,7 @@ functio after(ascii left, ascii right) → bivalens {
 fn mixed_ascii_and_ascii_one_relational_typechecks() {
     accepts(&compile(
         r"
-functio after(ascii left, ascii<1> right) → bivalens {
+functio after(ascii left, ascii<magnitudo 1> right) → bivalens {
     redde left ≥ right
 }
 ",

@@ -1480,6 +1480,48 @@ main args args {
 }
 
 #[test]
+fn run_optional_chain_captures_receiver_before_operands() {
+    // OC-3: `xs?[idx()]` and `f?(arg())` evaluate and test the receiver first;
+    // an operand that clears the receiver's place cannot change the result.
+    let dir = temp_dir("optional-chain-receiver-first");
+    let path = dir.join("main.fab");
+    fs::write(
+        &path,
+        r#"+++
+locale = "en"
++++
+type Op = (int) → int
+
+fn identity(int x) → int {
+    return x
+}
+
+main {
+    mut list<int> ∪ none xs ← [10]
+    let () → int idx ← () → int ∴ do {
+        xs ← null
+        return 0
+    }
+    print xs?[idx()]
+
+    mut Op ∪ none f ← identity
+    let () → int arg ← () → int ∴ do {
+        f ← null
+        return 7
+    }
+    print f?(arg())
+}
+"#,
+    )
+    .expect("write source");
+
+    let (stdout, stderr, ok) = run_faber(&["run", path.to_str().expect("utf8 path")]);
+
+    assert!(ok, "optional chain receiver-first run failed:\n{stderr}");
+    assert_eq!(stdout, "10\n7\n");
+}
+
+#[test]
 fn run_cli_root_optional_option_executes_without_cargo_or_rust_emit() {
     let package = temp_dir("cli-optional-option");
     fs::write(
@@ -3424,13 +3466,18 @@ fn run_cpu_device_matmul_kernels_match_the_reference() {
 /// A kernel error the program catches is delivered as a device fault: the
 /// handler prints the text of the lowest throwing lane, as the reference does,
 /// whatever the worker count. Mode 1 is `do all ... catch`, mode 2 a plain
-/// `do ... catch`; at [9, 6] the lower lanes throw a different site than the
+/// `do ... catch`, modes 5 and 6 the checked `do device ... catch` region
+/// (faults run to the block exit and reach the handler once; mode 6 is the
+/// clean run); at [9, 6] the lower lanes throw a different site than the
 /// last row, so the delivered text names the first lane in launch order.
 #[test]
 fn run_cpu_device_caught_kernel_errors_match_the_reference() {
     for mode in ["1", "2"] {
         assert_cpu_device_matches_reference("acceptance/c4-kernel-throw", &["9", "6", mode]);
         assert_cpu_device_matches_reference("acceptance/c4-kernel-get-set", &["7", "5", mode]);
+    }
+    for mode in ["5", "6"] {
+        assert_cpu_device_matches_reference("acceptance/c4-kernel-throw", &["9", "6", mode]);
     }
 }
 
@@ -3472,6 +3519,54 @@ fn run_cpu_device_kernel_fault_prints_one_coded_error() {
         "{stderr}"
     );
     assert!(errors[0].contains("lane [0, 0, 0]"), "{stderr}");
+}
+
+/// The same fatal fault inside the checked region `do device { } catch`: the
+/// handler does not see an index fault, the faults run to the block exit and
+/// the run ends once with the stable code, as `do all` does. The in-range run
+/// (`0 0 3`) completes cleanly.
+#[test]
+fn run_cpu_device_region_fault_ends_the_run_once() {
+    let path = repo_root()
+        .join("acceptance/c4-single-lane-index-fault")
+        .display()
+        .to_string();
+    let (stdout, stderr, status) = run_faber_status(&[
+        "run",
+        "--device",
+        "cpu",
+        "--threads",
+        "4",
+        &path,
+        "--",
+        "1",
+        "0",
+        "3",
+    ]);
+    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert!(stdout.starts_with(CPU_DEVICE_RECEIPT_PREFIX), "{stdout}");
+    let errors = error_lines(&stderr);
+    assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
+    assert!(
+        errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
+        "{stderr}"
+    );
+    assert!(errors[0].contains("lane [0, 0, 0]"), "{stderr}");
+
+    let (stdout, stderr, status) = run_faber_status(&[
+        "run",
+        "--device",
+        "cpu",
+        "--threads",
+        "4",
+        &path,
+        "--",
+        "0",
+        "0",
+        "3",
+    ]);
+    assert_eq!(status.code(), Some(0), "{stderr}");
+    assert!(stdout.ends_with("done\n"), "{stdout}");
 }
 
 /// [`run_cpu_device_kernel_fault_prints_one_coded_error`] on the Metal device.

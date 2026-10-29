@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/bits/bits-tensor-bytes.fab"
+group = "language"
+input_root = "corpus"
+input = "bits/bits-tensor-bytes.fab"
+category = "bits"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

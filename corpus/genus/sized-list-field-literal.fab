@@ -1,0 +1,47 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "array_literal", "nota_stmt"]
+category = "class"
+canonical = false
+summary = "A list literal supplied to a sized list field (`list<T, size N>`, aliased or optional) builds the field's declared type."
+syntax = "<Class> { <field> = [<value>, …] }"
+related = ["genus", "list"]
+locale = "en"
++++
+# =============================================================================
+# genus — list literals in sized list fields
+# =============================================================================
+#
+# What this teaches:
+#   • `Class { field = [a, b] }` stores the literal in a `list<T, size N>`
+#     field, the same as a typed local `let list<T, size N> x ← [a, b]`.
+#   • An aliased sized list, an optional sized field (`∪ none`) and a field
+#     default take a literal the same way.
+#
+# See also: genus
+# =============================================================================
+
+type Quad = list<int, size 4>
+
+class Block {
+    let list<int, size 4> qs
+    let Quad aliased
+    let list<u8, size 2> bytes
+    let list<int, size 2> ∪ none maybe
+    let list<int, size 2> fallback = [7, 8]
+}
+
+main {
+    let Block block ← Block {
+        qs = [1, 2, 3, 4],
+        aliased = [5, 6, 7, 8],
+        bytes = [11, 12],
+        maybe = [13, 14]
+    }
+    print block.qs
+    print block.aliased
+    print block.bytes
+    print block.maybe
+    print block.fallback
+}

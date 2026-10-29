@@ -35,10 +35,11 @@ struct ExampleFrontmatter {
 /// owns that module, so a lib unit test cannot reach it across the crate
 /// boundary.
 fn faber_binary() -> PathBuf {
+    static BUILT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
     if let Ok(path) = std::env::var("CARGO_BIN_EXE_faber") {
         return PathBuf::from(path);
     }
-    static BUILT: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
     BUILT.get_or_init(build_faber_binary).clone()
 }
 

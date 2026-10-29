@@ -33,6 +33,11 @@ use super::run_stats::{self, RunStatsArtifact};
 
 pub(super) fn cmd_run(args: RunArgs) {
     crate::commands::validate_deny_codes(&args.deny);
+    let diagnostic_mode = if args.no_diagnostics {
+        radix::services::DiagnosticMode::Normal
+    } else {
+        radix::services::DiagnosticMode::Diagnostics
+    };
     // Package discovery and execution require absolute inputs; resolve the
     // caller-relative path before any route selection or package handoff.
     let input_path = package::absolutize_path(&args.path);
@@ -55,6 +60,7 @@ pub(super) fn cmd_run(args: RunArgs) {
             args.locale.as_deref(),
             args.diagnostics_locale.as_deref(),
             &args.args,
+            diagnostic_mode,
         ),
         #[cfg(feature = "hir-go")]
         Some(crate::cli::RunTarget::Go) => package::cmd_run_go(
@@ -62,6 +68,7 @@ pub(super) fn cmd_run(args: RunArgs) {
             args.locale.as_deref(),
             args.diagnostics_locale.as_deref(),
             &args.args,
+            diagnostic_mode,
         ),
         #[cfg(not(feature = "hir-go"))]
         Some(crate::cli::RunTarget::Go) => {
@@ -73,12 +80,29 @@ pub(super) fn cmd_run(args: RunArgs) {
             &input_path,
             args.locale.as_deref(),
             args.diagnostics_locale.as_deref(),
+            args.safe,
             &args.args,
+            diagnostic_mode,
         ),
         #[cfg(not(feature = "mir-llvm"))]
         Some(crate::cli::RunTarget::LlvmHost) => {
             eprintln!(
                 "error: this faber build has no LLVM target; rebuild with feature `mir-llvm`"
+            );
+            exit_status::exit_usage();
+        }
+        #[cfg(feature = "mir-clif")]
+        Some(crate::cli::RunTarget::ClifJit) => package::cmd_run_clif_jit(
+            &input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            &args.args,
+            diagnostic_mode,
+        ),
+        #[cfg(not(feature = "mir-clif"))]
+        Some(crate::cli::RunTarget::ClifJit) => {
+            eprintln!(
+                "error: this faber build has no Cranelift target; rebuild with feature `mir-clif`"
             );
             exit_status::exit_usage();
         }
@@ -98,20 +122,16 @@ pub(super) fn cmd_run(args: RunArgs) {
     // N1.1 precedence: CLI `--device` > manifest `[device] device` > `auto`.
     // An invalid manifest value fails closed with a structured diagnostic
     // (never silently ignored).
-    let selection = match resolve_route_selection(&args, &input_path) {
-        Ok(selection) => selection,
+    let (selection, workers) = match resolve_route_options(&args, &input_path) {
+        Ok(options) => options,
         Err(diagnostic) => {
             let status = exit_status::status_for_run_diagnostic(&diagnostic);
-            eprint_route_diagnostics(&[*diagnostic]);
-            std::process::exit(status);
-        }
-    };
-    // Rule 16.9: `--threads` > manifest `[device] threads` > half the cores.
-    let threads = match package::resolve_cpu_threads(args.threads, selection, &input_path) {
-        Ok(threads) => threads.map(std::num::NonZeroU32::get),
-        Err(diagnostic) => {
-            let status = exit_status::status_for_run_diagnostic(&diagnostic);
-            eprint_route_diagnostics(&[*diagnostic]);
+            eprint_run_diagnostics(
+                std::slice::from_ref(diagnostic.as_ref()),
+                diagnostic_mode,
+                None,
+                eprint_route_diagnostics,
+            );
             std::process::exit(status);
         }
     };
@@ -121,10 +141,12 @@ pub(super) fn cmd_run(args: RunArgs) {
         &args.args,
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),
+        args.safe,
         selection,
-        cpu_device_shape(&args, threads),
+        cpu_device_shape(&args, workers),
         args.stats,
         args.stats_file.as_ref(),
+        diagnostic_mode,
     );
 }
 
@@ -160,28 +182,44 @@ fn interpret_path(
     program_args: &[String],
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
+    safe: bool,
     selection: DeviceSelection,
     cpu: package::mir::CpuDeviceShape,
     stats: bool,
     stats_file: Option<&std::path::PathBuf>,
+    diagnostic_mode: radix::services::DiagnosticMode,
 ) {
     let stats_requested = stats || stats_file.is_some();
     if super::archive::is_zip_archive(path) {
         let archive = match super::archive::extract_package_archive(path) {
             Ok(archive) => archive,
             Err(diagnostic) => {
-                eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                eprint_run_diagnostics(
+                    std::slice::from_ref(diagnostic.as_ref()),
+                    diagnostic_mode,
+                    None,
+                    eprint_archive_diagnostics,
+                );
                 exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
         };
-        let config =
-            match script_package_config(archive.package_input(), locale, diagnostics_locale) {
-                Ok(config) => config,
-                Err(diagnostic) => {
-                    eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                    exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
-                }
-            };
+        let (config, diagnostics_locale_pack) = match script_package_config(
+            archive.package_input(),
+            locale,
+            diagnostics_locale,
+            safe,
+        ) {
+            Ok(config) => config,
+            Err(diagnostic) => {
+                eprint_run_diagnostics(
+                    std::slice::from_ref(diagnostic.as_ref()),
+                    diagnostic_mode,
+                    None,
+                    eprint_archive_diagnostics,
+                );
+                exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
+            }
+        };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         #[cfg(feature = "device-runtime")]
         if let Some(result) = try_device_session(
@@ -195,7 +233,12 @@ fn interpret_path(
         ) {
             if let Err(mut diagnostics) = result {
                 archive.remap_diagnostics(&mut diagnostics);
-                eprint_archive_diagnostics(&diagnostics);
+                eprint_run_diagnostics(
+                    &diagnostics,
+                    diagnostic_mode,
+                    diagnostics_locale_pack.as_ref(),
+                    eprint_archive_diagnostics,
+                );
                 drop(archive);
                 exit_status::exit_for_run_diagnostics(&diagnostics);
             }
@@ -206,7 +249,12 @@ fn interpret_path(
             let metadata = match run_stats::package_metadata(archive.package_input()) {
                 Ok(metadata) => metadata,
                 Err(diagnostic) => {
-                    eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                    eprint_run_diagnostics(
+                        std::slice::from_ref(diagnostic.as_ref()),
+                        diagnostic_mode,
+                        None,
+                        eprint_archive_diagnostics,
+                    );
                     drop(archive);
                     exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
@@ -221,7 +269,12 @@ fn interpret_path(
             ) {
                 Err(mut diagnostics) => {
                     archive.remap_diagnostics(&mut diagnostics);
-                    eprint_archive_diagnostics(&diagnostics);
+                    eprint_run_diagnostics(
+                        &diagnostics,
+                        diagnostic_mode,
+                        diagnostics_locale_pack.as_ref(),
+                        eprint_archive_diagnostics,
+                    );
                     eprint_device_run_note(&diagnostics);
                     drop(archive);
                     exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -242,7 +295,12 @@ fn interpret_path(
                     }
                     if let Err(mut diagnostics) = outcome.result {
                         archive.remap_diagnostics(&mut diagnostics);
-                        eprint_archive_diagnostics(&diagnostics);
+                        eprint_run_diagnostics(
+                            &diagnostics,
+                            diagnostic_mode,
+                            diagnostics_locale_pack.as_ref(),
+                            eprint_archive_diagnostics,
+                        );
                         eprint_device_run_note(&diagnostics);
                         drop(archive);
                         exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -257,7 +315,12 @@ fn interpret_path(
             &mut host,
         ) {
             archive.remap_diagnostics(&mut diagnostics);
-            eprint_archive_diagnostics(&diagnostics);
+            eprint_run_diagnostics(
+                &diagnostics,
+                diagnostic_mode,
+                diagnostics_locale_pack.as_ref(),
+                eprint_archive_diagnostics,
+            );
             eprint_device_run_note(&diagnostics);
             drop(archive);
             exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -266,13 +329,19 @@ fn interpret_path(
     }
 
     if is_package_interpret_input(path) {
-        let config = match script_package_config(path, locale, diagnostics_locale) {
-            Ok(config) => config,
-            Err(diagnostic) => {
-                super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-                exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
-            }
-        };
+        let (config, diagnostics_locale_pack) =
+            match script_package_config(path, locale, diagnostics_locale, safe) {
+                Ok(config) => config,
+                Err(diagnostic) => {
+                    eprint_run_diagnostics(
+                        std::slice::from_ref(diagnostic.as_ref()),
+                        diagnostic_mode,
+                        None,
+                        super::eprint_compile_diagnostics,
+                    );
+                    exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
+                }
+            };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
         // gpu-reset C2-U6b/U6c: an explicit GPU run, or an `auto` run of a
         // package that declares kernels, goes through the in-process device
@@ -282,7 +351,12 @@ fn interpret_path(
             try_device_session(&config, path, selection, cpu, &mut host, stats, stats_file)
         {
             if let Err(diagnostics) = result {
-                eprint_route_diagnostics(&diagnostics);
+                eprint_run_diagnostics(
+                    &diagnostics,
+                    diagnostic_mode,
+                    diagnostics_locale_pack.as_ref(),
+                    eprint_route_diagnostics,
+                );
                 exit_status::exit_for_run_diagnostics(&diagnostics);
             }
             return;
@@ -291,7 +365,12 @@ fn interpret_path(
             let metadata = match run_stats::package_metadata(path) {
                 Ok(metadata) => metadata,
                 Err(diagnostic) => {
-                    super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                    eprint_run_diagnostics(
+                        std::slice::from_ref(diagnostic.as_ref()),
+                        diagnostic_mode,
+                        None,
+                        super::eprint_compile_diagnostics,
+                    );
                     exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
             };
@@ -304,7 +383,12 @@ fn interpret_path(
                 &mut host,
             ) {
                 Err(diagnostics) => {
-                    super::eprint_compile_diagnostics(&diagnostics);
+                    eprint_run_diagnostics(
+                        &diagnostics,
+                        diagnostic_mode,
+                        diagnostics_locale_pack.as_ref(),
+                        super::eprint_compile_diagnostics,
+                    );
                     eprint_device_run_note(&diagnostics);
                     exit_status::exit_for_run_diagnostics(&diagnostics);
                 }
@@ -322,7 +406,12 @@ fn interpret_path(
                         run_stats::exit_for_emit_error("run statistics", &error);
                     }
                     if let Err(diagnostics) = outcome.result {
-                        super::eprint_compile_diagnostics(&diagnostics);
+                        eprint_run_diagnostics(
+                            &diagnostics,
+                            diagnostic_mode,
+                            diagnostics_locale_pack.as_ref(),
+                            super::eprint_compile_diagnostics,
+                        );
                         eprint_device_run_note(&diagnostics);
                         exit_status::exit_for_run_diagnostics(&diagnostics);
                     }
@@ -335,7 +424,12 @@ fn interpret_path(
             &package::mir::faber_mir_seams(),
             &mut host,
         ) {
-            super::eprint_compile_diagnostics(&diagnostics);
+            eprint_run_diagnostics(
+                &diagnostics,
+                diagnostic_mode,
+                diagnostics_locale_pack.as_ref(),
+                super::eprint_compile_diagnostics,
+            );
             eprint_device_run_note(&diagnostics);
             exit_status::exit_for_run_diagnostics(&diagnostics);
         }
@@ -372,13 +466,19 @@ fn interpret_path(
         Err(err) => super::eprint_io_error(path, &err),
     };
 
-    let config = match script_package_config(path, locale, diagnostics_locale) {
-        Ok(config) => config,
-        Err(diagnostic) => {
-            super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
-            exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
-        }
-    };
+    let (config, diagnostics_locale_pack) =
+        match script_package_config(path, locale, diagnostics_locale, safe) {
+            Ok(config) => config,
+            Err(diagnostic) => {
+                eprint_run_diagnostics(
+                    std::slice::from_ref(diagnostic.as_ref()),
+                    diagnostic_mode,
+                    None,
+                    super::eprint_compile_diagnostics,
+                );
+                exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
+            }
+        };
     // gpu-reset C2-U6c: a lone `.fab` file runs on the in-process device
     // session too (explicit GPU, or `auto` with kernels).
     #[cfg(feature = "device-runtime")]
@@ -394,7 +494,12 @@ fn interpret_path(
             stats_file,
         ) {
             if let Err(diagnostics) = result {
-                eprint_route_diagnostics(&diagnostics);
+                eprint_run_diagnostics(
+                    &diagnostics,
+                    diagnostic_mode,
+                    diagnostics_locale_pack.as_ref(),
+                    eprint_route_diagnostics,
+                );
                 exit_status::exit_for_run_diagnostics(&diagnostics);
             }
             return;
@@ -413,7 +518,7 @@ fn interpret_path(
         &mut host,
         selection,
     );
-    exit_interpreted(result);
+    exit_interpreted(result, diagnostic_mode, diagnostics_locale_pack.as_ref());
 }
 
 /// Process status scripta gates observe for a single-file runner result.
@@ -430,9 +535,13 @@ pub(super) fn single_file_run_process_code(
     }
 }
 
-fn exit_interpreted(result: Result<ExitCode, radix::module::mir::RunSourceError>) {
+fn exit_interpreted(
+    result: Result<ExitCode, radix::module::mir::RunSourceError>,
+    diagnostic_mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
+) {
     if let Err(error) = &result {
-        print_run_source_error(error);
+        print_run_source_error_with_mode(error, diagnostic_mode, diagnostics_locale_pack);
     }
     let code = single_file_run_process_code(result);
     if code != 0 {
@@ -453,14 +562,29 @@ fn script_package_config(
     input: &Path,
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
-) -> Result<radix::module::driver::Config, Box<Diagnostic>> {
+    safe: bool,
+) -> Result<
+    (
+        radix::module::driver::Config,
+        Option<radix::module::locale::LocalePack>,
+    ),
+    Box<Diagnostic>,
+> {
     package::config_with_locale(
         radix::module::Target::HirTypeScript,
         input,
         locale,
         diagnostics_locale,
     )
-    .map(|(config, _)| config.with_dev_locale_root())
+    .map(|(config, diagnostics_locale_pack)| {
+        let config = config.with_dev_locale_root();
+        let config = if package::resolve_safe_kernels(safe, input) {
+            config.with_safe_kernels()
+        } else {
+            config
+        };
+        (config, diagnostics_locale_pack)
+    })
 }
 
 /// Whether `path` routes through the package-MIR runner rather than the
@@ -863,24 +987,27 @@ fn finish_device_run(
 /// combination fails closed before launch rather than silently ignoring the
 /// count. A stats request is permitted with any selection: a dispatching run
 /// reports host rows and a device receipt.
-fn resolve_route_selection(
+fn resolve_route_options(
     args: &RunArgs,
     input_path: &Path,
-) -> Result<DeviceSelection, Box<Diagnostic>> {
+) -> Result<(DeviceSelection, Option<std::num::NonZeroU32>), Box<Diagnostic>> {
     let selection = package::resolve_device_selection(args.device, input_path)?;
-    package::resolve_cpu_threads(args.threads, selection, input_path)?;
+    let workers = package::resolve_cpu_threads(args.threads, selection, input_path)?;
     ensure_partitions_cpu_route(args.partitions, selection)?;
-    Ok(selection)
+    Ok((selection, workers))
 }
 
 /// The CPU device shape: the worker count resolved by
 /// [`package::resolve_cpu_threads`] (`--threads`, then manifest `[device]
 /// threads`, then the route default when `None`) and `--partitions N` (one
 /// partition when absent). Only the CPU route reads it:
-/// [`resolve_route_selection`] refuses `--partitions` on any other route.
-fn cpu_device_shape(args: &RunArgs, threads: Option<u32>) -> package::mir::CpuDeviceShape {
+/// [`resolve_route_options`] refuses `--partitions` on any other route.
+fn cpu_device_shape(
+    args: &RunArgs,
+    workers: Option<std::num::NonZeroU32>,
+) -> package::mir::CpuDeviceShape {
     package::mir::CpuDeviceShape {
-        workers: threads.and_then(std::num::NonZeroU32::new),
+        workers,
         partitions: args
             .partitions
             .and_then(std::num::NonZeroU32::new)
@@ -910,6 +1037,20 @@ fn ensure_partitions_cpu_route(
         .with_arg("issue", "E_PARTITIONS_REQUIRES_CPU")
         .with_arg("device", selection.spelling()),
     ))
+}
+
+fn print_run_source_error_with_mode(
+    error: &radix::module::mir::RunSourceError,
+    mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
+) {
+    match error {
+        radix::module::mir::RunSourceError::Frontend(diagnostics) => {
+            let ordered = radix::services::normalize_locale002_notes(diagnostics.clone());
+            faber_cli::postprocess::print_diagnostics(&ordered, mode, diagnostics_locale_pack);
+        }
+        _ => print_run_source_error(error),
+    }
 }
 
 /// Render route diagnostics with their stable host codes (N1.4). The
@@ -1064,3 +1205,20 @@ mod run_device_tests;
 #[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
 #[path = "run_device_hw_test.rs"]
 mod run_device_hw_tests;
+
+/// Print `diagnostics` in the selected mode; `compact` is the command's
+/// existing compact form, which also carries the message of the package
+/// refusals the expanded renderer prints none for.
+fn eprint_run_diagnostics(
+    diagnostics: &[Diagnostic],
+    mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
+    compact: fn(&[Diagnostic]),
+) {
+    faber_cli::postprocess::print_diagnostics_or_compact(
+        diagnostics,
+        mode,
+        diagnostics_locale_pack,
+        compact,
+    );
+}

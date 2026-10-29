@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Decline: a textus literal longer than the target capacity rejects with textus_literal_too_long."
-syntax = "\"<text>\" ↦ textus<N>"
+syntax = "\"<text>\" ↦ textus<magnitudo N>"
 related = ["↦", "textus"]
 locale = "en"
 +++
@@ -15,7 +15,7 @@ locale = "en"
 # =============================================================================
 #
 # Decline row (reject reason in the comment):
-#   1. over capacity — `"abcdef" ↦ string<4>` asks a 6-scalar literal to fit
+#   1. over capacity — `"abcdef" ↦ string<size 4>` asks a 6-scalar literal to fit
 #      a capacity of 4: SEM011 textus_literal_too_long
 #
 # Common mistakes:
@@ -30,6 +30,6 @@ locale = "en"
 # WHY: pins the fail-closed overflow token in conversio-textus-overflow-decline.expected.
 
 main {
-    let string<4> t ← "abcdef" ↦ string<4>
+    let string<size 4> t ← "abcdef" ↦ string<size 4>
     print t
 }

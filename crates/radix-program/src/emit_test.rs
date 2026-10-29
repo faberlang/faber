@@ -304,8 +304,8 @@ main {
 @ public
 class ZeroGhost {
     @ public
-    fn remap(vector<int, 1> coord) → vector<int, 1> {
-        return [0] ↦ vector<int, 1>
+    fn remap(vector<int, size 1> coord) → vector<int, size 1> {
+        return [0] ↦ vector<int, size 1>
     }
 }
 ",

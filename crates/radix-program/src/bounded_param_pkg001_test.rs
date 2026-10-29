@@ -63,16 +63,18 @@ fn test_seams() -> AnalysisSeams {
     }
 }
 
-/// Red-first repro for the P2 empty-message PKG001: a bounded collection type
-/// in a `fn` param position (`ct-w2` / `ct-w5` / `ct-widths`) fails the check
-/// with a real, rendered diagnostic — not `error[PKG001]: <file>`.
+/// Red-first repro for the P2 empty-message PKG001: a bounded type the file
+/// interface cannot represent, in a `fn` param position (`ct-w2` / `ct-w5` /
+/// `ct-widths`), fails the check with a real, rendered diagnostic — not
+/// `error[PKG001]: <file>`. A bounded string stands in: a sized list now
+/// exports, a bounded string still does not.
 #[test]
 fn bounded_param_exported_signature_emits_real_rendered_diagnostic() {
     let dir = temp_root("ct-w2");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        "@ public\nfn probe(list<int, size 4> b) → void {\n    print b\n}\n",
+        "@ public\nfn probe(string<size 4> b) → void {\n    print b\n}\n",
     )
     .expect("write source");
 

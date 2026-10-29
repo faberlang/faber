@@ -10,10 +10,8 @@ use cranelift_codegen::ir::{
     AbiParam, Block, BlockArg, FuncRef, InstBuilder, MemFlagsData, Signature, StackSlot,
     StackSlotData, StackSlotKind, TrapCode, Type as ClType, Value, types,
 };
-use cranelift_codegen::settings::{self, Configurable, Flags};
 use cranelift_frontend::{FunctionBuilder, FunctionBuilderContext, Variable};
-use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module, default_libcall_names};
-use cranelift_object::{ObjectBuilder, ObjectModule};
+use cranelift_module::{DataDescription, DataId, FuncId, Linkage, Module};
 use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Interner;
 use radix_mir::{
@@ -36,9 +34,12 @@ use crate::abi::{self, AbiTy, RuntimeSymbol};
 mod closure;
 mod convert;
 mod entry_shims;
+mod jit;
 mod lift;
 mod wide;
 pub(crate) use convert::{byte_element, member_tests, numeric_conversion, sequence_conversion};
+pub(crate) use jit::EntryMode;
+pub use jit::{JitProgram, lower_program, lower_program_jit};
 
 /// A named refusal discovered during lowering.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -336,6 +337,16 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
     }
 }
 
+/// Whether a float value or cell of type `ty` rounds through `f32`: every
+/// declared float narrower than `f64` computes and stores at binary32, as
+/// the runner's `round_float` does for the same widths.
+fn rounds_f32(table: &TypeTable, ty: MirType) -> bool {
+    matches!(
+        resolve(table, ty.semantic_id()),
+        Type::SizedNumeric(Primitive::Fractus, width) if *width != NumericWidth::F64
+    )
+}
+
 fn union_rep(table: &TypeTable, members: &[TypeId]) -> Lowered<Rep> {
     for member in members {
         if matches!(
@@ -387,7 +398,8 @@ type TryCallInfo = (TryTarget, Vec<Rep>, Rep, Rep, Option<Signature>, Vec<bool>)
 
 /// Module-level state shared by every function being lowered.
 struct ModuleState<'a> {
-    module: ObjectModule,
+    /// The module being filled: an object file or an in-memory JIT image.
+    module: &'a mut (dyn Module + 'static),
     input: &'a ProgramInput<'a>,
     pointer: ClType,
     functions: FxHashMap<MirFunctionId, FuncId>,
@@ -589,24 +601,16 @@ impl ModuleState<'_> {
     }
 }
 
-/// Lower `input` to relocatable object bytes for the host triple.
-///
-/// # Errors
-///
-/// Returns the [`Decline`] naming the first shape the lowering cannot emit.
-pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
-    let mut flags = settings::builder();
-    flags.set("opt_level", "speed").map_err(cranelift_error)?;
-    flags.set("is_pic", "true").map_err(cranelift_error)?;
-    let isa = cranelift_native::builder_with_options(false)
-        .map_err(cranelift_error)?
-        .finish(Flags::new(flags))
-        .map_err(cranelift_error)?;
-    let pointer = isa.pointer_type();
-    let builder = ObjectBuilder::new(isa, "radix-mir-clif", default_libcall_names())
-        .map_err(cranelift_error)?;
+/// Declare and define every function the program reaches in `module`, then the
+/// entry shims. Returns the id of `faber_clif_incipit`.
+pub(super) fn lower_module(
+    module: &mut (dyn Module + 'static),
+    input: &ProgramInput<'_>,
+    mode: EntryMode,
+) -> Result<FuncId, Decline> {
+    let pointer = module.isa().pointer_type();
     let mut state = ModuleState {
-        module: ObjectModule::new(builder),
+        module,
         input,
         pointer,
         functions: FxHashMap::default(),
@@ -649,8 +653,7 @@ pub fn lower_program(input: &ProgramInput<'_>) -> Result<Vec<u8>, Decline> {
             break;
         }
     }
-    entry_shims::define_entry_shims(&mut state, entry)?;
-    state.module.finish().emit().map_err(cranelift_error)
+    entry_shims::define_entry_shims(&mut state, entry, mode)
 }
 
 /// The policy family of an integer store slot.
@@ -682,6 +685,8 @@ struct FunctionLower<'f, 'a> {
     slots: FxHashMap<Slot, (Variable, Rep)>,
     slot_tys: FxHashMap<Slot, MirType>,
     ret_rep: Rep,
+    /// The return type rounds a float through `f32` (narrower than `f64`).
+    ret_narrow: bool,
     error_rep: Option<Rep>,
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
@@ -718,6 +723,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
         return Err(Decline::new("failable generator function"));
     }
     let ret_rep = rep_of(state.input.types, function.return_ty)?;
+    let ret_narrow = ret_rep == Rep::Float && rounds_f32(state.input.types, function.return_ty);
     let error_rep = function
         .error_ty
         .map(|error_ty| rep_of(state.input.types, error_ty))
@@ -734,6 +740,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             slots: FxHashMap::default(),
             slot_tys: FxHashMap::default(),
             ret_rep,
+            ret_narrow,
             error_rep,
             values: FxHashMap::default(),
             refs: FxHashMap::default(),
@@ -806,7 +813,6 @@ impl FunctionLower<'_, '_> {
         environment: Option<&MirClosureEnvironment>,
     ) -> Lowered<()> {
         let table = self.state.input.types;
-        let unknown = |_: MirType| false;
         let (cells, environments) = closure::construction_slots(function);
         self.cells = cells;
         for local in &function.locals {
@@ -814,9 +820,6 @@ impl FunctionLower<'_, '_> {
                 || environment
                     .as_ref()
                     .is_some_and(|environment| environment.environment_local == local.id);
-            if unknown(local.ty) && !env_slot {
-                continue;
-            }
             let declared = function
                 .params
                 .iter()
@@ -837,9 +840,6 @@ impl FunctionLower<'_, '_> {
         }
         let wide_temps = wide::wide_temps(table, function);
         for temp in &function.temps {
-            if unknown(temp.ty) && !environments.contains(&Slot::Temp(temp.id)) {
-                continue;
-            }
             let slot = Slot::Temp(temp.id);
             if wide_temps.contains(&temp.id)
                 && !self.cells.contains(&slot)
@@ -1045,10 +1045,7 @@ impl FunctionLower<'_, '_> {
             {
                 let (key_ty, _) = self.map_types(ty)?;
                 let (key, key_rep) = self.element_operand(index, key_ty)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let tag = self.cell_tag_value(key_rep, key_ty)?;
                 let key = self.element_bits(key, key_rep);
                 self.call_runtime(&abi::MAP_GET, &[current, tag, key])?
             }
@@ -1481,6 +1478,23 @@ impl FunctionLower<'_, '_> {
         })
     }
 
+    /// The element tag of a container cell of representation `rep` whose
+    /// static type is `ty`: a float cell of declared `f32` width carries the
+    /// f32 tag, so the runtime renders and orders it at single precision;
+    /// every other cell keeps its representation's tag.
+    fn cell_tag(table: &TypeTable, rep: Rep, ty: MirType) -> Lowered<i64> {
+        Ok(match rep {
+            Rep::Float if rounds_f32(table, ty) => abi::TAG_FLOAT32,
+            rep => Self::element_tag(rep)?,
+        })
+    }
+
+    /// The iconst cell tag of `rep` at a cell of static type `ty`.
+    fn cell_tag_value(&mut self, rep: Rep, ty: MirType) -> Lowered<Value> {
+        let tag = Self::cell_tag(self.state.input.types, rep, ty)?;
+        Ok(self.builder.ins().iconst(types::I32, tag))
+    }
+
     /// A value as the 64 bits a list element stores.
     fn element_bits(&mut self, value: Value, rep: Rep) -> Value {
         match rep {
@@ -1711,10 +1725,7 @@ impl FunctionLower<'_, '_> {
                     return Err(Decline::new("chain index of an optional value"));
                 }
                 let (key, key_rep) = self.element_operand(index, key_ty)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let tag = self.cell_tag_value(key_rep, key_ty)?;
                 let key = self.element_bits(key, key_rep);
                 self.call_runtime(&abi::MAP_GET_OPT, &[payload, tag, key])?
                     .ok_or_else(|| Decline::new("chain index result"))?
@@ -1758,6 +1769,12 @@ impl FunctionLower<'_, '_> {
         }
         let (value, have) = self.scalar(operand)?;
         let value = self.coerce(value, have, rep)?;
+        // A container cell carries the real float width: an element narrower
+        // than `f64` stores its value rounded through `f32`.
+        if rep == Rep::Float {
+            let value = self.round_float_cell(value, element);
+            return Ok((value, rep));
+        }
         Ok((value, rep))
     }
 
@@ -1821,16 +1838,19 @@ impl FunctionLower<'_, '_> {
             projections: prefix.to_vec(),
         };
         let container_ty = self.place_type(&container)?;
+        let cell_ty = self.place_type(place)?;
         let (handle, handle_rep) = if prefix.is_empty() {
             let (variable, rep) = self.place_slot(&container)?;
             (self.builder.use_var(variable), rep)
         } else {
             self.read_projected(&container)?
         };
-        let tag = self
-            .builder
-            .ins()
-            .iconst(types::I32, Self::element_tag(rep)?);
+        let value = if rep == Rep::Float {
+            self.round_float_cell(value, cell_ty)
+        } else {
+            value
+        };
+        let tag = self.cell_tag_value(rep, cell_ty)?;
         let bits = self.element_bits(value, rep);
         match last {
             MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index)
@@ -1838,10 +1858,7 @@ impl FunctionLower<'_, '_> {
             {
                 let (key_ty, _) = self.map_types(container_ty)?;
                 let (key, key_rep) = self.element_operand(last_index, key_ty)?;
-                let key_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key_tag = self.cell_tag_value(key_rep, key_ty)?;
                 let key = self.element_bits(key, key_rep);
                 self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, tag, bits])?;
             }
@@ -1907,10 +1924,7 @@ impl FunctionLower<'_, '_> {
             match item {
                 MirAggregateItem::Operand(operand) => {
                     let (value, rep) = self.element_operand(operand, element)?;
-                    let tag = self
-                        .builder
-                        .ins()
-                        .iconst(types::I32, Self::element_tag(element_rep)?);
+                    let tag = self.cell_tag_value(element_rep, element)?;
                     let bits = self.element_bits(value, rep);
                     self.call_runtime(&abi::LIST_PUSH, &[list, tag, bits])?;
                 }
@@ -1951,11 +1965,9 @@ impl FunctionLower<'_, '_> {
             let MirAggregateItem::Operand(operand) = item else {
                 return Err(Decline::new("tuple spread"));
             };
-            let (value, rep) = self.element_operand(operand, MirType::semantic(element))?;
-            let tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(rep)?);
+            let element_ty = MirType::semantic(element);
+            let (value, rep) = self.element_operand(operand, element_ty)?;
+            let tag = self.cell_tag_value(rep, element_ty)?;
             let bits = self.element_bits(value, rep);
             self.call_runtime(&abi::LIST_PUSH, &[list, tag, bits])?;
         }
@@ -2040,10 +2052,7 @@ impl FunctionLower<'_, '_> {
                     return Err(Decline::new("set spread"));
                 };
                 let (value, rep) = self.element_operand(operand, element)?;
-                let tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(rep)?);
+                let tag = self.cell_tag_value(rep, element)?;
                 let bits = self.element_bits(value, rep);
                 let zero_tag = self.builder.ins().iconst(types::I32, 0);
                 let zero = self.builder.ins().iconst(types::I64, 0);
@@ -2065,15 +2074,9 @@ impl FunctionLower<'_, '_> {
             for entry in entries {
                 let (key, key_rep) = self.element_operand(&entry.key, key_ty)?;
                 let (value, value_rep) = self.element_operand(&entry.value, value_ty)?;
-                let key_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(key_rep)?);
+                let key_tag = self.cell_tag_value(key_rep, key_ty)?;
                 let key = self.element_bits(key, key_rep);
-                let value_tag = self
-                    .builder
-                    .ins()
-                    .iconst(types::I32, Self::element_tag(value_rep)?);
+                let value_tag = self.cell_tag_value(value_rep, value_ty)?;
                 let value = self.element_bits(value, value_rep);
                 self.call_runtime(&abi::MAP_SET, &[map, key_tag, key, value_tag, value])?;
             }
@@ -2117,16 +2120,14 @@ impl FunctionLower<'_, '_> {
             else {
                 return Err(Decline::new("record field without a value"));
             };
-            let (value, rep) = self.element_operand(&item.value, MirType::semantic(*field_ty))?;
+            let field_ty = MirType::semantic(*field_ty);
+            let (value, rep) = self.element_operand(&item.value, field_ty)?;
             let position = self.builder.ins().iconst(
                 types::I64,
                 i64::try_from(position).map_err(|_| Decline::new("field index"))?,
             );
             let text = self.text_literal(field.as_bytes())?;
-            let tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(rep)?);
+            let tag = self.cell_tag_value(rep, field_ty)?;
             let bits = self.element_bits(value, rep);
             self.call_runtime(&abi::RECORD_SET, &[record, position, text, tag, bits])?;
         }
@@ -2192,10 +2193,7 @@ impl FunctionLower<'_, '_> {
             );
             let text = self.state.input.interner.resolve(*field).to_owned();
             let text = self.text_literal(text.as_bytes())?;
-            let tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(rep)?);
+            let tag = self.cell_tag_value(rep, field_ty)?;
             let bits = self.element_bits(value, rep);
             self.call_runtime(&abi::RECORD_SET, &[record, position, text, tag, bits])?;
         }
@@ -3058,10 +3056,7 @@ impl FunctionLower<'_, '_> {
         }
         let element = self.element_type(self.operand_type(receiver)?)?;
         let (value, item_rep) = self.element_operand(item, element)?;
-        let tag = self
-            .builder
-            .ins()
-            .iconst(types::I32, Self::element_tag(item_rep)?);
+        let tag = self.cell_tag_value(item_rep, element)?;
         let bits = self.element_bits(value, item_rep);
         self.call_runtime(&abi::LIST_PUSH, &[handle, tag, bits])?;
         Ok(())
@@ -3080,10 +3075,7 @@ impl FunctionLower<'_, '_> {
             };
             let element = self.element_type(self.operand_type(receiver)?)?;
             let (value, item_rep) = self.element_operand(item, element)?;
-            let tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(item_rep)?);
+            let tag = self.cell_tag_value(item_rep, element)?;
             let bits = self.element_bits(value, item_rep);
             (
                 self.call_runtime(&abi::LIST_CONTAINS, &[handle, tag, bits])?,
@@ -3139,10 +3131,7 @@ impl FunctionLower<'_, '_> {
             };
             let (key_ty, _) = self.map_types(self.operand_type(receiver)?)?;
             let (key, key_rep) = self.element_operand(key, key_ty)?;
-            let key_tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(key_rep)?);
+            let key_tag = self.cell_tag_value(key_rep, key_ty)?;
             let key = self.element_bits(key, key_rep);
             let result_rep = rep_of(self.state.input.types, self.place_type(destination)?)?;
             if result_rep == Rep::Opt {
@@ -3181,10 +3170,7 @@ impl FunctionLower<'_, '_> {
                 _ => return Err(Decline::new("key access of a non-map")),
             };
             let (key, key_rep) = self.element_operand(key, key_ty)?;
-            let key_tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(key_rep)?);
+            let key_tag = self.cell_tag_value(key_rep, key_ty)?;
             let key = self.element_bits(key, key_rep);
             let symbol = if op == MirCollectionOp::Delete {
                 &abi::MAP_REMOVE
@@ -3212,15 +3198,9 @@ impl FunctionLower<'_, '_> {
         let (key_ty, value_ty) = self.map_types(self.operand_type(receiver)?)?;
         let (key, key_rep) = self.element_operand(key, key_ty)?;
         let (value, value_rep) = self.element_operand(value, value_ty)?;
-        let key_tag = self
-            .builder
-            .ins()
-            .iconst(types::I32, Self::element_tag(key_rep)?);
+        let key_tag = self.cell_tag_value(key_rep, key_ty)?;
         let key = self.element_bits(key, key_rep);
-        let value_tag = self
-            .builder
-            .ins()
-            .iconst(types::I32, Self::element_tag(value_rep)?);
+        let value_tag = self.cell_tag_value(value_rep, value_ty)?;
         let value = self.element_bits(value, value_rep);
         self.call_runtime(&abi::MAP_SET, &[handle, key_tag, key, value_tag, value])?;
         Ok(())
@@ -3243,10 +3223,7 @@ impl FunctionLower<'_, '_> {
             _ => return Err(Decline::new("set type")),
         };
         let (value, rep) = self.element_operand(item, element)?;
-        let tag = self
-            .builder
-            .ins()
-            .iconst(types::I32, Self::element_tag(rep)?);
+        let tag = self.cell_tag_value(rep, element)?;
         let bits = self.element_bits(value, rep);
         let zero_tag = self.builder.ins().iconst(types::I32, 0);
         let zero = self.builder.ins().iconst(types::I64, 0);
@@ -3476,10 +3453,7 @@ impl FunctionLower<'_, '_> {
             };
             let element = self.element_type(self.operand_type(receiver)?)?;
             let (value, item_rep) = self.element_operand(item, element)?;
-            let tag = self
-                .builder
-                .ins()
-                .iconst(types::I32, Self::element_tag(item_rep)?);
+            let tag = self.cell_tag_value(item_rep, element)?;
             let bits = self.element_bits(value, item_rep);
             (
                 self.call_runtime(&abi::LIST_APPENDED, &[handle, tag, bits])?,
@@ -3807,6 +3781,34 @@ impl FunctionLower<'_, '_> {
                 1
             }
             _ => 0,
+        }
+    }
+
+    /// Round a float through `f32`: the store and per-operation width of a
+    /// float narrower than `f64`. The round trip is exact on
+    /// an already-rounded value, so re-rounding is free.
+    fn round_f32(&mut self, value: Value) -> Value {
+        let narrow = self.builder.ins().fdemote(types::F32, value);
+        self.builder.ins().fpromote(types::F64, narrow)
+    }
+
+    /// A float value as the cell `ty` holds it: rounded through `f32` when
+    /// the cell is narrower than `f64`, unchanged for an `f64` cell.
+    fn round_float_cell(&mut self, value: Value, ty: MirType) -> Value {
+        if rounds_f32(self.state.input.types, ty) {
+            self.round_f32(value)
+        } else {
+            value
+        }
+    }
+
+    /// A float value at a declared `width`: rounded through `f32` when the
+    /// width is narrower than `f64`, unchanged at `f64`.
+    fn round_float_width(&mut self, value: Value, width: NumericWidth) -> Value {
+        if width == NumericWidth::F64 {
+            value
+        } else {
+            self.round_f32(value)
         }
     }
 
@@ -5028,8 +5030,12 @@ impl FunctionLower<'_, '_> {
         }
         let stored = match (rep, slot_rep) {
             (Rep::Int, Rep::Int) => self.int_store(site, conversion.target_ty, value)?,
-            (Rep::Float, Rep::Float)
-            | (Rep::Bool, Rep::Bool)
+            (Rep::Float, Rep::Float) => {
+                // A conversion store lands in a typed cell: a float target
+                // narrower than `f64` rounds through `f32` at the slot.
+                self.round_float_cell(value, conversion.target_ty)
+            }
+            (Rep::Bool, Rep::Bool)
             | (Rep::Text, Rep::Text)
             | (Rep::List, Rep::List)
             | (Rep::Record, Rep::Record)
@@ -5572,7 +5578,7 @@ impl FunctionLower<'_, '_> {
         {
             return Ok((Some(computed), rep));
         }
-        match &value.kind {
+        let (computed, rep) = match &value.kind {
             MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
                 let cap = wide::cap_int(self.state.input.types, value.ty);
@@ -5600,12 +5606,22 @@ impl FunctionLower<'_, '_> {
             MirValueKind::Binary { op, lhs, rhs } => {
                 let result = rep_of(self.state.input.types, value.ty)?;
                 let cap = wide::cap_int(self.state.input.types, value.ty);
-                let (computed, rep) = self.binary(*op, lhs, rhs, result, cap)?;
+                let narrow = result == Rep::Float && rounds_f32(self.state.input.types, value.ty);
+                let (computed, rep) = self.binary(*op, lhs, rhs, result, cap, narrow)?;
                 Ok((Some(computed), rep))
             }
             MirValueKind::Closure(closure) => Ok((Some(self.closure_value(closure)?), Rep::Func)),
             MirValueKind::TensorExtent { .. } => Err(Decline::new("value kind")),
-        }
+        }?;
+        // A float value narrower than `f64` lands at its declared width
+        // here, where the computation stores into a typed cell, exactly as
+        // the runner's `apply_declared_float_width` rounds at the value's
+        // type.
+        let (computed, rep) = match (computed, rep) {
+            (Some(computed), Rep::Float) => (Some(self.round_float_cell(computed, value.ty)), rep),
+            other => other,
+        };
+        Ok((computed, rep))
     }
 
     fn unary(&mut self, op: MirUnOp, operand: &MirOperand, cap: bool) -> Lowered<(Value, Rep)> {
@@ -5734,6 +5750,7 @@ impl FunctionLower<'_, '_> {
         rhs: &MirOperand,
         result: Rep,
         cap: bool,
+        narrow: bool,
     ) -> Lowered<(Value, Rep)> {
         let (mut a, a_rep) = self.scalar_wide(lhs)?;
         let (mut b, b_rep) = self.scalar_wide(rhs)?;
@@ -5812,7 +5829,7 @@ impl FunctionLower<'_, '_> {
         }
         match a_rep {
             Rep::Int => self.int_binary(op, a, b, cap),
-            Rep::Float => self.float_binary(op, a, b),
+            Rep::Float => self.float_binary(op, a, b, narrow),
             Rep::Bool => self.bool_binary(op, a, b),
             Rep::Text => self.text_binary(op, a, b),
             Rep::Char
@@ -5934,7 +5951,34 @@ impl FunctionLower<'_, '_> {
         Ok(self.builder.ins().sshr(a, clamped))
     }
 
-    fn float_binary(&mut self, op: MirBinOp, a: Value, b: Value) -> Lowered<(Value, Rep)> {
+    /// Float arithmetic at a declared width narrower than `f64` rounds its
+    /// operands and its result through `f32`, as the runner's `float_binop`
+    /// does; the operation itself still runs in `f64`, and comparisons take
+    /// the operands exactly as stored.
+    fn float_binary(
+        &mut self,
+        op: MirBinOp,
+        a: Value,
+        b: Value,
+        narrow: bool,
+    ) -> Lowered<(Value, Rep)> {
+        if narrow
+            && matches!(
+                op,
+                MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod
+            )
+        {
+            let a = self.round_f32(a);
+            let b = self.round_f32(b);
+            let computed = match op {
+                MirBinOp::Add => self.builder.ins().fadd(a, b),
+                MirBinOp::Sub => self.builder.ins().fsub(a, b),
+                MirBinOp::Mul => self.builder.ins().fmul(a, b),
+                MirBinOp::Div => self.builder.ins().fdiv(a, b),
+                _ => self.float_floor_rem(a, b)?,
+            };
+            return Ok((self.round_f32(computed), Rep::Float));
+        }
         let compare = |this: &mut Self, cc: FloatCC| (this.builder.ins().fcmp(cc, a, b), Rep::Bool);
         Ok(match op {
             MirBinOp::Add => (self.builder.ins().fadd(a, b), Rep::Float),
@@ -6320,13 +6364,24 @@ impl FunctionLower<'_, '_> {
                 if let Some(operand) = value
                     && let (Some(value), have) = self.operand_narrow(operand)?
                 {
-                    results.push(self.coerce(value, have, self.ret_rep)?);
+                    let value = self.coerce(value, have, self.ret_rep)?;
+                    // The return slot is a store site: a float narrower than
+                    // `f64` returns rounded through `f32`.
+                    let value = if self.ret_narrow {
+                        self.round_f32(value)
+                    } else {
+                        value
+                    };
+                    results.push(value);
                 }
                 if self.error_rep.is_some() {
                     results.push(self.builder.ins().iconst(types::I64, 0));
                 }
                 self.builder.ins().return_(&results);
                 Ok(())
+            }
+            MirTerminatorKind::ReturnThread => {
+                Err(Decline::new("return_thread lowering is pending"))
             }
             MirTerminatorKind::ReturnError(operand) => {
                 let Some(error_rep) = self.error_rep else {

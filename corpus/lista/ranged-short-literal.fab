@@ -1,0 +1,15 @@
++++
+term = "list<T, size lo‥hi>"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "array_literal", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "A zero-based inclusive size range accepts a short literal up to its maximum."
+syntax = "let list<int, size 0…3> pair ← [1, 2]"
+related = ["list<T, size lo‥hi>", "lista"]
+locale = "en"
++++
+
+main {
+    let list<int, size 0…3> pair ← [1, 2]
+    print pair
+}

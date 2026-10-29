@@ -468,9 +468,11 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::PhysicalScalar,
         ),
-        // decimal-widths D1: decimals have no MIR scalar arm until D4/D5.
+        // Kernel-wide types ruling 2026-10-28: `numerus<d64>` is the `D64`
+        // scalar layout (an `i64` mantissa at scale 10^-8); `fractus<d64>` is
+        // not a type and stays a loud error.
         NumericWidth::D64 => (
-            SizedNumericOutcome::LoudError,
+            SizedNumericOutcome::PhysicalScalar,
             SizedNumericOutcome::LoudError,
         ),
         // inf track U4: `numerus<inf>` is the unsized `Magnus` scalar layout
@@ -541,6 +543,15 @@ fn every_sized_numeric_width_matches_its_sub_table_row() {
             numerus_outcome,
             "numerus<{numerus_marker}>"
         );
+        if width == NumericWidth::D64 {
+            assert_eq!(
+                table
+                    .layout_for_type(MirType::semantic(numerus))
+                    .unwrap()
+                    .kind,
+                MirLayoutKind::Scalar(MirScalarLayout::D64)
+            );
+        }
         assert_eq!(
             resolve_outcome(&table, fractus),
             fractus_outcome,
@@ -648,14 +659,14 @@ fn bounded_ascii_and_textus_resolve_physical_byte_aggregates_with_length_member(
     };
     let textus_layout = table
         .layout_for_type(MirType::semantic(textus_ty))
-        .expect("textus<16> layout fact");
+        .expect("textus<magnitudo 16> layout fact");
     assert_eq!(
         textus_layout.kind,
         expected(MirAggregateFamily::BoundedTextus)
     );
     let ascii_layout = table
         .layout_for_type(MirType::semantic(ascii_ty))
-        .expect("ascii<16> layout fact");
+        .expect("ascii<magnitudo 16> layout fact");
     assert_eq!(
         ascii_layout.kind,
         expected(MirAggregateFamily::BoundedAscii)
@@ -825,7 +836,7 @@ fn vector_element_tensor_resolves_device_view_with_vector_element() {
 
     let layout = table
         .layout_for_type(MirType::semantic(tensor))
-        .expect("tensor<vector<f32, 4>> layout fact");
+        .expect("tensor<vector<f32, size 4>> layout fact");
     let MirLayoutKind::DeviceView(view) = layout.kind else {
         panic!("expected DeviceView, got {:?}", layout.kind);
     };
@@ -848,7 +859,7 @@ fn vector_element_tensor_width2_is_admitted() {
     let table = MirLayoutTable::from_types(&types);
     let layout = table
         .layout_for_type(MirType::semantic(tensor))
-        .expect("tensor<vector<f32, 2>> layout fact");
+        .expect("tensor<vector<f32, size 2>> layout fact");
     assert!(matches!(
         layout.kind,
         MirLayoutKind::DeviceView(MirDeviceViewLayout {

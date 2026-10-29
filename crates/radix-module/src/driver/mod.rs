@@ -346,7 +346,7 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
     }
 
     if analysis.cli_program.is_some() {
-        return compile_cli_program(session.config.target, name, source, analysis, session.config.no_fuse);
+        return compile_cli_program(&session.config, name, source, analysis);
     }
 
     // -------------------------------------------------------------------------
@@ -369,6 +369,8 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
         session.config.no_fuse,
         session.config.emit_nvvm_device_module,
         &session.config.target_bindings,
+        #[cfg(feature = "mir-clif")]
+        &session.config.clif_engine,
     ) {
         Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
         Err(err) => compile_codegen_error(analysis, name, source, err),
@@ -382,13 +384,9 @@ fn missing_cli_program(analysis: AnalyzedModule, name: &str) -> CompileResult {
     )
 }
 
-fn compile_cli_program(
-    target: Target,
-    name: &str,
-    source: &str,
-    analysis: AnalyzedModule,
-    no_fuse: bool,
-) -> CompileResult {
+fn compile_cli_program(config: &Config, name: &str, source: &str, analysis: AnalyzedModule) -> CompileResult {
+    let target = config.target;
+    let no_fuse = config.no_fuse;
     if let Some(diagnostic) = cli_codegen_diagnostic(target, name, &analysis) {
         return compile_error(analysis, diagnostic);
     }
@@ -405,7 +403,7 @@ fn compile_cli_program(
         #[cfg(feature = "mir-clif")]
         Target::MirClif => {
             let mut analysis = analysis;
-            match generate_clif_object_output(&mut analysis, no_fuse) {
+            match generate_clif_output(&mut analysis, no_fuse, &config.clif_engine) {
                 Ok(output) => CompileResult { output: Some(output), diagnostics: analysis.diagnostics },
                 Err(err) => compile_codegen_error(analysis, name, source, err),
             }
@@ -745,6 +743,7 @@ fn generate_output(
     no_fuse: bool,
     emit_nvvm_device_module: bool,
     target_bindings: &TargetBindings,
+    #[cfg(feature = "mir-clif")] clif_engine: &crate::ClifEngine,
 ) -> Result<crate::Output, SpannedCodegenError> {
     // Raw-bits types (b8..b64) have a carrier only on the Faber source emitter
     // and the MIR runner; every other target fails closed, named, before emit.
@@ -790,7 +789,7 @@ fn generate_output(
         #[cfg(not(feature = "mir-llvm"))]
         Target::MirLlvm | Target::MirLlvmHost => Err(unavailable_target_spanned(Target::MirLlvm)),
         #[cfg(feature = "mir-clif")]
-        Target::MirClif => generate_clif_object_output(analysis, no_fuse),
+        Target::MirClif => generate_clif_output(analysis, no_fuse, clif_engine),
         #[cfg(not(feature = "mir-clif"))]
         Target::MirClif => Err(unavailable_target_spanned(Target::MirClif)),
         Target::MirAmd => {
@@ -1039,88 +1038,96 @@ fn imported_entry_error_spanned(error: radix_mir::device::MirImportedEntryError)
     SpannedCodegenError { message: error.message(), args: vec![DiagnosticArg::new("issue", error.issue())], span: None }
 }
 
-#[cfg_attr(not(feature = "mir-llvm"), allow(unused_variables))]
 #[cfg(feature = "mir-llvm")]
 fn generate_llvm_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
     emit_nvvm_device_module: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(feature = "mir-llvm")]
-    {
-        prepare_mir_lowering_interner(analysis);
-        let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
-        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        // KPC-EMIT target-role handoff: the merged map (local entries plus
-        // concrete imported registrations) is what the text paths consume, so
-        // an import-only device package no longer reports the zero-entry red.
-        let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
-        // Source metadata is the package constructor's explicit admission
-        // carrier. LLVM's direct device-module route already receives the
-        // launch-filtered `device_roles`; pass only source-less closure rows
-        // here so a private named helper cannot be promoted back into an LLVM
-        // kernel annotation merely because it is a device-composition fact.
-        let llvm_metadata = mir
-            .device_function_metadata
-            .iter()
-            .filter(|(_, metadata)| metadata.origin == crate::mir::MirFunctionOrigin::SyntheticKernelClosure)
-            .map(|(function, metadata)| (*function, *metadata))
-            .collect::<crate::mir::MirDeviceFunctionMetadataMap>();
-        // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
-        // is the CPU-module path. A package that carries device roles routes
-        // through the HOST-PARTITION lane (direct declarations/calls, no device
-        // bodies). The ordinary `LlvmEmitRequest` with roles is the NVVM
-        // device-artifact path: `--cuda-descriptor` selects it so the emitted
-        // `.ll` matches the sidecar. No default route silently emits device
-        // bodies into a CPU module.
-        let code = if emit_nvvm_device_module || device_roles.is_empty() {
-            crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
-                device_roles: Some(device_roles),
-                device_function_metadata: Some(llvm_metadata),
-                ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
-            })
-            .map_err(llvm_text_codegen_error)?
-        } else {
-            // DDCP3-U5 (gate 6): the host-partition lane runs the pre-emission
-            // reject gate BEFORE any output byte — unsupported callsite shapes,
-            // unresolved region symbols, effect-crossing regions, missing
-            // layout/argument facts, and invalid cross-boundary values fail with
-            // stable structured diagnostics naming the rule; a rejected package
-            // produces zero output bytes. The legality facts (effect-crossing
-            // regions) ride the DDPP1-U6 materializer seam — empty-default here,
-            // the gate + record stay live regardless. The fmir→ArtifactPacketFacts
-            // adapter (crate::mir::fmir_artifact_packet_facts, U4 residual) is
-            // available to that seam at this route.
-            crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
-                device_roles: Some(device_roles),
-                device_function_metadata: Some(llvm_metadata),
-                host_partition: true,
-                host_partition_legality: crate::mir::device_semantics::DeviceLegalityFacts::default(),
-                ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
-            })
-            .map_err(llvm_text_codegen_error)?
-        };
-        Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
-    }
+    prepare_mir_lowering_interner(analysis);
+    let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    // KPC-EMIT target-role handoff: the merged map (local entries plus
+    // concrete imported registrations) is what the text paths consume, so
+    // an import-only device package no longer reports the zero-entry red.
+    let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+    // Source metadata is the package constructor's explicit admission
+    // carrier. LLVM's direct device-module route already receives the
+    // launch-filtered `device_roles`; pass only source-less closure rows
+    // here so a private named helper cannot be promoted back into an LLVM
+    // kernel annotation merely because it is a device-composition fact.
+    let llvm_metadata = mir
+        .device_function_metadata
+        .iter()
+        .filter(|(_, metadata)| metadata.origin == crate::mir::MirFunctionOrigin::SyntheticKernelClosure)
+        .map(|(function, metadata)| (*function, *metadata))
+        .collect::<crate::mir::MirDeviceFunctionMetadataMap>();
+    // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
+    // is the CPU-module path. A package that carries device roles routes
+    // through the HOST-PARTITION lane (direct declarations/calls, no device
+    // bodies). The ordinary `LlvmEmitRequest` with roles is the NVVM
+    // device-artifact path: `--cuda-descriptor` selects it so the emitted
+    // `.ll` matches the sidecar. No default route silently emits device
+    // bodies into a CPU module.
+    let code = if emit_nvvm_device_module || device_roles.is_empty() {
+        crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
+            device_roles: Some(device_roles),
+            device_function_metadata: Some(llvm_metadata),
+            ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
+        })
+        .map_err(llvm_text_codegen_error)?
+    } else {
+        // DDCP3-U5 (gate 6): the host-partition lane runs the pre-emission
+        // reject gate BEFORE any output byte — unsupported callsite shapes,
+        // unresolved region symbols, effect-crossing regions, missing
+        // layout/argument facts, and invalid cross-boundary values fail with
+        // stable structured diagnostics naming the rule; a rejected package
+        // produces zero output bytes. The legality facts (effect-crossing
+        // regions) ride the DDPP1-U6 materializer seam — empty-default here,
+        // the gate + record stay live regardless. The fmir→ArtifactPacketFacts
+        // adapter (crate::mir::fmir_artifact_packet_facts, U4 residual) is
+        // available to that seam at this route.
+        crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
+            device_roles: Some(device_roles),
+            device_function_metadata: Some(llvm_metadata),
+            host_partition: true,
+            host_partition_legality: crate::mir::device_semantics::DeviceLegalityFacts::default(),
+            ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
+        })
+        .map_err(llvm_text_codegen_error)?
+    };
+    Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
 }
 
-/// Lower one unit to a native Cranelift object (public `clif` target).
+/// Lower one unit with the Cranelift backend (public `clif` target): a native
+/// object for the linker, or an in-memory image, per the configured engine.
 #[cfg(feature = "mir-clif")]
-fn generate_clif_object_output(
+fn generate_clif_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
+    engine: &crate::ClifEngine,
 ) -> Result<crate::Output, SpannedCodegenError> {
     prepare_mir_lowering_interner(analysis);
     let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-    let object = radix_mir_clif::emit_object(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+    let codegen_error = |error: radix_mir_clif::ClifError| codegen::CodegenError {
         message: error.message,
         args: vec![
             DiagnosticArg::new("category", error.category),
             DiagnosticArg::new("shape", error.shape),
             DiagnosticArg::new("detail", error.detail),
         ],
-    })?;
-    Ok(crate::Output::ClifObject(crate::ClifObjectOutput { bytes: object.bytes }))
+    };
+    match engine {
+        crate::ClifEngine::Object => {
+            let object = radix_mir_clif::emit_object(&mir.validated, &mir.interner).map_err(codegen_error)?;
+            Ok(crate::Output::ClifObject(crate::ClifObjectOutput { bytes: object.bytes }))
+        }
+        crate::ClifEngine::Jit(runtime) => {
+            let program =
+                radix_mir_clif::emit_jit(&mir.validated, &mir.interner, &runtime.symbols()).map_err(codegen_error)?;
+            Ok(crate::Output::ClifJit(crate::ClifJitOutput { program }))
+        }
+    }
 }
 
 /// Build the NVVM kernel descriptor JSON sidecar for a source unit targeting
@@ -1215,98 +1222,86 @@ pub fn partition_record_json(session: &Session, name: &str, source: &str) -> Res
     })
 }
 
-#[cfg_attr(not(feature = "mir-metal"), allow(unused_variables))]
 #[cfg(feature = "mir-metal")]
 fn generate_metal_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(feature = "mir-metal")]
-    {
-        prepare_mir_lowering_interner(analysis);
-        let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
-        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        // KPC-EMIT target-role handoff: concrete imported registrations join
-        // the local entry map before the probe — the spike-3 zero-entry red
-        // is the omission this merge removes.
-        let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
-        let output = radix_mir_metal::emit_metal_text_probe_with_reflection_and_function_metadata(
-            &device_roles,
-            &mir.device_function_metadata,
-            &mir.validated,
-            &mir.interner,
-        )
-        .map_err(|error| codegen::CodegenError {
-            message: error.message,
-            args: vec![
-                DiagnosticArg::new("issue", error.issue),
-                DiagnosticArg::new("shape", error.shape),
-            ],
-        })?;
-        Ok(crate::Output::MetalText(crate::MetalTextOutput {
-            code: output.source,
-            reflection: Some(output.reflection),
-        }))
-    }
+    prepare_mir_lowering_interner(analysis);
+    let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    // KPC-EMIT target-role handoff: concrete imported registrations join
+    // the local entry map before the probe — the spike-3 zero-entry red
+    // is the omission this merge removes.
+    let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+    let output = radix_mir_metal::emit_metal_text_probe_with_reflection_and_function_metadata(
+        &device_roles,
+        &mir.device_function_metadata,
+        &mir.validated,
+        &mir.interner,
+    )
+    .map_err(|error| codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("issue", error.issue),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    })?;
+    Ok(crate::Output::MetalText(crate::MetalTextOutput {
+        code: output.source,
+        reflection: Some(output.reflection),
+    }))
 }
 
-#[cfg_attr(not(feature = "mir-wgsl"), allow(unused_variables))]
 #[cfg(feature = "mir-wgsl")]
 fn generate_wgsl_text_output(
     analysis: &mut AnalyzedModule,
     no_fuse: bool,
     target_bindings: &TargetBindings,
 ) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(feature = "mir-wgsl")]
-    {
-        // SPIKE (shader-annotation-stages): stages declared through
-        // manifest-bound annotation contracts take their own path beside the
-        // built-in `@ vertex` / `@ fragment` one.
-        let stage_bindings = target_bindings::wgsl_stage_bindings(
-            target_bindings,
-            &analysis.hir,
-            &analysis.resolver,
-            &analysis.interner,
-        )
-        .map_err(|message| SpannedCodegenError {
-            message,
-            args: vec![DiagnosticArg::new("issue", "wgsl_annotation_binding_invalid")],
-            span: None,
-        })?;
-        if !stage_bindings.stages.is_empty() {
-            return emit_wgsl_annotated_stage_output(analysis, &stage_bindings);
-        }
-        let graphics_source = analysis.graphics_source.clone();
-        let has_vertex = !graphics_source.vertex_entries.is_empty();
-        let has_fragment = !graphics_source.fragment_entries.is_empty();
-
-        if has_vertex || has_fragment {
-            return emit_wgsl_graphics_output(analysis, graphics_source, has_vertex, has_fragment, target_bindings);
-        }
-
-        prepare_mir_lowering_interner(analysis);
-        let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
-        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        // KPC-EMIT target-role handoff: same merged entry map as Metal/LLVM.
-        let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
-        let output = radix_mir_wgsl::emit_wgsl_text_probe_with_reflection_and_function_metadata(
-            &device_roles,
-            &mir.device_function_metadata,
-            &mir.validated,
-            &mir.interner,
-        )
-        .map_err(|error| codegen::CodegenError {
-            message: error.message,
-            args: vec![
-                DiagnosticArg::new("issue", error.issue),
-                DiagnosticArg::new("shape", error.shape),
-            ],
-        })?;
-        Ok(crate::Output::WgslText(crate::WgslTextOutput {
-            code: output.source,
-            reflection: Some(output.reflection),
-        }))
+    // SPIKE (shader-annotation-stages): stages declared through
+    // manifest-bound annotation contracts take their own path beside the
+    // built-in `@ vertex` / `@ fragment` one.
+    let stage_bindings =
+        target_bindings::wgsl_stage_bindings(target_bindings, &analysis.hir, &analysis.resolver, &analysis.interner)
+            .map_err(|message| SpannedCodegenError {
+                message,
+                args: vec![DiagnosticArg::new("issue", "wgsl_annotation_binding_invalid")],
+                span: None,
+            })?;
+    if !stage_bindings.stages.is_empty() {
+        return emit_wgsl_annotated_stage_output(analysis, &stage_bindings);
     }
+    let graphics_source = analysis.graphics_source.clone();
+    let has_vertex = !graphics_source.vertex_entries.is_empty();
+    let has_fragment = !graphics_source.fragment_entries.is_empty();
+
+    if has_vertex || has_fragment {
+        return emit_wgsl_graphics_output(analysis, graphics_source, has_vertex, has_fragment, target_bindings);
+    }
+
+    prepare_mir_lowering_interner(analysis);
+    let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    // KPC-EMIT target-role handoff: same merged entry map as Metal/LLVM.
+    let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+    let output = radix_mir_wgsl::emit_wgsl_text_probe_with_reflection_and_function_metadata(
+        &device_roles,
+        &mir.device_function_metadata,
+        &mir.validated,
+        &mir.interner,
+    )
+    .map_err(|error| codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("issue", error.issue),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    })?;
+    Ok(crate::Output::WgslText(crate::WgslTextOutput {
+        code: output.source,
+        reflection: Some(output.reflection),
+    }))
 }
 
 /// SPIKE (shader-annotation-stages): lower with the manifest-resolved stage
@@ -1829,23 +1824,18 @@ fn validate_wgsl_fragment_source_entry(
     Ok(())
 }
 
-#[cfg_attr(not(feature = "mir-sexp"), allow(unused_variables))]
 #[cfg(feature = "mir-sexp")]
 fn generate_sexp_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
-    #[cfg(feature = "mir-sexp")]
-    {
-        prepare_mir_lowering_interner(analysis);
-        let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-        let code =
-            crate::mir::emit_sexp_text(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
-                message: error.message,
-                args: vec![
-                    DiagnosticArg::new("category", error.category),
-                    DiagnosticArg::new("shape", error.shape),
-                ],
-            })?;
-        Ok(crate::Output::Sexp(crate::SexpOutput { code }))
-    }
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let code = crate::mir::emit_sexp_text(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+        message: error.message,
+        args: vec![
+            DiagnosticArg::new("category", error.category),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    })?;
+    Ok(crate::Output::Sexp(crate::SexpOutput { code }))
 }
 
 #[cfg(feature = "mir-basic")]
@@ -4508,6 +4498,7 @@ fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic
     pass_config.import_path_templates = session.config.import_path_templates.clone();
     pass_config.complexity_budget = session.config.complexity_budget;
     pass_config.kernel_complexity_budget = session.config.kernel_complexity_budget;
+    pass_config.deny_kernel_tiers = session.config.deny_kernel_tiers;
     pass_config.fold_literal_floats = !session.config.keep_authored_constants;
     pass_config.insere_files = insere_files;
     pass_config.source_text = Some(std::sync::Arc::from(body));
@@ -5282,3 +5273,7 @@ mod wgsl_stage_annotation_tests;
 #[cfg(test)]
 #[path = "codegen_analysis_test.rs"]
 mod codegen_analysis_tests;
+
+#[cfg(test)]
+#[path = "driver_behavior_test.rs"]
+mod driver_behavior_tests;

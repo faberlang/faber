@@ -686,8 +686,8 @@ fn container_store_narrowing_tensor_element() {
 #[test]
 fn container_store_narrowing_vector_and_matrix_elements() {
     // The vector and matrix twins follow the same element scalar rule.
-    let vector = "functio lane(vector<i8, 2> v) → vector<i8, 2> {\n\
-                  sit vector<i8, 2> s ← v + v\n\
+    let vector = "functio lane(vector<i8, magnitudo 2> v) → vector<i8, magnitudo 2> {\n\
+                  sit vector<i8, magnitudo 2> s ← v + v\n\
                   redde s\n}\n";
     assert_eq!(kinds(vector), vec![HirStoreKind::Declaration]);
     let matrix = "functio cell(matrix<i8, [2, 2]> m) → matrix<i8, [2, 2]> {\n\

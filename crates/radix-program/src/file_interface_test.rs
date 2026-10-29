@@ -2,7 +2,7 @@ use super::*;
 use radix_module::driver::{AnalyzeRequest, Config, ModuleImportContract, Session, analyze_source};
 use radix_module::file_interface::{
     FileExportKind, InterfaceBodyChannel, InterfaceDeviceRole, InterfaceDeviceVisibility,
-    InterfaceStructField, InterfaceTypeSnapshot,
+    InterfaceIndexSnapshot, InterfaceStructField, InterfaceTypeSnapshot,
 };
 use radix_module::semantic::Primitive;
 use std::collections::BTreeMap;
@@ -600,4 +600,136 @@ fn imported_nondum_method_is_refused_through_the_extracted_interface() {
     // The ts gate on `mitte` does not cover Rust, and `lege` is ungated.
     analyze_consumer("    n.mitte()\n    nota n.lege()")
         .expect("ungated and other-target-gated methods compile");
+}
+
+const SIZED_PRODUCER: &str = r"@ publica
+genus Block {
+    varia numerus scale
+    varia lista<numerus, magnitudo 4> qs
+}
+
+@ publica
+typus Quad = lista<numerus, magnitudo 4>
+
+@ publica
+typus Window = lista<numerus, magnitudo 2…5>
+";
+
+fn sized_producer_interface() -> radix_module::file_interface::FileInterface {
+    let producer = analyze(SIZED_PRODUCER);
+    extract_file_interface_with_identity(
+        &producer,
+        &["Block".to_owned(), "Quad".to_owned(), "Window".to_owned()],
+        "sized.fab",
+        None,
+    )
+    .expect("a public export carrying a sized or ranged list extracts")
+}
+
+fn analyze_sized_consumer(source: &str) -> Result<(), Vec<radix_module::diagnostics::Diagnostic>> {
+    analyze_source(
+        &Session::new(
+            Config::default()
+                .with_latin_locale()
+                .with_target(radix_module::codegen::Target::HirRust),
+        ),
+        "consumer.fab",
+        source,
+        AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract {
+                file_interfaces: BTreeMap::from([("sized".to_owned(), sized_producer_interface())]),
+                ..ModuleImportContract::default()
+            },
+        },
+    )
+    .map(|_| ())
+}
+
+#[test]
+fn sized_and_ranged_list_exports_snapshot_with_their_size_facts() {
+    let interface = sized_producer_interface();
+
+    let Some(FileExportKind::Struct(block)) =
+        interface.exports.get("Block").map(|export| &export.kind)
+    else {
+        panic!("Block export missing: {interface:?}");
+    };
+    let qs = block
+        .fields
+        .iter()
+        .find(|field| field.name == "qs")
+        .expect("qs field");
+    assert!(matches!(
+        &qs.ty,
+        InterfaceTypeSnapshot::BoundedArray(_, InterfaceIndexSnapshot::Literal(4))
+    ));
+
+    let Some(FileExportKind::TypeAlias(quad)) =
+        interface.exports.get("Quad").map(|export| &export.kind)
+    else {
+        panic!("Quad alias export missing");
+    };
+    assert!(matches!(
+        &quad.body,
+        InterfaceTypeSnapshot::BoundedArray(_, InterfaceIndexSnapshot::Literal(4))
+    ));
+
+    let Some(FileExportKind::TypeAlias(window)) =
+        interface.exports.get("Window").map(|export| &export.kind)
+    else {
+        panic!("Window alias export missing");
+    };
+    assert!(matches!(
+        &window.body,
+        InterfaceTypeSnapshot::RangedArray {
+            min: 2,
+            max: Some(5),
+            ..
+        }
+    ));
+}
+
+#[test]
+fn imported_sized_list_field_and_aliases_keep_their_size_rules() {
+    analyze_sized_consumer(
+        r#"importa ex "sized:types" sized
+
+functio lege(sized.Block b) → numerus {
+    redde b.qs[2] + b.scale
+}
+
+functio quad(sized.Quad q) → lista<numerus, magnitudo 4> {
+    redde q
+}
+
+functio fenestra(sized.Window w) → lista<numerus, magnitudo 2…5> {
+    redde w
+}
+"#,
+    )
+    .expect("imported sized and ranged lists keep their identity");
+
+    // The size rules still bind on the importing side: a four-slot field is
+    // not an eight-slot list, and a range never holds fewer than its minimum.
+    analyze_sized_consumer(
+        r#"importa ex "sized:types" sized
+
+functio lege(sized.Block b) → lista<numerus, magnitudo 8> {
+    redde b.qs
+}
+"#,
+    )
+    .expect_err("a four-slot list field must not satisfy an eight-slot list");
+
+    analyze_sized_consumer(
+        r#"importa ex "sized:types" sized
+
+functio vacua() → numerus {
+    fixum sized.Window w ← [1]
+    redde w[0]
+}
+"#,
+    )
+    .expect_err("a one-element list never fits a range with minimum two");
 }

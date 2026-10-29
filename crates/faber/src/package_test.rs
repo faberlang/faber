@@ -401,7 +401,9 @@ fn manifest_target_command_probe() {
                 deny_codes: Vec::new(),
                 locale: None,
                 diagnostics_locale: None,
+                diagnostic_mode: radix::services::DiagnosticMode::Normal,
             },
+            false,
             false,
             false,
         ),
@@ -1547,7 +1549,7 @@ main {
             .iter()
             .any(|diag| diag.phase == DiagnosticPhase::Tool && diag.file == manifest_file.as_ref())
     );
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1781,7 +1783,7 @@ fn package_fmir_text_image_rejects_bad_version_without_source_fallback() {
             && diagnostic_has_arg(diag, "actual", "999")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1810,7 +1812,7 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
             .iter()
             .any(|diag| diagnostic_has_issue(diag, "fmir_text_image_parse_failed"))
     );
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1847,7 +1849,7 @@ fn package_fmir_text_image_rejects_unknown_runtime_requirement_without_source_fa
             && diagnostic_has_arg(diag, "format", "fmir-text")
             && diagnostic_has_arg(diag, "requirement", "host:teleport")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -1885,7 +1887,7 @@ main args args {
         diagnostic_has_issue(diag, "fmir_image_type_metadata_invalid")
             && diagnostic_has_arg(diag, "format", "fmir-text")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -2220,7 +2222,7 @@ fn package_fmir_image_rejects_bad_version_without_source_fallback() {
             && diagnostic_has_arg(diag, "actual", "99")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 fn bytes_contain(haystack: &[u8], needle: &[u8]) -> bool {
@@ -2324,7 +2326,10 @@ main {
     .expect("write entry");
 
     let reached = with_lowered_package_mir(&Config::default(), &entry, |lowered| {
-        assert!(!lowered.validated.program().functions.is_empty());
+        assert_ne!(
+            lowered.validated.program().functions,
+            [] as [radix::module::mir::MirFunction; 0]
+        );
         assert!(
             lowered
                 .validated
@@ -3134,7 +3139,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("non-numeric CLI operand should fail");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics
             .iter()
@@ -3495,7 +3500,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("extra CLI arguments should not be ignored");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "package_mir_cli_surface_unsupported")
@@ -3529,7 +3534,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("missing required CLI operand should fail");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics
             .iter()
@@ -3619,7 +3624,7 @@ main args args {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("type-incompatible CLI option defaults should remain unsupported");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "package_mir_cli_surface_unsupported")
@@ -4502,7 +4507,7 @@ fn value() → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &fixture.package, &mut host)
         .expect_err("shared import cycle should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics
             .iter()
@@ -4548,7 +4553,7 @@ fn identity(string word) → string {
     let diagnostics = run_mir_for_faber(&Config::default(), &fixture.package, &mut host)
         .expect_err("private shared export should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "import_module_private")
@@ -4708,7 +4713,7 @@ fn publicum() → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("unmarked namespace member access should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "import_module_private")
@@ -4756,7 +4761,7 @@ fn publicum() → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("private namespace access should fail package analysis");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "import_module_private")
@@ -4799,7 +4804,7 @@ fn dupla(int n) → int {
     let diagnostics = run_mir_for_faber(&Config::default(), &entry, &mut host)
         .expect_err("nested namespace calls should be explicitly unsupported");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "namespace_missing_export")
@@ -5238,11 +5243,11 @@ steps = 250
     .expect("write manifest");
     fs::write(
         dir.join("src").join("main.fab"),
-        r#"@ kernel
+        r"@ kernel
 fn summa(tf32[2] x) → f32 {
     return x.sum()
 }
-"#,
+",
     )
     .expect("write entry");
     let entry = dir.join("src").join("main.fab");
@@ -5256,6 +5261,63 @@ fn summa(tf32[2] x) → f32 {
         diagnostics
             .iter()
             .any(|diag| { diagnostic_has_issue(diag, "package_device_steps_not_repeating") })
+    );
+}
+
+/// `faber build` of a `[device]` package always emits the Metal artifact, so a
+/// kernel Metal's requirement row refuses (a 48-bit intermediate in a `u32`
+/// expression) stops the build by name before any emission.
+#[cfg(feature = "device-runtime")]
+#[test]
+fn package_fmir_image_refuses_a_kernel_the_metal_row_refuses() {
+    let dir = test_temp_dir("package-device-metal-row");
+    fs::create_dir_all(dir.join("src")).expect("src dir");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "device-metal-row"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+
+[device]
+device = "auto"
+"#,
+    )
+    .expect("write manifest");
+    fs::write(
+        dir.join("src").join("main.fab"),
+        "+++\nlocale = \"en\"\n+++\n@ kernel
+@ public
+fn k_wide(tensor<u32, [8]> a, tensor<u32, [8]> b, mut tensor<u32, [8]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← ((x ∧ 16777215) * (b[[i]] ∧ 16777215)) / 1048576
+    }
+}
+main {}
+",
+    )
+    .expect("write entry");
+    let entry = dir.join("src").join("main.fab");
+    let result = build_fmir_image_for_faber(
+        &Config::default().with_target(Target::MirFmirBinary),
+        &entry,
+        &[],
+    );
+    let diagnostics = result.expect_err("a kernel Metal refuses must not build a device section");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "kernel_target_requirements_not_met")),
+        "{diagnostics:?}"
     );
 }
 
@@ -7729,7 +7791,7 @@ name = "defaults"
     assert!(manifest.library.is_none());
     // Implicit portable default: no explicit [build] target in the manifest.
     assert_eq!(manifest.build.target, None);
-    assert!(manifest.build.targets.is_empty());
+    assert_eq!(manifest.build.targets, [] as [String; 0]);
     assert_eq!(manifest.build.kind, "bin");
     assert!(manifest.product.is_none());
     assert!(manifest.locale.locale.is_none());
@@ -8611,8 +8673,8 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("if p_mark >= 90"));
     assert!(rust.contains("return true;"));
     assert!(rust.contains("return false;"));
-    assert!(rust.contains("fn นับคะแนน(p_marks: Vec<i64>) -> i64"));
-    assert!(rust.contains("for l_mark in 0..((p_marks).len() as i64)"));
+    assert!(rust.contains("fn นับคะแนน(p_marks: &Vec<i64>) -> i64"));
+    assert!(rust.contains("for l_mark in 0..(((*p_marks)).len() as i64)"));
     assert!(rust.contains("continue;"));
     assert!(rust.contains("break;"));
     assert!(rust.contains("fn ลดลง(p_start: i64) -> i64"));
@@ -8627,7 +8689,7 @@ fn thai_reader_locale_example_compiles_from_manifest() {
         ),
         "{rust}"
     );
-    assert!(rust.contains("นับคะแนน(l_marks.clone())"));
+    assert!(rust.contains("นับคะแนน(&l_marks)"));
     assert!(rust.contains("ลดลง(4)"));
 }
 
@@ -8958,7 +9020,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 class Canis {
     mut string nomen
@@ -8968,7 +9030,7 @@ class Canis {
 class Felis {
     mut string nomen
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -9012,7 +9074,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 class Canis {
     mut string nomen
@@ -9022,7 +9084,7 @@ class Canis {
 class Felis {
     mut string nomen
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -9767,7 +9829,7 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
     let linked = super::library_link::emit_linked_library_crates(&layout.package_root, &layout)
         .expect("entry-file layouts without manifest should not require native deps");
 
-    assert!(linked.is_empty());
+    assert_eq!(linked, [] as [super::library_link::LinkedLibraryCrate; 0]);
 }
 
 // ---------------------------------------------------------------------------
@@ -11098,6 +11160,87 @@ kind = "bin"
         code.contains("kernel void"),
         "expected emitted MSL kernels, got:\n{code}"
     );
+}
+
+/// Write a one-file package whose `main.fab` is `source`; return its entry and
+/// the temp dir that must outlive it.
+#[cfg(feature = "mir-metal")]
+fn metal_kernel_package(name: &str, source: &str) -> (PathBuf, impl Sized) {
+    let dir = test_temp_dir(name);
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/main.fab"), source).expect("entry");
+    fs::write(
+        dir.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "{name}"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#
+        ),
+    )
+    .expect("manifest");
+    (dir.join("src/main.fab"), dir)
+}
+
+/// `faber emit -t metal-text` on a package takes the package lane, which never
+/// ran the per-target kernel requirement rows. A `u32` expression with a
+/// 48-bit intermediate reached the Metal emitter and was multiplied in a
+/// 32-bit `uint` (a silent wrap); the row's refusal now stops it by name.
+#[cfg(feature = "mir-metal")]
+#[test]
+fn emit_metal_text_package_refuses_a_narrow_expression_with_a_wide_intermediate() {
+    let (entry, _dir) = metal_kernel_package(
+        "emit-metal-wide-intermediate",
+        "+++\nlocale = \"en\"\n+++\n@ kernel
+@ public
+fn k_wide(tensor<u32, [8]> a, tensor<u32, [8]> b, mut tensor<u32, [8]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← ((x ∧ 16777215) * (b[[i]] ∧ 16777215)) / 1048576
+    }
+}
+main {}
+",
+    );
+    let (config, _) = config_with_locale(Target::MirMetal, &entry, None, None).expect("config");
+    let diagnostics = compile_package_metal_text(&config, &entry)
+        .expect_err("a narrow-typed wide intermediate must not emit");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("kernel_target_requirements_not_met")),
+        "{diagnostics:?}"
+    );
+}
+
+/// The refusal is the row's, not a blanket 64-bit ban: an `i64` kernel whose
+/// intermediate is its own 64-bit type is admitted and emitted in `long`.
+#[cfg(feature = "mir-metal")]
+#[test]
+fn emit_metal_text_package_still_emits_a_native_64_bit_kernel() {
+    let (entry, _dir) = metal_kernel_package(
+        "emit-metal-native-i64",
+        "+++\nlocale = \"en\"\n+++\n@ kernel
+@ public
+fn k_sum(tensor<i64, [8]> a, tensor<i64, [8]> b, mut tensor<i64, [8]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← (x ∧ 4294967295) + (b[[i]] ∧ 4294967295)
+    }
+}
+main {}
+",
+    );
+    let (config, _) = config_with_locale(Target::MirMetal, &entry, None, None).expect("config");
+    let code = compile_package_metal_text(&config, &entry).expect("an i64 kernel emits");
+    assert!(code.contains("constant long* b0 [[buffer(0)]]"), "{code}");
 }
 
 /// The `clif` package build emits a native object through the package-MIR
@@ -13490,7 +13633,7 @@ fn package_fmir_text_image_rejects_version_2_images() {
             && diagnostic_has_arg(diag, "actual", "2")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13522,7 +13665,7 @@ fn package_fmir_text_image_rejects_future_versions() {
             && diagnostic_has_arg(diag, "actual", "999")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13551,7 +13694,7 @@ fn package_fmir_image_rejects_version_2_images() {
             && diagnostic_has_arg(diag, "actual", "2")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13580,7 +13723,7 @@ fn package_fmir_image_rejects_future_versions() {
             && diagnostic_has_arg(diag, "actual", "99")
             && diagnostic_has_arg(diag, "expected", "8")
     }));
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
 }
 
 #[test]
@@ -13949,7 +14092,7 @@ main {
     let diagnostics = run_mir_for_faber(&config, &entry, &mut host)
         .expect_err("unresolvable companion should fail closed at link time");
 
-    assert!(host.stdout_lines.is_empty());
+    assert_eq!(host.stdout_lines, [] as [String; 0]);
     assert!(
         diagnostics.iter().any(|diag| {
             diagnostic_has_issue(diag, "package_mir_companion_unresolved")

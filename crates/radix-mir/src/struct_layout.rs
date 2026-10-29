@@ -6,11 +6,11 @@
 //! `struct_fields` map and never interner `Symbol` order), each at the next
 //! offset rounded up to its alignment. Scalars `i8`/`u8` are 1/1,
 //! `i16`/`u16`/`f16`/`bf16` are 2/2, `f32`/`i32`/`u32` are 4/4, `int`
-//! (`numerus`, i64) and `u64` are 8/8, `vector<_, 2>` is 8/8, `vector<_, 4>` is
+//! (`numerus`, i64) and `u64` are 8/8, `vector<_, size 2>` is 8/8, `vector<_, size 4>` is
 //! 16/16. The struct alignment is the maximum field alignment and the struct
 //! size is rounded up to it.
 //!
-//! `vector<_, 3>` is a packed 12-byte, 4-aligned field; that arm is not
+//! `vector<_, size 3>` is a packed 12-byte, 4-aligned field; that arm is not
 //! admitted yet and fails closed by name (`Vec3PackedNotYet`). The register
 //! alignment that `layout.rs` reports for width 3 (16) is never read here.
 //!
@@ -72,7 +72,7 @@ pub enum StructLayoutRefusal {
     /// A `sponte` (optional) or nullable (`T ∪ none`) field.
     Nullable,
     Text,
-    /// `vector<_, 3>`: packed 12 bytes / align 4, not admitted yet.
+    /// `vector<_, size 3>`: packed 12 bytes / align 4, not admitted yet.
     Vec3PackedNotYet,
     /// The struct exceeds [`MAX_STRUCT_LAYOUT_BYTES`].
     TooLarge,
@@ -300,7 +300,7 @@ fn scalar_size_align(scalar: MirScalarLayout) -> Result<(u32, u32), StructLayout
         | MirScalarLayout::F16
         | MirScalarLayout::Bf16 => Ok((2, 2)),
         MirScalarLayout::F64 => Err(StructLayoutRefusal::F64),
-        MirScalarLayout::I128 | MirScalarLayout::Magnus => {
+        MirScalarLayout::I128 | MirScalarLayout::Magnus | MirScalarLayout::D64 => {
             Err(StructLayoutRefusal::UnsupportedField)
         }
     }
@@ -357,7 +357,7 @@ fn pack_fields(specs: &[FieldSpec]) -> Result<MirStructLayout, StructLayoutRefus
     })
 }
 
-/// Table-only packer for the packed-vec3 arithmetic rows: `vector<_, 3>` is
+/// Table-only packer for the packed-vec3 arithmetic rows: `vector<_, size 3>` is
 /// 12 bytes, align 4. Not product behaviour; the resolver refuses width 3.
 #[cfg(test)]
 pub(crate) fn pack_table_with_packed_vec3(

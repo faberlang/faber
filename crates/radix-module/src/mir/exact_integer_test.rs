@@ -481,7 +481,7 @@ fn grouped_reducta_summa_widens_narrow_integer_terms_before_accumulating() {
             .with_target(Target::HirTypeScript)
             .with_latin_locale(),
     );
-    let source = "functio grouped(tensor<i8, [2]> values, tensor<numerus, [2]> keys) → tensor<i64, [1]> {\n  redde reducta via summa ex values apud [i] pro keys[i]\n}\n\
+    let source = "functio grouped(tensor<i8, [2]> values, tensor<numerus, [2]> keys) → tensor<i64, [1]> {\n  redde reducta via summa ex values apud [i] pro [keys[i]]\n}\n\
                   incipit {\nsit tensor<i8, [2]> values ← [100, 100] ↦ tensor<i8, [2]>\nsit tensor<numerus, [2]> keys ← [0, 0] ↦ tensor<numerus, [2]>\nnota grouped(values, keys)\n}\n";
     let mut host = BufferHost::default();
     let result = run_source(&session, "reducta-group.fab", source, &mut host);

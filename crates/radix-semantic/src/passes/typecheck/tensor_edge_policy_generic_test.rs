@@ -88,7 +88,7 @@ fn generic_method_forwarding_keeps_the_method_definition_identity() {
 #[test]
 fn forwarded_custom_policy_retains_checked_callback_identities() {
     let result = analyze(&format!(
-        "class ZeroGhost {{\n    fn remap(vector<int, 1> coord) → vector<int, 1> {{ return coord }}\n    fn transform(vector<int, 1> coord, f32 value) → f32 {{ return value }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>().materialize()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← forward<ZeroGhost>(base)\n}}",
+        "class ZeroGhost {{\n    fn remap(vector<int, size 1> coord) → vector<int, size 1> {{ return coord }}\n    fn transform(vector<int, size 1> coord, f32 value) → f32 {{ return value }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>().materialize()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← forward<ZeroGhost>(base)\n}}",
         tensor_seed()
     ));
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
@@ -115,7 +115,7 @@ fn forwarded_custom_policy_retains_checked_callback_identities() {
 fn forwarded_policy_rejects_a_concrete_class_with_an_invalid_callback() {
     rejects_with_issue(
         &format!(
-            "class InvalidPolicy {{\n    fn remap(vector<int, 1> coord) → int {{ return 0 }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← forward<InvalidPolicy>(base)\n}}",
+            "class InvalidPolicy {{\n    fn remap(vector<int, size 1> coord) → int {{ return 0 }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← forward<InvalidPolicy>(base)\n}}",
             tensor_seed()
         ),
         "tensor_limes_policy_invalid",
@@ -126,7 +126,7 @@ fn forwarded_policy_rejects_a_concrete_class_with_an_invalid_callback() {
 fn forwarded_policy_rejects_a_class_with_runtime_state() {
     rejects_with_issue(
         &format!(
-            "class StatefulPolicy {{\n    mut int state\n    fn remap(vector<int, 1> coord) → vector<int, 1> {{ return coord }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← forward<StatefulPolicy>(base)\n}}",
+            "class StatefulPolicy {{\n    mut int state\n    fn remap(vector<int, size 1> coord) → vector<int, size 1> {{ return coord }}\n}}\nfn forward<P>(tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← forward<StatefulPolicy>(base)\n}}",
             tensor_seed()
         ),
         "tensor_limes_policy_invalid",
@@ -148,7 +148,7 @@ fn forwarded_builtin_marker_cannot_bind_a_runtime_parameter() {
 fn custom_policy_parameter_cannot_carry_a_runtime_value() {
     rejects_with_issue(
         &format!(
-            "class ZeroGhost {{\n    fn remap(vector<int, 1> coord) → vector<int, 1> {{ return coord }}\n}}\nfn stored<P>(P value, tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← stored<ZeroGhost>(ZeroGhost {{}}, base)\n}}",
+            "class ZeroGhost {{\n    fn remap(vector<int, size 1> coord) → vector<int, size 1> {{ return coord }}\n}}\nfn stored<P>(P value, tf32[3] base) → tf32[3] {{\n    return base.shift([1]).edge<P>()\n}}\nmain {{\n{}\nlet tf32[3] mapped ← stored<ZeroGhost>(ZeroGhost {{}}, base)\n}}",
             tensor_seed()
         ),
         "tensor_limes_policy_invalid",

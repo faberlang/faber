@@ -1,4 +1,4 @@
-//! Lowering and validation for `vector<T, N>` width syntax.
+//! Lowering and validation for `vector<T, size N>` width syntax.
 //!
 //! Vector width reuses the shared [`IndexId`] arena but must be a single
 //! dimension — not a multi-axis `Figura` tuple.
@@ -7,8 +7,10 @@ use super::index::{IndexExpr, IndexId};
 use super::{Resolver, TypeTable};
 use radix_syntax::FiguraExpr;
 
-pub const VECTOR_INCOMPLETE_MSG: &str = "vector requires element type and width; use vector<T, N>";
-pub const VECTOR_MISSING_WIDTH_MSG: &str = "vector requires a width; use vector<T, 4> or vf32[4]";
+pub const VECTOR_INCOMPLETE_MSG: &str =
+    "vector requires element type and width; use vector<T, size N>";
+pub const VECTOR_MISSING_WIDTH_MSG: &str =
+    "vector requires a width; use vector<T, size 4> or vf32[4]";
 pub const VECTOR_WIDTH_SINGLE_DIM_MSG: &str = "vector width must be a single dimension";
 pub const VECTOR_WIDTH_SINGLE_DIM_ISSUE: &str = "vector_width_single_dim";
 

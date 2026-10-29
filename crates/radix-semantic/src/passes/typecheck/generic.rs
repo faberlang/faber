@@ -977,6 +977,10 @@ impl TypeChecker<'_> {
                 let capacity = self.freshen_anonymous_index_holes(capacity, holes);
                 self.types.bounded_array(element, capacity)
             }
+            Type::RangedArray { element, min, max } => {
+                let element = self.freshen_anonymous_type_holes(element, holes);
+                self.types.ranged_array(element, min, max)
+            }
             Type::Queue(inner) => {
                 let inner = self.freshen_anonymous_type_holes(inner, holes);
                 self.types.queue(inner)
@@ -1220,6 +1224,10 @@ impl TypeChecker<'_> {
                 let element = self.substitute_type_params(element, vars, shape_vars.as_deref_mut());
                 let capacity = self.substitute_index_params(capacity, shape_vars.as_deref_mut());
                 self.types.bounded_array(element, capacity)
+            }
+            Type::RangedArray { element, min, max } => {
+                let element = self.substitute_type_params(element, vars, shape_vars.as_deref_mut());
+                self.types.ranged_array(element, min, max)
             }
             Type::Queue(inner) => {
                 self.substitute_unary_type(inner, vars, shape_vars, |this, inner| {

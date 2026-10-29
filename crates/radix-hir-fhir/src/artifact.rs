@@ -738,7 +738,13 @@ pub struct FunctionProvenanceTableWire {
 /// them, so MIR lowering from a loaded unit kept the bounds check (a trap on
 /// every backend that emits one) where the direct unit lowered a proven
 /// projection; schema-v59 artifacts fail closed.
-pub const SCHEMA_VERSION: u32 = 60;
+/// Version 61 adds `HirTypeFormHead::ImportedAlias`: an imported alias written
+/// by its authored path (`decl.Quad`). A file-interface import carries the alias
+/// as its resolved body with no `DefId`, so no `Named` head could name it and
+/// the degenerate semantic form over the body failed the validator for every
+/// collection-shaped alias (a sized list among them); schema-v60 artifacts fail
+/// closed because the serialized head enum gained a variant.
+pub const SCHEMA_VERSION: u32 = 61;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

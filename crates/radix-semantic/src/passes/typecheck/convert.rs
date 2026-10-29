@@ -64,11 +64,12 @@ const ISSUE_TEXTUS_LITERAL_TOO_LONG: &str = "textus_literal_too_long";
 const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
-const ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
-const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "octeti_to_tensor_element_unsupported";
-const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "octeti_to_tensor_length_mismatch";
-const ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
-const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_octeti_element_unsupported";
+const ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED: &str = "list_b8_to_tensor_unspecified";
+const ISSUE_OCTETI_TO_TENSOR_ELEMENT_UNSUPPORTED: &str = "list_b8_to_tensor_element_unsupported";
+const ISSUE_OCTETI_TO_TENSOR_LENGTH_MISMATCH: &str = "list_b8_to_tensor_length_mismatch";
+const ISSUE_OCTETI_TO_TENSOR_RECORD_BIG_ENDIAN: &str = "list_b8_to_tensor_record_big_endian";
+const ISSUE_TENSOR_TO_OCTETI_UNSPECIFIED: &str = "tensor_to_list_b8_unspecified";
+const ISSUE_TENSOR_TO_OCTETI_ELEMENT_UNSUPPORTED: &str = "tensor_to_list_b8_element_unsupported";
 // decimal-widths D2 (wildcard audit): the conversio `via` hints are
 // integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
 // (Be/Le) all reject decimal targets/sources with named teaching issues
@@ -1632,10 +1633,12 @@ impl TypeChecker<'_> {
     /// reinterpretation of the bytes (row-major, byte order from the hint).
     /// The hint is required for every element wider than 8 bits and forbidden
     /// on 8-bit ones; `E` is one of u8 i8 i16 u16 i32
-    /// u32 i64 u64 f32 f64. The byte length must equal `product(shape) x
-    /// width` exactly: checked here only when the source length is static
-    /// (an octeti literal or a constant window) and every extent is a
-    /// literal; otherwise it is a runtime check.
+    /// u32 i64 u64 f32 f64, or a fixed-layout genus (need: little-
+    /// endian only, `Le` required, width from the layout law). The byte length
+    /// must equal `product(shape) x width` exactly: checked here only when the
+    /// source length is static (an octeti literal or a constant window), every
+    /// extent is a literal and the element is a scalar; otherwise it is a
+    /// runtime check (a genus row's width is not known to the checker).
     fn check_octeti_to_tensor_conversio(
         &mut self,
         source: &HirExpression,
@@ -1651,6 +1654,26 @@ impl TypeChecker<'_> {
         let Type::Tensor(elem, shape) = self.types.get(target_carrier).clone() else {
             return None;
         };
+        // A genus element is a fixed-layout record whose byte
+        // image is the device layout law's: little-endian, field offsets from
+        // `resolve_struct_layout`. The checker cannot see that layout, so it
+        // admits the element, requires the explicit `Le` clause (a `Be` clause
+        // is refused by name) and leaves the byte count to the run-time check:
+        // truncation, misalignment and overflow are named conversion failures.
+        if matches!(
+            self.types.get(self.resolve_inferred_type(elem)),
+            Type::Struct(_)
+        ) {
+            if !self.conversio_has_endian_hint(params) {
+                self.invalid_conversion(ISSUE_OCTETI_TO_TENSOR_UNSPECIFIED, span);
+                return Some(self.error_type);
+            }
+            if self.conversio_has_big_endian_hint(params) {
+                self.invalid_conversion(ISSUE_OCTETI_TO_TENSOR_RECORD_BIG_ENDIAN, span);
+                return Some(self.error_type);
+            }
+            return Some(target_resolved);
+        }
         // Ruling B6: an 8-bit element has no byte order, so
         // it takes no `via` clause and a clause written on it is refused;
         // every wider element still requires one.
@@ -1732,8 +1755,8 @@ impl TypeChecker<'_> {
 
     /// CTFP-1 register-class rows. Register-in windows
     /// (`octeti<N> ↦ vector<T, N/width>`), register-out
-    /// (`vector<T, N> ↦ lista<T>` / `↦ octeti<N>`), and element bridges
-    /// (`vector<T, N> ↦ vector<U, N>`). v1 window elements are u16/u32 only;
+    /// (`vector<T, size N> ↦ lista<T>` / `↦ octeti<N>`), and element bridges
+    /// (`vector<T, size N> ↦ vector<U, size N>`). v1 window elements are u16/u32 only;
     /// every window needs a static byte length with `widths × count = N` and a
     /// `Be`/`Le` hint. Out-of-set bridges and wrong widths fail closed.
     fn check_register_conversio(
@@ -2078,6 +2101,16 @@ impl TypeChecker<'_> {
             },
             _ => None,
         }
+    }
+
+    /// Whether a `Be` clause is among `params` (the record row admits `Le` only).
+    fn conversio_has_big_endian_hint(&self, params: &[Symbol]) -> bool {
+        let Some(interner) = self.interner else {
+            return false;
+        };
+        params
+            .iter()
+            .any(|param| matches!(interner.resolve(*param), "be" | "Be"))
     }
 
     pub(super) fn conversio_has_endian_hint(&self, params: &[Symbol]) -> bool {
@@ -2630,7 +2663,7 @@ impl TypeChecker<'_> {
         Some(self.error_type)
     }
 
-    /// CTFP-1: non-literal `lista<T, magnitudo N> ↦ vector<T, N>` — a bounded lista with
+    /// CTFP-1: non-literal `lista<T, magnitudo N> ↦ vector<T, size N>` — a bounded lista with
     /// a literal capacity that exactly matches the vector width materializes
     /// into the register; unbounded `lista<T>` stays literal-only.
     fn check_bounded_lista_to_vector_conversio(
@@ -4889,6 +4922,3 @@ struct CollectionConversioShape {
     key: Option<TypeId>,
     value: Option<TypeId>,
 }
-
-// Lane-gated: compiles through the full driver to the Rust target; a
-// core-only build excludes the module.

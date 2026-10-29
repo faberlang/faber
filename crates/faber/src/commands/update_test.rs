@@ -229,6 +229,6 @@ fn uninstall_all_removes_every_version_and_link() {
     })
     .expect("uninstall all");
 
-    assert!(installed_versions(&bin_dir).is_empty());
+    assert_eq!(installed_versions(&bin_dir), [] as [Version; 0]);
     assert!(fs::symlink_metadata(bin_dir.join("faber")).is_err());
 }

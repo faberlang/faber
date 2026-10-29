@@ -1,0 +1,37 @@
++++
+term = "optional ranged list type formatting"
+kind = "concept"
+grammar = ["fab_file", "program", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "concrete_type", "block_stmt", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "Formatting an optional bounded list preserves the authored length range."
+syntax = "list<int, size 0…3> ∪ none"
+related = ["list<T, size lo…hi>", "format"]
+locale = "en"
++++
+# =============================================================================
+# optional ranged list type formatting — the length range survives `∪ none`.
+# =============================================================================
+#
+# What this teaches:
+#   • `list<int, size 0…3> ∪ none` is an optional list whose length is limited
+#     to 0 through 3; `faber format` writes the same range back, not a single
+#     size.
+#   • A caller passes a list within the range, or `null`.
+#
+# Common mistakes:
+#   • Expecting the formatter to drop the range under `∪ none`: it keeps the
+#     authored bounds.
+#
+# See also: lista
+# =============================================================================
+
+fn show(list<int, size 0…3> ∪ none xs) → void {
+    print xs
+}
+
+main {
+    let list<int, size 0…3> pair ← [1, 2, 3]
+    show(pair)
+    show(null)
+}

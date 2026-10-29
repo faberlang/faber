@@ -40,7 +40,7 @@ fn tensor_plus_same_shape_typechecks() {
 #[test]
 fn vector_plus_same_shape_typechecks() {
     accepts(
-        r"functio sum(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+        r"functio sum(vector<f32, magnitudo 3> a, vector<f32, magnitudo 3> b) → vector<f32, magnitudo 3> {
     redde a + b
 }",
     );

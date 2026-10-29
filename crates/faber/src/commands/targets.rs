@@ -3,7 +3,7 @@
 //! `faber targets` reports **capability truth** for the compiled build
 //! (DDPP1-U3): every row's `available` flag and build/run/package claims
 //! reflect what this faber binary was actually compiled with — capability
-//! truth, not a shipping promise (§SelectionPolicy).
+//! truth, not a shipping promise (§`SelectionPolicy`).
 //!
 //! Row-set policy (decision #6): emit-target rows always list with honest
 //! per-row availability; device/host-leaf/device-runtime capability rows are
@@ -39,16 +39,17 @@ struct FaberTargetRowSpec {
 /// The only literal rows left are documented overrides:
 ///
 /// - the fmir family's shared feature gate ([`faber_row_feature`]); and
-/// - MirWasm's compatibility alias row (`wasm`): the CLI keeps two live
+/// - `MirWasm`'s compatibility alias row (`wasm`): the CLI keeps two live
 ///   spellings — primary `wasm-text` and the `wasm` alias — so the report
 ///   carries both rows with identical capability truth (goal Open question 4
 ///   ruling: the double row may stay explicit).
 fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
     let mut rows = Vec::new();
     for variant in FaberCliTarget::value_variants() {
-        if matches!(variant, FaberCliTarget::MirScena) {
-            // Hidden CLI spelling (legacy source-backed scena runtime) — not
-            // a discoverable `faber targets` row.
+        if matches!(variant, FaberCliTarget::MirScena | FaberCliTarget::ClifJit) {
+            // Hidden CLI spellings — not discoverable `faber targets` rows:
+            // the legacy source-backed scena runtime, and the `clif-jit`
+            // engine, which is the `clif` row's in-memory run route.
             continue;
         }
         let target = variant.to_radix();

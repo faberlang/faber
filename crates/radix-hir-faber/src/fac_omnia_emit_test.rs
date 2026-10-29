@@ -51,6 +51,7 @@ impl KeywordSurface for EnSurface {
         match key {
             "fac" => "do",
             "omnia" => "all",
+            "machina" => "device",
             key => key,
         }
     }
@@ -76,6 +77,7 @@ impl KeywordPack for EnPack {
         match text {
             "do" => Some("fac"),
             "all" => Some("omnia"),
+            "device" => Some("machina"),
             "catch" => Some("cape"),
             _ => None,
         }
@@ -142,6 +144,20 @@ impl Ctx {
 }
 
 fn assert_fac_omnia(code: &str, english: bool, expect_catch: bool) {
+    assert_fac_modifier(
+        code,
+        english,
+        expect_catch,
+        radix_syntax::FacModifier::Omnia,
+    );
+}
+
+fn assert_fac_modifier(
+    code: &str,
+    english: bool,
+    expect_catch: bool,
+    modifier: radix_syntax::FacModifier,
+) {
     let lexed = if english {
         radix_lexer::lex_with_locale_pack(code, &EnPack)
     } else {
@@ -162,7 +178,10 @@ fn assert_fac_omnia(code: &str, english: bool, expect_catch: bool) {
     let StmtKind::Fac(fac) = &program.statements[0].kind else {
         panic!("expected a fac statement, got:\n{code}");
     };
-    assert!(fac.omnia, "marker must survive re-parse, got:\n{code}");
+    assert_eq!(
+        fac.modifier, modifier,
+        "marker must survive re-parse, got:\n{code}"
+    );
     assert_eq!(
         fac.catch.is_some(),
         expect_catch,
@@ -255,4 +274,44 @@ fn english_do_all_round_trips() {
         "en surface renders the handler, got:\n{code}"
     );
     assert_fac_omnia(&code, true, true);
+}
+
+#[test]
+fn fac_machina_block_emits_marker() {
+    let ctx = Ctx::new();
+    let code = ctx.render(
+        &expr(HirExpressionKind::Block(fac_block(
+            HirBreakableKind::FacMachina,
+            1,
+        ))),
+        &LatinSurface,
+    );
+    assert!(
+        code.starts_with("fac machina {"),
+        "breakable FacMachina block must emit its own keyword, got:\n{code}"
+    );
+    assert_fac_modifier(&code, false, false, radix_syntax::FacModifier::Machina);
+}
+
+#[test]
+fn english_do_device_round_trips() {
+    let mut ctx = Ctx::new();
+    let catch = ctx.cape("err", 2);
+    let handled = expr(HirExpressionKind::Handled {
+        body: HirBlock::simple(
+            Vec::new(),
+            Some(Box::new(expr(HirExpressionKind::Block(fac_block(
+                HirBreakableKind::FacMachina,
+                1,
+            ))))),
+            Span::new(0, 0),
+        ),
+        catch: Box::new(catch),
+    });
+    let code = ctx.render(&handled, &EnSurface);
+    assert!(
+        code.starts_with("do device {"),
+        "en surface renders `do device`, got:\n{code}"
+    );
+    assert_fac_modifier(&code, true, true, radix_syntax::FacModifier::Machina);
 }

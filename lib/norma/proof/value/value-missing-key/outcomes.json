@@ -18,12 +18,6 @@
       "diagnostic_contains": "go_failable_call_order_unsupported",
       "reason": "A carried Norma module (`toml/serialize`) calls a failable function after an expression with effects in the same statement, which the hoister refuses to reorder (`go_failable_call_order_unsupported`); the emitter unit is open."
     },
-    "ts": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "ts_trap_expression_unsupported",
-      "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
-    },
     "llvm": {
       "outcome": "known-fail",
       "phase": "build",

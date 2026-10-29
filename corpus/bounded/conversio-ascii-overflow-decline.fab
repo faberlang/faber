@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "conversion"
 canonical = false
 summary = "Decline: an ascii literal longer than the target capacity rejects with ascii_literal_too_long."
-syntax = "'<text>' ↦ ascii<N>"
+syntax = "'<text>' ↦ ascii<size N>"
 related = ["↦", "ascii"]
 locale = "en"
 +++
@@ -15,7 +15,7 @@ locale = "en"
 # =============================================================================
 #
 # Decline row (reject reason in the comment):
-#   1. over capacity — `'alpha' ↦ ascii<4>` asks a 5-byte literal to fit a
+#   1. over capacity — `'alpha' ↦ ascii<size 4>` asks a 5-byte literal to fit a
 #      capacity of 4: SEM011 ascii_literal_too_long
 #
 # Common mistakes:
@@ -30,6 +30,6 @@ locale = "en"
 # WHY: pins the fail-closed overflow token in conversio-ascii-overflow-decline.expected.
 
 main {
-    let ascii<4> a ← 'alpha' ↦ ascii<4>
+    let ascii<size 4> a ← 'alpha' ↦ ascii<size 4>
     print a
 }

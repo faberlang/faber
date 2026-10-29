@@ -1,0 +1,26 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "genus_decl", "genus_member", "assignment", "place", "member_suffix", "expression", "literal"]
+category = "list"
+canonical = false
+summary = "A mut genus binder from a list index aliases the stored element, so field writes through the binder update the list."
+syntax = "mut T item ← items[index]; item.field ← value"
+related = ["lista", "mutabilitas", "genus-alias-on-bind"]
+locale = "en"
++++
+# =============================================================================
+# mut-list-element-alias — indexed mut genus bind preserves element identity.
+# =============================================================================
+# The binder points at the boxed list element rather than a shallow struct copy.
+
+class Cell {
+    mut int value
+}
+
+main {
+    mut list<Cell> cells ← [Cell { value = 7 }]
+    mut Cell c ← cells[0]
+    c.value ← 42
+    print cells[0].value
+}

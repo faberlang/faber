@@ -370,13 +370,13 @@ impl super::FaberCodegen<'_> {
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
             Type::BoundedStack { element, capacity } => format!(
                 "{}<{}, {}>",
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
                 self.type_to_faber(*element, names, surface),
-                self.format_figura(*capacity, surface)
+                self.list_count_to_faber(*capacity, surface)
             ),
             Type::BoundedTextus { capacity } => {
                 self.bounded_primitive_head(Primitive::Textus, *capacity, surface)
@@ -444,6 +444,14 @@ impl super::FaberCodegen<'_> {
             }
             HirTypeFormHead::Named { def_id, path } => {
                 self.named_form_to_faber(form, *def_id, path, names, surface)
+            }
+            HirTypeFormHead::ImportedAlias { path } => {
+                Self::expect_no_form_args(form)?;
+                Ok(path
+                    .iter()
+                    .map(|segment| self.interner.resolve(*segment))
+                    .collect::<Vec<_>>()
+                    .join("."))
             }
             HirTypeFormHead::Semantic(level) => {
                 self.semantic_form_to_faber(form, *level, names, surface)
@@ -1006,7 +1014,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             Type::BoundedStack { capacity, .. } => {
@@ -1014,7 +1022,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!(
                     "{}<{elem}, {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
-                    self.format_figura(*capacity, surface)
+                    self.list_count_to_faber(*capacity, surface)
                 ))
             }
             Type::Option(_) => match form.args.as_slice() {
@@ -1243,10 +1251,16 @@ impl super::FaberCodegen<'_> {
         figura: IndexId,
         surface: &impl KeywordSurface,
     ) -> String {
-        format!(
-            "{}<{child}, {}>",
-            surface.type_surface(TypeBindingKind::TensorFamily(kind)),
+        // The vector long form writes its lane count after the `size` marker
+        //; the other heads take a bracketed extent.
+        let extent = if matches!(kind, TensorFamilyKind::Vector) {
+            self.vector_width_to_faber(figura, surface)
+        } else {
             self.format_figura(figura, surface)
+        };
+        format!(
+            "{}<{child}, {extent}>",
+            surface.type_surface(TypeBindingKind::TensorFamily(kind)),
         )
     }
 
@@ -1259,7 +1273,7 @@ impl super::FaberCodegen<'_> {
         format!(
             "{}<{}>",
             surface.type_surface(TypeBindingKind::Primitive(prim)),
-            self.format_figura(capacity, surface)
+            self.list_count_to_faber(capacity, surface)
         )
     }
 

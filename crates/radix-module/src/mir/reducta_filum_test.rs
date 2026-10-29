@@ -169,18 +169,18 @@ fn thread_grouped_reductions_bucket_like_the_plain_reduction() {
 @ kernel
 @ public
 fn t_sum<size N>(tf32[N] a, tensor<i32, [N]> g) → tf32[3] {
-    return reduce via sum from a at [i] per g[i] thread lane let s { return s }
+    return reduce via sum from a at [i] per [g[i]] thread lane let s { return s }
 }
 @ kernel
 @ public
 fn t_count<size N>(tf32[N] a, tensor<i32, [N]> g) → tensor<i32, [3]> {
-    return reduce via count from a at [i] per g[i] thread lane let s { return s ≻ 2.5 }
+    return reduce via count from a at [i] per [g[i]] thread lane let s { return s ≻ 2.5 }
 }
 fn p_sum<size N>(tf32[N] a, tensor<i32, [N]> g) → tf32[3] {
-    return reduce via sum from a at [i] per g[i] let s { return s }
+    return reduce via sum from a at [i] per [g[i]] let s { return s }
 }
 fn p_count<size N>(tf32[N] a, tensor<i32, [N]> g) → tensor<i32, [3]> {
-    return reduce via count from a at [i] per g[i] let s { return s ≻ 2.5 }
+    return reduce via count from a at [i] per [g[i]] let s { return s ≻ 2.5 }
 }
 main {
     let tf32[6] a ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0] ↦ tf32[6]

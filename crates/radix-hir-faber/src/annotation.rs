@@ -64,6 +64,16 @@ impl super::FaberCodegen<'_> {
             return;
         }
 
+        // `@ kernel relaxed` / `@ kernel unsafe`: the tier is a sugar word
+        // after the family, spelled in the source locale. The parser admits
+        // no braced tier, so the sugar form is the only round trip.
+        let tier = annotation.kernel_tier(self.interner);
+        if let Some(identity) = tier.identity() {
+            writer.write(" ");
+            writer.write(surface.contextual_keyword(identity));
+            return;
+        }
+
         if annotation.fields.is_empty() && annotation.raw_args.is_empty() {
             // Only an authored empty braced record re-emits braces; a bare
             // marker (`@ public`) stays bare. `@ conversio` is always bare:

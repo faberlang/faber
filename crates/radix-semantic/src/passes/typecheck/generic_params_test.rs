@@ -128,7 +128,7 @@ incipit {
 #[test]
 fn magnitudo_param_lowers_in_vector_signature() {
     accepts(
-        r"functio same_width<elem, magnitudo N>(vector<elem, N> v) → vector<elem, N> {
+        r"functio same_width<elem, magnitudo N>(vector<elem, magnitudo N> v) → vector<elem, magnitudo N> {
     redde v
 }",
     );
@@ -489,7 +489,7 @@ fn parametric_vector_intrinsic_method_keeps_rigid_width() {
     // SameAsReceiver methods on a size-generic receiver: the body's rigid
     // `N` is not a call-site shape param to solve (no SEM014).
     accepts(
-        r"functio normata<magnitudo N>(vector<f32, N> v) → vector<f32, N> {
+        r"functio normata<magnitudo N>(vector<f32, magnitudo N> v) → vector<f32, magnitudo N> {
     redde v.normalizata()
 }",
     );
@@ -501,7 +501,7 @@ fn parametric_vector_scalar_multiplica_splats() {
     // lanes; the result keeps the receiver shape at any width. The copy-out
     // elementwise method is the perfect form `multiplicata`.
     accepts(
-        r"functio scala<magnitudo N>(vector<f32, N> v, f32 s) → vector<f32, N> {
+        r"functio scala<magnitudo N>(vector<f32, magnitudo N> v, f32 s) → vector<f32, magnitudo N> {
     redde v.multiplicata(s)
 }",
     );
@@ -510,7 +510,7 @@ fn parametric_vector_scalar_multiplica_splats() {
 #[test]
 fn vector_scalar_multiplica_rejects_foreign_element() {
     rejects_with_issue(
-        r"functio scala(vector<f32, 3> v, numerus n) → vector<f32, 3> {
+        r"functio scala(vector<f32, magnitudo 3> v, numerus n) → vector<f32, magnitudo 3> {
     redde v.multiplicata(n)
 }",
         "argument_type_mismatch",
@@ -559,22 +559,38 @@ incipit {
     );
 }
 
+// --- A ranged list keeps its range while the element parameter is bound ---
+
+#[test]
+fn generic_element_param_binds_a_ranged_list_argument() {
+    accepts(
+        r"functio numera<T>(lista<T, magnitudo 1…∞> xs) → numerus {
+    redde xs.longitudo()
+}
+
+incipit {
+    sit lista<numerus, magnitudo 1…∞> xs ← [7]
+    nota numera<numerus>(xs)
+}",
+    );
+}
+
 // --- Size parameters of a generic class instantiate at the receiver ---
 
 #[test]
 fn applied_class_method_return_type_instantiates_size_param() {
-    // `Box<3>.mensura()` returns `vector<f32, 3>`: the class's `N` is the
+    // `Box<3>.mensura()` returns `vector<f32, size 3>`: the class's `N` is the
     // receiver's size argument, not a rigid parameter.
     accepts(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 
-    functio mensura() → vector<f32, N> {
+    functio mensura() → vector<f32, magnitudo N> {
         redde ego.minima
     }
 }
 
-functio a(Capsa<3> b) → vector<f32, 3> {
+functio a(Capsa<3> b) → vector<f32, magnitudo 3> {
     redde b.mensura()
 }",
     );
@@ -584,14 +600,14 @@ functio a(Capsa<3> b) → vector<f32, 3> {
 fn applied_class_method_parameter_type_instantiates_size_param() {
     accepts(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 
-    functio muta(vector<f32, N> offset) → vector<f32, N> {
+    functio muta(vector<f32, magnitudo N> offset) → vector<f32, magnitudo N> {
         redde offset
     }
 }
 
-functio a(Capsa<3> b, vector<f32, 3> o) → vector<f32, 3> {
+functio a(Capsa<3> b, vector<f32, magnitudo 3> o) → vector<f32, magnitudo 3> {
     redde b.muta(o)
 }",
     );
@@ -601,14 +617,14 @@ functio a(Capsa<3> b, vector<f32, 3> o) → vector<f32, 3> {
 fn applied_class_method_parameter_rejects_foreign_width() {
     rejects_with_issue(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 
-    functio muta(vector<f32, N> offset) → vector<f32, N> {
+    functio muta(vector<f32, magnitudo N> offset) → vector<f32, magnitudo N> {
         redde offset
     }
 }
 
-functio a(Capsa<3> b, vector<f32, 2> o) → vector<f32, 3> {
+functio a(Capsa<3> b, vector<f32, magnitudo 2> o) → vector<f32, magnitudo 3> {
     redde b.muta(o)
 }",
         "incompatible_tensor_index",
@@ -619,14 +635,14 @@ functio a(Capsa<3> b, vector<f32, 2> o) → vector<f32, 3> {
 fn applied_class_method_return_rejects_foreign_width() {
     rejects_with_issue(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 
-    functio mensura() → vector<f32, N> {
+    functio mensura() → vector<f32, magnitudo N> {
         redde ego.minima
     }
 }
 
-functio a(Capsa<3> b) → vector<f32, 2> {
+functio a(Capsa<3> b) → vector<f32, magnitudo 2> {
     redde b.mensura()
 }",
         "incompatible_tensor_index",
@@ -637,10 +653,10 @@ functio a(Capsa<3> b) → vector<f32, 2> {
 fn applied_class_field_type_instantiates_size_param() {
     accepts(
         r"genus Capsa<magnitudo N> {
-    varia vector<f32, N> minima
+    varia vector<f32, magnitudo N> minima
 }
 
-functio a(Capsa<3> b) → vector<f32, 3> {
+functio a(Capsa<3> b) → vector<f32, magnitudo 3> {
     redde b.minima
 }",
     );

@@ -565,7 +565,7 @@ functio product(matrix<f32, [2, 2]> a, matrix<f32, [2, 2]> b) → matrix<f32, [2
 fn lowers_matrix_applica_to_cell_lane_mul_add() {
     let dump = dump_source(
         r"
-functio apply(matrix<f32, [2, 2]> m, vector<f32, 2> v) → vector<f32, 2> {
+functio apply(matrix<f32, [2, 2]> m, vector<f32, magnitudo 2> v) → vector<f32, magnitudo 2> {
     redde m.applica(v)
 }
 ",
@@ -619,7 +619,7 @@ fn lowers_vector_norma_to_sqrt_of_dot() {
     // The prior `contains(".lane0")` OR-fallback was near-vacuous for any vector dump.
     let dump = dump_source(
         r"
-functio length(vector<f32, 3> v) → f32 {
+functio length(vector<f32, magnitudo 3> v) → f32 {
     redde v.norm()
 }
 ",
@@ -631,11 +631,11 @@ functio length(vector<f32, 3> v) → f32 {
     );
     assert!(
         dump.contains("_0.lane1 * _0.lane1"),
-        "norm must square lane1 for vector<f32,3>\n{dump}"
+        "norm must square lane1 for vector<f32,magnitudo 3>\n{dump}"
     );
     assert!(
         dump.contains("_0.lane2 * _0.lane2"),
-        "norm must square lane2 for vector<f32,3>\n{dump}"
+        "norm must square lane2 for vector<f32,magnitudo 3>\n{dump}"
     );
 }
 
@@ -3627,7 +3627,8 @@ functio maybe(Persona ∪ nihil p) → textus ∪ nihil {
 }
 ",
     );
-    assert!(chain_dump.contains("option chain(_0, .sym#"));
+    // The receiver is captured into a temp before the guard.
+    assert!(chain_dump.contains("option chain(%0, .sym#"), "{chain_dump}");
 
     let non_null_dump = dump_source(
         r"
@@ -4883,7 +4884,7 @@ incipit {
 #[test]
 fn reducta_grouping_preserves_source_and_key_tensors() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-  redde reducta via numeratio ex values apud [i] pro keys[i] sit value { redde value }
+  redde reducta via numeratio ex values apud [i] pro [keys[i]] sit v { redde v }
 }
 incipit {
   sit lista<bivalens> values_data ← [verum, falsum, verum]
@@ -4908,7 +4909,7 @@ incipit {
 #[test]
 fn reducta_group_out_of_range_uses_existing_tensor_write_failure() {
     let source = r"functio count(tensor<bivalens, [3]> values, tensor<numerus, [3]> keys) → tensor<numerus, [2]> {
-  redde reducta via numeratio ex values apud [i] pro keys[i] sit value { redde value }
+  redde reducta via numeratio ex values apud [i] pro [keys[i]] sit v { redde v }
 }
 incipit {
   sit lista<bivalens> values_data ← [verum, falsum, verum]
@@ -7887,14 +7888,14 @@ incipit {
 // ──────────────────────────────────────────────────────────────────────
 
 const VECTOR_LANE_SOURCE: &str = r"
-functio lane(vector<f32, 3> v) → f32 {
+functio lane(vector<f32, magnitudo 3> v) → f32 {
     redde v[1]
 }
-functio asserted(vector<f32, 3> ∪ nihil v) → f32 {
+functio asserted(vector<f32, magnitudo 3> ∪ nihil v) → f32 {
     redde v![2]
 }
-functio write(vector<f32, 3> v) → vector<f32, 3> {
-    varia vector<f32, 3> u ← copy v
+functio write(vector<f32, magnitudo 3> v) → vector<f32, magnitudo 3> {
+    varia vector<f32, magnitudo 3> u ← copy v
     u[0] ← 4.0
     redde u
 }
@@ -7918,11 +7919,11 @@ fn vector_constant_index_lowers_to_a_lane_projection() {
 // ──────────────────────────────────────────────────────────────────────
 
 const VECTOR_LANE_SELECT_SOURCE: &str = r"
-functio pick(vector<f32, 3> v, numerus i) → f32 {
+functio pick(vector<f32, magnitudo 3> v, numerus i) → f32 {
     redde v[i]
 }
-functio store(numerus i) → vector<f32, 3> {
-    varia vector<f32, 3> u ← [0.0, 0.0, 0.0] ↦ vector<f32, 3>
+functio store(numerus i) → vector<f32, magnitudo 3> {
+    varia vector<f32, magnitudo 3> u ← [0.0, 0.0, 0.0] ↦ vector<f32, magnitudo 3>
     u[i] ← 4.0
     redde u
 }
@@ -8045,4 +8046,28 @@ fn missing_array_row_is_a_named_lowering_error_not_a_dropped_statement() {
         Some(array)
     );
     assert!(builder.errors.is_empty(), "the happy path pushes nothing");
+}
+
+#[test]
+fn thread_return_is_refused_at_mir_lowering_by_name_until_lane_lowering_lands() {
+    let unit = analyze(
+        r"
+@ nucleum
+@ publica
+functio k(in tensor<f32, [4]> out, de tensor<f32, [4]> src) → vacuum {
+    itera ex src apud [i] filum lane sit value {
+        redde filum
+    }
+}
+",
+    );
+    let errors = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect_err("`redde filum` must not be mislowered");
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "return_thread_lowering_pending"),
+        "{:?}",
+        errors.iter().map(|error| &error.issue).collect::<Vec<_>>()
+    );
 }

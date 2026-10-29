@@ -191,6 +191,9 @@ impl Parser {
         let parsed = self.parse_stmt();
         self.nondum_function_pending = false;
         let mut stmt = parsed?;
+        if !matches!(stmt.kind, StmtKind::Func(_)) {
+            self.check_nucleum_tier_target(&annotations);
+        }
         let mut combined = leading_trivia;
         combined.append(&mut stmt.leading_trivia);
         stmt.leading_trivia = combined;
@@ -1454,6 +1457,7 @@ impl Parser {
             };
             ClassMemberKind::Method(func)
         } else {
+            self.check_nucleum_tier_target(&annotations);
             let field_start = self.current_span();
             let field = self.parse_field_decl(true)?;
             if field.modifier.is_none() {
@@ -1503,6 +1507,8 @@ impl Parser {
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let leading_trivia = self.parse_leading_trivia();
             let annotations = self.parse_annotations()?;
+            // An interface signature declares a contract, not a kernel.
+            self.check_nucleum_tier_target(&annotations);
             let start = self.current_span();
 
             self.expect_keyword_ident(TokenKind::Functio)?;
@@ -1828,6 +1834,7 @@ impl Parser {
                     if self.skip_sum_type_function(Some(start))? {
                         continue;
                     }
+                    self.check_nucleum_tier_target(&annotations);
                     let field = self.parse_field_decl(false)?;
                     shared_fields.push(UnionField {
                         leading_trivia,
@@ -3092,11 +3099,66 @@ impl Parser {
         if self.eat_annotation_ident(TokenKind::Lane) {
             return Err(self.removed_nucleum_lane_error());
         }
+        let tier = self.parse_nucleum_tier(fragment)?;
         self.expect_annotation_end("unexpected token after @ nucleum")?;
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
+            tier,
             braced: false,
         }))
+    }
+
+    /// Parse the optional tier word after `@ nucleum` (`laxus` / `intutus`,
+    /// en `relaxed` / `unsafe`). A second tier word, a word that is no tier,
+    /// and a tier on a `fragment` each refuse by name; the default tier has no
+    /// word.
+    fn parse_nucleum_tier(&mut self, fragment: bool) -> Result<KernelTier, ParseError> {
+        let mut tier = KernelTier::Default;
+        let mut written = false;
+        while self.is_annotation_arg() {
+            let word = self.current_keyword_ident();
+            let next = match word {
+                Some(TokenKind::Laxus) => KernelTier::Relaxed,
+                Some(TokenKind::Intutus) => KernelTier::Unsafe,
+                Some(TokenKind::Fragment) if written => {
+                    return Err(self.invalid_annotation_error("nucleum_tier_on_fragment"));
+                }
+                Some(TokenKind::Fragment) => break,
+                _ => {
+                    let TokenKind::Ident(symbol) = self.peek().kind else {
+                        break;
+                    };
+                    return Err(self
+                        .invalid_annotation_error("unknown_nucleum_tier")
+                        .with_arg("name", self.interner.resolve(symbol).to_owned()));
+                }
+            };
+            if written {
+                return Err(self.invalid_annotation_error("duplicate_nucleum_tier"));
+            }
+            if fragment {
+                return Err(self.invalid_annotation_error("nucleum_tier_on_fragment"));
+            }
+            self.advance();
+            tier = next;
+            written = true;
+        }
+        Ok(tier)
+    }
+
+    /// A tier modifier belongs to a kernel function. Report it by name when
+    /// the annotated declaration is anything else.
+    fn check_nucleum_tier_target(&mut self, annotations: &[Annotation]) {
+        for annotation in annotations {
+            if let AnnotationKind::Nucleum(nucleum) = &annotation.kind
+                && nucleum.tier != KernelTier::Default
+            {
+                self.errors.push(
+                    ParseError::structured(ParseErrorKind::AnnotationInvalid, annotation.span)
+                        .with_arg("issue", "nucleum_tier_non_kernel"),
+                );
+            }
+        }
     }
 
     fn parse_braced_nucleum_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
@@ -3133,6 +3195,7 @@ impl Parser {
         self.expect_issue(&TokenKind::RBrace, "nucleum_annotation_fields_end")?;
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
+            tier: KernelTier::Default,
             braced: true,
         }))
     }

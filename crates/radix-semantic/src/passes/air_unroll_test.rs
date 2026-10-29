@@ -1140,15 +1140,24 @@ fn ascii_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio ascii_full() → vacuum {
-    sit ascii<8> xs ← 'alphabet' ↦ ascii<8>
+    sit ascii<magnitudo 8> xs ← 'alphabet' ↦ ascii<magnitudo 8>
     itera ex xs sit c { }
 }
 "#,
     );
-    assert_no_itera_decline(&result, "full ascii<8> must not decline its itera loop");
+    assert_no_itera_decline(
+        &result,
+        "full ascii<magnitudo 8> must not decline its itera loop",
+    );
     let hir = result.hir.as_ref().expect("typed HIR");
-    assert!(!has_itera(hir), "full ascii<8> iteration must be erased");
-    assert!(!has_si(hir), "full ascii<8> iteration is guard-free");
+    assert!(
+        !has_itera(hir),
+        "full ascii<magnitudo 8> iteration must be erased"
+    );
+    assert!(
+        !has_si(hir),
+        "full ascii<magnitudo 8> iteration is guard-free"
+    );
     let mut gathers = GatherTys(Vec::new());
     walk_program(&mut gathers, hir);
     assert_eq!(
@@ -1158,7 +1167,7 @@ functio ascii_full() → vacuum {
     );
     assert!(
         gathers.0.iter().all(|ty| is_littera(&result.types, *ty)),
-        "every ascii<N> lane gathers littera (D10.1): {:?}",
+        "every ascii<size N> lane gathers littera (D10.1): {:?}",
         gathers.0
     );
 }
@@ -1169,15 +1178,24 @@ fn textus_ex_full_literal_admits_guard_free_lanes() {
         r#"
 @ radix lane "air"
 functio textus_full() → vacuum {
-    sit textus<8> xs ← "abcdefgh" ↦ textus<8>
+    sit textus<magnitudo 8> xs ← "abcdefgh" ↦ textus<magnitudo 8>
     itera ex xs sit c { }
 }
 "#,
     );
-    assert_no_itera_decline(&result, "full textus<8> must not decline its itera loop");
+    assert_no_itera_decline(
+        &result,
+        "full textus<magnitudo 8> must not decline its itera loop",
+    );
     let hir = result.hir.as_ref().expect("typed HIR");
-    assert!(!has_itera(hir), "full textus<8> iteration must be erased");
-    assert!(!has_si(hir), "full textus<8> iteration is guard-free");
+    assert!(
+        !has_itera(hir),
+        "full textus<magnitudo 8> iteration must be erased"
+    );
+    assert!(
+        !has_si(hir),
+        "full textus<magnitudo 8> iteration is guard-free"
+    );
     let mut gathers = GatherTys(Vec::new());
     walk_program(&mut gathers, hir);
     assert_eq!(
@@ -1189,7 +1207,7 @@ functio textus_full() → vacuum {
     // non-ASCII trap row on text iteration.
     assert!(
         gathers.0.iter().all(|ty| is_littera(&result.types, *ty)),
-        "every textus<N> lane gathers littera: {:?}",
+        "every textus<magnitudo N> lane gathers littera: {:?}",
         gathers.0
     );
 }
@@ -1204,12 +1222,12 @@ functio runtime(lista<b8, magnitudo 8> xs) → vacuum {
 }"#,
         r#"
 @ radix lane "air"
-functio runtime(ascii<8> xs) → vacuum {
+functio runtime(ascii<magnitudo 8> xs) → vacuum {
     itera ex xs sit c { }
 }"#,
         r#"
 @ radix lane "air"
-functio runtime(textus<8> xs) → vacuum {
+functio runtime(textus<magnitudo 8> xs) → vacuum {
     itera ex xs sit c { }
 }"#,
     ] {
@@ -1224,7 +1242,7 @@ fn textus_ex_over_budget_declines_whole_with_causa() {
         r#"
 @ radix lane "air"
 functio too_wide() → vacuum {{
-    sit textus<65> xs ← "{literal}" ↦ textus<65>
+    sit textus<magnitudo 65> xs ← "{literal}" ↦ textus<magnitudo 65>
     itera ex xs sit c {{ }}
 }}
 "#

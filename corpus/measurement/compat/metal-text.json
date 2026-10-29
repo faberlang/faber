@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 546
+    "analyzable": 567
   },
   "terms": [
     {
@@ -37,7 +37,7 @@
       "term": "?(",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 5
     },
     {
       "term": "?.",
@@ -367,7 +367,7 @@
       "term": "genus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 21
+      "analyzable": 25
     },
     {
       "term": "guillemet",
@@ -487,7 +487,7 @@
       "term": "list<T, size lo‥hi>",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "list<b8>",
@@ -499,7 +499,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 18
+      "analyzable": 25
     },
     {
       "term": "manifest",
@@ -535,7 +535,7 @@
       "term": "modulus<u64>",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "modulus<u8>",
@@ -553,7 +553,7 @@
       "term": "mori",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 6
     },
     {
       "term": "named-holes",
@@ -811,7 +811,7 @@
       "term": "si",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "sin",
@@ -1081,7 +1081,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 44
+      "analyzable": 45
     },
     {
       "term": "⇇",

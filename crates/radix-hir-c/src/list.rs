@@ -144,12 +144,10 @@ impl Emitter<'_> {
         self.temps += 1;
         let mut body =
             format!("faber_list_{suffix} *{target} = faber_list_{suffix}_new(faber_a, 0); ");
-        let mut effect = true;
         for element in elements {
             match element {
                 HirArrayElement::Expr(value) => {
                     let item = self.element(value, elem)?;
-                    effect |= item.effect;
                     write!(
                         body,
                         "faber_list_{suffix}_push(faber_a, {target}, {}); ",
@@ -165,7 +163,6 @@ impl Emitter<'_> {
                     if inner != elem {
                         return Err(unsupported("spread of a list of another element class"));
                     }
-                    effect |= list.effect;
                     write!(
                         body,
                         "faber_list_{suffix}_push_all(faber_a, {target}, {}); ",
@@ -179,7 +176,7 @@ impl Emitter<'_> {
             }
         }
         let text = format!("(__extension__ ({{ {body}{target}; }}))");
-        Ok(self.list_operand(text, elem).with_effect(effect))
+        Ok(self.list_operand(text, elem).with_effect(true))
     }
 
     /// One element value of class `elem`: an exact value that arrives with
@@ -580,7 +577,6 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let inner = Inner::from_ty(elem.ty())
             .ok_or_else(|| unsupported("list element without an optional form"))?;
-        let mut effect = list.effect;
         // An element argument or an index argument, evaluated after the list.
         let mut operands = vec![list];
         match (op, args) {
@@ -614,7 +610,7 @@ impl Emitter<'_> {
         }
         // A method that changes the list is an effect: where it runs
         // relative to its siblings shows in what they read.
-        effect |= operands.iter().any(|operand| operand.effect)
+        let effect = operands.iter().any(|operand| operand.effect)
             || matches!(
                 op,
                 MirCollectionOp::RemoveFirst

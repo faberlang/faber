@@ -1,0 +1,15 @@
++++
+term = "reperta union closure parameter"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "A list find closure may declare a union-typed parameter and still round-trip as a call argument."
+syntax = "<lista>.find((<type> ∪ <type> <name>) ∴ <predicate>)"
+related = ["quilibet", "omnia", "methodi-reperta"]
+locale = "en"
++++
+# A union-typed single closure parameter stays a closure when emitted inside a call.
+main {
+    let list<int ∪ none> xs ← [null, 3]
+    print xs.find((int ∪ none x) → bool ∴ x ≢ null)
+}

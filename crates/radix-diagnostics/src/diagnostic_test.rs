@@ -71,6 +71,9 @@ fn offset_to_line_clamps_past_eof_to_physical_length() {
     assert_eq!(physical, 3);
     assert_eq!(offset_to_line(source, 1846), physical);
     assert_eq!(offset_to_line("", 0), 1);
+    assert_eq!(offset_to_line("\n", 1), 1);
+    assert_eq!(offset_to_line("a\n\n", 3), 2);
+    assert_eq!(offset_to_line("a\nb", 99), 2);
 }
 
 #[test]

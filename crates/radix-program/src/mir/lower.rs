@@ -372,6 +372,7 @@ fn collect_terminator_aggregate_defs(terminator: &MirTerminator, variants: &mut 
         }
         MirTerminatorKind::Switch { value, .. } => collect_operand_variant_defs(value, variants),
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -455,7 +456,7 @@ fn collect_place_variant_defs(place: &MirPlace, variants: &mut Vec<DefId>) {
         match projection {
             MirProjection::VariantField { variant, .. } => variants.push(*variant),
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                collect_operand_variant_defs(operand, variants)
+                collect_operand_variant_defs(operand, variants);
             }
             MirProjection::Field(_)
             | MirProjection::ClosureCapture { .. }
@@ -3533,6 +3534,7 @@ fn rewrite_terminator_variant_defs(
             rewrite_operand_variant_defs(value, variant_remap);
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -4219,6 +4221,7 @@ pub(super) fn shift_terminator_ids(terminator: &mut MirTerminator, offset: u32) 
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -4254,7 +4257,7 @@ pub(super) fn shift_place_ids(place: &mut MirPlace, offset: u32) {
                 shift_environment_id(environment, offset);
             }
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                shift_operand_ids(operand, offset)
+                shift_operand_ids(operand, offset);
             }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
@@ -4836,6 +4839,7 @@ fn remap_terminator_function_ids(
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -4977,6 +4981,7 @@ fn scan_terminator_references(terminator: &MirTerminator, scan: &mut MirReferenc
             }
         }
         MirTerminatorKind::Return(None)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Unreachable => {}
     }
@@ -5016,7 +5021,7 @@ fn scan_place_references(place: &MirPlace, scan: &mut MirReferenceScan) {
                 scan.environments.push(*environment);
             }
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                scan_operand_references(operand, scan)
+                scan_operand_references(operand, scan);
             }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }

@@ -113,12 +113,19 @@ mod device_block_erase_test;
 mod grid_reduce_test;
 
 #[cfg(test)]
+#[path = "control_coverage_test.rs"]
+mod control_coverage_test;
+
+#[cfg(test)]
 #[path = "reduction_access_marker_test.rs"]
 mod reduction_access_marker_test;
 
 #[cfg(test)]
 #[path = "device_value_join_test.rs"]
 mod device_value_join_test;
+#[cfg(test)]
+#[path = "kernel_tier_test.rs"]
+mod kernel_tier_test;
 #[cfg(test)]
 #[path = "lane_form_test.rs"]
 mod lane_form_test;
@@ -451,6 +458,9 @@ mod rank2_reduction_readiness_tests;
 #[cfg(test)]
 #[path = "record_literal_test.rs"]
 mod record_literal_tests;
+#[cfg(test)]
+#[path = "reducta_group_identity_test.rs"]
+mod reducta_group_identity_tests;
 #[cfg(test)]
 #[path = "saturating_word_test.rs"]
 mod saturating_word_tests;

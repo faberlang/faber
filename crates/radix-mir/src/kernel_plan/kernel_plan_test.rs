@@ -3697,18 +3697,17 @@ fn simdgroup_admission_refuses_non_class_shapes() {
         simdgroup_matmul_admission(&plan).is_none(),
         "k=12 carries a K tail and must keep the scalar body"
     );
-    let mut tile_multiple_m = matmul_plan();
-    tile_multiple_m.m = 16;
-    tile_multiple_m.k = 960;
-    assert!(
-        simdgroup_matmul_admission(&tile_multiple_m).is_none(),
-        "tile-multiple m has no padded-FMA class"
-    );
-    let mut one_row = tile_multiple_m.clone();
+    let mut square = matmul_plan();
+    square.m = 16;
+    square.k = 960;
+    let facts = simdgroup_matmul_admission(&square)
+        .expect("tile-multiple m (the square/tall full-band class) is admitted");
+    assert_eq!(facts.k_tiles, 960 / u64::from(MATMUL_TILE));
+    let mut one_row = square.clone();
     one_row.m = 1;
     one_row.workgroup_y = 1;
     assert!(simdgroup_matmul_admission(&one_row).is_none());
-    let mut bf16 = tile_multiple_m.clone();
+    let mut bf16 = square.clone();
     bf16.m = 36;
     bf16.right_layout = crate::MirScalarLayout::Bf16;
     assert!(simdgroup_matmul_admission(&bf16).is_none());

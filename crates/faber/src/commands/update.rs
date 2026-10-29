@@ -598,10 +598,7 @@ pub(crate) fn resolve_bin_dir(
         .parent()
         .ok_or_else(|| format!("cannot derive an install directory from {}", exe.display()))?;
     let link = parent.join("faber");
-    if fs::symlink_metadata(&link)
-        .map(|metadata| metadata.file_type().is_symlink())
-        .unwrap_or(false)
-    {
+    if fs::symlink_metadata(&link).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
         return Ok(parent.to_path_buf());
     }
     Err(format!(

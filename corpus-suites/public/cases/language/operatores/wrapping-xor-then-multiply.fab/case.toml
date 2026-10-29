@@ -1,0 +1,15 @@
+version = 1
+id = "corpus/operatores/wrapping-xor-then-multiply.fab"
+group = "language"
+input_root = "corpus"
+input = "operatores/wrapping-xor-then-multiply.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"

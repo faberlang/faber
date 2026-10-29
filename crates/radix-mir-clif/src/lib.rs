@@ -12,8 +12,8 @@ pub mod capability;
 mod emit;
 mod lower;
 
-pub use emit::{ClifError, ClifObject, emit_object, emit_program};
-pub use lower::StructMeta;
+pub use emit::{ClifError, ClifObject, emit_jit, emit_object, emit_program};
+pub use lower::{JitProgram, StructMeta};
 
 #[cfg(test)]
 mod capability_test;

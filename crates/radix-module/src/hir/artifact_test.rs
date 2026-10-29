@@ -2489,7 +2489,7 @@ targets = ["rust"]
         r"@ public
 class ZeroGhost {
     @ public
-    fn remap(vector<int, 1> coord) → vector<int, 1> {
+    fn remap(vector<int, size 1> coord) → vector<int, size 1> {
         return coord - coord
     }
 }
@@ -3072,13 +3072,13 @@ fn size_generic_genus_applied_to_size_survives_round_trip() {
         "+++\nlocale = \"en\"\n+++\n\n",
         "@ public\n",
         "class Box<size N> {\n",
-        "    mut vector<f32, N> minima\n",
-        "    mut vector<f32, N> maxima\n",
+        "    mut vector<f32, size N> minima\n",
+        "    mut vector<f32, size N> maxima\n",
         "}\n",
         "@ public\n",
         "fn box_inflated(Box<3> box, f32 amount) \u{2192} Box<3> {\n",
-        "    let vector<f32, 3> lo \u{2190} box.minima\n",
-        "    let vector<f32, 3> hi \u{2190} box.maxima\n",
+        "    let vector<f32, size 3> lo \u{2190} box.minima\n",
+        "    let vector<f32, size 3> hi \u{2190} box.maxima\n",
         "    let Box<3> expanded \u{2190} Box {minima = lo, maxima = hi}\n",
         "    return expanded\n",
         "}\n",

@@ -713,6 +713,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Control | `ergo` | compact statement-body joint |
 # | Control | `fac` | do block / post-test loop |
 # | Control | `itera` | for |
+# | Control | `machina` | device region modifier after `fac` (en `device`); contextual |
 # | Control | `perge` | continue |
 # | Control | `redde` | return |
 # | Control | `rumpe` | break |
@@ -804,6 +805,8 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 # | Builtin | `lineam` | line |
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
+# | Annotation | `laxus` | kernel tier `@ nucleum laxus` (en `relaxed`); contextual |
+# | Annotation | `intutus` | kernel tier `@ nucleum intutus` (en `unsafe`); contextual |
 # | Annotation | `nondum` | availability marker `@ nondum` (en `@ unstable`) |
 # | Annotation | `nucleum` | kernel annotation |
 # | Annotation | `radix` | compiler-reserved annotation family |
@@ -1088,7 +1091,7 @@ clausura_joint  := '∴'
 clausura_expr   := compact_clausura_expr | clausura_legacy_expr
 compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
 clausura_signature := (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
-fac_block := 'fac' block_stmt cape_clause?
+fac_block := 'fac' fac_modifier? block_stmt cape_clause?
 clausura_legacy_expr := 'clausura' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
@@ -1138,9 +1141,18 @@ annotation_field_list   := annotation_field (',' annotation_field)*
 annotation_field       := ANNOTATION_FIELD_NAME '=' (expression | concrete_type)
 annotation_sugar       := '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
 nucleum_annotation     := nucleum_sugar | nucleum_braced
+# A tier word (`laxus`, `intutus`; en `relaxed`, `unsafe`) sets the kernel's
+# safety tier (operator ruling 2026-10-28). The tiers are ordered and one
+# choice, never both: a second tier word is `duplicate_nucleum_tier`, an
+# unknown word `unknown_nucleum_tier`. A tier belongs to a kernel function:
+# on a `fragment` it is `nucleum_tier_on_fragment` (a fragment takes the tier
+# of the entry that composes it), and on any other declaration it is
+# `nucleum_tier_non_kernel`. `--safe` / `safe = true` lowers every kernel to
+# the default tier. The braced form carries `fragment` only.
 nucleum_sugar          := '@' 'nucleum' nucleum_modifier? NEWLINE
 nucleum_braced         := '@' 'nucleum' '{' nucleum_field_list? '}'
-nucleum_modifier       := 'fragment'
+nucleum_modifier       := 'fragment' | nucleum_tier
+nucleum_tier           := 'laxus' | 'intutus'
 nucleum_field_list      := nucleum_field (',' nucleum_field)*
 nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
 # `@ radix` is reserved for compiler-owned metadata; applications must not
@@ -1287,7 +1299,9 @@ labeled_type_argument := IDENTIFIER ':' type_annotation
 # (`lista<T, magnitudo 1…∞>`): a list size range, trapping only, with no policy
 # word; there the range follows the `magnitudo` marker (`sized_range_argument`),
 # because a bare range bounds a value and a list's bound is a count. A bare
-# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`.
+# `lista<T, 4>` or `lista<T, 4‥8>` is `list_count_needs_size`, and a bare
+# `queue<T, 4>`, `stack<T, 4>`, `textus<4>` or `ascii<4>` is `capacity_needs_size`:
+# a capacity is written after `magnitudo`.
 range_argument  := range_bound range_glyph range_bound
 sized_range_argument := 'magnitudo' range_argument
 range_glyph     := '‥' | '…'
@@ -1380,7 +1394,7 @@ extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceter
 extract_field  := IDENTIFIER ('ut' IDENTIFIER)?
 ceteri_field     := 'ceteri' IDENTIFIER
 
-redde_stmt   := 'redde' expression?
+redde_stmt   := 'redde' ('filum' expression? | expression?)
 reddet_stmt := 'reddet' expression
 tacebit_stmt := 'tacebit' expression
 cede_stmt    := 'cede' expression
@@ -1645,13 +1659,15 @@ scriptum_expr  := 'scriptum' '(' STRING (',' expression)* ')'
 lege_expr      := 'lege' 'lineam'?
 # General shaped-source reduction. `via` is mandatory; the operator is one of
 # the ten locale-pack words below. Grouping is contextual, and the optional
-# tail is either a body (with an optional `filum`) or a bodiless identity.
+# identity follows either the optional body or the source directly. A bare key
+# is unary-tight so `vel` remains available to the reduction identity.
 # The body is claimed only by `(fixum | varia) IDENTIFIER '{'`, so a following
 # declaration remains a separate statement. `reducta` and its operator words
 # stay ordinary identifiers outside their grammar slots.
-reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+reducta_expr := 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta_group? (filum_clause? reducta_body)? reducta_identity?
 reducta_op := 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
-reducta_group := 'pro' expression
+reducta_group := 'pro' (group_key | '[' expression (',' expression)* ']')
+group_key := unary_expr
 reducta_body := ('sit' | 'varia') IDENTIFIER block_stmt
 reducta_identity := 'vel' expression
 # Ordered prefix scan. `vel` is parsed at the ordinary outer expression level,
@@ -1696,4 +1712,5 @@ proba_modifier := 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'ta
               | 'solum_in' STRING
 praepara_block := ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
 
-fac_stmt := 'fac' block_stmt cape_clause? ('dum' expression)?
+fac_stmt := 'fac' fac_modifier? block_stmt cape_clause? ('dum' expression)?
+fac_modifier := 'omnia' | 'machina'

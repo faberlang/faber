@@ -1,0 +1,20 @@
+version = 1
+id = "corpus/lista/while-empties-list-index-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/while-empties-list-index-trap.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout_contains = "before"
+stderr_contains = "array index out of bounds"
+check_only = false

@@ -1,0 +1,41 @@
++++
+term = "extende"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "expr_stmt", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "call_expr", "call_suffix", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+summary = "A bounded byte buffer list<b8, size N> joins a list<b8> with extend, which chains fixed-width encodes into one byte string."
+syntax = "<lista<b8>>.extend(<lista<b8, size N>>)"
+related = ["extende", "appende", "bits"]
+locale = "en"
++++
+# =============================================================================
+# extende — joining fixed-width encodes into one byte string.
+# =============================================================================
+#
+# What this teaches:
+#   • `x ↦ list<b8, size 4> via Le` encodes one number into a bounded byte
+#     buffer; `out.extend(buffer)` appends all of its bytes to a `list<b8>`
+#   • the buffer keeps its live length, so a short buffer adds only its own
+#     bytes
+#   • byte order is chosen per encode, so one string can mix `via Le` and
+#     `via Be` fields
+#
+# Common mistakes:
+#   • appending the buffer one byte at a time: `out.append(buffer[0])` is a
+#     different type (the buffer element is a number, not a raw byte)
+#   • adding the two lists with `+`: numeric list `+` is elementwise
+#
+# See also: extend, bits-bulk
+# =============================================================================
+
+main {
+    let f32 one ← 1.0
+    let f32 half ← 0.5
+    let list<b8, size 4> first_bytes ← one ↦ list<b8, size 4> via Le
+    let list<b8, size 4> second_bytes ← half ↦ list<b8, size 4> via Be
+    mut list<b8> out ← []
+    out.extend(first_bytes)
+    out.extend(second_bytes)
+    print out
+    print out.length()
+}

@@ -94,6 +94,7 @@ axis = "axis"
 lege = "lege"
 lineam = "lineam"
 omnia = "omnia"
+machina = "machina"
 praefixum = "praefixum"
 insere = "insere"
 scriptum = "scriptum"
@@ -136,6 +137,8 @@ futura = "futura"
 imperium = "imperium"
 longum = "longum"
 lane = "lane"
+laxus = "laxus"
+intutus = "intutus"
 operandus = "operandus"
 optio = "optio"
 ubique = "ubique"
@@ -210,7 +213,7 @@ instans = "instans"
 objectum = "objectum"
 quidlibet = "quidlibet"
 lista = "lista"
-# Shipped bounded forms: lista<T, magnitudo N>, lista<T, magnitudo lo‥hi>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, lista<T, magnitudo lo‥hi>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "tabula"
 # tabulae (ledger, an insertion-ordered map) is one letter from tabula (map) on purpose:
 # "two shades of the same thing" (Roman account books were tabulae). Not a typo;
@@ -870,6 +873,22 @@ help = "use `target = {functio}` in v1"
 message = "a declaration carries more than one `@ nucleum` annotation"
 help = "keep a single nucleum annotation"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "adnotatio `@ {nucleum}` plus quam unum gradum nominat"
+help = "scribe `{laxus}` aut `{intutus}`, aut neutrum pro gradu communi"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` non est gradus nuclei"
+help = "gradus sunt `{laxus}` et `{intutus}`; neutrum scribe pro gradu communi"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` gradum non accipit"
+help = "fragmentum gradum nuclei componentis sequitur; gradum in nucleo pone"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "gradus nuclei functionem nuclei requirit"
+help = "gradum in declaratione functionis `@ {nucleum}` scribe, aut remove"
+
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "a `@ nucleum` fragment conflicts with a graphics fragment annotation"
 help = "remove one of the fragment annotations"
@@ -889,6 +908,10 @@ help = "use {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "'{cape}' must come before '{dum}' in a '{fac}' loop"
 help = "write the handler before the condition: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "blocus '{fac}' unum modificatorem capit, non '{omnia}' et '{machina}' simul"
+help = "'{machina}' omnes errores semel in exitu blocui iam tradit; '{omnia}' omitte"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "comma iam non separat subiecta '{discerne}'"
@@ -980,7 +1003,7 @@ help = "name the hint right after via, as in `x ↦ u32 via Hex`; the hints are 
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "a convert hint is not a type argument"
-help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "write the hint as a via clause after the target: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "a convert hint does not follow the target in angle brackets"
@@ -1570,6 +1593,14 @@ help = "scribe ambitum in lista, ut {lista}<int, {magnitudo} 1…8>; semper trah
 message = "numerus listae post `{magnitudo}` scribitur"
 help = "scribe `{lista}<int, {magnitudo} 4>` pro quattuor elementis ad summum, aut `{lista}<int, {magnitudo} 1…8>` pro ambitu; ambitus nudus valorem terminat, non numerum"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "capacitas post `{magnitudo}` scribitur"
+help = "scribe `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` aut `{ascii}<{magnitudo} 8>` pro capacitate tot ad summum; numerus nudus capacitas non est"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "numerus ordinum vectoris post `{magnitudo}` scribitur"
+help = "scribe `{vector}<f32, {magnitudo} 4>` pro quattuor ordinibus; brevis forma `vf32[4]` immutata manet"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "habitus annotationis functionis '{annotation_posture}' cum habitu scripto '{written_posture}' pugnat"
 help = "emenda structuram AST ad demittendum"
@@ -1596,11 +1627,11 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
-help = "use queue<T> or queue<T, N>"
+help = "use queue<T> or queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack requires one or two type parameters"
-help = "use stack<T> or stack<T, N>"
+help = "use stack<T> or stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne {casu} requires a pattern"
@@ -1814,6 +1845,26 @@ help = "parametrum omitte et coordinatam iterationis per `{apud}` in ansa `{filu
 message = "corpus nuclei tractatorem localem ('{construct}') ponere non potest"
 help = "errorem ad vocationem lancientem perveniat, ubi hospes eum tractat"
 
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "regio '{fac} {machina}' aliam '{fac} {machina}' continere non potest"
+help = "unam regionem machinae serva et nuclea ex ea directe voca"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' regionem '{fac} {machina}' relinquit; regio verbum exitus nondum habet"
+help = "regionem fini et post eam decerne, vel exitum extra blocum move"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "ansa lineae ('{construct}') directe in regione '{fac} {machina}' nondum efficitur"
+help = "nucleum ex regione voca ad opus parallelum"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "regio '{fac} {machina}' tensorem nondum assignare potest ({construct})"
+help = "tensorem ante regionem assigna et intus utere"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' in regione '{fac} {machina}' valorem in machina computatum legit; imperium ansae in machina nondum efficitur"
+help = "condiciones, limites et argumenta scalaria ad valores ante regionem notos restringe, et eventus machinae post eam lege"
+
 [diagnostics.SEM008.issues.nucleum_saturating_float_not_built]
 message = "nucleum fractum saturatum nondum adhibere potest ({site}); nucleorum structio fractorum saturatorum nondum efficitur"
 help = "in nucleo latitudinem fractionis nudam adhibe et ad limitem hospitis per `↦` muta"
@@ -1839,12 +1890,12 @@ message = "precision marker must be a bare spelling such as ms or us"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.ascii_format_hint_not_capacity]
-message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N> via Hex|Bin|Oct"
-help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width"
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<{magnitudo} N> via Hex|Bin|Oct"
+help = "write ascii<{magnitudo} N> via Hex, ascii<{magnitudo} N> via Bin, or ascii<{magnitudo} N> via Oct with N as digit width"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type cannot accept parameters"
-help = "textus<N>, ascii<N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N>, and {lista}<b8, {magnitudo} N> are bounded forms, spelled with their own type words"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
@@ -1984,7 +2035,7 @@ help = "foramen `_` in annotatione est, non in constructione"
 
 [diagnostics.SEM008.issues.constructor_register_extent_requires_literal]
 message = "latitudo vectoris vel dimensio matricis in constructione litteram numeri requirit"
-help = "scribe latitudinem numero, ut vector<f32, 4>"
+help = "scribe latitudinem numero, ut vector<f32, magnitudo 4>"
 
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "dimensiones constructionis litteras, nomina magnitudinum, et sublatas scriptas admittunt"
@@ -2759,11 +2810,11 @@ message = "vector element type mismatch"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector requires element type and width; use vector<T, N>"
+message = "vector requires element type and width; use vector<T, magnitudo N>"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector requires a width; use vector<T, 4> or vf32[4]"
+message = "vector requires a width; use vector<T, magnitudo 4> or vf32[4]"
 help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.tuple_index_out_of_bounds]
@@ -3036,7 +3087,7 @@ help = "convert both operands to the same {modulus} width, or keep both operands
 
 [diagnostics.SEM011.issues.textus_literal_too_long]
 message = "{textus} literal exceeds its declared capacity of {capacity}"
-help = "shorten the {textus}<N> literal to fit its declared capacity, or use unbounded {textus}"
+help = "shorten the {textus}<{magnitudo} N> literal to fit its declared capacity, or use unbounded {textus}"
 
 [diagnostics.SEM011.issues.glyph_operands_unsupported]
 message = "operator {op} does not apply to these operand types"
@@ -3181,6 +3232,10 @@ help = "remove the explicit type argument list"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "numeric {lista} elements required"
 help = "use numeric elements for this {lista} intrinsic"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extende` needs a plain lista receiver; a bounded or length-ranged lista cannot grow in place"
+help = "extende into an unbounded lista, or add one element at a time with `appende`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "methodus `.ordinata(clavis)` remota est; utere expressione ordinandi"
@@ -3424,7 +3479,7 @@ help = "call shift(offsets) before {limes}<Policy>()"
 
 [diagnostics.SEM011.issues.tensor_limes_policy_invalid]
 message = "{limes} requirit rationem marginis propriam aut genus sine campis instantiarum validum"
-help = "provide remap(vector<int, R>) -> vector<int, R> and an optional transform(vector<int, R>, T) -> T method"
+help = "provide remap(vector<int, magnitudo R>) -> vector<int, magnitudo R> and an optional transform(vector<int, magnitudo R>, T) -> T method"
 
 [diagnostics.SEM011.issues.tensor_shift_offset_rank_mismatch]
 message = "tensoris disloco offsets eandem rationem habere debent atque tensor"
@@ -3548,7 +3603,7 @@ help = "add a declared collection type for vacua"
 
 [diagnostics.SEM014.issues.bounded_capacity_unsolved]
 message = "bounded capacity could not be inferred"
-help = "write a concrete N ({ascii}<8>) or give the hole a bounded witness"
+help = "write a concrete N ({ascii}<{magnitudo} 8>) or give the hole a bounded witness"
 
 [diagnostics.SEM014.issues.marker_width_unsolved]
 message = "numeric width marker could not be inferred"
@@ -3647,8 +3702,8 @@ message = "{lista}<b8> endian conversion requires a window whose length matches 
 help = "use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64"
 
 [diagnostics.SEM016.issues.ascii_format_hint_not_capacity]
-message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N> via Hex|Bin|Oct"
-help = "write ascii<N> via Hex, ascii<N> via Bin, or ascii<N> via Oct with N as digit width"
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<{magnitudo} N> via Hex|Bin|Oct"
+help = "write ascii<{magnitudo} N> via Hex, ascii<{magnitudo} N> via Bin, or ascii<{magnitudo} N> via Oct with N as digit width"
 
 [diagnostics.SEM016.issues.ascii_pack_width_overflow]
 message = "ascii format pack needs more digits than the declared capacity N; widen N or narrow the source first"
@@ -3662,23 +3717,27 @@ help = "convert to an unsigned numerus width before packing"
 message = "conversion from {lista}<b8> to fractus is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
 help = "use chorda or explicit byte conversion helpers"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_unspecified]
+[diagnostics.SEM016.issues.list_b8_to_tensor_unspecified]
 message = "conversion from {lista}<b8> to tensor needs the byte order of each element; write `via Le` or `via Be`"
 help = "write {lista}<b8> ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_element_unsupported]
+[diagnostics.SEM016.issues.list_b8_to_tensor_element_unsupported]
 message = "{lista}<b8> convert only to a tensor of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 elements"
 help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_length_mismatch]
+[diagnostics.SEM016.issues.list_b8_to_tensor_length_mismatch]
 message = "the {lista}<b8> length must equal the element count times the element width: expected {expected} bytes, found {actual}"
 help = "size the {lista}<b8> window to product(shape) times the element width, or change the tensor shape"
 
-[diagnostics.SEM016.issues.tensor_to_octeti_unspecified]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
+message = "a record tensor reads its bytes in the little-endian layout of the record; write `via Le`, not `via Be`"
+help = "write {lista}<b8> ↦ tensor<Record, [n]> via Le; a record element has one byte order, fixed by its layout"
+
+[diagnostics.SEM016.issues.tensor_to_list_b8_unspecified]
 message = "conversion from tensor to {lista}<b8> needs the byte order of each element; write `via Le` or `via Be`"
 help = "write tensor ↦ {lista}<b8> via Le (or via Be); no other hint applies, and the hint is required for every element width"
 
-[diagnostics.SEM016.issues.tensor_to_octeti_element_unsupported]
+[diagnostics.SEM016.issues.tensor_to_list_b8_element_unsupported]
 message = "a tensor converts to {lista}<b8> only when its elements are u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64"
 help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
 
@@ -4948,11 +5007,11 @@ help = "choose a different binding name when the `{keyword}` literal is needed"
 
 [diagnostics.WARN022]
 message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
-help = "convert to textus<N> for O(1) indexing or iterate scalars"
+help = "convert to textus<{magnitudo} N> for O(1) indexing or iterate scalars"
 
 [diagnostics.WARN022.issues.unbounded_textus_index]
 message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
-help = "convert to textus<N> for O(1) indexing or iterate scalars"
+help = "convert to textus<{magnitudo} N> for O(1) indexing or iterate scalars"
 
 [diagnostics.WARN023]
 message = "type test names a member its union cannot hold"
@@ -5068,7 +5127,19 @@ help = "`{rumpe}` ciclum `{filum}` sistere non potest: semitae seorsum currunt. 
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` ex ciclo `{filum}` exire non potest"
-help = "`{redde}` ex ciclo `{filum}` exire non potest: semitae seorsum currunt. Unum valorem ex semitis capere: `{reducta}`; ad terminum sistere: terminum prius computa et usque ad eum itera."
+help = "`{redde} {filum}` hanc semitam ex quavis altitudine finit; `{perge}` idem in summo semitae gradu facit."
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` tantum intra corpus cicli semitarum valet"
+help = "`{redde} {filum}` tantum intra corpus cicli `{filum}` utere"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` valorem non accipit"
+help = "valorem dele; semitae per repositoria sua eventus tradunt"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "`{redde} {filum}` in corpore interiore semitam circumdantem finire non potest"
+help = "in ipso corpore semitae utere, non in clausura vel reductione interiore"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "corpus reductionis vocare potest tantum intrinseca machinae, fragmenta, et adiutores nuclei privatos: {reason}"
@@ -5080,141 +5151,187 @@ help = "serva terminum purum: scribe tantum locales a corpore declaratos, et voc
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"
+help = "Post argumenta generis adde `>` clausorium."
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "expected '(' before function type parameters"
+help = "Genus functionis per `(` ante genera parametrorum incipe."
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "expected ')' after function type parameters"
+help = "Indicem parametrorum per `)` claude ante sagittam reditus `→`."
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "expected '→' before the function return type"
+help = "Inter indicem parametrorum et genus reditus scribe `→`."
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "expected '<' after the numeric wrapper name"
+help = "Utere genere latitudinis simplici, ut `i32` aut `f32`; genera numerica iam `<...>` non accipiunt."
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "expected ':' after the tuple element label"
+help = "Inter titulum elementi iunctae et genus pone `:`, ut in `tuple<name: string>`."
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "expected ':' after the ratio element label"
+help = "Inter titulum campi rationis et genus pone `:`, ut in `record<name: string>`."
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "expected ']' after shape dimensions"
+help = "Dimensiones figurae `]` claude, ut in `tf32[2, 3]`."
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "expected ')' after the parenthesized shape"
+help = "Expressionem magnitudinis parenthesibus inclusam `)` claude, ut in `{magnitudo} (n + 1)`."
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "expected '←' after the awaited binding"
+help = "Post ligamen `{figendum}` aut `{variandum}`, ante expressionem futuri utere `←`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "expected '[' to start the array binding pattern"
+help = "Ligamen ordinatum per `[` incipe, ut in `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "expected ']' to end the array binding pattern"
+help = "Ligamen ordinatum `]` claude, ut in `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "expected an opening brace for the object binding pattern"
+help = "Ligamen obiecti per `{{` incipe, ut in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "expected a closing brace for the object binding pattern"
+help = "Ligamen obiecti `}` claude, ut in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "expected '(' before function declaration parameters"
+help = "Parametra functionis parenthesibus post nomen scribe: `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "expected ')' after function declaration parameters"
+help = "Indicem parametrorum post ultimum parametrum claude, ut in `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "expected a closing brace after the class body"
+help = "Genus post membra eius claude, ut in `{genus} Name {{ {sit} int value }`."
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "expected an opening brace for the interface body"
+help = "Corpus interface per `{{` incipe, ut in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "expected '(' before interface method parameters"
+help = "Parametra methodi interface parenthesibus scribe: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "expected ')' after interface method parameters"
+help = "Indicem parametrorum methodi post ultimum parametrum claude: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "expected a closing brace after the interface body"
+help = "Interfaciem post subscriptiones methodorum claude, ut in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "expected '=' before the type alias value"
+help = "Alias generis per `=` scribe, ut in `{typus} Name = string`."
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "expected an opening brace for the schema body"
+help = "Corpus schematis per `{{` incipe, ut in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "expected a closing brace after the schema body"
+help = "Schema post columnas claude, ut in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "expected an opening brace for the enum body"
+help = "Corpus enumerationis per `{{` incipe, ut in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "expected a closing brace after the enum body"
+help = "Enumerationem post membra eius claude, ut in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "expected an opening brace for the union body"
+help = "Corpus unionis per `{{` incipe, ut in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "expected a closing brace after the union variant fields"
+help = "Contentum variantis post campos claude, ut in `Circle {{ int radius }`."
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "expected a closing brace after the union body"
+help = "Unionem post variantes eius claude, ut in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "expected an opening brace for the import record"
+help = "Tabulam importationis per `{{` incipe, ut in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "expected '=' after the import field name"
+help = "Inter campum importationis et valorem pone `=`, ut in `{ex} = \"norma:console\"`."
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "expected a closing brace after the import record fields"
+help = "Tabulam importationis post campos claude, ut in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "expected an opening brace for the probandum body"
+help = "Corpus cohortis probationum per `{{` incipe, ut in `{probandum} \"suite\" {{`."
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "expected a closing brace after the probandum body"
+help = "Cohortem probationum post probationes et praeparationis clausulas `}` claude."
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "expected an opening brace for the annotation fields"
+help = "Ad campos annotationem uncis inclusam utere, ut `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "expected '=' after the annotation field name"
+help = "Inter campum annotationis et valorem pone `=`, ut in `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "expected a closing brace after the annotation fields"
+help = "Annotationem uncis inclusam post campos claude, ut in `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "expected an opening brace for the nucleum annotation fields"
+help = "Utere optionibus nuclei uncis inclusis, ut `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "expected '=' after the nucleum annotation field name"
+help = "Inter optionem nuclei et valorem pone `=`, ut in `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "expected a closing brace after the nucleum annotation fields"
+help = "Optiones nuclei uncis inclusas post campos claude, ut in `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.block_start]
 message = "expected an opening brace for the block"
+help = "Partem post caput eius incipe, ut in `{si} ready {{ {tacet} }`."
 
 [diagnostics.PARSE001.issues.block_end]
 message = "expected a closing brace to end the block"
+help = "Partem post sententias eius `}` claude."
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "expected '>' after generic parameters"
+help = "Indicem parametrorum genericorum per `>` claude, ut in `{functio} identity<T>(T value)`."
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "expected '>' after contract type arguments"
+help = "Argumenta generis contractus per `>` claude, ut in `Contract<Type>`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "expected '[' after 'apud'"
+help = "Coordinatas iterationis uncis quadratis post `{apud}` pone, ut in `{itera} {ex} values {apud} [i] {sit} value`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "expected ']' after the 'apud' coordinates"
+help = "Indicem coordinatarum post nomina `]` claude."
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "vocabulum exspectabatur: '{keyword}'"
@@ -5222,36 +5339,47 @@ help = "scribe '{keyword}' hic"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "expected a reduction source after the reduction operator"
+help = "Post operatorium reductionis scribe `{ex} source`."
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "expected '{lege}' or '{lineam}'"
+help = "Utere `{lege}` ut omnia data legas, aut `{lineam}` ut unam lineam legas."
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "expected an opening brace for the elige body"
+help = "Scribe `{elige} value {{ ... }` cum casibus `{casu}` intus."
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "expected a closing brace after the elige cases"
+help = "Corpus `{elige}` post casus `{casu}` et casum optionalem `{ceterum}` claude."
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "expected an opening brace for the discerne body"
+help = "Scribe `{discerne} value {{ ... }` cum brachiis exemplarium `{casu}` intus."
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "expected a closing brace after the discerne arms"
+help = "Corpus `{discerne}` post brachia `{casu}` et brachium optionalem `{ceterum}` claude."
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "expected an opening brace for the custodi body"
+help = "Corpus per `{custodi} {{` incipe et unam vel plures clausulas `{si}` adde."
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "expected a closing brace after the custodi clauses"
+help = "Corpus `{custodi}` post clausulas `{si}` claude."
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "expected '✗' after the conditional value"
+help = "Inter valorem rami tunc et valorem rami alterius pone `✗`."
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "expected ')' after the call arguments"
+help = "Indicem argumentorum vocationis `)` claude."
 
 [diagnostics.PARSE001.issues.index_end]
 message = "expected ']' after the index expression"
+help = "Expressionem indicis `]` claude."
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "index unam tantum expressionem accipit; coordinatae separatae singula per axem non sunt"
@@ -5259,99 +5387,131 @@ help = "scribe coordinatas in lista unica, sicut m[[r, c]]"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "expected ']' after the gradient selectors"
+help = "Indicem selectorum uncis quadratis inclusum post elementa `]` claude."
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "expected ']' after the optional index expression"
+help = "Indicem optionalem ita finias: `value?[index]`."
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "expected ')' after the optional call arguments"
+help = "Vocationem optionalem ita finias: `value?(arguments)`."
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "expected ']' after the non-null index expression"
+help = "Indicem non nullum ita finias: `value![index]`."
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "expected ')' after the non-null call arguments"
+help = "Vocationem non nullam ita finias: `value!(arguments)`."
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "expected a closing brace after the constructor fields"
+help = "Campos constructoris post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "expected ']' after the inferred constructor elements"
+help = "Indicem elementorum constructoris illati `]` claude."
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "expected ']' after the array elements"
+help = "Litterale indicis post elementa `]` claude."
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "expected ')' after the parenthesized expression"
+help = "Expressionem parenthesibus inclusam `)` claude."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "expected '<' after 'ratio'"
+help = "Argumenta generis nominata post `record` scribe, ut in `record<label: Type>`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "expected '>' after the ratio type arguments"
+help = "Indicem argumentorum generis rationis ante campos per `>` claude."
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "expected an opening brace after the ratio type arguments"
+help = "Post argumenta generis rationis, campos per `{{` incipe."
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "expected a closing brace after the ratio fields"
+help = "Campos rationis post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "expected a closing brace after the typed constructor fields"
+help = "Campos constructoris typati post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "expected a closing brace after the finge fields"
+help = "Campos variantis post ultimum campum `}` claude."
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "expected '<' after 'iuncta'"
+help = "Argumenta generis iunctae post `{iuncta}` scribe, ut in `{iuncta}<T, U>`."
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "expected '[' after the iuncta type arguments"
+help = "Post argumenta generis, indicem valorum iunctae uncis quadratis inclusum scribe."
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "expected ']' after the iuncta elements"
+help = "Indicem valorum iunctae `]` claude post elementa."
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "expected ')' after the closure parameters"
+help = "Indicem parametrorum per `)` claude ante subscriptionem optionalem et `∴`."
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "expected '∴' after the closure signature"
+help = "Post subscriptionem clausurae scribe `∴`, deinde expressionem aut partem `{fac}`."
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "expected ')' after the ad opener"
+help = "Expressionem apertoris optionalis post eius valorem `)` claude."
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "expected ':' after the argument label"
+help = "In vocatione formulae, inter titulum argumenti et valorem pone `:`."
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "expected ']' after the computed object key"
+help = "Clavem campi computatam `]` claude ante scribendum `= value`."
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "expected ':' after the JSON key"
+help = "Inter unamquamque clavem JSON inter virgulas et eius valorem pone `:`."
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "expected a closing brace after the JSON object"
+help = "Obiectum JSON post membra eius `}` claude."
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "expected ']' after the JSON array"
+help = "Indicem JSON post valores eius `]` claude."
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "expected a closing brace after the inferred constructor fields"
+help = "Constructorem illatum `}` claude."
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "expected '>' after the call type arguments"
+help = "Indicem argumentorum generis ante '(' vocationis per '>' claude."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "expected '<' before the constructor type arguments"
+help = "Ante argumenta generis constructoris adde '<'."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "expected '>' after the constructor type arguments"
+help = "Indicem argumentorum generis constructoris per '>' claude."
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "expected '(' after 'scriptum'"
+help = "Vocationem `{scriptum}` per '(' incipe."
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "expected ')' after the scriptum arguments"
+help = "Vocationem `{scriptum}` post argumenta per ')' claude."
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "nomen identificatoris exspectabatur"
@@ -5443,18 +5603,24 @@ message = "kernel `{kernel}` runs serialized on the {device} device"
 
 [diagnostics.INFO001.issues.single_lane]
 message = "kernel `{kernel}` runs on one lane"
+help = "Utere functione `@ {nucleum}` cum circuitu `{itera}` et clausula `{filum}`, cum unaquaeque via rem tractare debeat."
 
 [diagnostics.INFO001.issues.not_split]
 message = "kernel `{kernel}` runs on one of the {partitions} partitions: {reason}"
+help = "Causam inspice: divisio reticulum lineare viarum executionis, spatium viae, et scripturas intra spatium uniuscuiusque viae contentas requirit."
 
 [diagnostics.INFO001.issues.split_depends_on_shapes]
 message = "kernel `{kernel}`: whether it splits across the {partitions} partitions depends on run-time shapes"
+help = "Formas exsecutionis elige quae ordini viarum et scripturis eiusdem spatia congruentia praebent, ut divisio praedictibilis sit."
 
 [diagnostics.INFO001.issues.whole_call]
 message = "kernel `{kernel}` runs as one sequential call on one CPU worker"
+help = "Ad opus independens singulorum elementorum, utere functione `@ {nucleum}` cum circuitu `{itera}` et clausula `{filum}`."
 
 [diagnostics.INFO001.issues.not_placed]
 message = "kernel `{kernel}` is not placed on the {device} device: {reason}"
+help = "Causam inspice et forma nuclei utere quam machina electa sustinet."
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
+help = "Sequere causam inspectionis ut dependentiam invenias. Lectiones et scripturas per partitiones divisas intra singulas vias contine, et dispositionibus bufferorum congruentibus utere ubi fieri potest."

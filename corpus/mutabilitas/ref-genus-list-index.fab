@@ -1,0 +1,24 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "genus_decl", "genus_member", "field_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "redde_stmt", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "array_literal", "member_suffix", "call_expr", "call_suffix", "argument_list", "argument", "nota_stmt"]
+category = "binding"
+summary = "A list field remains safely indexable through a ref genus parameter."
+syntax = "fn second(ref Shelf shelf, int i) → int { return shelf.values[i] }"
+related = ["ref", "genus", "lista"]
+locale = "en"
++++
+# Ref genus parameters preserve checked indexing on list fields.
+
+class Shelf {
+    let list<int> values
+}
+
+fn second(ref Shelf shelf, int i) → int {
+    return shelf.values[i]
+}
+
+main {
+    let Shelf shelf ← Shelf { values = [10, 20, 30] }
+    print second(ref shelf, 1)
+}

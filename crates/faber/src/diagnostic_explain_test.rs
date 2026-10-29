@@ -86,7 +86,7 @@ fn embedded_default_pack_resolves_diagnostic_issue_structurally() {
         Some("initializer_annotation_mismatch")
     );
     assert_eq!(explanation.locale, "en");
-    assert!(!explanation.message.is_empty());
+    assert_ne!(explanation.message, "");
     assert!(
         explanation
             .help
@@ -108,7 +108,7 @@ fn embedded_nonlatin_pack_resolves_diagnostic_issue_structurally() {
         Some("initializer_annotation_mismatch")
     );
     assert_eq!(explanation.locale, "zh-Hans");
-    assert!(!explanation.message.is_empty());
+    assert_ne!(explanation.message, "");
 }
 
 #[test]

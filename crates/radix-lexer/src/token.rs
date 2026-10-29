@@ -186,6 +186,10 @@ pub enum TokenKind {
     Descriptio,
     Fragment,
     Imperium,
+    /// `intutus` (en `unsafe`): the `@ nucleum` tier that also drops unproven index checks.
+    Intutus,
+    /// `laxus` (en `relaxed`): the `@ nucleum` tier that allows relaxed float math.
+    Laxus,
     Longum,
     Lane,
     Nomen,
@@ -236,6 +240,8 @@ pub enum TokenKind {
     Lege,
     Lineam,
     Omnia,
+    /// `machina` (en `device`): the device-region modifier directly after `fac`.
+    Machina,
     Praefixum,
     /// Build-time file embed in a constant initializer (en `embed`, D8.10).
     Insere,

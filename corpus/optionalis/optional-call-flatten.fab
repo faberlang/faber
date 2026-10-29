@@ -1,0 +1,30 @@
++++
+term = "?("
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "function_type", "optional_suffix"]
+category = "type"
+summary = "Optional calls flatten nullable results, including a nested optional factory call."
+syntax = "<expression>?(<args>)"
+related = ["?(", "?[", "?."]
+locale = "en"
++++
+# Optional calls flatten nullable results, including nested chains.
+
+type Op = (int) → int ∪ none
+type Factory = () → Op ∪ none
+
+fn maybe(int x) → int ∪ none {
+    return null
+}
+
+fn factory() → Op ∪ none {
+    return maybe
+}
+
+main {
+    let Op ∪ none f ← maybe
+    print f?(1)
+
+    let Factory ∪ none make ← factory
+    print make?()?(1)
+}

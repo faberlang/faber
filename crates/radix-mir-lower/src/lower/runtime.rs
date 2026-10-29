@@ -797,6 +797,15 @@ impl FunctionBuilder<'_> {
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
             if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && matches!(entry.mir_kind, radix_intrinsics::IntrinsicMirKind::ListExtend)
+            {
+                return self.lower_extende(receiver, &args[0].expr, expr);
+            }
+        }
+
+        if let Some(receiver_ty) = receiver.ty {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if let Some(entry) = radix_intrinsics::lookup_method_for_type(payload, &method_name, args.len())
                 && radix_intrinsics::mir_is_higher_order_lista(entry)
             {
                 let closure = &args[0].expr;
@@ -3364,16 +3373,23 @@ impl FunctionBuilder<'_> {
             let base = self.lower_expr_value(object)?;
             let ty = self.expr_ty(expr)?;
             let operands_effect_free = args.iter().all(|arg| arg.expr.is_effect_free_operand());
-            return self.lower_option_chain_guarded(&base, object.ty, operands_effect_free, ty, expr.span, |this| {
-                let mut call_args = Vec::with_capacity(args.len() + 1);
-                call_args.push(base.clone());
-                call_args.extend(this.lower_hir_call_args(args)?);
-                this.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
-                Some(MirOptionChainLink::Call {
-                    callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
-                    args: call_args,
-                })
-            });
+            return self.lower_option_chain_guarded(
+                &base,
+                object.ty,
+                operands_effect_free,
+                ty,
+                expr.span,
+                |this, captured_base| {
+                    let mut call_args = Vec::with_capacity(args.len() + 1);
+                    call_args.push(captured_base.clone());
+                    call_args.extend(this.lower_hir_call_args(args)?);
+                    this.emit_call_shape_check(expr.id, &call_args, 1, expr.span)?;
+                    Some(MirOptionChainLink::Call {
+                        callee: MirCallee::definition_with_type_args(target.def_id, Vec::new()),
+                        args: call_args,
+                    })
+                },
+            );
         }
 
         // Callable value: a local binding or non-path expression. Positional args,
@@ -4484,7 +4500,7 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
-        // `tensor<E, [N]> ↦ vector<E, N>`: the tensor flattens to its element
+        // `tensor<E, [N]> ↦ vector<E, size N>`: the tensor flattens to its element
         // lista and lane `k` reads slot `k`. A tensor source is not a literal,
         // so it never reaches the `lista` literal arm below.
         if recovery.is_none()
@@ -5095,7 +5111,7 @@ impl FunctionBuilder<'_> {
         id
     }
 
-    /// `tensor<E, [N]> ↦ vector<E, N>`: flatten the tensor to its element
+    /// `tensor<E, [N]> ↦ vector<E, size N>`: flatten the tensor to its element
     /// lista, then build lane `k` from slot `k` of that lista in order.
     fn lower_tensor_to_vector_conversio(
         &mut self,
@@ -6782,6 +6798,10 @@ mod sink_into_test;
 #[cfg(test)]
 #[path = "imported_default_test.rs"]
 mod imported_default_test;
+
+#[cfg(test)]
+#[path = "unary_mut_param_test.rs"]
+mod unary_mut_param_test;
 
 #[cfg(test)]
 #[path = "omitted_optional_test.rs"]

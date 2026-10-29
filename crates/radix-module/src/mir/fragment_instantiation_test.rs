@@ -875,6 +875,8 @@ fn synthetic_metadata(function_id: u32) -> MirDeviceFunctionMetadataMap {
             visibility: MirFunctionVisibility::Private,
             origin: MirFunctionOrigin::SyntheticKernelClosure,
             lane_domain_local: None,
+            refused_backends: Default::default(),
+            tier: radix_mir::device::KernelTier::Default,
         },
     );
     metadata
@@ -1017,12 +1019,12 @@ fn lower_source(source: &str) -> Result<(), Vec<crate::mir::MirError>> {
 fn vector_lane_arguments_instantiate() {
     let source = r"
 @ kernel
-fn vec3(f32 x, f32 y, f32 z) → vector<f32, 3> {
-    return [x, y, z] ↦ vector<f32, 3>
+fn vec3(f32 x, f32 y, f32 z) → vector<f32, size 3> {
+    return [x, y, z] ↦ vector<f32, size 3>
 }
 
 @ kernel
-fn xyz(vector<f32, 4> v) → vector<f32, 3> {
+fn xyz(vector<f32, size 4> v) → vector<f32, size 3> {
     return vec3(v[0], v[1], v[2])
 }
 ";
@@ -1034,16 +1036,16 @@ fn genus_field_arguments_instantiate() {
     let source = r"
 class Params {
     let f32 scale
-    let vector<f32, 3> axis
+    let vector<f32, size 3> axis
 }
 
 @ kernel
-fn scaled(f32 s, vector<f32, 3> axis) → vector<f32, 3> {
+fn scaled(f32 s, vector<f32, size 3> axis) → vector<f32, size 3> {
     return axis * s
 }
 
 @ kernel
-fn use_field(Params p) → vector<f32, 3> {
+fn use_field(Params p) → vector<f32, size 3> {
     return scaled(p.scale, p.axis)
 }
 ";
@@ -1066,7 +1068,7 @@ fn pick(tensor<f32, [24]> clock, i32 i) → f32 {
     lower_source(source).unwrap_or_else(|errors| panic!("tensor element projections must instantiate: {errors:?}"));
 }
 
-/// Entry `k(vector<f32, 4> v)` calling `helper(v[0])`, where `helper` takes
+/// Entry `k(vector<f32, size 4> v)` calling `helper(v[0])`, where `helper` takes
 /// one `param_ty` parameter.
 fn lane_argument_program(types: &mut TypeTable, param_ty: Option<MirType>) -> (Vec<MirFunction>, MirType) {
     use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type};

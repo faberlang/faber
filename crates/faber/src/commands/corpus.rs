@@ -1321,6 +1321,37 @@ fn judge_lower_pass(lowered: &Output) -> (&'static str, Option<String>) {
     }
 }
 
+fn judge_output_expectations(
+    expected: &Expected,
+    expected_stdout: Option<&[u8]>,
+    expected_stderr: Option<&[u8]>,
+    output: &Output,
+) -> Option<&'static str> {
+    if expected_stdout
+        .is_some_and(|expected| normalize_stdout(expected) != normalize_stdout(&output.stdout))
+    {
+        Some("stdout mismatch")
+    } else if expected.stderr.is_some()
+        && output.stderr.as_slice() != expected_stderr.unwrap_or_default()
+    {
+        Some("stderr mismatch")
+    } else if expected
+        .stdout_contains
+        .as_ref()
+        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stdout).contains(fragment))
+    {
+        Some("stdout diagnostic mismatch")
+    } else if expected
+        .stderr_contains
+        .as_ref()
+        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stderr).contains(fragment))
+    {
+        Some("stderr diagnostic mismatch")
+    } else {
+        None
+    }
+}
+
 fn judge_pass(
     case: &Case,
     expected_stdout: Option<Vec<u8>>,
@@ -1339,25 +1370,13 @@ fn judge_pass(
                 expected.exit, output.status
             )),
         )
-    } else if expected_stdout
-        .as_deref()
-        .is_some_and(|expected| normalize_stdout(expected) != normalize_stdout(&output.stdout))
-    {
-        ("fail", Some("stdout mismatch".to_owned()))
-    } else if expected.stderr.is_some() && output.stderr != expected_stderr.unwrap_or_default() {
-        ("fail", Some("stderr mismatch".to_owned()))
-    } else if expected
-        .stdout_contains
-        .as_ref()
-        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stdout).contains(fragment))
-    {
-        ("fail", Some("stdout diagnostic mismatch".to_owned()))
-    } else if expected
-        .stderr_contains
-        .as_ref()
-        .is_some_and(|fragment| !String::from_utf8_lossy(&output.stderr).contains(fragment))
-    {
-        ("fail", Some("stderr diagnostic mismatch".to_owned()))
+    } else if let Some(reason) = judge_output_expectations(
+        expected,
+        expected_stdout.as_deref(),
+        expected_stderr.as_deref(),
+        output,
+    ) {
+        ("fail", Some(reason.to_owned()))
     } else {
         ("pass", None)
     }
@@ -1481,18 +1500,22 @@ fn judge_known_run_kind(case: &Case, output: &Output) -> Option<(&'static str, O
                     Some("unexpected exit match; update target expectation".to_owned()),
                 ));
             }
-            // The pin names the exit status as the one known failure, so the
-            // output the program does produce must still be the golden.
-            if let Some(path) = expected.stdout.as_ref() {
-                let golden = match fs::read(path) {
-                    Ok(bytes) => bytes,
-                    Err(error) => {
-                        return Some(("fail", Some(format!("cannot read stdout golden: {error}"))));
-                    }
-                };
-                if normalize_stdout(&golden) != normalize_stdout(&output.stdout) {
-                    return Some(("fail", Some("stdout mismatch".to_owned())));
+            let stdout = match expected.stdout.as_ref().map(fs::read).transpose() {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    return Some(("fail", Some(format!("cannot read stdout golden: {error}"))));
                 }
+            };
+            let stderr = match expected.stderr.as_ref().map(fs::read).transpose() {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    return Some(("fail", Some(format!("cannot read stderr golden: {error}"))));
+                }
+            };
+            if let Some(reason) =
+                judge_output_expectations(expected, stdout.as_deref(), stderr.as_deref(), output)
+            {
+                return Some(("fail", Some(reason.to_owned())));
             }
             Some(("expected-fail", None))
         }

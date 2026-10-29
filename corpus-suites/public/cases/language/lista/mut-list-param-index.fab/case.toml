@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/lista/mut-list-param-index.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/mut-list-param-index.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true

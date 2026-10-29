@@ -63,7 +63,7 @@ fn literal_width_methods_leave_no_deferred_op_in_the_program() {
 
 #[test]
 fn generic_width_method_expands_at_the_instance() {
-    let lines = run(r"functio dot_self<magnitudo N>(vector<f32, N> v) → f32 {
+    let lines = run(r"functio dot_self<magnitudo N>(vector<f32, magnitudo N> v) → f32 {
     redde v.productum(v)
 }
 
@@ -77,7 +77,7 @@ incipit {
 
 #[test]
 fn one_generic_template_instantiates_at_two_widths() {
-    let lines = run(r"functio dot_self<magnitudo N>(vector<f32, N> v) → f32 {
+    let lines = run(r"functio dot_self<magnitudo N>(vector<f32, magnitudo N> v) → f32 {
     redde v.productum(v)
 }
 

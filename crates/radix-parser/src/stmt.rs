@@ -541,7 +541,7 @@ impl Parser {
     /// Parse `fac`, the canonical block form for do/try-style execution.
     ///
     /// GRAMMAR:
-    ///   fac-stmt := `fac` [`omnia`] block [`cape` ident block] [`dum` expr]
+    ///   fac-stmt := `fac` [`omnia` | `machina`] block [`cape` ident block] [`dum` expr]
     ///
     /// At statement level, a trailing `dum` turns `fac` into a do-while form.
     /// Closure bodies call the shared construct with `allow_while = false` so
@@ -553,7 +553,25 @@ impl Parser {
     pub(super) fn parse_fac_construct(&mut self, allow_while: bool) -> Result<FacStmt, ParseError> {
         self.expect_keyword_ident(TokenKind::Fac)?;
 
-        let omnia = self.eat_keyword_ident(TokenKind::Omnia);
+        let modifier = if self.eat_keyword_ident(TokenKind::Omnia) {
+            FacModifier::Omnia
+        } else if self.eat_keyword_ident(TokenKind::Machina) {
+            FacModifier::Machina
+        } else {
+            FacModifier::None
+        };
+        if modifier != FacModifier::None
+            && (self.check_keyword_ident(TokenKind::Omnia)
+                || self.check_keyword_ident(TokenKind::Machina))
+        {
+            // `do all device` and `do device all` (and a repeat): `device`
+            // already delivers every fault once at the block's exit.
+            return Err(ParseError::structured(
+                ParseErrorKind::StatementInvalid,
+                self.current_span(),
+            )
+            .with_arg("issue", "fac_modifier_redundant"));
+        }
         let body = self.parse_block()?;
         let catch = self.try_parse_cape_stmt()?;
 
@@ -579,7 +597,7 @@ impl Parser {
         };
 
         Ok(FacStmt {
-            omnia,
+            modifier,
             body,
             catch,
             while_,
@@ -588,16 +606,36 @@ impl Parser {
 
     // TRANSFER STATEMENTS
 
-    /// Parse `redde`.
+    /// Parse `redde` or `redde filum`.
     ///
     /// GRAMMAR:
     ///   redde-stmt := `redde` [`expr`]
+    ///   redde-filum-stmt := `redde` `filum` [`expr`]
     ///
-    /// The value must start on the `redde` line. A newline ends a bare
-    /// `redde`, so `si n ≡ 0 ergo redde` never swallows the next statement as
-    /// its return value.
+    /// The value must start on the statement's line. A newline ends a bare
+    /// return (or a bare thread return), so a following statement cannot be
+    /// swallowed as its payload.
     pub(super) fn parse_redde_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Redde)?;
+
+        if !self.raw_newline_before_next_word()
+            && matches!(
+                self.peek().kind,
+                TokenKind::Ident(sym) if self.keyword_claim_key(sym) == Some("filum")
+            )
+        {
+            self.advance();
+            let value = if !self.is_at_end()
+                && !self.check(&TokenKind::RBrace)
+                && !self.check(&TokenKind::Semicolon)
+                && !self.raw_newline_before_next_word()
+            {
+                Some(Box::new(self.parse_expression()?))
+            } else {
+                None
+            };
+            return Ok(StmtKind::ReddeFilum(ReddeFilumStmt { value }));
+        }
 
         let value = if !self.is_at_end()
             && !self.check(&TokenKind::RBrace)

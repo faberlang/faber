@@ -304,7 +304,29 @@ impl Lowerer<'_> {
         let Some(frame) = self.form_frames.pop() else {
             return ty_id;
         };
-        let mut form = Self::complete_type_form(ty, base_ty, frame);
+        let union_form_children = if matches!(ty.kind, TypeExprKind::Union(_))
+            && matches!(self.types.get(base_ty), Type::Option(_))
+        {
+            let children = frame
+                .args
+                .iter()
+                .filter_map(|arg| match arg {
+                    radix_hir::HirTypeFormArg::Type(child)
+                        if !matches!(
+                            self.types.get(child.ty),
+                            Type::Primitive(Primitive::Nihil)
+                        ) =>
+                    {
+                        Some(arg.clone())
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            (children.len() == 1).then_some(children)
+        } else {
+            None
+        };
+        let mut form = Self::complete_type_form(ty, base_ty, frame, union_form_children);
         // Access and nullable modifiers wrap the authored carrier. Keep
         // its name and generic children beneath each semantic wrapper.
         for wrapper_ty in [marked_ty, ty_id] {
@@ -342,19 +364,22 @@ impl Lowerer<'_> {
         expr: &TypeExpr,
         ty: TypeId,
         frame: super::TypeFormFrame,
+        union_form_children: Option<Vec<radix_hir::HirTypeFormArg>>,
     ) -> radix_hir::HirTypeForm {
         let head = match &expr.kind {
             TypeExprKind::Infer | TypeExprKind::FieldListHole => radix_hir::HirTypeFormHead::Infer,
             TypeExprKind::UnionHole => radix_hir::HirTypeFormHead::UnionHole,
             _ => match frame.named {
                 Some((def_id, path)) => radix_hir::HirTypeFormHead::Named { def_id, path },
-                None => radix_hir::HirTypeFormHead::Semantic(expr.form),
+                None => match frame.imported_alias {
+                    Some(path) => radix_hir::HirTypeFormHead::ImportedAlias { path },
+                    None => radix_hir::HirTypeFormHead::Semantic(expr.form),
+                },
             },
         };
         let mut args = match &expr.kind {
-            TypeExprKind::Func(_) | TypeExprKind::Union(_) | TypeExprKind::Intersection(_) => {
-                Vec::new()
-            }
+            TypeExprKind::Func(_) | TypeExprKind::Intersection(_) => Vec::new(),
+            TypeExprKind::Union(_) => union_form_children.unwrap_or_default(),
             _ => frame.args,
         };
         // Range endpoints and the inclusive/exclusive glyph do not contribute
@@ -846,7 +871,7 @@ impl Lowerer<'_> {
             // A selectively imported type (D22.5) is the imported `TypeId`
             // itself, exactly as its qualified `module.Type` path lowers.
             if let Some(type_id) = self.resolver.lookup_selective_import_type(name.name) {
-                self.record_imported_named_head(type_id, vec![name.name]);
+                self.record_imported_named_head(type_id, vec![name.name], !params.is_empty());
                 if params.is_empty() {
                     return type_id;
                 }
@@ -1511,8 +1536,17 @@ impl Lowerer<'_> {
     ///
     /// `type_id` is the imported base type; its definition identity is the
     /// struct, enum, interface or alias it names. A base that names no
-    /// definition keeps the semantic head.
-    fn record_imported_named_head(&mut self, type_id: TypeId, path: Vec<radix_lexer::Symbol>) {
+    /// definition is an imported alias carried as its resolved body: with no
+    /// applied arguments it is recorded as an [`ImportedAlias`] head, and an
+    /// applied one keeps the semantic head.
+    ///
+    /// [`ImportedAlias`]: radix_hir::HirTypeFormHead::ImportedAlias
+    fn record_imported_named_head(
+        &mut self,
+        type_id: TypeId,
+        path: Vec<radix_lexer::Symbol>,
+        applied: bool,
+    ) {
         let mut current = type_id;
         let def_id = loop {
             match self.types.get(current) {
@@ -1521,7 +1555,12 @@ impl Lowerer<'_> {
                 | Type::Interface(def_id)
                 | Type::Alias(def_id, _) => break *def_id,
                 Type::Applied(base, _) => current = *base,
-                _ => return,
+                _ => {
+                    if !applied && let Some(frame) = self.form_frames.last_mut() {
+                        frame.imported_alias = Some(path);
+                    }
+                    return;
+                }
             }
         };
         if let Some(frame) = self.form_frames.last_mut() {
@@ -1554,6 +1593,7 @@ impl Lowerer<'_> {
             self.record_imported_named_head(
                 type_id,
                 path.iter().map(|segment| segment.name).collect(),
+                !params.is_empty(),
             );
             // Imported declarations carry their ordered declaration kinds on
             // the file interface (S0-R1); kind mismatches fail closed instead

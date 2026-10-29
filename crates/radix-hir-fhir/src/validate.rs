@@ -1061,17 +1061,43 @@ fn named_witness(
     types: &radix_types::TypeTableSnapshot,
     ty: radix_types::TypeId,
 ) -> Option<(radix_types::DefId, Vec<radix_types::AppliedArg>)> {
-    match types.types().get(ty.0 as usize)? {
-        radix_types::Type::Struct(def_id)
-        | radix_types::Type::Enum(def_id)
-        | radix_types::Type::Interface(def_id)
-        | radix_types::Type::Alias(def_id, _) => Some((*def_id, Vec::new())),
-        radix_types::Type::Applied(base, args) => {
-            let (def_id, _) = named_witness(types, *base)?;
-            Some((def_id, args.clone()))
+    let mut current = ty;
+    let mut seen = FxHashSet::default();
+    let mut outer_args = None;
+    while seen.insert(current) {
+        match types.types().get(current.0 as usize)? {
+            radix_types::Type::Struct(def_id)
+            | radix_types::Type::Enum(def_id)
+            | radix_types::Type::Interface(def_id)
+            | radix_types::Type::Alias(def_id, _) => {
+                return Some((*def_id, outer_args.unwrap_or_default()));
+            }
+            radix_types::Type::Applied(base, args) => {
+                outer_args.get_or_insert_with(|| args.clone());
+                current = *base;
+            }
+            radix_types::Type::Ref(_, inner) => current = *inner,
+            _ => return None,
         }
-        radix_types::Type::Ref(_, inner) => named_witness(types, *inner),
-        _ => None,
+    }
+    None
+}
+
+fn range_endpoint(
+    bound: &radix_hir::HirRangeBound,
+) -> Option<radix_types::numeric_width::RangeEnd> {
+    match bound {
+        radix_hir::HirRangeBound::Literal(value) => value
+            .parse::<i128>()
+            .ok()
+            .map(radix_types::numeric_width::RangeEnd::Value),
+        radix_hir::HirRangeBound::Unbounded { negative: true } => {
+            Some(radix_types::numeric_width::RangeEnd::NegInf)
+        }
+        radix_hir::HirRangeBound::Unbounded { negative: false } => {
+            Some(radix_types::numeric_width::RangeEnd::PosInf)
+        }
+        radix_hir::HirRangeBound::Name { .. } => None,
     }
 }
 
@@ -1089,20 +1115,7 @@ fn validate_policy_range(
             check_symbol(*name)?;
         }
     }
-    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
-        radix_hir::HirRangeBound::Literal(value) => value
-            .parse::<i128>()
-            .ok()
-            .map(radix_types::numeric_width::RangeEnd::Value),
-        radix_hir::HirRangeBound::Unbounded { negative: true } => {
-            Some(radix_types::numeric_width::RangeEnd::NegInf)
-        }
-        radix_hir::HirRangeBound::Unbounded { negative: false } => {
-            Some(radix_types::numeric_width::RangeEnd::PosInf)
-        }
-        radix_hir::HirRangeBound::Name { .. } => None,
-    };
-    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+    let (Some(lo), Some(hi)) = (range_endpoint(&range.lo), range_endpoint(&range.hi)) else {
         return Err(type_presentation_issue("policy_range_not_constant", site));
     };
     if matches!(
@@ -1148,20 +1161,7 @@ fn validate_list_size_range(
     types: &radix_types::TypeTableSnapshot,
     site: &radix_hir::HirTypeSite,
 ) -> Result<(), HirArtifactError> {
-    let endpoint = |bound: &radix_hir::HirRangeBound| match bound {
-        radix_hir::HirRangeBound::Literal(value) => value
-            .parse::<i128>()
-            .ok()
-            .map(radix_types::numeric_width::RangeEnd::Value),
-        radix_hir::HirRangeBound::Unbounded { negative: true } => {
-            Some(radix_types::numeric_width::RangeEnd::NegInf)
-        }
-        radix_hir::HirRangeBound::Unbounded { negative: false } => {
-            Some(radix_types::numeric_width::RangeEnd::PosInf)
-        }
-        radix_hir::HirRangeBound::Name { .. } => None,
-    };
-    let (Some(lo), Some(hi)) = (endpoint(&range.lo), endpoint(&range.hi)) else {
+    let (Some(lo), Some(hi)) = (range_endpoint(&range.lo), range_endpoint(&range.hi)) else {
         return Err(type_presentation_issue("list_range_not_constant", site));
     };
     let resolved = radix_types::numeric_width::resolve_ranged_list(lo, hi, range.inclusive)
@@ -1241,6 +1241,21 @@ fn validate_type_form(
                 check_index,
                 root_slot,
             );
+        }
+        radix_hir::HirTypeFormHead::ImportedAlias { path } => {
+            // An imported alias is carried as its resolved body, so the
+            // witness is the whole presentation: the authored path and no
+            // authored arguments.
+            if path.is_empty() {
+                return Err(type_presentation_issue("empty_imported_alias_path", site));
+            }
+            for symbol in path {
+                check_symbol(*symbol)?;
+            }
+            if !form.args.is_empty() {
+                return Err(type_presentation_issue("imported_alias_arguments", site));
+            }
+            return Ok(());
         }
         radix_hir::HirTypeFormHead::Semantic(level) => {
             let ty = types
@@ -2073,7 +2088,9 @@ fn collect_stmt_expr_defs(
                 collect_expr_defs(init, registry);
             }
         }
-        HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+        HirStatementKind::Expr(expr)
+        | HirStatementKind::Redde(Some(expr))
+        | HirStatementKind::ReddeFilum(Some(expr)) => {
             collect_expr_defs(expr, registry);
         }
         HirStatementKind::IncDec(inc) => {
@@ -2088,7 +2105,8 @@ fn collect_stmt_expr_defs(
         HirStatementKind::Rumpe
         | HirStatementKind::Perge
         | HirStatementKind::Tacet
-        | HirStatementKind::Redde(None) => {}
+        | HirStatementKind::Redde(None)
+        | HirStatementKind::ReddeFilum(None) => {}
     }
 }
 
@@ -2508,7 +2526,9 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
         for stmt in &block.statements {
             registry.insert(stmt.id);
             match &stmt.kind {
-                HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+                HirStatementKind::Expr(expr)
+                | HirStatementKind::Redde(Some(expr))
+                | HirStatementKind::ReddeFilum(Some(expr)) => {
                     collect_expr(expr, registry);
                 }
                 HirStatementKind::IncDec(inc) => collect_expr(&inc.target, registry),
@@ -2526,7 +2546,8 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
                 HirStatementKind::Rumpe
                 | HirStatementKind::Perge
                 | HirStatementKind::Tacet
-                | HirStatementKind::Redde(None) => {}
+                | HirStatementKind::Redde(None)
+                | HirStatementKind::ReddeFilum(None) => {}
             }
         }
         if let Some(ref expr) = block.expr {
@@ -2921,6 +2942,49 @@ fn collect_hir_registry_for_hir(hir: &radix_hir::HirModule) -> FxHashSet<radix_h
     registry
 }
 
+/// Validate arena chains before any presentation helper follows them. Nominal
+/// recursion terminates at Struct/Enum; these transparent edges must terminate.
+fn validate_type_chains(types: &radix_types::TypeTableSnapshot) -> Result<(), HirArtifactError> {
+    let mut done = vec![false; types.type_count()];
+    for start in 0..done.len() {
+        let mut path = Vec::new();
+        let mut visiting = FxHashSet::default();
+        let mut current = start;
+        while current < done.len() && !done[current] {
+            if !visiting.insert(current) {
+                return Err(HirArtifactError::MalformedSnapshot {
+                    kind: "types",
+                    detail: format!("cyclic type chain at TypeId({current})"),
+                });
+            }
+            path.push(current);
+            current = match &types.types()[current] {
+                radix_types::Type::Applied(base, _)
+                | radix_types::Type::Ref(_, base)
+                | radix_types::Type::Alias(_, base) => base.0 as usize,
+                _ => break,
+            };
+        }
+        for index in path {
+            done[index] = true;
+        }
+    }
+    Ok(())
+}
+
+fn validate_interner(rows: &[String]) -> Result<(), HirArtifactError> {
+    let mut seen = FxHashSet::default();
+    for row in rows {
+        if !seen.insert(row) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "interner",
+                detail: "duplicate string row".to_owned(),
+            });
+        }
+    }
+    Ok(())
+}
+
 struct IntegrityChecks<'a> {
     def_registry: &'a FxHashSet<radix_types::DefId>,
     hir_registry: &'a FxHashSet<radix_hir::HirId>,
@@ -3108,7 +3172,14 @@ fn validate_shape_obligation_table(
     table: &crate::artifact::ShapeObligationTableWire,
     checks: &IntegrityChecks<'_>,
 ) -> Result<(), HirArtifactError> {
+    let mut seen = FxHashSet::default();
     for row in &table.calls {
+        if !seen.insert(row.call) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "shape obligations",
+                detail: "duplicate calls row".to_owned(),
+            });
+        }
         checks.check_hir(row.call)?;
         for relation in &row.relations {
             checks.check_index(relation.left)?;
@@ -3121,13 +3192,27 @@ fn validate_shape_obligation_table(
             }
         }
     }
+    let mut seen = FxHashSet::default();
     for row in &table.call_size_bindings {
+        if !seen.insert(row.call) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "shape obligations",
+                detail: "duplicate call_size_bindings row".to_owned(),
+            });
+        }
         checks.check_hir(row.call)?;
         for binding in &row.bindings {
             checks.check_index(binding.witness)?;
         }
     }
+    let mut seen = FxHashSet::default();
     for row in &table.functions {
+        if !seen.insert(row.function) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "shape obligations",
+                detail: "duplicate functions row".to_owned(),
+            });
+        }
         checks.check_def(row.function)?;
         for relation in &row.relations {
             checks.check_index(relation.left)?;
@@ -3144,7 +3229,14 @@ fn validate_shape_obligation_table(
             }
         }
     }
+    let mut seen = FxHashSet::default();
     for row in &table.stores {
+        if !seen.insert(row.initializer) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "shape obligations",
+                detail: "duplicate stores row".to_owned(),
+            });
+        }
         checks.check_hir(row.initializer)?;
         for relation in &row.relations {
             checks.check_index(relation.left)?;
@@ -3157,7 +3249,14 @@ fn validate_shape_obligation_table(
             }
         }
     }
+    let mut seen = FxHashSet::default();
     for row in &table.function_size_bindings {
+        if !seen.insert(row.function) {
+            return Err(HirArtifactError::MalformedSnapshot {
+                kind: "shape obligations",
+                detail: "duplicate function_size_bindings row".to_owned(),
+            });
+        }
         checks.check_def(row.function)?;
         for binding in &row.bindings {
             checks.check_index(binding.witness)?;
@@ -3165,34 +3264,6 @@ fn validate_shape_obligation_table(
     }
     for access in &table.proven_indexes {
         checks.check_hir(*access)?;
-    }
-    Ok(())
-}
-
-fn validate_nested_provider_edge_policy_tables(
-    units: &std::collections::BTreeMap<String, crate::artifact::ProviderCarriageEntryWire>,
-) -> Result<(), HirArtifactError> {
-    use crate::artifact::ProviderCarriageEntryWire;
-
-    for entry in units.values() {
-        let ProviderCarriageEntryWire::Unit(provider) = entry else {
-            continue;
-        };
-        let provider = provider.as_ref();
-        let libraries = radix_hir::LibraryRegistry::default();
-        let def_registry =
-            collect_def_registry_for_parts(&provider.hir, &libraries, &provider.resolver);
-        let hir_registry = collect_hir_registry_for_hir(&provider.hir);
-        let checks = IntegrityChecks {
-            def_registry: &def_registry,
-            hir_registry: &hir_registry,
-            type_count: provider.types.type_count(),
-            interner_len: provider.interner.len(),
-            index_count: provider.types.indices().len(),
-        };
-        validate_tensor_edge_policy_ids(&provider.tensor_edge_policies, &checks)?;
-        validate_shape_obligation_table(&provider.shape_obligations, &checks)?;
-        validate_nested_provider_edge_policy_tables(&provider.nested)?;
     }
     Ok(())
 }
@@ -3529,6 +3600,11 @@ pub(crate) fn validate_referential_integrity(
                 HirStatementKind::Local(local) => {
                     checks.check_def(local.def_id)?;
                     checks.check_symbol(local.name)?;
+                    if let Some(site) = &local.await_store
+                        && let Some(slot) = site.slot
+                    {
+                        checks.check_symbol(slot)?;
+                    }
                     if let Some(ty) = local.ty {
                         checks.check_type(ty)?;
                     }
@@ -3536,7 +3612,9 @@ pub(crate) fn validate_referential_integrity(
                         validate_expr(init, checks)?;
                     }
                 }
-                HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
+                HirStatementKind::Expr(expr)
+                | HirStatementKind::Redde(Some(expr))
+                | HirStatementKind::ReddeFilum(Some(expr)) => {
                     validate_expr(expr, checks)?;
                 }
                 HirStatementKind::IncDec(inc) => {
@@ -3551,7 +3629,8 @@ pub(crate) fn validate_referential_integrity(
                 HirStatementKind::Rumpe
                 | HirStatementKind::Perge
                 | HirStatementKind::Tacet
-                | HirStatementKind::Redde(None) => {}
+                | HirStatementKind::Redde(None)
+                | HirStatementKind::ReddeFilum(None) => {}
             }
         }
         if let Some(ref expr) = block.expr {
@@ -3983,13 +4062,30 @@ pub(crate) fn validate_referential_integrity(
                 }
             }
             HirExpressionKind::Conversio {
-                route: _,
+                route,
                 source,
                 target,
                 params,
                 recovery,
-                implicit: _,
+                implicit,
             } => {
+                match route {
+                    Some(radix_hir::HirConversioRoute::Function { def_id, .. }) => {
+                        checks.check_def(*def_id)?;
+                    }
+                    Some(radix_hir::HirConversioRoute::Ordo { members, .. }) => {
+                        for member in members {
+                            checks.check_def(member.variant)?;
+                            checks.check_symbol(member.name)?;
+                        }
+                    }
+                    None => {}
+                }
+                if let Some(site) = implicit
+                    && let Some(slot) = site.slot
+                {
+                    checks.check_symbol(slot)?;
+                }
                 validate_expr(source, checks)?;
                 match target {
                     radix_hir::HirConversioTarget::Type(ty) => checks.check_type(*ty)?,
@@ -4513,6 +4609,164 @@ pub(crate) fn validate_referential_integrity(
         Ok(())
     }
 
+    fn validate_nested_providers(
+        units: &std::collections::BTreeMap<String, crate::artifact::ProviderCarriageEntryWire>,
+    ) -> Result<(), HirArtifactError> {
+        use crate::artifact::ProviderCarriageEntryWire;
+
+        for entry in units.values() {
+            let ProviderCarriageEntryWire::Unit(provider) = entry else {
+                continue;
+            };
+            let provider = provider.as_ref();
+            let libraries = radix_hir::LibraryRegistry::default();
+            let def_registry =
+                collect_def_registry_for_parts(&provider.hir, &libraries, &provider.resolver);
+            let hir_registry = collect_hir_registry_for_hir(&provider.hir);
+            let checks = IntegrityChecks {
+                def_registry: &def_registry,
+                hir_registry: &hir_registry,
+                type_count: provider.types.type_count(),
+                interner_len: provider.interner.len(),
+                index_count: provider.types.indices().len(),
+            };
+            validate_interner(&provider.interner)?;
+            validate_type_chains(&provider.types)?;
+            validate_items(&provider.hir.items, &checks)?;
+            if let Some(entry) = &provider.hir.entry {
+                validate_block(entry, &checks)?;
+            }
+            for annotation in &provider.hir.entry_annotations {
+                validate_annotation(annotation, &checks)?;
+            }
+            if let Some(name) = provider.hir.entry_args_name {
+                checks.check_symbol(name)?;
+            }
+            for ty in provider.types.types() {
+                validate_type(ty, &checks)?;
+            }
+            validate_indices(&provider.types, &checks)?;
+            validate_resolver(&provider.resolver, &checks)?;
+            validate_generic_calls(&provider.resolved_generic_calls, &checks)?;
+            validate_tensor_edge_policy_ids(&provider.tensor_edge_policies, &checks)?;
+            validate_shape_obligation_table(&provider.shape_obligations, &checks)?;
+            validate_nested_providers(&provider.nested)?;
+        }
+        Ok(())
+    }
+
+    fn validate_resolver(
+        resolver: &crate::artifact::ResolverSnapshot,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        for (sym, _) in &resolver.namespace_exports {
+            checks.check_symbol(*sym)?;
+        }
+        for (sym, iface) in &resolver.file_interfaces {
+            checks.check_symbol(*sym)?;
+            validate_file_interface_snapshot(iface, checks)?;
+        }
+        for sym in &resolver.used_namespaces {
+            checks.check_symbol(*sym)?;
+        }
+        for (def_id, sym) in &resolver.module_bindings {
+            checks.check_def(*def_id)?;
+            checks.check_symbol(*sym)?;
+        }
+        for ((_, sym), ty) in &resolver.imported_nominal_types {
+            checks.check_symbol(*sym)?;
+            checks.check_type(*ty)?;
+        }
+        for row in &resolver.conversion_rows {
+            if let Some(fn_def_id) = row.fn_def_id {
+                checks.check_def(fn_def_id)?;
+            }
+            checks.check_type(row.source)?;
+            checks.check_type(row.destination)?;
+        }
+
+        Ok(())
+    }
+
+    fn validate_indices(
+        types: &radix_types::TypeTableSnapshot,
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        for index in types.indices() {
+            match index {
+                radix_types::IndexExpr::Tuple(children) => {
+                    for child in children {
+                        checks.check_index(*child)?;
+                    }
+                }
+                radix_types::IndexExpr::Param(symbol) => checks.check_symbol(*symbol)?,
+                radix_types::IndexExpr::Affine { base, .. } => checks.check_index(*base)?,
+                radix_types::IndexExpr::Divide { numerator, .. } => {
+                    checks.check_index(*numerator)?
+                }
+                radix_types::IndexExpr::Runtime(source) => match source {
+                    radix_types::RuntimeExtentId::ScalarBinding(binding)
+                    | radix_types::RuntimeExtentId::TensorBindingAxis { binding, .. } => {
+                        checks.check_def(*binding)?;
+                    }
+                    radix_types::RuntimeExtentId::TensorFieldAxis {
+                        binding, fields, ..
+                    } => {
+                        checks.check_def(*binding)?;
+                        for field in fields {
+                            checks.check_symbol(*field)?;
+                        }
+                    }
+                    radix_types::RuntimeExtentId::FunctionParameterFieldAxis { fields, .. }
+                    | radix_types::RuntimeExtentId::CallArgumentFieldAxis { fields, .. } => {
+                        for field in fields {
+                            checks.check_symbol(*field)?;
+                        }
+                    }
+                    radix_types::RuntimeExtentId::ExpressionFieldAxis {
+                        expression,
+                        fields,
+                        ..
+                    } => {
+                        checks.check_hir(radix_hir::HirId(*expression))?;
+                        for field in fields {
+                            checks.check_symbol(*field)?;
+                        }
+                    }
+                    radix_types::RuntimeExtentId::ScalarExpression { expression }
+                    | radix_types::RuntimeExtentId::ExpressionAxis { expression, .. } => {
+                        checks.check_hir(radix_hir::HirId(*expression))?;
+                    }
+                    radix_types::RuntimeExtentId::ScalarParameter { .. }
+                    | radix_types::RuntimeExtentId::CallArgumentAxis { .. }
+                    | radix_types::RuntimeExtentId::FunctionParameterAxis { .. } => {}
+                },
+                radix_types::IndexExpr::Literal(_)
+                | radix_types::IndexExpr::Infer(_)
+                | radix_types::IndexExpr::Unspecified => {}
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_generic_calls(
+        calls: &[radix_types::ResolvedGenericCall],
+        checks: &IntegrityChecks<'_>,
+    ) -> Result<(), HirArtifactError> {
+        for row in calls {
+            for binding in &row.bindings {
+                checks.check_symbol(binding.name)?;
+                match binding.witness {
+                    radix_types::GenericWitness::Typus(ty) => checks.check_type(ty)?,
+                    radix_types::GenericWitness::Magnitudo(xi) => checks.check_index(xi)?,
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     // ――― DefId registry (S2: collect every definition-site DefId) ―――――――
     let def_registry = collect_def_registry(artifact);
 
@@ -4533,6 +4787,9 @@ pub(crate) fn validate_referential_integrity(
     };
 
     // ── Top-level validation ───────────────────────────────────────────
+
+    validate_interner(&artifact.interner)?;
+    validate_type_chains(&artifact.types)?;
 
     // 1. HirModule items and entry.
     validate_items(&artifact.hir.items, &checks)?;
@@ -4638,87 +4895,14 @@ pub(crate) fn validate_referential_integrity(
 
     // 7. resolver snapshot: deep walk. E3 conversion rows are validated
     // here rather than silently dropped at the artifact boundary.
-    for (sym, _) in &artifact.resolver.namespace_exports {
-        checks.check_symbol(*sym)?;
-    }
-    for (sym, iface) in &artifact.resolver.file_interfaces {
-        checks.check_symbol(*sym)?;
-        validate_file_interface_snapshot(iface, &checks)?;
-    }
-    for sym in &artifact.resolver.used_namespaces {
-        checks.check_symbol(*sym)?;
-    }
-    for (def_id, sym) in &artifact.resolver.module_bindings {
-        checks.check_def(*def_id)?;
-        checks.check_symbol(*sym)?;
-    }
-    for ((_, sym), ty) in &artifact.resolver.imported_nominal_types {
-        checks.check_symbol(*sym)?;
-        checks.check_type(*ty)?;
-    }
-    for row in &artifact.resolver.conversion_rows {
-        if let Some(fn_def_id) = row.fn_def_id {
-            checks.check_def(fn_def_id)?;
-        }
-        checks.check_type(row.source)?;
-        checks.check_type(row.destination)?;
-    }
+    validate_resolver(&artifact.resolver, &checks)?;
 
     // 8. Type arena walk: validate TypeId/DefId/Symbol/IndexId
     //    cross-references inside the type-table snapshot.
     for ty in artifact.types.types() {
         validate_type(ty, &checks)?;
     }
-    for index in artifact.types.indices() {
-        match index {
-            radix_types::IndexExpr::Tuple(children) => {
-                for child in children {
-                    checks.check_index(*child)?;
-                }
-            }
-            radix_types::IndexExpr::Param(symbol) => checks.check_symbol(*symbol)?,
-            radix_types::IndexExpr::Affine { base, .. } => checks.check_index(*base)?,
-            radix_types::IndexExpr::Divide { numerator, .. } => checks.check_index(*numerator)?,
-            radix_types::IndexExpr::Runtime(source) => match source {
-                radix_types::RuntimeExtentId::ScalarBinding(binding)
-                | radix_types::RuntimeExtentId::TensorBindingAxis { binding, .. } => {
-                    checks.check_def(*binding)?;
-                }
-                radix_types::RuntimeExtentId::TensorFieldAxis {
-                    binding, fields, ..
-                } => {
-                    checks.check_def(*binding)?;
-                    for field in fields {
-                        checks.check_symbol(*field)?;
-                    }
-                }
-                radix_types::RuntimeExtentId::FunctionParameterFieldAxis { fields, .. }
-                | radix_types::RuntimeExtentId::CallArgumentFieldAxis { fields, .. } => {
-                    for field in fields {
-                        checks.check_symbol(*field)?;
-                    }
-                }
-                radix_types::RuntimeExtentId::ExpressionFieldAxis {
-                    expression, fields, ..
-                } => {
-                    checks.check_hir(radix_hir::HirId(*expression))?;
-                    for field in fields {
-                        checks.check_symbol(*field)?;
-                    }
-                }
-                radix_types::RuntimeExtentId::ScalarExpression { expression }
-                | radix_types::RuntimeExtentId::ExpressionAxis { expression, .. } => {
-                    checks.check_hir(radix_hir::HirId(*expression))?;
-                }
-                radix_types::RuntimeExtentId::ScalarParameter { .. }
-                | radix_types::RuntimeExtentId::CallArgumentAxis { .. }
-                | radix_types::RuntimeExtentId::FunctionParameterAxis { .. } => {}
-            },
-            radix_types::IndexExpr::Literal(_)
-            | radix_types::IndexExpr::Infer(_)
-            | radix_types::IndexExpr::Unspecified => {}
-        }
-    }
+    validate_indices(&artifact.types, &checks)?;
 
     // 8a. Runtime shape obligations (schema v31): each site and every
     //     relation/binding index must resolve before lowering consumes it.
@@ -4947,7 +5131,7 @@ pub(crate) fn validate_referential_integrity(
         }
     }
     validate_ordo_order_rows(edge_policies, &checks)?;
-    validate_nested_provider_edge_policy_tables(&artifact.provider_units)?;
+    validate_nested_providers(&artifact.provider_units)?;
 
     // 9. Presentation sidecar (anchors from v2, authored types from v9): every
     //    attachment anchor must name a registered owner, owner anchors must be
@@ -4982,15 +5166,7 @@ pub(crate) fn validate_referential_integrity(
 
     // 11. Resolved generic bindings (schema v10): each binding name and
     //     kind-tagged witness must resolve against the interner and arenas.
-    for row in &artifact.resolved_generic_calls {
-        for binding in &row.bindings {
-            checks.check_symbol(binding.name)?;
-            match binding.witness {
-                radix_types::GenericWitness::Typus(ty) => checks.check_type(ty)?,
-                radix_types::GenericWitness::Magnitudo(xi) => checks.check_index(xi)?,
-            }
-        }
-    }
+    validate_generic_calls(&artifact.resolved_generic_calls, &checks)?;
 
     // 12. Compiler lane metadata (schema v11): a rehydrated AIR unit must
     // reference only declarations and symbols present in the same artifact.

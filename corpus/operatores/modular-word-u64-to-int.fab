@@ -1,0 +1,41 @@
++++
+term = "wrapping<u64> to int"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "cast_expr", "conversio_expr", "bitwise_and_expr", "shift_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "A 64-bit word reduced by a remainder, mask, shift or quotient converts to int exactly."
+syntax = "(<wrapping<u64>> % m) ↦ int"
+related = ["wrapping", "int", "↦"]
+locale = "en"
++++
+# =============================================================================
+# wrapping<u64> to int — reduce first, convert the exact result
+# =============================================================================
+#
+# What this teaches:
+#   • A 64-bit word past 2^53 is still an exact value: the expression
+#     `(h % m)` is computed on the full word, and only the final store into
+#     an `int` cell is checked
+#   • A remainder, a mask, a right shift and a quotient all bring a large word
+#     into `int` range, so each converts without trapping
+#
+# Common mistakes:
+#   • Treating the word as a double before the operator runs
+#
+# See also: wrapping, ↦
+# =============================================================================
+
+main {
+    let wrapping<u64> h ← 16294208416658607535
+    let int r ← (h % 200000001) ↦ int
+    print r
+    let int low ← (h ∧ 255) ↦ int
+    print low
+    let int top ← (h ⇒ 60) ↦ int
+    print top
+    let int q ← (h / 4000000000000) ↦ int
+    print q
+    let int total ← (h % 1000 + h % 7) ↦ int
+    print total
+}

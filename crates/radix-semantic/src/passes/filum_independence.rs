@@ -585,6 +585,23 @@ fn is_register_value(ty: Option<TypeId>, types: &TypeTable) -> bool {
     })
 }
 
+/// A fixed-array (`list<T, size N>`) field of a genus value: `record.field`.
+/// The array lives inline in the record, so indexing it reads the record's own
+/// bytes (the record is the storage the enclosing access already recorded).
+fn is_record_array_field(expr: &HirExpression, types: &TypeTable) -> bool {
+    let HirExpressionKind::Field(parent, _) = &expr.kind else {
+        return false;
+    };
+    let peeled = |ty: Option<TypeId>| ty.map(|ty| types.peel_access_marker(ty).1);
+    matches!(
+        peeled(expr.ty).map(|ty| types.get(ty)),
+        Some(Type::BoundedArray { .. })
+    ) && matches!(
+        peeled(parent.ty).map(|ty| types.get(ty)),
+        Some(Type::Struct(_))
+    )
+}
+
 #[derive(Default)]
 struct Declarations {
     bindings: Vec<HirLocal>,
@@ -993,8 +1010,12 @@ impl HirVisitor for BodyProof<'_> {
                 self.decline(expr.span, "unproved_conversion_effect");
             }
             HirExpressionKind::Index(object, index) => {
-                // A component of a register-class value is no storage access.
-                if !is_register_value(object.ty, self.types) {
+                // A component of a register-class value is no storage access,
+                // nor is an element of a fixed-array field of a record: the
+                // array is part of the record's own bytes, read as a value.
+                if !is_register_value(object.ty, self.types)
+                    && !is_record_array_field(object, self.types)
+                {
                     self.access(object, Some(index), false, expr.span);
                 }
                 self.receiver(object);
@@ -1373,6 +1394,112 @@ impl HirVisitor for Scopes<'_> {
     }
 }
 
+/// Validates `redde filum` placement independently of the lane-independence proof.
+/// A lane records the nested-body depth at its entry: closures and reduction
+/// bodies nested inside that lane cannot target it, but a lane nested inside
+/// such a body is itself a valid target.
+#[derive(Default)]
+struct ThreadReturns {
+    lane_nested_depths: Vec<u32>,
+    nested_body_depth: u32,
+    errors: Vec<SemanticError>,
+}
+
+impl ThreadReturns {
+    fn refuse(&mut self, issue: &'static str, stmt: &HirStatement) {
+        self.errors.push(
+            SemanticError::structured(SemanticErrorKind::TypeMismatch, stmt.span)
+                .with_arg("issue", issue),
+        );
+    }
+}
+
+impl HirVisitor for ThreadReturns {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Itera {
+                filum: Some(_),
+                iter,
+                body,
+                ..
+            } => {
+                self.visit_expr(iter);
+                self.lane_nested_depths.push(self.nested_body_depth);
+                self.visit_block(body);
+                self.lane_nested_depths.pop();
+            }
+            HirExpressionKind::Clausura(params, _, _, body) => {
+                for param in params {
+                    if let Some(default) = &param.default {
+                        self.visit_expr(default);
+                    }
+                }
+                self.nested_body_depth += 1;
+                self.visit_expr(body);
+                self.nested_body_depth -= 1;
+            }
+            HirExpressionKind::Reduction {
+                source,
+                group,
+                body,
+                identity,
+                ..
+            } => {
+                self.visit_expr(source);
+                if let Some(group) = group {
+                    self.visit_expr(group);
+                }
+                if let Some(body) = body {
+                    self.nested_body_depth += 1;
+                    self.visit_block(body);
+                    self.nested_body_depth -= 1;
+                }
+                if let Some(identity) = identity {
+                    self.visit_expr(identity);
+                }
+            }
+            HirExpressionKind::Scan {
+                source,
+                group,
+                body,
+                ..
+            } => {
+                self.visit_expr(source);
+                if let Some(group) = group {
+                    self.visit_expr(group);
+                }
+                self.nested_body_depth += 1;
+                self.visit_block(body);
+                self.nested_body_depth -= 1;
+            }
+            HirExpressionKind::Sort { source, body, .. } => {
+                self.visit_expr(source);
+                if let Some(body) = body {
+                    self.nested_body_depth += 1;
+                    self.visit_block(body);
+                    self.nested_body_depth -= 1;
+                }
+            }
+            _ => walk_expr(self, expr),
+        }
+    }
+
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if let HirStatementKind::ReddeFilum(value) = &stmt.kind {
+            if value.is_some() {
+                self.refuse("return_thread_with_value", stmt);
+            } else {
+                match self.lane_nested_depths.last() {
+                    Some(depth) if *depth == self.nested_body_depth => {}
+                    Some(_) => self.refuse("return_thread_in_nested_body", stmt),
+                    None => self.refuse("return_thread_outside_lane", stmt),
+                }
+            }
+        }
+        walk_stmt(self, stmt);
+    }
+}
+
 /// All targets share this admission before target-sensitive HIR rewrites.
 pub(crate) fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> Vec<SemanticError> {
     let module = Module::build(hir, types, interner);
@@ -1388,5 +1515,8 @@ pub(crate) fn check(hir: &HirModule, types: &TypeTable, interner: &Interner) -> 
     if let Some(entry) = &hir.entry {
         scopes.check_body(&[], entry);
     }
+    let mut thread_returns = ThreadReturns::default();
+    thread_returns.visit_program(hir);
+    scopes.errors.extend(thread_returns.errors);
     scopes.errors
 }

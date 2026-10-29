@@ -166,6 +166,31 @@ impl AnalyzedProgram {
         }
     }
 
+    /// A copy of this program narrowed to `root` and its local import
+    /// closure, with `root` as the only entry and test root. Only the closure's
+    /// nodes are cloned; the source program is left untouched so one analysis
+    /// can serve every test unit.
+    #[must_use]
+    pub fn scoped_to_closure(&self, root: &ModuleId) -> Self {
+        let included = self.imports.local_closure(std::iter::once(root));
+        Self {
+            spec: self.spec.clone(),
+            entry: Some(root.clone()),
+            roots: vec![root.clone()],
+            nodes: self
+                .nodes
+                .iter()
+                .filter(|(id, _)| included.contains(*id))
+                .map(|(id, node)| (id.clone(), node.clone()))
+                .collect(),
+            imports: self.imports.clone(),
+            entry_frontmatter: self.entry_frontmatter.clone(),
+            diagnostics: self.diagnostics.clone(),
+            library_resolver: self.library_resolver.clone(),
+            routes: self.routes.clone(),
+        }
+    }
+
     // Go package assembly (`generate_package_go_result`) consumes the entry
     // node directly. `allow(dead_code)`: dead only in builds without `hir-go`.
     #[allow(dead_code)]

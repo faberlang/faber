@@ -579,8 +579,8 @@ fn resolve_test_proposed_bounded_lista_typechecks() {
 #[test]
 fn resolve_test_proposed_bounded_cords_typecheck() {
     for source in [
-        "typus X = textus<8>",
-        "typus X = ascii<8>",
+        "typus X = textus<magnitudo 8>",
+        "typus X = ascii<magnitudo 8>",
         "typus X = lista<b8, magnitudo 8>",
     ] {
         let (_types, resolved) = resolve_bounded_source(source);

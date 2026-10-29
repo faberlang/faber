@@ -1,0 +1,16 @@
++++
+locale = "en"
+term = "norma_python_import"
+kind = "concept"
+category = "package"
+canonical = false
+summary = "A norma provider import lowers to its Python dotted package module."
+grammar = ["fab_file", "program", "statement", "statement_core", "importa_decl", "importa_sugar", "named_import", "incipit_stmt", "block_stmt", "nota_stmt", "call_expr", "call_suffix", "member_suffix", "expression"]
++++
+# Provider imports use a language-level provider and module identity. Python
+# emission maps it to the dotted module path `norma.math`.
+import from "norma:math" math
+
+main {
+    print math.PI()
+}

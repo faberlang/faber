@@ -236,7 +236,7 @@ fn tensor_long_constructor_is_rejected() {
 
 #[test]
 fn vector_long_constructor_is_rejected() {
-    assert_call_form_constructor_rejected("incipit { sit _ v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0) }");
+    assert_call_form_constructor_rejected("incipit { sit _ v ← vector<f32, magnitudo 4>(1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]

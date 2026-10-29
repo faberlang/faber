@@ -1,0 +1,22 @@
+version = 1
+id = "corpus/genus/air-struct-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/air-struct-literal.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.mir]
+outcome = "known-fail"
+phase = "emit"
+diagnostic_contains = "@ radix lane \"air\" requires a MIR-backed target"
+
+[targets.runner]
+outcome = "known-fail"
+phase = "run"
+diagnostic_contains = "TARGETLANE001:lane_requires_mir_backed_target"

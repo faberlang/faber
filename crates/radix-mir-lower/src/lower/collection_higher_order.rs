@@ -180,6 +180,142 @@ impl FunctionBuilder<'_> {
         self.lower_collection_cumulata(receiver, receiver_ty, reducer, initial, result_ty, accumulator_ty, expr)
     }
 
+    /// `extende` (en `extend`) — append every element of `source` to
+    /// `receiver`, in order, in place.
+    ///
+    /// The source length is read once before the loop, so `xs.extend(xs)`
+    /// appends the original elements exactly once. Each step is the same
+    /// `Append` a single `xs.append(v)` runs.
+    pub(super) fn lower_extende(
+        &mut self,
+        receiver: &HirExpression,
+        source: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let (Some(receiver_ty), Some(source_ty)) = (receiver.ty, source.ty) else {
+            self.errors
+                .push(MirError::missing_type(expr.span, "collection extend operands"));
+            return None;
+        };
+        let is_array = |lowerer: &Self, ty| {
+            matches!(
+                lowerer.normalized_type(lowerer.types.peel_access_marker(ty).1),
+                Type::Array(_)
+                    | Type::BoundedArray { .. }
+                    | Type::RangedArray { .. }
+                    | Type::BoundedOcteti { .. }
+                    | Type::Primitive(Primitive::Octeti)
+            )
+        };
+        if !is_array(self, receiver_ty) || !is_array(self, source_ty) {
+            self.errors
+                .push(MirError::unsupported(expr.span, "collection extend before array MIR lowering"));
+            return None;
+        }
+        let result_ty = self.expr_ty(expr)?;
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+
+        let target = self.lower_expr_value(receiver)?;
+        let mut source_value = self.lower_expr_value(source)?;
+        let mut source_ty = self.types.peel_access_marker(source_ty).1;
+        if matches!(self.normalized_type(source_ty), Type::BoundedOcteti { .. }) {
+            // A bounded byte buffer carries no per-element MIR place, so it
+            // widens to the receiver's `list<b8>` first, the copy `↦ list<b8>`
+            // performs. The checker admits this source only beside a `b8`
+            // receiver, so the receiver's own type is that target.
+            let list_ty = self.types.peel_access_marker(receiver_ty).1;
+            if !matches!(self.normalized_type(list_ty), Type::Array(_)) {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "collection extend of a bounded byte buffer into a non-list receiver",
+                ));
+                return None;
+            }
+            let list_mir_ty = MirType::semantic(list_ty);
+            source_value = self.runtime_call_value(
+                MirIntrinsic::Convert(MirConversion {
+                    store: None,
+                    flavor: MirConversionFlavor::Runtime,
+                    source_ty: MirType::semantic(source_ty),
+                    target_ty: list_mir_ty,
+                    params: Vec::new(),
+                    recovery: None,
+                    struct_defaults: Vec::new(),
+                }),
+                vec![source_value],
+                list_mir_ty,
+                source.span,
+            );
+            source_ty = list_ty;
+        }
+        let source_place = self.materialize_operand_place(source_value, MirType::semantic(source_ty), source.span);
+
+        let index = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span: expr.span });
+        self.assign(
+            MirPlace::local(index),
+            MirOperand::Constant(MirConstant::Int(0)),
+            numerus,
+            expr.span,
+        );
+        let length = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![MirOperand::Place(source_place.clone())],
+            numerus,
+            expr.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+
+        let cond_id = self.fresh_block(expr.span);
+        let body_id = self.fresh_block(expr.span);
+        let after_id = self.fresh_block(expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(cond_id);
+        let continues = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(index)),
+            length,
+            bivalens,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: continues, then_block: body_id, else_block: after_id },
+            expr.span,
+        );
+
+        self.switch_to(body_id);
+        let mut item_place = source_place;
+        item_place
+            .projections
+            .push(MirProjection::Index(MirOperand::Place(MirPlace::local(index))));
+        self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Append),
+            vec![target, MirOperand::Place(item_place)],
+            result_ty,
+            expr.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(index)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            numerus,
+            expr.span,
+        );
+        self.assign(MirPlace::local(index), next, numerus, expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(after_id);
+        Some(MirOperand::Constant(MirConstant::Unit))
+    }
+
     fn lower_collection_predicate(
         &mut self,
         receiver: &HirExpression,
@@ -202,6 +338,12 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         }
+        let item_is_optional = match self.normalized_type(receiver_ty) {
+            Type::Array(element) | Type::BoundedArray { element, .. } | Type::RangedArray { element, .. } => {
+                matches!(self.normalized_type(*element), Type::Option(_))
+            }
+            _ => false,
+        };
         let result_ty = self.expr_ty(expr)?;
         let collection_ty = MirType::semantic(receiver_ty);
         let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
@@ -285,7 +427,11 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(decisive_id);
         let decisive_value = if matches!(kind, TransformKind::Find) {
-            self.assign_temp(MirValueKind::Option(MirOptionOp::Some(item)), result_ty, expr.span)
+            if item_is_optional {
+                item
+            } else {
+                self.assign_temp(MirValueKind::Option(MirOptionOp::Some(item)), result_ty, expr.span)
+            }
         } else {
             MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::Any)))
         };

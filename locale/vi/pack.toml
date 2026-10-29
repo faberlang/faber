@@ -101,6 +101,7 @@ axis = "trục"
 lege = "đọc"
 lineam = "dòng"
 omnia = "tất_cả"
+machina = "thiết_bị"
 scriptum = "văn_bản_hóa"
 sparge = "rải"
 ut = "như"
@@ -149,6 +150,8 @@ brevis = "ngắn"
 descriptio = "mô_tả"
 longum = "dài"
 lane = "làn"
+laxus = "nới_lỏng"
+intutus = "không_an_toàn"
 ubique = "toàn_cục"
 annotatio = "chú_thích"
 versio = "phiên_bản"
@@ -199,7 +202,7 @@ instans = "thời_điểm"
 objectum = "đối_tượng"
 quidlibet = "bất_kỳ"
 lista = "danh_sách"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "bảng"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "sổ_cái"
@@ -705,6 +708,22 @@ help = "dùng `@ {expected}` cho locale reader của tệp này"
 message = "một khai báo mang nhiều hơn một annotation `@ nucleum`"
 help = "giữ lại một annotation nucleum duy nhất"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "chú thích `@ {nucleum}` nêu nhiều hơn một mức"
+help = "viết `{laxus}` hoặc `{intutus}`, hoặc không viết gì để dùng mức mặc định"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` không phải là mức của kernel"
+help = "các mức là `{laxus}` và `{intutus}`; không viết gì để dùng mức mặc định"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` không nhận mức"
+help = "mảnh dùng mức của kernel ghép nó; hãy đặt mức trên kernel đó"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "mức kernel cần một hàm kernel"
+help = "viết mức trên khai báo hàm `@ {nucleum}`, hoặc xóa nó"
+
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "fragment `@ nucleum` xung đột với graphics fragment annotation"
 help = "xóa một trong các fragment annotation"
@@ -724,6 +743,10 @@ help = "dùng {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "'{cape}' phải đứng trước '{dum}' trong vòng lặp '{fac}'"
 help = "viết trình xử lý trước điều kiện: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "khối '{fac}' chỉ nhận một từ bổ nghĩa, không dùng '{omnia}' cùng '{machina}'"
+help = "'{machina}' đã giao mọi lỗi một lần ở cuối khối; bỏ '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "dấu phẩy không còn ngăn cách các đối tượng của '{discerne}'"
@@ -799,7 +822,7 @@ help = "ghi tên hint ngay sau via, như trong `x ↦ u32 via Hex`; các hint l�
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "hint chuyển đổi không phải là đối số kiểu"
-help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "viết hint thành mệnh đề via sau đích: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "hint chuyển đổi không đi theo sau đích trong ngoặc nhọn"
@@ -1245,6 +1268,14 @@ help = "viết phạm vi trên danh sách, ví dụ {lista}<int, {magnitudo} 1�
 message = "số phần tử của danh sách được viết sau `{magnitudo}`"
 help = "viết `{lista}<int, {magnitudo} 4>` cho tối đa 4 phần tử, hoặc `{lista}<int, {magnitudo} 1…8>` cho một phạm vi; phạm vi trần giới hạn một giá trị, không phải số lượng"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "sức chứa được viết sau `{magnitudo}`"
+help = "viết `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` hoặc `{ascii}<{magnitudo} 8>` cho sức chứa tối đa chừng đó; một con số trần không phải là sức chứa"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "số làn của vectơ được viết sau `{magnitudo}`"
+help = "viết `{vector}<f32, {magnitudo} 4>` cho bốn làn; dạng rút gọn `vf32[4]` không đổi"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "tư thế callable trong chú giải '{annotation_posture}' xung đột với tư thế đã viết '{written_posture}'"
 help = "sửa cấu trúc AST để hạ mức"
@@ -1271,11 +1302,11 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue yêu cầu một hoặc hai tham số kiểu"
-help = "dùng queue<T> hoặc queue<T, N>"
+help = "dùng queue<T> hoặc queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack yêu cầu một hoặc hai tham số kiểu"
-help = "dùng stack<T> hoặc stack<T, N>"
+help = "dùng stack<T> hoặc stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu yêu cầu một mẫu"
@@ -1443,7 +1474,7 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "kiểu nguyên thủy không thể nhận tham số"
-help = "textus<N>, ascii<N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N> và {lista}<b8, {magnitudo} N> là dạng bounded đã phát hành"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "kiểu đủ điều kiện không được namespace xuất ra"
@@ -1569,10 +1600,6 @@ help = "sửa cấu trúc AST để hạ cấp"
 message = "dấu độ rộng không thể nhận tham số"
 help = "sửa cấu trúc AST để hạ cấp"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 không được hỗ trợ trong kernel nucleum"
-help = "dùng một kiểu giá trị kernel được hỗ trợ"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "phạm vi số nguyên của kernel {extent} chưa được chứng minh là vừa với phạm vi di động"
 help = "ràng buộc phạm vi vào các giá trị trong phạm vi số nguyên di động"
@@ -1585,9 +1612,25 @@ help = "dùng f32 cho các giá trị kernel dấu phẩy động"
 message = "việc ghi với độ rộng {width} có thể gây lỗi trong kernel nucleum"
 help = "chứng minh việc ghi nằm trong phạm vi hoặc dùng cell bao hoặc bão hòa"
 
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "độ rộng số nguyên {width} vượt quá độ rộng kernel nucleum được hỗ trợ"
-help = "dùng độ rộng số nguyên không quá 32 bit"
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "vùng '{fac} {machina}' không được chứa vùng '{fac} {machina}' khác"
+help = "giữ một vùng thiết bị và gọi kernel trực tiếp từ đó"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' rời vùng '{fac} {machina}'; vùng chưa có từ thoát"
+help = "kết thúc vùng rồi quyết định sau đó, hoặc chuyển lối thoát ra ngoài khối"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "vòng lặp lane ('{construct}') ngay trong vùng '{fac} {machina}' chưa được xây dựng"
+help = "gọi một kernel từ vùng cho công việc song song"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "vùng '{fac} {machina}' chưa thể cấp phát tensor ({construct})"
+help = "cấp phát tensor trước vùng rồi dùng bên trong"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' trong vùng '{fac} {machina}' đọc giá trị tính trên thiết bị; điều khiển vòng lặp trên thiết bị chưa được xây dựng"
+help = "giữ điều kiện, cận và đối số vô hướng ở các giá trị biết trước vùng, và đọc kết quả thiết bị sau vùng"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "phạm vi trung gian của kernel {extent} vượt quá phạm vi số nguyên di động"
@@ -2190,11 +2233,11 @@ message = "kiểu phần tử vector không khớp"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, N>"
+message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, kích_thước N>"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector yêu cầu độ rộng; dùng vector<T, 4> hoặc vf32[4]"
+message = "vector yêu cầu độ rộng; dùng vector<T, kích_thước 4> hoặc vf32[4]"
 help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2436,6 +2479,10 @@ help = "xóa danh sách đối số kiểu được chỉ rõ"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "cần các phần tử số trong lista"
 help = "dùng các phần tử số cho intrinsic lista này"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` cần bộ nhận là list thường; list có giới hạn hoặc có khoảng độ dài không thể dài ra tại chỗ"
+help = "dùng extend trên list không giới hạn, hoặc thêm từng phần tử bằng `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "phương thức có khóa `.đã_sắp_xếp(khóa)` đã bị gỡ bỏ; hãy dùng biểu thức sắp xếp"
@@ -2796,6 +2843,10 @@ help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte r
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "chuyển đổi từ {lista}<b8> sang fractus chưa được đặc tả (độ rộng IEEE và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
 help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
+
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
+message = "tensor bản ghi đọc byte theo bố cục little-endian của bản ghi; viết `via Le`, không viết `via Be`"
+help = "viết {lista}<b8> ↦ tensor<Record, [n]> via Le; phần tử bản ghi chỉ có một thứ tự byte, do bố cục của nó quy định"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3622,11 +3673,11 @@ message = "union hole `∪` đã giải thành type đơn `{type}`"
 help = "dùng `_` nếu chỉ một type được chủ đích"
 
 [diagnostics.WARN034]
-message = "chuỗi này thoát `\\\"`; hãy viết bằng «…», không cần thoát ký tự nào"
+message = "chuỗi này thoát `\"`; hãy viết bằng «…», không cần thoát ký tự nào"
 help = "dùng «...» cho văn bản chứa dấu trích dẫn"
 
 [diagnostics.WARN034.issues.prefer_guillemet_for_quote]
-message = "chuỗi này thoát `\\\"`; hãy viết bằng «…», không cần thoát ký tự nào"
+message = "chuỗi này thoát `\"`; hãy viết bằng «…», không cần thoát ký tự nào"
 help = "dùng «...» cho văn bản chứa dấu trích dẫn"
 
 [diagnostics.WARN035]
@@ -3665,6 +3716,7 @@ argminima = "argmin"
 continet = "chứa"
 cumulata = "tích_lũy"
 decapita = "bỏ_đầu"
+extende = "nối_dài"
 filtrata = "lọc"
 immerge = "chìm"
 inversa = "nghịch_đảo"
@@ -3814,7 +3866,19 @@ help = "`{rumpe}` không thể dừng vòng lặp `{filum}`: các làn chạy đ
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` không thể rời vòng lặp `{filum}`"
-help = "`{redde}` không thể rời vòng lặp `{filum}`: các làn chạy độc lập. Để lấy một giá trị từ các làn, dùng `{reducta}`; để dừng ở một ngưỡng, hãy tính ngưỡng trước rồi lặp đến ngưỡng đó."
+help = "`{redde} {filum}` kết thúc làn này từ mọi độ sâu, còn `{perge}` làm vậy ở cấp cao nhất của làn."
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` chỉ hợp lệ bên trong thân vòng lặp làn luồng"
+help = "chỉ dùng `{redde} {filum}` bên trong thân vòng lặp `{filum}`"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` không nhận giá trị"
+help = "bỏ giá trị; các làn gửi kết quả qua kho lưu trữ của chúng"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "`{redde} {filum}` trong thân lồng nhau không thể kết thúc làn bên ngoài"
+help = "dùng trong chính thân làn, không dùng trong closure hoặc thân reduction lồng nhau"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "thân phép rút gọn chỉ được gọi hàm nội tại của thiết bị, đoạn mã và hàm trợ giúp nhân riêng: {reason}"
@@ -3826,177 +3890,234 @@ help = "giữ số hạng thuần túy: chỉ ghi biến cục bộ do thân kha
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "cần '>' sau các đối số kiểu"
+help = "Thêm `>` đóng sau các đối số kiểu."
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "cần '(' trước các tham số của kiểu hàm"
+help = "Bắt đầu kiểu hàm bằng `(` trước các kiểu tham số."
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "cần ')' sau các tham số của kiểu hàm"
+help = "Đóng danh sách tham số bằng `)` trước mũi tên trả về `→`."
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "cần '→' trước kiểu trả về của hàm"
+help = "Viết `→` giữa danh sách tham số và kiểu trả về."
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "cần '<' sau tên kiểu bao số"
+help = "Dùng kiểu độ rộng trần như `i32` hoặc `f32`; kiểu số không còn dùng `<...>`."
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "cần ':' sau nhãn phần tử bộ"
+help = "Ngăn cách nhãn kiểu tuple với kiểu bằng `:`, như trong `tuple<name: string>`."
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "cần ':' sau nhãn phần tử ratio"
+help = "Ngăn cách nhãn trường bản ghi với kiểu bằng `:`, như trong `record<name: string>`."
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "cần ']' sau các chiều hình dạng"
+help = "Đóng các chiều shape bằng `]`, như trong `tf32[2, 3]`."
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "cần ')' sau hình dạng trong ngoặc"
+help = "Đóng biểu thức kích thước trong ngoặc đơn bằng `)`, như trong `{magnitudo} (n + 1)`."
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "cần '←' sau binding đã đợi"
+help = "Sau binding `{figendum}` hoặc `{variandum}`, dùng `←` trước biểu thức future."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "cần '[' để bắt đầu pattern binding của mảng"
+help = "Bắt đầu binding mảng bằng `[`, như trong `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "cần ']' để kết thúc pattern binding của mảng"
+help = "Đóng binding mảng bằng `]`, như trong `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "cần dấu ngoặc nhọn mở cho pattern binding của object"
+help = "Bắt đầu binding đối tượng bằng `{{`, như trong `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "cần dấu ngoặc nhọn đóng cho pattern binding của object"
+help = "Đóng binding đối tượng bằng `}`, như trong `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "cần '(' trước các tham số của khai báo hàm"
+help = "Viết tham số hàm trong ngoặc đơn sau tên: `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "cần ')' sau các tham số của khai báo hàm"
+help = "Đóng danh sách tham số sau tham số cuối cùng, như trong `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "cần dấu ngoặc nhọn đóng sau thân class"
+help = "Đóng lớp sau các thành viên, như trong `{genus} Name {{ {sit} int value }`."
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân interface"
+help = "Bắt đầu thân interface bằng `{{`, như trong `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "cần '(' trước các tham số của method interface"
+help = "Viết tham số phương thức interface trong ngoặc đơn: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "cần ')' sau các tham số của method interface"
+help = "Đóng danh sách tham số phương thức sau tham số cuối cùng: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "cần dấu ngoặc nhọn đóng sau thân interface"
+help = "Đóng interface sau các chữ ký phương thức, như trong `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "cần '=' trước giá trị của type alias"
+help = "Viết type alias với `=`, như trong `{typus} Name = string`."
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân schema"
+help = "Bắt đầu thân schema bằng `{{`, như trong `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "cần dấu ngoặc nhọn đóng sau thân schema"
+help = "Đóng schema sau các cột, như trong `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân enum"
+help = "Bắt đầu thân enum bằng `{{`, như trong `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "cần dấu ngoặc nhọn đóng sau thân enum"
+help = "Đóng enum sau các thành viên, như trong `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân union"
+help = "Bắt đầu thân union bằng `{{`, như trong `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường variant của union"
+help = "Đóng payload của biến thể sau các trường, như trong `Circle {{ int radius }`."
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "cần dấu ngoặc nhọn đóng sau thân union"
+help = "Đóng union sau các biến thể, như trong `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "cần dấu ngoặc nhọn mở cho bản ghi import"
+help = "Bắt đầu bản ghi import bằng `{{`, như trong `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "cần '=' sau tên trường import"
+help = "Ngăn cách trường import với giá trị bằng `=`, như trong `{ex} = \"norma:console\"`."
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của bản ghi import"
+help = "Đóng bản ghi import sau các trường, như trong `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân probandum"
+help = "Bắt đầu thân suite kiểm thử bằng `{{`, như trong `{probandum} \"suite\" {{`."
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "cần dấu ngoặc nhọn đóng sau thân probandum"
+help = "Đóng suite kiểm thử bằng `}` sau các bài kiểm thử và hook thiết lập."
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "cần dấu ngoặc nhọn mở cho các trường annotation"
+help = "Dùng annotation có ngoặc nhọn cho các trường, chẳng hạn `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "cần '=' sau tên trường annotation"
+help = "Ngăn cách trường annotation với giá trị bằng `=`, như trong `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường annotation"
+help = "Đóng annotation có ngoặc nhọn sau các trường, như trong `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "cần dấu ngoặc nhọn mở cho các trường annotation của nucleum"
+help = "Dùng các tùy chọn kernel có ngoặc nhọn, chẳng hạn `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "cần '=' sau tên trường annotation của nucleum"
+help = "Ngăn cách tùy chọn kernel với giá trị bằng `=`, như trong `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường annotation của nucleum"
+help = "Đóng các tùy chọn kernel có ngoặc nhọn sau các trường, như trong `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.block_start]
 message = "cần dấu ngoặc nhọn mở cho khối"
+help = "Bắt đầu khối sau phần đầu, như trong `{si} ready {{ {tacet} }`."
 
 [diagnostics.PARSE001.issues.block_end]
 message = "cần dấu ngoặc nhọn đóng để kết thúc khối"
+help = "Đóng khối bằng `}` sau các câu lệnh."
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "cần '>' sau các tham số generic"
+help = "Đóng danh sách tham số generic bằng `>`, như trong `{functio} identity<T>(T value)`."
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "cần '>' sau các đối số kiểu của contract"
+help = "Đóng đối số kiểu của contract bằng `>`, như trong `Contract<Type>`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "cần '[' sau 'apud'"
+help = "Đặt tọa độ lặp trong ngoặc vuông sau `{apud}`, như trong `{itera} {ex} values {apud} [i] {sit} value`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "cần ']' sau tọa độ 'apud'"
+help = "Đóng danh sách tọa độ bằng `]` sau các tên."
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "cần '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "cần nguồn reduction sau toán tử reduction"
+help = "Viết `{ex} source` sau toán tử reduction."
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "cần '{lege}' hoặc '{lineam}'"
+help = "Dùng `{lege}` để đọc toàn bộ đầu vào, hoặc `{lineam}` để đọc một dòng."
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân elige"
+help = "Viết `{elige} value {{ ... }` với các trường hợp `{casu}` bên trong."
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "cần dấu ngoặc nhọn đóng sau các case của elige"
+help = "Đóng thân `{elige}` sau các trường hợp `{casu}` và nhánh `{ceterum}` tùy chọn."
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân discerne"
+help = "Viết `{discerne} value {{ ... }` với các nhánh mẫu `{casu}` bên trong."
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "cần dấu ngoặc nhọn đóng sau các nhánh của discerne"
+help = "Đóng thân `{discerne}` sau các nhánh `{casu}` và nhánh `{ceterum}` tùy chọn."
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "cần dấu ngoặc nhọn mở cho thân custodi"
+help = "Bắt đầu thân bằng `{custodi} {{` và thêm một hoặc nhiều mệnh đề `{si}`."
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "cần dấu ngoặc nhọn đóng sau các mệnh đề của custodi"
+help = "Đóng thân `{custodi}` sau các mệnh đề `{si}`."
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "cần '✗' sau giá trị điều kiện"
+help = "Đặt `✗` giữa giá trị nhánh then và giá trị nhánh else."
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "cần ')' sau các đối số lời gọi"
+help = "Đóng danh sách đối số của lời gọi bằng `)`."
 
 [diagnostics.PARSE001.issues.index_end]
 message = "cần ']' sau biểu thức chỉ mục"
+help = "Đóng biểu thức chỉ mục bằng `]`."
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "ngoặc chỉ mục chỉ nhận một biểu thức; các tọa độ tách rời không phải ô theo từng trục"
@@ -4004,99 +4125,131 @@ help = "viết tọa độ thành một danh sách trong ngoặc, chẳng hạn 
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "cần ']' sau các gradient selector"
+help = "Đóng danh sách selector trong ngoặc vuông bằng `]` sau các mục."
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "cần ']' sau biểu thức chỉ mục tùy chọn"
+help = "Hoàn tất chỉ mục tùy chọn theo dạng `value?[index]`."
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "cần ')' sau các đối số lời gọi tùy chọn"
+help = "Hoàn tất lời gọi tùy chọn theo dạng `value?(arguments)`."
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "cần ']' sau biểu thức chỉ mục không null"
+help = "Hoàn tất chỉ mục không null theo dạng `value![index]`."
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "cần ')' sau các đối số lời gọi không null"
+help = "Hoàn tất lời gọi không null theo dạng `value!(arguments)`."
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo"
+help = "Đóng các trường constructor bằng `}` sau trường cuối cùng."
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "cần ']' sau các phần tử của bộ khởi tạo suy ra"
+help = "Đóng danh sách phần tử của constructor suy luận bằng `]`."
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "cần ']' sau các phần tử của mảng"
+help = "Đóng literal danh sách bằng `]` sau các phần tử."
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "cần ')' sau biểu thức trong ngoặc đơn"
+help = "Đóng biểu thức trong ngoặc đơn bằng `)`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "cần '<' sau 'ratio'"
+help = "Viết các đối số kiểu có nhãn sau `record`, như trong `record<label: Type>`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "cần '>' sau các đối số kiểu của ratio"
+help = "Đóng các đối số kiểu bản ghi bằng `>` trước các trường."
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "cần dấu ngoặc nhọn mở sau các đối số kiểu của ratio"
+help = "Sau các đối số kiểu bản ghi, bắt đầu các trường bằng `{{`."
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của ratio"
+help = "Đóng các trường bản ghi bằng `}` sau trường cuối cùng."
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo có kiểu"
+help = "Đóng các trường constructor có kiểu bằng `}` sau trường cuối cùng."
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của finge"
+help = "Đóng các trường biến thể bằng `}` sau trường cuối cùng."
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "cần '<' sau 'iuncta'"
+help = "Viết đối số kiểu tuple sau `{iuncta}`, như trong `{iuncta}<T, U>`."
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "cần '[' sau các đối số kiểu của iuncta"
+help = "Sau các đối số kiểu, viết danh sách giá trị tuple trong ngoặc vuông."
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "cần ']' sau các phần tử của iuncta"
+help = "Đóng danh sách giá trị tuple bằng `]` sau các phần tử."
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "cần ')' sau các parameter của closure"
+help = "Đóng danh sách tham số bằng `)` trước chữ ký tùy chọn và `∴`."
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "cần '∴' sau chữ ký closure"
+help = "Sau chữ ký closure, viết `∴` rồi đến biểu thức hoặc khối `{fac}`."
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "cần ')' sau phần mở đầu ad"
+help = "Đóng biểu thức mở đầu tùy chọn bằng `)` sau giá trị của nó."
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "cần ':' sau nhãn đối số"
+help = "Trong lời gọi template, đặt `:` giữa nhãn đối số và giá trị."
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "cần ']' sau key object tính toán"
+help = "Đóng khóa trường được tính bằng `]` trước khi viết `= value`."
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "cần ':' sau key JSON"
+help = "Đặt `:` giữa mỗi khóa JSON có dấu nháy và giá trị của nó."
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "cần dấu ngoặc nhọn đóng sau object JSON"
+help = "Đóng đối tượng JSON bằng `}` sau các thành viên."
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "cần ']' sau mảng JSON"
+help = "Đóng mảng JSON bằng `]` sau các giá trị."
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "cần dấu ngoặc nhọn đóng sau các trường của bộ khởi tạo suy ra"
+help = "Đóng constructor suy luận bằng `}`."
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "cần '>' sau các đối số kiểu của lời gọi"
+help = "Đóng danh sách đối số kiểu bằng '>' trước '(' của lời gọi."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "cần '<' trước các đối số kiểu của bộ khởi tạo"
+help = "Thêm '<' trước các đối số kiểu của constructor."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "cần '>' sau các đối số kiểu của bộ khởi tạo"
+help = "Đóng danh sách đối số kiểu của constructor bằng '>'."
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "cần '(' sau 'scriptum'"
+help = "Bắt đầu lời gọi `{scriptum}` bằng '('."
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "cần ')' sau các đối số của scriptum"
+help = "Đóng lời gọi `{scriptum}` bằng ')' sau các đối số."
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "cần một identifier"
@@ -4204,5 +4357,26 @@ help = "khai báo `{implendum} Sink<T>` với `{functio} sink(T res) → vacuum 
 [diagnostics.INFO001]
 message = "kernel `{kernel}` chạy tuần tự trên thiết bị {device}"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "kernel `{kernel}` chạy trên một làn"
+help = "Dùng hàm `@ {nucleum}` với vòng lặp `{itera}` và mệnh đề `{filum}` khi mỗi lane cần xử lý một mục."
+
+[diagnostics.INFO001.issues.not_split]
+message = "kernel `{kernel}` chạy trên một trong {partitions} phân vùng: {reason}"
+help = "Kiểm tra lý do: việc tách cần lưới lane tuyến tính, một phạm vi lane và các thao tác ghi chỉ trong phạm vi của từng lane."
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "kernel `{kernel}`: việc chia ra {partitions} phân vùng phụ thuộc vào hình dạng lúc chạy"
+help = "Chọn các shape thời gian chạy sao cho lưới lane và các thao tác ghi có phạm vi khớp nhau để việc tách có thể dự đoán."
+
+[diagnostics.INFO001.issues.whole_call]
+message = "kernel `{kernel}` chạy như một lệnh gọi tuần tự trên một worker CPU"
+help = "Với công việc độc lập trên từng mục, hãy dùng hàm `@ {nucleum}` với vòng lặp `{itera}` và mệnh đề `{filum}`."
+
+[diagnostics.INFO001.issues.not_placed]
+message = "kernel `{kernel}` không được đặt trên thiết bị {device}: {reason}"
+help = "Kiểm tra lý do và dùng dạng kernel được thiết bị đã chọn hỗ trợ."
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: {kind} của nó trên {partitions} phân vùng có thể tránh được: {avoidable} ({reason})"
+help = "Theo lý do kiểm tra để tìm phần phụ thuộc. Giữ các lượt đọc và ghi đã phân vùng trong cùng lane, và khi có thể hãy dùng bố cục bộ đệm tương ứng."

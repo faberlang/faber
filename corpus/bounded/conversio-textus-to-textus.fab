@@ -4,19 +4,19 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Bounded textus<N> widens to unbounded textus: string<8> ↦ string."
-syntax = "textus<N> ↦ textus"
+summary = "Bounded textus<magnitudo N> widens to unbounded textus: string<size 8> ↦ string."
+syntax = "textus<magnitudo N> ↦ textus"
 related = ["↦", "textus"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — bounded textus<N> widens to unbounded textus
+# ↦ — bounded textus<magnitudo N> widens to unbounded textus
 # =============================================================================
 #
 # What this teaches:
-#   • Width release — a bounded `string<8>` converts to the unbounded
+#   • Width release — a bounded `string<size 8>` converts to the unbounded
 #     `string` surface with `↦`; the widened value is an ordinary textus
-#   • The bounded value itself is conversion-built — `raw ↦ string<8>` is
+#   • The bounded value itself is conversion-built — `raw ↦ string<size 8>` is
 #     the only way into the capacity from a runtime string
 #
 # Common mistakes:
@@ -26,7 +26,7 @@ locale = "en"
 # See also: ↦, textus
 # =============================================================================
 
-# conversio — textus<N> ↦ textus
+# conversio — textus<magnitudo N> ↦ textus
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' 'string'
@@ -36,7 +36,7 @@ locale = "en"
 
 main {
     let string raw ← "abcd"
-    let string<8> t ← raw ↦ string<8>
+    let string<size 8> t ← raw ↦ string<size 8>
     let string u ← t ↦ string
     print u
 }

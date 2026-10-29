@@ -668,6 +668,14 @@ fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String 
                 .join("."),
             canonical_type_shape(analysis, form.ty, &mut BTreeSet::new())
         ),
+        HirTypeFormHead::ImportedAlias { path } => format!(
+            "imported-alias(path={},shape={})",
+            path.iter()
+                .map(|symbol| analysis.interner.resolve(*symbol))
+                .collect::<Vec<_>>()
+                .join("."),
+            canonical_type_shape(analysis, form.ty, &mut BTreeSet::new())
+        ),
         HirTypeFormHead::Infer => {
             format!("infer(shape={})", canonical_type_shape(analysis, form.ty, &mut BTreeSet::new()))
         }

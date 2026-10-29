@@ -136,6 +136,7 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
         | StmtKind::Expr(_)
         | StmtKind::IncDec(_)
         | StmtKind::Redde(_)
+        | StmtKind::ReddeFilum(_)
         | StmtKind::Rumpe(_)
         | StmtKind::Perge(_)
         | StmtKind::Iace(_)

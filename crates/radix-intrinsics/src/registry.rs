@@ -26,7 +26,7 @@ pub enum IntrinsicReceiver {
     Matrix,
     /// Sparse `sparsa<T, Figura>` container (numeric-only in v1).
     Sparsa,
-    /// Register-class `vector<T, N>` (numeric elements).
+    /// Register-class `vector<T, size N>` (numeric elements).
     Vector,
     /// Numeric `intervallum<T>` interval.
     Intervallum,
@@ -154,6 +154,10 @@ pub enum IntrinsicMirKind {
     /// `reperta` (en `find`): the first element, in list order, whose
     /// predicate holds, as `T ∪ nihil`. Stops at the first match like `quilibet`.
     HigherOrderFind,
+    /// `extende` (en `extend`): append every element of another list of the
+    /// same element type, in order, in place. Lowered as one element-wise
+    /// append per argument element; it has no single MIR collection op.
+    ListExtend,
     HigherOrderFiltrata,
     HigherOrderMap,
     HigherOrderReduce,
@@ -425,6 +429,17 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         &[IntrinsicParamKind::Predicate],
         OptionInner,
         HigherOrderFind
+    ),
+    // `extende` (en `extend`): the list join. One signature: another list of the
+    // receiver's element type (a bounded list joins an unbounded one). It
+    // mutates the receiver, so the receiver must be `mut`.
+    intrinsic!(
+        Lista,
+        "extende",
+        1,
+        &[IntrinsicParamKind::ElementArray],
+        Vacuum,
+        ListExtend
     ),
     intrinsic!(Lista, "inversa", 0, &[], ArrayInner, collection Reverse),
     intrinsic!(Lista, "inverte", 0, &[], Vacuum, collection ReverseInPlace),

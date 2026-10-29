@@ -10,7 +10,7 @@ use crate::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 #[test]
 fn ascii8_to_textus_accepts() {
     assert_accepts_la(
-        "functio s(ascii<8> b) → textus {
+        "functio s(ascii<magnitudo 8> b) → textus {
     redde b ↦ textus
 }",
     );
@@ -21,7 +21,7 @@ fn ascii8_to_textus_accepts() {
 #[test]
 fn bounded_textus_to_textus_accepts() {
     assert_accepts_la(
-        "functio s(textus<4> t) → textus {
+        "functio s(textus<magnitudo 4> t) → textus {
     redde t ↦ textus
 }",
     );
@@ -32,8 +32,8 @@ fn bounded_textus_to_textus_accepts() {
 #[test]
 fn ascii4_to_ascii8_resize_grow_accepts() {
     assert_accepts_la(
-        "functio s(ascii<4> b) → ascii<8> {
-    redde b ↦ ascii<8>
+        "functio s(ascii<magnitudo 4> b) → ascii<magnitudo 8> {
+    redde b ↦ ascii<magnitudo 8>
 }",
     );
 }
@@ -41,8 +41,8 @@ fn ascii4_to_ascii8_resize_grow_accepts() {
 #[test]
 fn ascii8_to_ascii4_resize_shrink_accepts() {
     assert_accepts_la(
-        "functio s(ascii<8> b) → ascii<4> {
-    redde b ↦ ascii<4>
+        "functio s(ascii<magnitudo 8> b) → ascii<magnitudo 4> {
+    redde b ↦ ascii<magnitudo 4>
 }",
     );
 }
@@ -50,8 +50,8 @@ fn ascii8_to_ascii4_resize_shrink_accepts() {
 #[test]
 fn ascii8_to_ascii8_identity_accepts() {
     assert_accepts_la(
-        "functio s(ascii<8> b) → ascii<8> {
-    redde b ↦ ascii<8>
+        "functio s(ascii<magnitudo 8> b) → ascii<magnitudo 8> {
+    redde b ↦ ascii<magnitudo 8>
 }",
     );
 }
@@ -62,7 +62,7 @@ fn ascii8_to_ascii8_identity_accepts() {
 fn ascii_literal_over_capacity_rejects() {
     assert_rejects_with_issue_la(
         "incipit {
-    sit _ s ← 'alpha' ↦ ascii<4>
+    sit _ s ← 'alpha' ↦ ascii<magnitudo 4>
 }",
         "ascii_literal_too_long",
     );
@@ -72,7 +72,7 @@ fn ascii_literal_over_capacity_rejects() {
 fn textus_literal_over_capacity_rejects() {
     assert_rejects_with_issue_la(
         "incipit {
-    sit _ t ← \"abcdef\" ↦ textus<4>
+    sit _ t ← \"abcdef\" ↦ textus<magnitudo 4>
 }",
         "textus_literal_too_long",
     );

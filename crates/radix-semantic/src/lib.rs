@@ -351,6 +351,10 @@ pub struct PassConfig {
     /// Faber and FHIR targets never fold either, see
     /// [`PassConfig::folds_literal_floats`].
     pub fold_literal_floats: bool,
+    /// The kernel safe switch (`--safe`, `safe = true`): every kernel runs at
+    /// the default tier whatever its annotation says. See
+    /// [`passes::kernel_tier`].
+    pub deny_kernel_tiers: bool,
 }
 
 impl PassConfig {
@@ -385,6 +389,7 @@ impl PassConfig {
             insere_files: crate::insere::InsereFiles::default(),
             source_text: None,
             fold_literal_floats: true,
+            deny_kernel_tiers: false,
         }
     }
 
@@ -620,6 +625,9 @@ pub fn analyze_with_cli(
         annotation_contracts: Some(&annotation_contracts),
     });
     let mut hir = lowered.hir;
+    if config.deny_kernel_tiers {
+        passes::kernel_tier::deny_tiers(&mut hir, interner);
+    }
 
     for err in lower_errors {
         let mut semantic_error = SemanticError::structured(err.kind, err.span);

@@ -53,6 +53,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # Embedded reader-locale packs: gzip via flate2 (already in the workspace lock
 # through zip's deflate backend). Build-time compressor + runtime decoder.
 flate2 = "1"
+
 # `faber update`: public release lookup, verified archive download, and the
 # versioned install layout. HTTP(S) rides the shared `faber-leaf` client
 # (rustls TLS, already linked); the SHA-256 checksum is `handroll::sha256`.
@@ -62,6 +63,14 @@ semver = "1"
 handroll = { path = "../handroll" }
 # Shared native leaves (core-norma N2): plan-time `solum:*` classification.
 faber-leaf = { path = "../faber-leaf" }
+# `faber run --target clif-jit` runs the program in this process: the CLIF
+# runtime is linked as an rlib and its entry points are registered with the JIT
+# from an explicit table. `faber build --target clif` still links the archive.
+faber-host-clif = { path = "../../runtime/clif", optional = true }
+
+# Unix advisory locks protect shared llvm-host output and archive materialization.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [build-dependencies]
 flate2 = "1"
@@ -80,7 +89,7 @@ hir-faber = ["radix/hir-faber", "dep:radix-hir-faber"]
 hir-c = ["radix/hir-c"]
 hir-fhir = ["radix/hir-fhir"]
 mir-fmir = ["radix/mir-fmir"]
-mir-clif = ["radix/mir-clif"]
+mir-clif = ["radix/mir-clif", "dep:faber-host-clif"]
 runner = ["radix/runner", "dep:radix-mir-runner", "dep:proba", "proba/runner"]
 
 [lints]

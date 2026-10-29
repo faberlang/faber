@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/kernel/tier-fragment-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "kernel/tier-fragment-reject.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "nucleum_tier_on_fragment"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "nucleum_tier_on_fragment"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "nucleum_tier_on_fragment"

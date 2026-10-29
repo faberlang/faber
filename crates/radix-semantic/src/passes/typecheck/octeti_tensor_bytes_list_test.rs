@@ -21,7 +21,7 @@ fn wide_element_without_a_clause_is_refused() {
         "functio f(lista<b8> a) → tensor<u16, [2]> ⇥ textus { redde a ↦ tensor<u16, [2]> }",
         "functio f(lista<b8> a) → tensor<i32, [2]> ⇥ textus { redde a ↦ tensor<i32, [2]> }",
     ] {
-        test_support::assert_rejects_with_issue(source, "octeti_to_tensor_unspecified");
+        test_support::assert_rejects_with_issue(source, "list_b8_to_tensor_unspecified");
     }
 }
 

@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/genus/callee-record-list-store.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/callee-record-list-store.fab"
+category = "class"
+domain = "types"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

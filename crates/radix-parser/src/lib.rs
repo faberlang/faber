@@ -1970,6 +1970,10 @@ mod summa_disambiguation_test;
 #[cfg(test)]
 #[path = "reducta_test.rs"]
 mod reducta_test;
+
+#[cfg(test)]
+#[path = "return_thread_test.rs"]
+mod return_thread_test;
 #[cfg(test)]
 #[path = "scan_test.rs"]
 mod scan_test;

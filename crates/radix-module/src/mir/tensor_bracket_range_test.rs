@@ -49,7 +49,7 @@ fn tensor_bracket_range_rank2_slots_slice_and_drop() {
     assert_eq!(ok(body), ["[4.0, 5.0, 6.0]", "6.0"]);
 }
 
-const V: &str = "let vector<f32, 4> v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>";
+const V: &str = "let vector<f32, size 4> v ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>";
 
 #[test]
 fn vector_bracket_range_slice_runs() {
@@ -57,7 +57,7 @@ fn vector_bracket_range_slice_runs() {
     // a fresh vector from the kept lanes instead of reading one lane.
     let body = format!(
         "{V}\n\
-         let vector<f32, 2> w ← v[1 ‥ 3]\n\
+         let vector<f32, size 2> w ← v[1 ‥ 3]\n\
          print w[0]\n\
          print w[1]"
     );
@@ -68,7 +68,7 @@ fn vector_bracket_range_slice_runs() {
 fn vector_bracket_range_step_slice_runs() {
     let body = format!(
         "{V}\n\
-         let vector<f32, 2> w ← v[0 ‥ 4 step 2]\n\
+         let vector<f32, size 2> w ← v[0 ‥ 4 step 2]\n\
          print w[0]\n\
          print w[1]"
     );
@@ -81,8 +81,8 @@ fn matrix_bracket_slot_range_runs() {
     // range keeps a row, a column or a block as cell reads, not `TensorSliceNd`.
     let body = "\
         let matrix<f32, [2, 3]> m ← [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]] ↦ matrix<f32, [2, 3]>\n\
-        let vector<f32, 3> row ← m[[1, 0 ‥ 3]]\n\
-        let vector<f32, 2> col ← m[[0 ‥ 2, 2]]\n\
+        let vector<f32, size 3> row ← m[[1, 0 ‥ 3]]\n\
+        let vector<f32, size 2> col ← m[[0 ‥ 2, 2]]\n\
         let matrix<f32, [1, 2]> block ← m[[0 … 0, 1 ‥ 3]]\n\
         print row[0]\n\
         print col[1]\n\

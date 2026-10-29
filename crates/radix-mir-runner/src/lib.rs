@@ -539,6 +539,9 @@ pub(crate) struct FunctionSlots {
     locals: Vec<Option<TypeId>>,
     temps: Vec<Option<TypeId>>,
     param_locals: Vec<MirLocalId>,
+    /// `(local, mode)` of every parameter in declaration order, shared so a
+    /// call reads it with a refcount bump instead of rebuilding a `Vec`.
+    params: Rc<[(MirLocalId, MirParamMode)]>,
     /// Locals whose declared type is a bare `f32` (through aliases): a float
     /// stored there rounds to binary32. A `PolicyFloat` cell is not flagged;
     /// it keeps the bare float and its own store check.
@@ -625,6 +628,11 @@ fn index_slot_types(
                 locals,
                 temps,
                 param_locals,
+                params: function
+                    .params
+                    .iter()
+                    .map(|param| (param.local, param.mode))
+                    .collect(),
                 f32_locals,
                 f32_temps,
             },
@@ -757,6 +765,8 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     interner: &'a Interner,
     host: &'a mut H,
     frames: Vec<Frame>,
+    /// Emptied slot buffers of returned frames, reused by the next call.
+    slot_pool: Vec<Vec<Option<Value>>>,
     /// Optional diagnostic meter. `None` is the unmetered fast path: no
     /// statistics clock reads, active-stack work, or row lookups occur.
     stats: Option<stats::StatsCollector>,
@@ -863,6 +873,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             interner,
             host,
             frames: Vec::new(),
+            slot_pool: Vec::new(),
             stats: None,
             errors: Vec::new(),
             step_limit: None,
@@ -1947,25 +1958,33 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn new_frame(&self, function_id: MirFunctionId, entry_block: MirBlockId) -> Frame {
-        let (mut locals, temps_len) = match self.prepared.slot_types.get(&function_id) {
-            Some(slots) => {
-                let mut locals = vec![None; slots.locals.len()];
-                for param in slots.param_locals.iter().copied() {
-                    if let Some(slot) = locals.get_mut(param.0 as usize) {
-                        *slot = Some(Value::Unit);
-                    }
+        self.new_frame_from(function_id, entry_block, Vec::new(), Vec::new())
+    }
+
+    /// [`Self::new_frame`] over recycled (empty) slot buffers, so a call
+    /// reuses the allocations of a frame that already returned.
+    fn new_frame_from(
+        &self,
+        function_id: MirFunctionId,
+        entry_block: MirBlockId,
+        mut locals: Vec<Option<Value>>,
+        mut temps: Vec<Option<Value>>,
+    ) -> Frame {
+        if let Some(slots) = self.prepared.slot_types.get(&function_id) {
+            locals.resize(slots.locals.len(), None);
+            for param in slots.param_locals.iter().copied() {
+                if let Some(slot) = locals.get_mut(param.0 as usize) {
+                    *slot = Some(Value::Unit);
                 }
-                (locals, slots.temps.len())
             }
-            None => (Vec::new(), 0),
-        };
-        locals.shrink_to_fit();
+            temps.resize(slots.temps.len(), None);
+        }
         Frame {
             function: function_id,
             locals,
             aliases: FxHashMap::default(),
             mut_writebacks: Vec::new(),
-            temps: vec![None; temps_len],
+            temps,
             values: FxHashMap::default(),
             records_values: self.prepared.value_reading_functions.contains(&function_id),
             block: entry_block,
@@ -1984,6 +2003,23 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             stats.leave_function(frame.function);
         }
         frame
+    }
+
+    /// Keep a returned frame's slot buffers for the next call.
+    fn recycle_frame(&mut self, frame: Frame) {
+        const SLOT_POOL_LIMIT: usize = 64;
+        if self.slot_pool.len() + 2 > SLOT_POOL_LIMIT {
+            return;
+        }
+        let Frame {
+            mut locals,
+            mut temps,
+            ..
+        } = frame;
+        locals.clear();
+        temps.clear();
+        self.slot_pool.push(locals);
+        self.slot_pool.push(temps);
     }
 
     fn close_all_frames(&mut self) {
@@ -2243,8 +2279,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     self.return_error = None;
                     self.return_value = Some(value);
                     let returned = self.pop_frame();
-                    if let Some(frame) = returned {
-                        for (caller, place, local) in frame.mut_writebacks {
+                    if let Some(mut frame) = returned {
+                        for (caller, place, local) in std::mem::take(&mut frame.mut_writebacks) {
                             let Some(value) = frame.locals.get(local.0 as usize).cloned().flatten()
                             else {
                                 self.fail(RunnerError::internal(
@@ -2260,7 +2296,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                                 break;
                             }
                         }
+                        self.recycle_frame(frame);
                     }
+                }
+                MirTerminatorKind::ReturnThread => {
+                    self.fail(RunnerError::unsupported(
+                        terminator.span,
+                        "return_thread terminator is not executable before lane lowering",
+                    ));
                 }
                 MirTerminatorKind::ReturnError(operand) => {
                     let value = match self.eval_operand(operand, terminator.span) {
@@ -2720,15 +2763,23 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         let kernel_scope = self.kernel_trace_scope(func_id, span)?;
         let traced = kernel_scope && self.kernel_trace_depth == 0;
         // BO-M-3/052: avoid cloning the entire MirFunction; collect param locals only.
-        let param_modes = self
-            .function_by_id(func_id, span)?
-            .params
-            .iter()
-            .map(|param| (param.local, param.mode))
-            // The lane id is a builtin of the device launch, never a call
-            // argument: a dispatched lane-form kernel is called without it.
-            .filter(|(_, mode)| !(dispatched && *mode == MirParamMode::Lane))
-            .collect::<Vec<_>>();
+        let param_modes: Rc<[(MirLocalId, MirParamMode)]> = match self
+            .prepared
+            .slot_types
+            .get(&func_id)
+            .filter(|_| !dispatched)
+        {
+            Some(slots) => Rc::clone(&slots.params),
+            None => self
+                .function_by_id(func_id, span)?
+                .params
+                .iter()
+                .map(|param| (param.local, param.mode))
+                // The lane id is a builtin of the device launch, never a call
+                // argument: a dispatched lane-form kernel is called without it.
+                .filter(|(_, mode)| !(dispatched && *mode == MirParamMode::Lane))
+                .collect(),
+        };
         let arg_values = args
             .iter()
             .map(|arg| self.eval_operand(arg, span))
@@ -2803,7 +2854,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
         self.return_value = None;
         self.return_error = None;
-        self.push_frame(func_id, MirBlockId(0));
+        let locals_buf = self.slot_pool.pop().unwrap_or_default();
+        let temps_buf = self.slot_pool.pop().unwrap_or_default();
+        let frame = self.new_frame_from(func_id, MirBlockId(0), locals_buf, temps_buf);
+        self.resume_frame(frame);
         // The executed kernel's tensors are shared (`Rc`), so the arguments
         // evaluated here still see the body's writes after it returns.
         let trace_args = trace_roles.is_some().then(|| arg_values.clone());
@@ -2814,7 +2868,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 write_slot(&mut frame.locals, local.0 as usize, value, span, "local")?;
             }
             for ((local, mode), (arg, operand)) in param_modes
-                .into_iter()
+                .iter()
+                .copied()
                 .zip(arg_values.into_iter().zip(args))
             {
                 // `in` is a borrow contract, not a scalar copy. Keep a
@@ -3925,6 +3980,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Width of a modular word operand, following type aliases. A bitwise
+    /// intermediate can lose its word result type even though the other
+    /// multiplication operand remains a `wrapping<W>` value.
+    fn operand_modular_word_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        let mut ty = self.operand_static_type(operand)?;
+        loop {
+            match self.types.get(ty) {
+                Type::ModularWord(width) => return Some(*width),
+                Type::Alias(_, inner) => ty = *inner,
+                _ => return None,
+            }
+        }
+    }
+
     /// Whether an operand's *static* type is a `wrapping<W>` word, following
     /// type aliases to their underlying word. Range-based typing can give
     /// arithmetic on such operands a plain integer result, so the result type
@@ -4228,7 +4297,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         {
             return value::bits_binop(&left, &right, op, bits, span);
         }
-        if let Some(modular) = self.modular_word_width(result_ty) {
+        let modular = self.modular_word_width(result_ty);
+        // Range-based typing can erase the `wrapping<u64>` result type from a
+        // bitwise intermediate. When that value feeds multiplication, keep
+        // the word's modular product instead of trapping before the wrapping
+        // destination store.
+        if modular.is_none()
+            && op == MirBinOp::Mul
+            && let Some(NumericWidth::U64) = self
+                .operand_modular_word_width(lhs)
+                .or_else(|| self.operand_modular_word_width(rhs))
+        {
+            return modular_word_numeric_binop(left, right, op, NumericWidth::U64, span);
+        }
+        if let Some(modular) = modular {
             return match op {
                 MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod => {
                     modular_word_numeric_binop(left, right, op, modular, span)
@@ -4499,6 +4581,7 @@ fn reachable_block_ids(function: &MirFunction) -> FxHashSet<MirBlockId> {
 fn terminator_successors(kind: &MirTerminatorKind) -> Vec<MirBlockId> {
     match kind {
         MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::ReturnError(_)
         | MirTerminatorKind::Unreachable => Vec::new(),
         MirTerminatorKind::Goto(target) => vec![*target],

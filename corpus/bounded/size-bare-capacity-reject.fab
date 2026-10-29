@@ -1,0 +1,35 @@
++++
+term = "queue<T, size N>"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "nota_stmt", "expression", "literal"]
+category = "list"
+canonical = false
+summary = "A capacity is written after size: a bare queue<T, 4>, stack<T, 4>, string<4> or ascii<4> is retired by name."
+syntax = "queue<int, 4> — rejected; write queue<int, size 4>"
+related = ["stack<T, size N>", "string<size N>", "ascii<size N>", "size"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM008:capacity_needs_size"
++++
+# =============================================================================
+# queue<T, N> / stack<T, N> / string<N> / ascii<N> — the bare capacity is retired
+# =============================================================================
+# This exemplum intentionally fails to compile.
+#
+# What this teaches:
+#   • A capacity is a count, so it follows `size`: `queue<int, size 4>` holds at most 4 elements, `stack<int, size 4>` the same, and `string<size 8>` / `ascii<size 8>` hold at most 8 characters. The bare number is the same retirement `list<int, 4>` has.
+#
+# Common mistakes:
+#   • Writing the capacity as a bare number, as these heads once allowed; every bounded head takes `size` first.
+#   • Putting `size` on the `_` hole: the hole stays bare (`queue<int, _>`).
+
+main {
+    mut queue<int, 4> q ← empty
+    mut stack<int, 4> s ← empty
+    let string<8> t ← "ab" ↦ string<8>
+    let ascii<4> c ← 'x'
+    print q.length()
+    print s.length()
+    print t
+    print c
+}

@@ -38,7 +38,7 @@
 //!   facts for bindings they touch before entry; untouched immutable facts may
 //!   enter as loop-invariant knowledge.
 
-use super::flow_range::{FactValue, RangeSnapshot};
+use super::flow_range::{Endpoint, FactValue, IntRange, RangeSnapshot};
 use super::store::StoreSite;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
@@ -616,8 +616,14 @@ impl TypeChecker<'_> {
         match &cond.kind {
             // Both conjuncts hold when `A and B` is true, at any depth. Its
             // falsity forces neither conjunct, so the else edge learns nothing.
+            //
+            // The facts are read from the flow state as it stands once the
+            // whole condition has been checked, so an effect in a conjunct
+            // evaluated later than a fact's conjunct has already moved the
+            // state under it: that fact's interval half dies.
             HirExpressionKind::Binary(HirBinOp::And, lhs, rhs) => {
                 let (mut then_facts, _) = self.condition_refinement(lhs);
+                self.drop_ranges_killed_by(&mut then_facts, rhs);
                 then_facts.extend(self.condition_refinement(rhs).0);
                 (then_facts, Vec::new())
             }
@@ -626,6 +632,7 @@ impl TypeChecker<'_> {
             // both negations. Its truth forces neither disjunct.
             HirExpressionKind::Binary(HirBinOp::Or, lhs, rhs) => {
                 let (_, mut else_facts) = self.condition_refinement(lhs);
+                self.drop_ranges_killed_by(&mut else_facts, rhs);
                 else_facts.extend(self.condition_refinement(rhs).1);
                 (Vec::new(), else_facts)
             }
@@ -636,12 +643,75 @@ impl TypeChecker<'_> {
             }
             _ => {
                 let (then_fact, else_fact) = self.leaf_refinement(cond);
-                (
-                    then_fact.into_iter().collect(),
-                    else_fact.into_iter().collect(),
-                )
+                let mut then_facts: Facts = then_fact.into_iter().collect();
+                let mut else_facts: Facts = else_fact.into_iter().collect();
+                // An effect inside the leaf itself (`i ≺ f(mut xs)`) runs
+                // after the operands the fact was read from.
+                self.drop_ranges_killed_by(&mut then_facts, cond);
+                self.drop_ranges_killed_by(&mut else_facts, cond);
+                (then_facts, else_facts)
             }
         }
+    }
+
+    /// Take the interval half out of every fact that `later`, an expression
+    /// evaluated after the fact was established, can invalidate: a fact about
+    /// a binding it stores to or (when it calls, or stores through a
+    /// projection) about any mutable source, and every endpoint bounded by the
+    /// live length of a list or mutable source. The same rule as
+    /// [`Self::kill_mutable_source_ranges`], applied to facts the checker
+    /// rebuilds from syntax after the effects already ran. A narrowed type is
+    /// left alone: this is the interval half only.
+    fn drop_ranges_killed_by(&self, facts: &mut Facts, later: &HirExpression) {
+        if facts.iter().all(|(_, value)| value.range.is_none()) {
+            return;
+        }
+        let read_only = |receiver: &HirExpression, name: Symbol, arg_count: usize| {
+            self.is_read_only_intrinsic_call(receiver, name, arg_count)
+        };
+        let mut effects = AssignmentTargetCollector {
+            read_only: Some(&read_only),
+            ..Default::default()
+        };
+        effects.visit_expr(later);
+        if effects.targets.is_empty() && !effects.kills_ranges {
+            return;
+        }
+        let is_mutable = |def_id: DefId| {
+            self.binding_shadow
+                .get(&def_id)
+                .is_none_or(|info| info.mutable)
+        };
+        for (key, value) in facts.iter_mut() {
+            let Some(range) = value.range.take() else {
+                continue;
+            };
+            let FactKey::Binding(subject) = key else {
+                continue;
+            };
+            if effects.targets.contains(subject) || (effects.kills_ranges && is_mutable(*subject)) {
+                continue;
+            }
+            let strip = |endpoint: Option<Endpoint>| {
+                endpoint.filter(|endpoint| {
+                    !endpoint
+                        .key
+                        .live_length_source()
+                        .is_some_and(|(source, _)| {
+                            effects.kills_ranges
+                                && (is_mutable(source) || self.is_list_source(source))
+                        })
+                })
+            };
+            let range = IntRange {
+                lo: strip(range.lo),
+                hi: strip(range.hi),
+            };
+            if !range.is_unbounded() {
+                value.range = Some(range);
+            }
+        }
+        facts.retain(|(_, value)| value.ty.is_some() || value.range.is_some());
     }
 
     /// Refinement for one non-compound condition (null probe, member test,
@@ -982,7 +1052,12 @@ impl TypeChecker<'_> {
             self.invalidate_flow_fact(def_id);
         }
         self.kill_ranges_for_loop_effects(block);
+        // The loop can be left from the top, or from any `break`, so what the
+        // body establishes does not hold after it: the continuation resumes
+        // from the facts that survived the loop-entry kills.
+        let at_entry = self.range_flow.snapshot();
         self.check_block(block, None);
+        self.range_flow.restore(&at_entry);
     }
 
     /// Check a `dum` body under its condition's taken-edge facts (Option A,
@@ -1005,6 +1080,7 @@ impl TypeChecker<'_> {
             self.invalidate_flow_fact(def_id);
         }
         self.kill_ranges_for_loop_effects(block);
+        let at_entry = self.range_flow.snapshot();
         // The condition is re-tested before every iteration, so its
         // then-facts hold at body entry each time and are seeded fresh; a
         // re-point inside the body ends them for the rest of that iteration
@@ -1012,6 +1088,10 @@ impl TypeChecker<'_> {
         let (then_facts, _) = self.condition_refinement(cond);
         self.check_block_with_refinement(block, None, then_facts);
         self.restore_flow_state(&incoming);
+        // The loop-entry kills hold after the loop too: the body that ran
+        // zero or more times may have written what `incoming` still proves
+        //.
+        self.range_flow.restore(&at_entry);
     }
 
     /// Snapshot the currently visible binding state for one control-flow edge.
@@ -1479,7 +1559,10 @@ impl TypeChecker<'_> {
             // other edge. The loop-entry policy already drops facts for every
             // binding the body assigns, and a body-scope fact never survives
             // the loop, so ignoring the edge here cannot leak a stale fact.
-            HirStatementKind::Redde(_) | HirStatementKind::Rumpe | HirStatementKind::Perge => true,
+            HirStatementKind::Redde(_)
+            | HirStatementKind::ReddeFilum(_)
+            | HirStatementKind::Rumpe
+            | HirStatementKind::Perge => true,
             HirStatementKind::Expr(expr) => self.expression_diverges(expr),
             _ => false,
         }

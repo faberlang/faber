@@ -1,0 +1,32 @@
++++
+term = "genus"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "type_annotation", "owned_type", "base_type", "type_arguments", "incipit_stmt", "fixum_decl", "typed_constructor", "field_list", "field_init", "field_key", "expression", "literal", "array_literal", "nota_stmt"]
+category = "class"
+canonical = false
+summary = "A list literal supplied to a length-range list field (`list<T, size lo‥hi>`) is stored as the plain list the range checks."
+syntax = "<Class> { <field> = [<value>, …] }"
+related = ["genus", "list"]
+locale = "en"
++++
+# =============================================================================
+# genus — list literals in length-range list fields
+# =============================================================================
+#
+# What this teaches:
+#   • `Class { field = [a, b] }` stores the literal in a `list<T, size lo‥hi>`
+#     field; the range is a store rule on the plain list, not a bounded carrier.
+#
+# See also: genus
+# =============================================================================
+
+class Window {
+    let list<int, size 1‥3> ranged
+    let list<int, size 2…∞> open
+}
+
+main {
+    let Window window ← Window { ranged = [9, 10], open = [1, 2, 3] }
+    print window.ranged
+    print window.open
+}

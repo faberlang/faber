@@ -705,6 +705,22 @@ impl FunctionLower<'_, '_> {
         Ok(())
     }
 
+    fn byte_order_flag(
+        &self,
+        conversion: &MirConversion,
+        missing_hint: &'static str,
+    ) -> Lowered<i64> {
+        conversion
+            .params
+            .iter()
+            .find_map(|param| match self.state.input.interner.resolve(*param) {
+                "be" | "Be" => Some(1),
+                "le" | "Le" => Some(0),
+                _ => None,
+            })
+            .ok_or_else(|| Decline::new(missing_hint))
+    }
+
     fn sequence_rewidth(
         &mut self,
         conversion: &MirConversion,
@@ -714,15 +730,7 @@ impl FunctionLower<'_, '_> {
         kind: i64,
     ) -> Lowered<SequenceValue> {
         Ok({
-            let big = conversion
-                .params
-                .iter()
-                .find_map(|param| match self.state.input.interner.resolve(*param) {
-                    "be" | "Be" => Some(1),
-                    "le" | "Le" => Some(0),
-                    _ => None,
-                })
-                .ok_or_else(|| Decline::new("list regroup without a byte order"))?;
+            let big = self.byte_order_flag(conversion, "list regroup without a byte order")?;
             let from = self.builder.ins().iconst(types::I32, i64::from(from));
             let to = self.builder.ins().iconst(types::I32, i64::from(to));
             let flags = self.builder.ins().iconst(types::I32, big | (kind << 1));
@@ -748,15 +756,7 @@ impl FunctionLower<'_, '_> {
         float: bool,
     ) -> Lowered<SequenceValue> {
         Ok({
-            let big = conversion
-                .params
-                .iter()
-                .find_map(|param| match self.state.input.interner.resolve(*param) {
-                    "be" | "Be" => Some(1),
-                    "le" | "Le" => Some(0),
-                    _ => None,
-                })
-                .ok_or_else(|| Decline::new("byte read without a byte order"))?;
+            let big = self.byte_order_flag(conversion, "byte read without a byte order")?;
             let flags = big | if signed { 2 } else { 0 } | if float { 4 } else { 0 };
             let width = self.builder.ins().iconst(types::I32, i64::from(bytes));
             let flags = self.builder.ins().iconst(types::I32, flags);
@@ -792,15 +792,7 @@ impl FunctionLower<'_, '_> {
         float: bool,
     ) -> Lowered<SequenceValue> {
         Ok({
-            let big = conversion
-                .params
-                .iter()
-                .find_map(|param| match self.state.input.interner.resolve(*param) {
-                    "be" | "Be" => Some(1),
-                    "le" | "Le" => Some(0),
-                    _ => None,
-                })
-                .ok_or_else(|| Decline::new("byte write without a byte order"))?;
+            let big = self.byte_order_flag(conversion, "byte write without a byte order")?;
             let bits = if float {
                 self.builder
                     .ins()
@@ -923,7 +915,12 @@ impl FunctionLower<'_, '_> {
                 (self.builder.ins().fcvt_from_sint(types::F64, wide), None)
             }
             (Num::Bool, Num::Int(_)) => (self.builder.ins().uextend(types::I64, value), None),
-            (Num::Float(_), Num::Float(_)) | (Num::Nil, Num::Dyn) => (value, None),
+            (Num::Float(_), Num::Float(width)) => {
+                // A float target narrower than `f64` rounds at the slot
+                // through `f32` (the runner's `round_float_at_slot`).
+                (self.round_float_width(value, width), None)
+            }
+            (Num::Nil, Num::Dyn) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value),
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
             (Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => {
@@ -954,7 +951,12 @@ impl FunctionLower<'_, '_> {
             (Num::Text, Num::Char) => self.convert_text_char(value)?,
             (Num::Int(_), Num::Char) => self.convert_int_char(conversion, value)?,
             (Num::Char, Num::Int(_)) => self.convert_char_int(conversion, value)?,
-            (Num::Text, Num::Float(_)) => self.convert_text_float(value)?,
+            (Num::Text, Num::Float(width)) => {
+                let (parsed, failure) = self.convert_text_float(value)?;
+                // Text parses in `f64` and narrows at the slot: the double
+                // rounding is accepted for text sources, as in the runner.
+                (self.round_float_width(parsed, width), failure)
+            }
             (Num::Int(_), Num::Bool) => {
                 let zero = self.builder.ins().iconst(types::I64, 0);
                 (self.builder.ins().icmp(IntCC::NotEqual, value, zero), None)
@@ -976,16 +978,14 @@ impl FunctionLower<'_, '_> {
         value: Value,
         width: NumericWidth,
     ) -> (Value, Option<(Value, Failure)>) {
-        {
-            let widened = if width == NumericWidth::F32 {
-                // Rounded once, nearest-even, straight from the integer.
-                let narrow = self.builder.ins().fcvt_from_sint(types::F32, value);
-                self.builder.ins().fpromote(types::F64, narrow)
-            } else {
-                self.builder.ins().fcvt_from_sint(types::F64, value)
-            };
-            (widened, None)
-        }
+        let widened = if width == NumericWidth::F32 {
+            // Rounded once, nearest-even, straight from the integer.
+            let narrow = self.builder.ins().fcvt_from_sint(types::F32, value);
+            self.builder.ins().fpromote(types::F64, narrow)
+        } else {
+            self.builder.ins().fcvt_from_sint(types::F64, value)
+        };
+        (widened, None)
     }
 
     fn box_numeric_scalar(
@@ -1331,13 +1331,11 @@ impl FunctionLower<'_, '_> {
     }
 
     fn convert_float_bool(&mut self, value: Value) -> (Value, Option<(Value, Failure)>) {
-        {
-            let zero = self.builder.ins().f64const(0.0);
-            (
-                self.builder.ins().fcmp(FloatCC::NotEqual, value, zero),
-                None,
-            )
-        }
+        let zero = self.builder.ins().f64const(0.0);
+        (
+            self.builder.ins().fcmp(FloatCC::NotEqual, value, zero),
+            None,
+        )
     }
 
     fn convert_text_bool(&mut self, value: Value) -> Lowered<(Value, Option<(Value, Failure)>)> {
@@ -1362,23 +1360,21 @@ impl FunctionLower<'_, '_> {
         to: IntKind,
         width: BitsWidth,
     ) -> (Value, Option<(Value, Failure)>) {
-        {
-            let read = self.extend_pattern(value, width, signed_width(to.width));
-            if to.width == NumericWidth::U64 {
-                // A pattern with the top bit set is a u64 the i64 carrier
-                // cannot hold: refuse it by name at run time.
-                let zero = self.builder.ins().iconst(types::I64, 0);
-                let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
-                return (
-                    read,
-                    Some((
-                        beyond,
-                        Failure::Static("u64 value beyond 2^63 is not carried by the clif target"),
-                    )),
-                );
-            }
-            (read, None)
+        let read = self.extend_pattern(value, width, signed_width(to.width));
+        if to.width == NumericWidth::U64 {
+            // A pattern with the top bit set is a u64 the i64 carrier
+            // cannot hold: refuse it by name at run time.
+            let zero = self.builder.ins().iconst(types::I64, 0);
+            let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
+            return (
+                read,
+                Some((
+                    beyond,
+                    Failure::Static("u64 value beyond 2^63 is not carried by the clif target"),
+                )),
+            );
         }
+        (read, None)
     }
 
     fn convert_float_bits_half(
@@ -1410,21 +1406,19 @@ impl FunctionLower<'_, '_> {
         value: Value,
         width: BitsWidth,
     ) -> (Value, Option<(Value, Failure)>) {
-        {
-            let pattern = if width == BitsWidth::B32 {
-                let narrow = self.builder.ins().fdemote(types::F32, value);
-                let bits = self
-                    .builder
-                    .ins()
-                    .bitcast(types::I32, MemFlagsData::new(), narrow);
-                self.builder.ins().uextend(types::I64, bits)
-            } else {
-                self.builder
-                    .ins()
-                    .bitcast(types::I64, MemFlagsData::new(), value)
-            };
-            (pattern, None)
-        }
+        let pattern = if width == BitsWidth::B32 {
+            let narrow = self.builder.ins().fdemote(types::F32, value);
+            let bits = self
+                .builder
+                .ins()
+                .bitcast(types::I32, MemFlagsData::new(), narrow);
+            self.builder.ins().uextend(types::I64, bits)
+        } else {
+            self.builder
+                .ins()
+                .bitcast(types::I64, MemFlagsData::new(), value)
+        };
+        (pattern, None)
     }
 
     fn convert_bits_float(
@@ -1432,21 +1426,19 @@ impl FunctionLower<'_, '_> {
         value: Value,
         width: BitsWidth,
     ) -> (Value, Option<(Value, Failure)>) {
-        {
-            let float = if width == BitsWidth::B32 {
-                let bits = self.builder.ins().ireduce(types::I32, value);
-                let narrow = self
-                    .builder
-                    .ins()
-                    .bitcast(types::F32, MemFlagsData::new(), bits);
-                self.builder.ins().fpromote(types::F64, narrow)
-            } else {
-                self.builder
-                    .ins()
-                    .bitcast(types::F64, MemFlagsData::new(), value)
-            };
-            (float, None)
-        }
+        let float = if width == BitsWidth::B32 {
+            let bits = self.builder.ins().ireduce(types::I32, value);
+            let narrow = self
+                .builder
+                .ins()
+                .bitcast(types::F32, MemFlagsData::new(), bits);
+            self.builder.ins().fpromote(types::F64, narrow)
+        } else {
+            self.builder
+                .ins()
+                .bitcast(types::F64, MemFlagsData::new(), value)
+        };
+        (float, None)
     }
 
     /// A letter result: null is the failure.

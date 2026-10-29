@@ -165,11 +165,13 @@ fn bad(tensor<f32, [8]> x, int j) → f32 {
         [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
     );
 
+    // A 64-bit index is a kernel value now, but the address it forms is not
+    // proven to fit the device index path.
     let bad = target_row(&fixture, "bad", Target::MirWgsl);
     assert!(
         bad.failures.iter().any(|failure| matches!(
             failure,
-            KernelRequirementFailure::IntermediateOutOfRange { .. }
+            KernelRequirementFailure::UnsupportedIntegerRange { .. }
         )),
         "{:?}",
         bad.failures
@@ -292,7 +294,12 @@ main {}
 }
 
 #[test]
-fn wrapping_word_intermediates_observed_before_store_must_fit_their_carrier() {
+fn wrapping_word_intermediates_observed_before_store_live_in_the_64_bit_range() {
+    // Ruling 2026-10-28: a wrapping word reduces once, at the store; the exact
+    // value an observer reads lives in the host's 64-bit intermediate range.
+    // Beyond the portable 32-bit envelope it needs a 64-bit lane, which no
+    // device emitter computes yet: every target row refuses it by name, and it
+    // is never a check error.
     let fixture = analyze_en(
         r"
 @ kernel
@@ -324,69 +331,87 @@ fn unsigned_sub(wrapping<u32> left, wrapping<u32> right) → bool {
 fn nested_add_div(wrapping<i32> left, wrapping<i32> right) → bool {
     return (left + right) / 2 ≻ left
 }
+main {}
 ",
     );
-    let wide_intermediates = fixture
-        .diagnostics
-        .iter()
-        .filter(|error| error.issue() == Some("nucleum_wide_intermediate"))
-        .count();
-    assert_eq!(
-        wide_intermediates, 5,
-        "one check error per kernel: {:?}",
-        fixture.diagnostics
-    );
-    assert!(
-        fixture
-            .diagnostics
-            .iter()
-            .filter(|error| error.issue() == Some("nucleum_wide_intermediate"))
-            .all(|error| error.args.iter().any(|arg| arg.name == "extent")),
-        "every wide intermediate names its extent: {:?}",
-        fixture.diagnostics
-    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
 
-    let cases = [
-        ("signed_sub", -4_294_967_295, 4_294_967_295),
-        (
-            "signed_mul",
-            -4_611_686_016_279_904_256,
-            4_611_686_018_427_387_904,
-        ),
-        ("signed_neg", -2_147_483_647, 2_147_483_648),
-        ("unsigned_sub", -4_294_967_295, 4_294_967_295),
-        ("nested_add_div", -4_294_967_296, 4_294_967_294),
-    ];
-    for (name, expected_minimum, expected_maximum) in cases {
-        for target in [Target::MirMetal, Target::MirWgsl] {
+    for name in [
+        "signed_sub",
+        "signed_mul",
+        "signed_neg",
+        "unsigned_sub",
+        "nested_add_div",
+    ] {
+        for target in Target::DEVICE_TARGETS {
             let report = target_row(&fixture, name, target);
             assert!(
                 !report.admitted,
                 "{target:?} admitted {name}: {:?}",
                 report.failures
             );
-            let range = report
-                .failures
-                .iter()
-                .find_map(|failure| match failure {
-                    KernelRequirementFailure::IntermediateOutOfRange { range, .. } => Some(range),
-                    _ => None,
-                })
-                .unwrap_or_else(|| {
-                    panic!(
-                        "{target:?} missing exact {name} intermediate failure: {:?}",
-                        report.failures
-                    )
-                });
-            assert_eq!(
-                range.minimum,
-                crate::passes::kernel_requirements::KernelRangeExpr::Constant(expected_minimum),
-                "{target:?} {name}"
+            assert!(
+                report.failures.iter().any(|failure| matches!(
+                    failure,
+                    KernelRequirementFailure::UnsupportedIntegerWidth {
+                        width: NumericWidth::I64,
+                        ..
+                    }
+                )),
+                "{target:?} must refuse {name} by naming the 64-bit lane: {:?}",
+                report.failures
             );
-            assert_eq!(
-                range.maximum,
-                crate::passes::kernel_requirements::KernelRangeExpr::Constant(expected_maximum),
-                "{target:?} {name}"
+        }
+    }
+}
+
+#[test]
+fn wrapping_u64_intermediates_beyond_64_bits_are_check_errors() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn sub(wrapping<u64> left, wrapping<u64> right) → bool {
+    return left - right ≺ left
+}
+
+@ kernel
+@ public
+fn neg(wrapping<u64> value, wrapping<u64> bound) → bool {
+    return -value ≻ bound
+}
+
+@ kernel
+@ public
+fn add_div(wrapping<u64> left, wrapping<u64> right) → bool {
+    return (left + right) / 2 ≻ left
+}
+main {}
+",
+    );
+    let extents: Vec<_> = fixture
+        .diagnostics
+        .iter()
+        .filter(|error| error.issue() == Some("nucleum_wide_intermediate"))
+        .filter_map(|error| error.args.iter().find(|arg| arg.name == "extent"))
+        .map(|arg| arg.value.as_str())
+        .collect();
+    assert_eq!(
+        extents.len(),
+        3,
+        "one check error per kernel: {:?}",
+        fixture.diagnostics
+    );
+    for name in ["sub", "neg", "add_div"] {
+        for target in Target::DEVICE_TARGETS {
+            let report = target_row(&fixture, name, target);
+            assert!(
+                report.failures.iter().any(|failure| matches!(
+                    failure,
+                    KernelRequirementFailure::IntermediateOutOfRange { .. }
+                )),
+                "{target:?} {name}: {:?}",
+                report.failures
             );
         }
     }
@@ -422,7 +447,7 @@ functio copy_coordinate<magnitudo N>(
 }
 
 #[test]
-fn transitive_kernel_width_failure_closes_the_calling_kernel() {
+fn transitive_wide_width_refusal_closes_the_calling_kernel_on_narrow_targets() {
     let fixture = analyze_source(
         r"
 @ nucleum
@@ -439,30 +464,34 @@ functio caller(f32 value) → f32 {
 ",
     );
     assert!(
-        fixture
-            .diagnostics
-            .iter()
-            .any(|error| error.issue() == Some("nucleum_wide_integer")),
-        "wide_helper is a check error: {:?}",
-        fixture.diagnostics
-    );
-    assert_eq!(
-        issue_arg(&fixture, "nucleum_wide_integer", "width"),
-        Some("i64"),
-        "{:?}",
+        !fixture.diagnostics.iter().any(|error| error.is_error()),
+        "a 64-bit helper is a capability fact, not a check error: {:?}",
         fixture.diagnostics
     );
 
-    let helper = target_row(&fixture, "wide_helper", Target::MirMetal);
-    assert!(!helper.admitted);
-    let caller = target_row(&fixture, "caller", Target::MirMetal);
-    assert!(!caller.admitted);
-    assert!(
-        caller
-            .failures
-            .iter()
-            .any(|failure| matches!(failure, KernelRequirementFailure::CalleeNotAdmitted { .. }))
-    );
+    for name in ["wide_helper", "caller"] {
+        let metal = target_row(&fixture, name, Target::MirMetal);
+        assert!(metal.admitted, "{name}: {:?}", metal.failures);
+    }
+    for target in [Target::MirWgsl, Target::MirAmd] {
+        let helper = target_row(&fixture, "wide_helper", target);
+        assert!(!helper.admitted);
+        assert!(helper.failures.iter().any(|failure| matches!(
+            failure,
+            KernelRequirementFailure::UnsupportedIntegerWidth {
+                width: NumericWidth::I64,
+                ..
+            }
+        )));
+        let caller = target_row(&fixture, "caller", target);
+        assert!(!caller.admitted);
+        assert!(
+            caller.failures.iter().any(|failure| matches!(
+                failure,
+                KernelRequirementFailure::CalleeNotAdmitted { .. }
+            ))
+        );
+    }
 }
 
 #[test]
@@ -565,8 +594,8 @@ fn limes_callback_gets_shift_and_symbolic_extent_range_facts() {
     let fixture = analyze_en(
         r"
 interface EdgePolicy<C> { fn remap(C coord) → C }
-class ZeroGhost implements EdgePolicy<vector<int, 1>> {
-    fn remap(vector<int, 1> coord) → vector<int, 1> {
+class ZeroGhost implements EdgePolicy<vector<int, size 1>> {
+    fn remap(vector<int, size 1> coord) → vector<int, size 1> {
         return coord
     }
 }
@@ -895,18 +924,10 @@ main {}
 ",
         "widest",
     );
-    assert!(
-        fixture
-            .diagnostics
-            .iter()
-            .any(|error| error.issue() == Some("nucleum_wide_integer")),
-        "the i64 tensor<int, [32]> parameter is a check error: {:?}",
-        fixture.diagnostics
-    );
     assert_eq!(
-        issue_arg(&fixture, "nucleum_wide_integer", "width"),
-        Some("i64"),
-        "{:?}",
+        issue_arg(&fixture, "nucleum_trapping_store", "width"),
+        Some("i32"),
+        "the i64 tensor<int, [32]> parameter is legal; the i32 store is not: {:?}",
         fixture.diagnostics
     );
     assert!(!report.admitted);
@@ -934,45 +955,213 @@ fn issue_arg<'a>(
         .map(|arg| arg.value.as_str())
 }
 
+/// Assert that `name` checks clean and carries `width` as a per-target fact:
+/// admitted on Metal, refused by name (never a check error) on WGSL and AMD.
+fn assert_wide_width_is_a_capability_fact(
+    fixture: &crate::test_support::AnalyzedFixture,
+    name: &str,
+    width: NumericWidth,
+) {
+    assert!(fixture.is_ok(), "{name}: {:?}", fixture.diagnostics);
+    let metal = target_row(fixture, name, Target::MirMetal);
+    assert!(metal.admitted, "{name}: {:?}", metal.failures);
+    assert!(
+        metal.widths.iter().any(|row| row.width == width),
+        "{name}: missing a {width:?} widths row"
+    );
+    for target in [Target::MirWgsl, Target::MirAmd] {
+        let row = target_row(fixture, name, target);
+        assert!(!row.admitted, "{target:?} admitted {name}");
+        assert!(
+            row.failures.iter().any(|failure| matches!(
+                failure,
+                KernelRequirementFailure::UnsupportedIntegerWidth { width: refused, .. }
+                    if *refused == width
+            )),
+            "{target:?} {name} must refuse {width:?} by name: {:?}",
+            row.failures
+        );
+    }
+}
+
 #[test]
-fn wide_integer_kernel_values_are_check_errors() {
+fn wide_integer_kernel_values_pass_check_and_report_per_target() {
+    // Ruling 2026-10-28: i64, u64 and wrapping<u64> are kernel values.
     let fixture = analyze_en(
         r"
 @ kernel
 @ public
-fn k(int x) → int {
-    return x + 1
+fn k_int(int x) → int {
+    return x
+}
+
+@ kernel
+@ public
+fn k_i64(i64 x) → i64 {
+    return x
+}
+
+@ kernel
+@ public
+fn k_u64(u64 x) → u64 {
+    return x
+}
+
+@ kernel
+@ public
+fn k_wrap(wrapping<u64> a, wrapping<u64> b) → wrapping<u64> {
+    return a + b
+}
+
+@ kernel
+@ public
+fn k_tensor(tensor<u64, [4]> src, mut tensor<u64, [4]> dst) → void {
+    for from src at [i] thread lane let v {
+        dst[[i]] ← v
+    }
 }
 main {}
 ",
     );
-    assert_eq!(
-        issue_arg(&fixture, "nucleum_wide_integer", "width"),
-        Some("i64"),
-        "{:?}",
-        fixture.diagnostics
-    );
+    assert_wide_width_is_a_capability_fact(&fixture, "k_int", NumericWidth::I64);
+    assert_wide_width_is_a_capability_fact(&fixture, "k_i64", NumericWidth::I64);
+    assert_wide_width_is_a_capability_fact(&fixture, "k_u64", NumericWidth::U64);
+    assert_wide_width_is_a_capability_fact(&fixture, "k_wrap", NumericWidth::U64);
+    assert_wide_width_is_a_capability_fact(&fixture, "k_tensor", NumericWidth::U64);
+}
 
-    let twin = analyze_en(
+#[test]
+fn saturating_u64_passes_check_and_keeps_its_lowering_deferral() {
+    let fixture = analyze_en(
         r"
 @ kernel
 @ public
-fn k(u64 x) → u64 {
+fn k(saturating<u64> x) → saturating<u64> {
     return x
 }
 main {}
 ",
     );
-    assert_eq!(
-        issue_arg(&twin, "nucleum_wide_integer", "width"),
-        Some("u64"),
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let metal = target_row(&fixture, "k", Target::MirMetal);
+    assert!(
+        metal.failures.iter().all(|failure| matches!(
+            failure,
+            KernelRequirementFailure::SaturatingLoweringDeferred { .. }
+        )),
+        "the only Metal blocker is the saturating deferral every width has: {:?}",
+        metal.failures
+    );
+    let wgsl = target_row(&fixture, "k", Target::MirWgsl);
+    assert!(wgsl.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::UnsupportedIntegerWidth {
+            width: NumericWidth::U64,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn d64_kernel_values_pass_check_and_report_per_target() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn k_id(d64 x) → d64 {
+    return x
+}
+
+@ kernel
+@ public
+fn k_sum(tensor<d64, [4]> a, tensor<d64, [4]> b, mut tensor<d64, [4]> out) → void {
+    for from a at [i] thread lane let x {
+        out[[i]] ← x + b[[i]]
+    }
+}
+
+@ kernel
+@ public
+fn k_mul(d64 a, d64 b) → d64 {
+    return a * b
+}
+main {}
+",
+    );
+    assert_wide_width_is_a_capability_fact(&fixture, "k_id", NumericWidth::D64);
+    assert_wide_width_is_a_capability_fact(&fixture, "k_sum", NumericWidth::D64);
+    assert_wide_width_is_a_capability_fact(&fixture, "k_mul", NumericWidth::D64);
+}
+
+#[test]
+fn d64_kernel_carrier_bounds_defer_possible_overflow_to_runtime() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn decision_step(d64 dx, d64 dy, d64 dz) → d64 {
+    return dx * dx + dy * dy + dz * dz
+}
+
+@ kernel
+@ public
+fn product(d64 a, d64 b) → d64 {
+    return a * b
+}
+main {}
+",
+    );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    for name in ["decision_step", "product"] {
+        let metal = target_row(&fixture, name, Target::MirMetal);
+        assert!(metal.admitted, "{name}: {:?}", metal.failures);
+    }
+}
+
+#[test]
+fn constant_d64_intermediate_proven_to_overflow_remains_a_check_error() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn constant_product() → d64 {
+    return (90000000000 ↦ d64) * (90000000000 ↦ d64) * (90000000000 ↦ d64)
+}
+main {}
+",
+    );
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_wide_intermediate")),
         "{:?}",
-        twin.diagnostics
+        fixture.diagnostics
     );
 }
 
 #[test]
-fn f64_and_d64_kernel_values_are_check_errors() {
+fn integer_intermediate_beyond_64_bits_is_a_check_error() {
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn sum(u64 a, u64 b) → u64 {
+    return a + b
+}
+main {}
+",
+    );
+    assert_eq!(
+        issue_arg(&fixture, "nucleum_wide_intermediate", "extent"),
+        Some("0..36893488147419103230"),
+        "{:?}",
+        fixture.diagnostics
+    );
+}
+
+#[test]
+fn f64_kernel_values_are_still_check_errors() {
     let fixture = analyze_en(
         r"
 @ kernel
@@ -988,23 +1177,6 @@ main {}
         Some("f64"),
         "{:?}",
         fixture.diagnostics
-    );
-
-    let decimal = analyze_en(
-        r"
-@ kernel
-@ public
-fn k(d64 x) → d64 {
-    return x
-}
-main {}
-",
-    );
-    assert_eq!(
-        issue_arg(&decimal, "nucleum_d64", "width"),
-        Some("d64"),
-        "{:?}",
-        decimal.diagnostics
     );
 }
 
@@ -1030,7 +1202,10 @@ main {}
 }
 
 #[test]
-fn wide_exact_intermediate_is_a_check_error() {
+fn exact_intermediate_beyond_32_bits_is_a_per_target_fact() {
+    // `(left + right) / 2` over wrapping<i32> is 33 bits wide: exact in the
+    // ether (ruling 17), so legal Faber; it needs a 64-bit lane, which every
+    // target row refuses by name until its emitter computes one.
     let fixture = analyze_en(
         r"
 @ kernel
@@ -1041,12 +1216,64 @@ fn half(wrapping<i32> left, wrapping<i32> right) → bool {
 main {}
 ",
     );
-    assert_eq!(
-        issue_arg(&fixture, "nucleum_wide_intermediate", "extent"),
-        Some("-4294967296..4294967294"),
-        "{:?}",
-        fixture.diagnostics
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    for target in Target::DEVICE_TARGETS {
+        let row = target_row(&fixture, "half", target);
+        assert!(
+            row.failures.iter().any(|failure| matches!(
+                failure,
+                KernelRequirementFailure::UnsupportedIntegerWidth {
+                    width: NumericWidth::I64,
+                    ..
+                }
+            )),
+            "{target:?}: {:?}",
+            row.failures
+        );
+    }
+}
+
+#[test]
+fn wide_intermediate_in_its_own_64_bit_type_is_native_on_metal_only() {
+    // The masked sum is 33 bits wide and the expression is an `i64`: the
+    // 64-bit lane is the expression's own type, so Metal computes it in a
+    // `long` and admits it; WGSL and AMD have no 64-bit lane and refuse it.
+    let fixture = analyze_en(
+        r"
+@ kernel
+@ public
+fn sum(i64 left, i64 right) → i64 {
+    return (left ∧ 4294967295) + (right ∧ 4294967295)
+}
+
+@ kernel
+@ public
+fn narrow(u32 left, u32 right) → u32 {
+    return ((left ∧ 16777215) * (right ∧ 16777215)) / 1048576
+}
+main {}
+",
     );
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let metal = target_row(&fixture, "sum", Target::MirMetal);
+    assert!(metal.admitted, "{:?}", metal.failures);
+    for target in [Target::MirWgsl, Target::MirAmd] {
+        let row = target_row(&fixture, "sum", target);
+        assert!(!row.admitted, "{target:?} admitted a 64-bit lane");
+    }
+    // A narrow expression holding a 48-bit intermediate needs a widening no
+    // emitter performs: every row, Metal included, refuses it by name.
+    for target in Target::DEVICE_TARGETS {
+        let row = target_row(&fixture, "narrow", target);
+        assert!(
+            row.failures.iter().any(|failure| matches!(
+                failure,
+                KernelRequirementFailure::UnsupportedIntegerWidth { .. }
+            )),
+            "{target:?}: {:?}",
+            row.failures
+        );
+    }
 }
 
 #[test]
@@ -1081,7 +1308,6 @@ main {}
 ",
     );
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
-    assert!(issue_arg(&fixture, "nucleum_wide_integer", "width").is_none());
     let row = target_row(&fixture, "expand_mask", Target::MirMetal);
     assert!(row.admitted, "{:?}", row.failures);
 }
@@ -1100,7 +1326,16 @@ fn gather(tensor<i32, [4]> ids, tensor<f32, [8]> data, mut tensor<f32, [4]> out)
 main {}
 ",
     );
-    assert!(issue_arg(&fixture, "nucleum_wide_intermediate", "extent").is_some());
+    // The address stays on the 32-bit device index path: a 33-bit coordinate
+    // is neither proven nor a value-width question.
+    assert!(
+        fixture
+            .diagnostics
+            .iter()
+            .any(|error| error.issue() == Some("nucleum_extent_unproven")),
+        "{:?}",
+        fixture.diagnostics
+    );
     assert!(!target_row(&fixture, "gather", Target::MirMetal).admitted);
 }
 
@@ -1155,8 +1390,21 @@ fn bad(i32 x) → i32 {
         sample.failures,
         [] as [crate::passes::kernel_requirements::KernelRequirementFailure; 0]
     );
+    // `((x ⤒ 0) + 1) * 3` is 33 bits: legal Faber, so it is no longer an
+    // out-of-range intermediate; it needs a 64-bit lane (refused by name per
+    // target) and its i32 return store is not proven.
     let bad = target_row(&fixture, "bad", Target::MirMetal);
+    assert!(!bad.admitted);
+    assert!(
+        bad.failures
+            .iter()
+            .any(|failure| matches!(failure, KernelRequirementFailure::StoreOutOfRange { .. }))
+    );
     assert!(bad.failures.iter().any(|failure| matches!(
+        failure,
+        KernelRequirementFailure::UnsupportedIntegerWidth { .. }
+    )));
+    assert!(!bad.failures.iter().any(|failure| matches!(
         failure,
         KernelRequirementFailure::IntermediateOutOfRange { .. }
     )));
@@ -1169,12 +1417,12 @@ fn grouped_reduction_keys_have_coordinate_facts_and_count_cells_keep_their_bound
 @ kernel
 @ public
 fn grouped(tf32[6] a, tensor<i32, [6]> keys) → tf32[3] {
-    return reduce via sum from a at [i] per keys[i]
+    return reduce via sum from a at [i] per [keys[i]]
 }
 @ kernel
 @ public
 fn too_many(tf32[65536, 65536] a) → tensor<i32, [1]> {
-    return reduce via count from a at [i, j] per 0 thread lane let s { return s ≻ 0.0 }
+    return reduce via count from a at [i, j] per [0] thread lane let s { return s ≻ 0.0 }
 }
 ",
     );
@@ -1325,13 +1573,13 @@ fn constant_arguments_seed_a_private_kernel_callee() {
     let fixture = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 8)
 }
 ",
@@ -1344,13 +1592,13 @@ fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
     let dynamic = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
     return helper(clock, base)
 }
 ",
@@ -1374,13 +1622,13 @@ fn imported_const_call_argument_seeds_a_private_kernel_callee() {
 import from "./params" params
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_WHOLE)
 }
 "#,
@@ -1397,13 +1645,13 @@ fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
 import from "./params" params
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_WHOLE)
 }
 "#,
@@ -1429,13 +1677,13 @@ fn module_const_call_argument_seeds_a_private_kernel_callee() {
 const i32 K = 4
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, K + 4)
 }
 ",
@@ -1453,19 +1701,19 @@ fn disagreeing_call_sites_merge_into_one_admitted_row() {
 import from "./params" params
 
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller_whole(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_whole(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_WHOLE)
 }
 
 @ kernel
 @ public
-fn caller_frac(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_frac(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, params.CLK_T_FRAC)
 }
 "#,
@@ -1645,19 +1893,19 @@ fn distinct_constant_tuples_merge_into_one_admitted_callee_row() {
     let fixture = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller_om(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_om(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 8)
 }
 
 @ kernel
 @ public
-fn caller_al(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_al(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 11)
 }
 ",
@@ -1675,19 +1923,19 @@ fn mixed_constant_and_dynamic_call_sites_keep_the_conservative_row_when_merging(
     let fixture = analyze_en(
         r"
 @ kernel
-fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
-    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, 3>
+fn helper(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
+    return [clock[base + base], clock[base + base + 1], clock[base + base + 2]] ↦ vector<f32, size 3>
 }
 
 @ kernel
 @ public
-fn caller_const(tensor<f32, [24]> clock) → vector<f32, 3> {
+fn caller_const(tensor<f32, [24]> clock) → vector<f32, size 3> {
     return helper(clock, 8)
 }
 
 @ kernel
 @ public
-fn caller_dynamic(tensor<f32, [24]> clock, i32 base) → vector<f32, 3> {
+fn caller_dynamic(tensor<f32, [24]> clock, i32 base) → vector<f32, size 3> {
     return helper(clock, base)
 }
 ",
@@ -1726,7 +1974,10 @@ main {}
 ",
     );
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
-    assert!(issue_arg(&fixture, "nucleum_wide_integer", "width").is_none());
-    let row = target_row(&fixture, "edges", Target::MirMetal);
-    assert!(row.admitted, "{:?}", row.failures);
+    let row = target_row(&fixture, "edges", Target::MirWgsl);
+    assert!(
+        row.admitted,
+        "a size read is no 64-bit value, so even a 32-bit target admits it: {:?}",
+        row.failures
+    );
 }

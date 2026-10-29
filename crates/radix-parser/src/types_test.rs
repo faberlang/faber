@@ -536,7 +536,7 @@ fn parses_tensor_sugar_with_bracket_figura() {
 
 #[test]
 fn parses_vector_long_form() {
-    let result = parse_ok_la("functio f(vector<f32, 4> a) → vacuum {}");
+    let result = parse_ok_la("functio f(vector<f32, magnitudo 4> a) → vacuum {}");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -549,7 +549,11 @@ fn parses_vector_long_form() {
     };
     assert_eq!(result.interner.resolve(elem_name.name), "f32");
     assert!(elem_params.is_empty());
-    assert!(matches!(width, FiguraExpr::Literal(4)));
+    // The long form's lane count follows the `magnitudo` marker.
+    let FiguraExpr::Lift(extent) = width else {
+        panic!("expected a spelled size lift");
+    };
+    assert!(matches!(**extent, radix_syntax::LiftExtent::Literal(4)));
 }
 
 #[test]

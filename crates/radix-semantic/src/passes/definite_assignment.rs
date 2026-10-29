@@ -196,7 +196,7 @@ impl<'a> DefiniteAssignmentChecker<'a> {
         match &stmt.kind {
             HirStatementKind::Local(local) => self.check_local(local),
             HirStatementKind::Expr(expr) => self.visit_expr(expr),
-            HirStatementKind::Redde(value) => {
+            HirStatementKind::Redde(value) | HirStatementKind::ReddeFilum(value) => {
                 if let Some(expr) = value {
                     self.visit_expr(expr);
                 }

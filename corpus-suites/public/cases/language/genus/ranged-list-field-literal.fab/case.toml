@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/genus/ranged-list-field-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "genus/ranged-list-field-literal.fab"
+category = "class"
+domain = "types"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

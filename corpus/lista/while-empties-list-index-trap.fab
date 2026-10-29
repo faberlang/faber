@@ -1,0 +1,46 @@
++++
+term = "lista"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "dum_stmt", "si_stmt", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A guard proves an index in range only until something can shorten the list: a while loop that empties the list leaves the later index to the run-time check, which aborts."
+syntax = "if i ≺ xs.length() { while … { xs.remove_last() }  xs[i] }"
+related = ["lista", "dum", "range-index-oob", "alias-length-index-trap"]
+locale = "en"
++++
+# =============================================================================
+# while-empties-list-index-trap — a guard is not a proof past a loop.
+# =============================================================================
+#
+# What this teaches:
+#   • `i ≺ xs.length()` holds at the guard. The `while` loop then removes every
+#     element, so `xs[i]` after the loop reads past the end and the run aborts
+#     with the index error (exit 70).
+#   • The compiler keeps the index check here. A length fact dies at every
+#     effect that can change the length, a loop body that writes the list
+#     included; the guard before the loop does not survive it.
+#
+# Common mistakes:
+#   • Reading the guard as a promise for the rest of the block. It is a fact
+#     about the list at that point, and later writes end it.
+#
+# See also: alias-length-index-trap, range-index-oob
+# =============================================================================
+
+fn at_after_drain(mut list<int> xs, int i) → int {
+    if i ≥ 0 and i ≺ xs.length() {
+        while xs.length() ≻ 0 {
+            xs.remove_last()
+        }
+        return xs[i]
+    }
+    return 0
+}
+
+main {
+    mut list<int> xs ← [7]
+    print "before"
+    print at_after_drain(mut xs, 0)
+    print "unreached"
+}

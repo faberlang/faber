@@ -1356,6 +1356,11 @@ impl TypeChecker<'_> {
     }
 
     pub(super) fn numeric_expected_type(&self, ty: TypeId) -> TypeId {
+        // Numeric shape discovery accepts access-marked places, but literal
+        // slot inference (for example, `expected_decimal_slot_type`) needs the
+        // value type beneath a `mut`/`ref` parameter marker. Treat a parameter
+        // place like a local of the same declared numeric type.
+        let (_, ty) = self.types.peel_access_marker(ty);
         match self.types.get(ty) {
             Type::Alias(_, target) => self.numeric_expected_type(*target),
             _ => ty,
@@ -2000,7 +2005,7 @@ impl TypeChecker<'_> {
                 return self.glyph_matrix_type(elem, lhs_n, rhs_m);
             }
             // S0-G8: glyph-static but parametric widths keep the outer
-            // product symbolic — `vector<f32, N> ⊗ vector<f32, 1>` is
+            // product symbolic — `vector<f32, size N> ⊗ vector<f32, size 1>` is
             // `matrix<f32, [N, 1]>` instead of demanding literals.
             if let Some(shape) = self.glyph_symbolic_outer_shape(lhs_width, rhs_width) {
                 return self.types.matrix_with_shape(elem, shape);

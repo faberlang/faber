@@ -70,6 +70,8 @@ mod types;
 pub(super) struct TypeFormFrame {
     args: Vec<HirTypeFormArg>,
     named: Option<(radix_types::DefId, Vec<Symbol>)>,
+    /// The authored path of an imported alias that has no definition of its own.
+    imported_alias: Option<Vec<Symbol>>,
 }
 
 use crate::cli::{CliOperand, CliOption, CliProgram, CliType};

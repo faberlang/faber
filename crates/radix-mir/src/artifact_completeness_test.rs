@@ -75,6 +75,8 @@ fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
                     visibility: MirFunctionVisibility::Public,
                     origin: MirFunctionOrigin::Source,
                     lane_domain_local: None,
+                    refused_backends: Default::default(),
+                    tier: crate::device::KernelTier::Default,
                 },
             )
         })

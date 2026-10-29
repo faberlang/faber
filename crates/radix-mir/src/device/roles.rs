@@ -5,6 +5,7 @@ use crate::{
     MirLocalId, MirProgram, MirSyntheticFunctionIdentity,
 };
 use handroll::FxHashMap;
+pub use radix_hir::KernelTier;
 use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use radix_lexer::Interner;
 
@@ -25,6 +26,68 @@ pub struct MirDeviceFunctionMetadata {
     /// shift view (`src.shift(s).limes<P>()`) carries no storage of its own,
     /// so a region over one records the view's base parameter.
     pub lane_domain_local: Option<MirLocalId>,
+    /// The portable device backends whose inferred per-target requirement row
+    /// refuses this function's kernel body (unit-local semantic facts carried
+    /// to the emit boundary). Empty for a function the rows admit everywhere
+    /// and for a source-less function whose parent is not a kernel.
+    pub refused_backends: MirRefusedBackends,
+    /// The kernel's effective safety tier (ruling 2026-10-28): what the
+    /// author declared, lowered to [`KernelTier::Default`] by the safe switch.
+    /// Device emitters read this to choose their math and index-check forms.
+    /// Source-less synthetic kernels (closures, scan steps, region
+    /// lowerings) carry [`KernelTier::Default`].
+    pub tier: KernelTier,
+}
+
+/// A portable device backend that has a per-target kernel requirement row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MirDeviceBackend {
+    Amd,
+    Metal,
+    Wgsl,
+}
+
+impl MirDeviceBackend {
+    const fn bit(self) -> u8 {
+        match self {
+            Self::Amd => 1,
+            Self::Metal => 2,
+            Self::Wgsl => 4,
+        }
+    }
+}
+
+/// A set of [`MirDeviceBackend`]s that refuse a kernel by name.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct MirRefusedBackends(u8);
+
+impl MirRefusedBackends {
+    /// This set with `backend` added.
+    #[must_use]
+    pub const fn with(self, backend: MirDeviceBackend) -> Self {
+        Self(self.0 | backend.bit())
+    }
+
+    /// Whether `backend` refuses the function.
+    #[must_use]
+    pub const fn refuses(self, backend: MirDeviceBackend) -> bool {
+        self.0 & backend.bit() != 0
+    }
+}
+
+/// The functions of `metadata` that `backend` refuses, in function-id order.
+#[must_use]
+pub fn functions_refused_by(
+    metadata: &MirDeviceFunctionMetadataMap,
+    backend: MirDeviceBackend,
+) -> Vec<MirFunctionId> {
+    let mut refused: Vec<MirFunctionId> = metadata
+        .iter()
+        .filter(|(_, row)| row.refused_backends.refuses(backend))
+        .map(|(id, _)| *id)
+        .collect();
+    refused.sort();
+    refused
 }
 
 impl MirDeviceFunctionMetadata {

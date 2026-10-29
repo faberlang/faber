@@ -2459,6 +2459,8 @@ impl FunctionBuilder<'_> {
                 visibility: MirFunctionVisibility::Private,
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
                 lane_domain_local: None,
+                refused_backends: Default::default(),
+                tier: radix_mir::device::KernelTier::Default,
             },
         );
         Some(id)
@@ -2596,6 +2598,8 @@ impl FunctionBuilder<'_> {
                 visibility: MirFunctionVisibility::Private,
                 origin: MirFunctionOrigin::SyntheticKernelClosure,
                 lane_domain_local: None,
+                refused_backends: Default::default(),
+                tier: radix_mir::device::KernelTier::Default,
             },
         );
         let declaration = MirFilumReduceOp {
@@ -3868,7 +3872,11 @@ impl FunctionBuilder<'_> {
             .is_some_and(|context| context.rumpe_used);
         self.terminate_open_current(MirTerminatorKind::Goto(test_id), test.span);
         self.switch_to(test_id);
-        if block.breakable == Some(radix_hir::HirBreakableKind::FacOmniaLoop) && self.context.fault_delivery {
+        if block
+            .breakable
+            .is_some_and(radix_hir::HirBreakableKind::is_loop_marker)
+            && self.context.fault_delivery
+        {
             // `fac omnia … dum` delivers per iteration at the back edge.
             self.emit_device_marker(radix_mir::MirDeviceBlockOp::Deliver { sync: true }, Vec::new(), test.span);
         }
@@ -6108,13 +6116,13 @@ fn hir_cond_is_literal_true(expr: &HirExpression) -> bool {
     matches!(&expr.kind, HirExpressionKind::Literal(radix_hir::HirLiteral::Bool(true)))
 }
 
-/// Whether a handled body is a `fac omnia` block or loop.
+/// Whether a handled body is a `fac omnia` or `fac machina` block or loop.
+/// V0 lowers `machina` exactly as `omnia`.
 fn handled_body_is_omnia(body: &HirBlock) -> bool {
     let omnia_block = |block: &HirBlock| {
-        matches!(
-            block.breakable,
-            Some(radix_hir::HirBreakableKind::FacOmnia | radix_hir::HirBreakableKind::FacOmniaLoop)
-        )
+        block
+            .breakable
+            .is_some_and(radix_hir::HirBreakableKind::defers_faults)
     };
     omnia_block(body)
         || matches!(

@@ -26,7 +26,7 @@ locale = "en"
 #   • Code points use the `Code` hint: `'A' ↦ u32 via Code` is 65 and
 #     `65 ↦ char via Code` is 'A' (fails above U+10FFFF and on surrogates).
 #   • Every failable row takes a `⊥` default (or propagates through `⇥`).
-#     A one-letter literal is ascii<1>, so a bare ascii default needs two.
+#     A one-letter literal is ascii<size 1>, so a bare ascii default needs two.
 #
 # Common mistakes:
 #   • Expecting `65 ↦ char` to be 'A' — without `Code` it is the digits rule

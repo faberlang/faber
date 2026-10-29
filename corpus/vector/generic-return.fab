@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "vector"
 canonical = false
 summary = "A generic function returns a width-generic vector; the call result takes the argument's width."
-syntax = "fn <name><size N>(vector<elem, N> v) → vector<elem, N>"
+syntax = "fn <name><size N>(vector<elem, size N> v) → vector<elem, size N>"
 related = ["vector", "generic", "magnitudo"]
 locale = "en"
 +++
@@ -15,7 +15,7 @@ locale = "en"
 #
 # What this teaches:
 #   • `size N` binds the width from the argument: calling with a
-#     `vector<f32, 3>` makes the result `vector<f32, 3>`.
+#     `vector<f32, size 3>` makes the result `vector<f32, size 3>`.
 #   • The call result needs no annotation: `let _ w ← idv(v)` infers the
 #     bound width, and a call can be printed directly.
 #   • The body can compute with the generic width (`v + v`).
@@ -30,16 +30,16 @@ locale = "en"
 #   generic-return.expected
 # =============================================================================
 
-fn idv<size N>(vector<f32, N> v) → vector<f32, N> {
+fn idv<size N>(vector<f32, size N> v) → vector<f32, size N> {
     return v
 }
 
-fn dbl<size N>(vector<f32, N> v) → vector<f32, N> {
+fn dbl<size N>(vector<f32, size N> v) → vector<f32, size N> {
     return v + v
 }
 
 main {
-    let vector<f32, 3> v ← [3.0, 4.0, 0.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> v ← [3.0, 4.0, 0.0] ↦ vector<f32, size 3>
     print idv(v)
     let _ w ← dbl(v)
     print w

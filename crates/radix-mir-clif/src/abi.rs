@@ -67,6 +67,10 @@ pub const TEXT_FROM_BITS: RuntimeSymbol = RuntimeSymbol {
 /// carries one of these tags so the runtime can display and compare it.
 pub const TAG_INT: i64 = 0;
 pub const TAG_FLOAT: i64 = 1;
+/// A float cell of declared `f32` width: the payload is still the `f64`
+/// carrier of the `f32`-rounded value, and the tag makes the runtime render
+/// and order it at single precision.
+pub const TAG_FLOAT32: i64 = 18;
 pub const TAG_BOOL: i64 = 2;
 pub const TAG_TEXT: i64 = 3;
 /// Raw-bits tags are `TAG_BITS + log2(width / 8)`: 4, 5, 6, 7.
@@ -885,10 +889,11 @@ pub const UNION_IS_STRUCT: RuntimeSymbol = RuntimeSymbol {
     ret: Some(I8),
 };
 
-/// The runtime entry the emitted `main` shim calls.
+/// The runtime entry the emitted `main` shim calls: (argc, argv, the program's
+/// `faber_clif_incipit`).
 pub const MAIN: RuntimeSymbol = RuntimeSymbol {
     name: "__faber_clif_v1_main",
-    params: &[I32, Ptr],
+    params: &[I32, Ptr, Ptr],
     ret: Some(I32),
 };
 

@@ -1,5 +1,6 @@
 use super::{judge_run_output, judge_stale_build_pin, judge_unexecuted_pin};
 use crate::commands::corpus::{CASE_TIMEOUT_SECS, Case, Expected, Outcome, TargetExpectation};
+use std::collections::BTreeMap;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
 use std::process::{ExitStatus, Output};
@@ -251,5 +252,185 @@ fn product_recipe_parses_and_names_the_product_target() {
     assert!(
         !plain.product,
         "a recipe is not a product lane unless it says so"
+    );
+}
+
+fn external_recipe() -> crate::commands::corpus::SuiteTarget {
+    toml::from_str("emit = \"sample\"\nextension = \"src\"\n").expect("external recipe")
+}
+
+#[test]
+fn command_expansion_sorts_globs_and_reads_a_stdin_fixture() {
+    let dir = tempfile::tempdir().expect("temporary command directory");
+    std::fs::write(dir.path().join("z.wat"), "").expect("write glob match");
+    std::fs::write(dir.path().join("a.wat"), "").expect("write glob match");
+    let stdin = dir.path().join("stdin");
+    std::fs::write(&stdin, b"fixture input").expect("write stdin fixture");
+    let paths = super::Paths {
+        suite: dir.path(),
+        workspace: dir.path(),
+        runtime: None,
+        case_dir: dir.path(),
+        source: &stdin,
+        artifact: &stdin,
+    };
+    let (argv, output) = super::run_command(
+        &[
+            "printf".into(),
+            "%s\\n".into(),
+            format!("{}/*.wat", dir.path().display()),
+        ],
+        &paths,
+        dir.path(),
+        None,
+        Duration::from_secs(2),
+    )
+    .expect("wildcard command succeeds");
+    assert_eq!(argv[2], dir.path().join("a.wat").display().to_string());
+    assert_eq!(argv[3], dir.path().join("z.wat").display().to_string());
+    assert_eq!(
+        output.stdout,
+        format!("{}\n{}\n", argv[2], argv[3]).as_bytes()
+    );
+
+    let (_, output) = super::run_command(
+        &["cat".into()],
+        &paths,
+        dir.path(),
+        Some(&stdin),
+        Duration::from_secs(2),
+    )
+    .expect("stdin command succeeds");
+    assert_eq!(output.stdout, b"fixture input");
+    assert!(super::run_command(&[], &paths, dir.path(), None, Duration::from_secs(1)).is_err());
+    assert!(
+        super::run_command(
+            &["echo".into(), format!("{}/*.missing", dir.path().display())],
+            &paths,
+            dir.path(),
+            None,
+            Duration::from_secs(1),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn staged_files_expand_templates_and_create_runtime_links_idempotently() {
+    let dir = tempfile::tempdir().expect("temporary staging directory");
+    let runtime = dir.path().join("runtime");
+    std::fs::create_dir(&runtime).expect("create runtime directory");
+    let library = runtime.join("library");
+    std::fs::write(&library, b"runtime").expect("write runtime fixture");
+    let case_dir = dir.path().join("case");
+    std::fs::create_dir(&case_dir).expect("create case directory");
+    let source = case_dir.join("main.src");
+    let artifact = case_dir.join("program");
+    let paths = super::Paths {
+        suite: dir.path(),
+        workspace: dir.path(),
+        runtime: Some(&runtime),
+        case_dir: &case_dir,
+        source: &source,
+        artifact: &artifact,
+    };
+    let mut recipe = external_recipe();
+    recipe.files.insert(
+        "nested/config".into(),
+        "{suite}|{workspace}|{runtime}|{case_dir}|{source}|{artifact}".into(),
+    );
+    recipe
+        .links
+        .insert("nested/library".into(), "{runtime}/library".into());
+
+    for _ in 0..2 {
+        super::prepare_files(&recipe, &paths, b"emitted").expect("stage files");
+    }
+    assert_eq!(
+        std::fs::read(&source).expect("read emitted source"),
+        b"emitted"
+    );
+    assert_eq!(
+        std::fs::read_to_string(case_dir.join("nested/config")).expect("read config"),
+        format!(
+            "{}|{}|{}|{}|{}|{}",
+            dir.path().display(),
+            dir.path().display(),
+            runtime.display(),
+            case_dir.display(),
+            source.display(),
+            artifact.display()
+        )
+    );
+    assert_eq!(
+        std::fs::read_link(case_dir.join("nested/library")).expect("read link"),
+        library
+    );
+
+    recipe.files.insert("../outside".into(), "refused".into());
+    assert!(super::prepare_files(&recipe, &paths, b"emitted").is_err());
+    assert!(!dir.path().join("outside").exists());
+}
+
+#[test]
+fn stdout_line_replacements_preserve_unmapped_lines_and_invalid_bytes() {
+    let mut output = exited(0, "");
+    output.stdout = b"raw\nkeep\nraw".to_vec();
+    let replacements = BTreeMap::from([("raw".to_owned(), "stable".to_owned())]);
+    super::normalize_stdout_lines(&mut output, &replacements);
+    assert_eq!(output.stdout, b"stable\nkeep\nstable");
+
+    let invalid = vec![0xff, b'\n'];
+    output.stdout = invalid.clone();
+    super::normalize_stdout_lines(&mut output, &replacements);
+    assert_eq!(output.stdout, invalid);
+}
+
+#[test]
+fn external_case_runs_emitted_source_and_applies_stdout_normalization() {
+    let dir = tempfile::tempdir().expect("temporary external target");
+    // WHY: a stand-in for the `faber` binary whose `emit` prints fixed source on every
+    // platform; BSD printf rejects the extra operands of `printf emit -t ...`.
+    let faber = dir.path().join("fake-faber");
+    std::fs::write(&faber, "#!/bin/sh\nprintf emit\n").expect("write stand-in faber");
+    std::fs::set_permissions(&faber, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("mark stand-in faber executable");
+    let mut test_case = case(Outcome::Pass, None);
+    test_case.dir = dir.path().to_path_buf();
+    test_case.input = dir.path().join("input.fab");
+    test_case.expect = Some(Expected {
+        exit: 0,
+        exit_nonzero: false,
+        stdout: None,
+        stderr: None,
+        stdout_contains: Some("stable".to_owned()),
+        stderr_contains: None,
+        check_only: false,
+    });
+    let mut recipe = external_recipe();
+    recipe.build = vec!["true".to_owned()];
+    recipe.run = vec!["printf".to_owned(), "raw\\n".to_owned()];
+    recipe
+        .stdout_lines
+        .insert("raw".to_owned(), "stable".to_owned());
+    let suite = dir.path();
+    let workspace = suite.join("target/corpus/sample");
+    let mut build_ms = 0.0;
+    let row = super::run_case(
+        &test_case,
+        0,
+        "custom",
+        "external",
+        &recipe,
+        &faber,
+        suite,
+        &workspace,
+        std::time::Instant::now(),
+        &mut build_ms,
+    );
+    assert_eq!(row["status"], "pass");
+    assert_eq!(
+        std::fs::read(workspace.join("case_0000/main.src")).expect("read staged source"),
+        b"emit"
     );
 }

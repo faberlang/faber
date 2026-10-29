@@ -21,10 +21,11 @@ pub(super) const ISSUE_LOOP_COLLECTION_SHAPE_CHANGE: &str = "loop_collection_sha
 /// Registry rows (receiver, canonical method name) that change the shape or
 /// order of their receiver. Append the ledger rows here.
 const SHAPE_CHANGING_METHODS: &[(IntrinsicReceiver, &str)] = &[
-    // lista: append (appende and its sink twin immerge), remove first/last,
+    // lista: append (appende and its sink twin immerge), extend, remove first/last,
     // in-place reverse, in-place sort.
     (IntrinsicReceiver::Lista, "appende"),
     (IntrinsicReceiver::Lista, "immerge"),
+    (IntrinsicReceiver::Lista, "extende"),
     (IntrinsicReceiver::Lista, "decapita"),
     (IntrinsicReceiver::Lista, "detrahe"),
     (IntrinsicReceiver::Lista, "inverte"),

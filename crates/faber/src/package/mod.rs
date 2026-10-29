@@ -38,6 +38,8 @@ mod build_recipe;
 mod cargo;
 #[cfg(feature = "mir-clif")]
 pub(crate) mod clif_build;
+#[cfg(all(feature = "mir-clif", feature = "runner"))]
+mod clif_jit;
 mod cmd;
 pub(crate) mod composite_plan;
 #[cfg(feature = "device-runtime")]
@@ -102,6 +104,8 @@ pub(crate) use cargo::{
 #[cfg(feature = "hir-rust")]
 #[cfg(test)]
 pub use cargo::emit_generated_crate;
+#[cfg(all(feature = "mir-clif", feature = "runner"))]
+pub use clif_jit::cmd_run_clif_jit;
 pub use cmd::{
     CHECKS_BUT_DOES_NOT_LOWER, DeviceAdviceRequest, cmd_build, cmd_check_package, cmd_emit_package,
     should_treat_as_package_from_args, use_package_compiler_from_args,
@@ -123,7 +127,7 @@ pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     DeviceChoice, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders, manifest_package_build_target as manifest_build_target_for_input,
-    read_manifest, resolve_format_width,
+    read_manifest, resolve_format_width, resolve_safe_kernels,
 };
 #[cfg(feature = "runner")]
 pub use manifest::{

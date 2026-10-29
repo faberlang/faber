@@ -235,7 +235,7 @@ pub fn index_projection_result_ty(
         Type::BoundedAscii { .. } => Ok(MirType::semantic(types.primitive(Primitive::Littera))),
         Type::BoundedTextus { .. } => find_bounded_ascii_one(types)
             .map(MirType::semantic)
-            .ok_or_else(|| MirTypeError::unsupported("ascii<1> element type")),
+            .ok_or_else(|| MirTypeError::unsupported("ascii<size 1> element type")),
         Type::Tuple(_) => Err(MirTypeError::unsupported(
             "tuple index projection (use tuple_index_projection for physical aggregate tuples)",
         )),

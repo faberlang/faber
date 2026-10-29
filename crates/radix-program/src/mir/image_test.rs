@@ -74,13 +74,12 @@ fn empty_program_json() -> String {
 
 #[test]
 fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
-    // (error, issue arg, message fragment, extra args)
-    let cases: Vec<(FmirImageError, Option<&str>, &str, Vec<(&str, &str)>)> = vec![
+    // (error, issue arg, the structured args the diagnostic carries)
+    let cases: Vec<(FmirImageError, Option<&str>, Vec<(&str, &str)>)> = vec![
         (
             FmirImageError::Parse("bad toml".into()),
             Some("parse_issue"),
-            "could not parse fmir image: bad toml",
-            vec![],
+            vec![("detail", "bad toml")],
         ),
         (
             FmirImageError::VersionMismatch {
@@ -88,7 +87,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: 7,
             },
             Some("version_issue"),
-            "unsupported fmir image version 2; expected 7",
             vec![("actual", "2"), ("expected", "7")],
         ),
         (
@@ -97,8 +95,7 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: "fmir",
             },
             None,
-            "fmir image target must be `fmir`",
-            vec![],
+            vec![("found", "x"), ("expected", "fmir")],
         ),
         (
             FmirImageError::ToolchainMismatch {
@@ -106,8 +103,7 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: "2.0".into(),
             },
             None,
-            "unsupported fmir image toolchain 1.0; expected 2.0",
-            vec![],
+            vec![("found", "1.0"), ("expected", "2.0")],
         ),
         (
             FmirImageError::ArtifactDigestMismatch {
@@ -117,8 +113,12 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 computed: "bb".into(),
             },
             None,
-            "artifact `metal` digest `content_sha256` mismatch (stored aa, recomputed bb)",
-            vec![],
+            vec![
+                ("backend", "metal"),
+                ("field", "content_sha256"),
+                ("stored", "aa"),
+                ("computed", "bb"),
+            ],
         ),
         (
             FmirImageError::CompilerInputProvenance {
@@ -126,16 +126,14 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "no parent".into(),
             },
             None,
-            "artifact `cuda` provenance violation: no parent",
-            vec![],
+            vec![("backend", "cuda"), ("detail", "no parent")],
         ),
         (
             FmirImageError::NonAdmittedTargetFeature {
                 feature: "warp9".into(),
             },
             None,
-            "unknown target feature `warp9`",
-            vec![],
+            vec![("feature", "warp9")],
         ),
         (
             FmirImageError::TargetIdMismatch {
@@ -144,16 +142,18 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: "apple".into(),
             },
             None,
-            "artifact `metal` declares target `sm_90`; expected `apple`",
-            vec![],
+            vec![
+                ("backend", "metal"),
+                ("target", "sm_90"),
+                ("expected", "apple"),
+            ],
         ),
         (
             FmirImageError::AbsentArtifactForSelection {
                 selection: "cuda".into(),
             },
             None,
-            "selection `cuda` names no declared artifact",
-            vec![],
+            vec![("selection", "cuda")],
         ),
         (
             FmirImageError::ArtifactEncodingMismatch {
@@ -161,16 +161,14 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "bom".into(),
             },
             None,
-            "artifact `metal` payload-encoding mismatch: bom",
-            vec![],
+            vec![("backend", "metal"), ("detail", "bom")],
         ),
         (
             FmirImageError::NonAdmittedArtifactBackend {
                 backend: "tpu".into(),
             },
             None,
-            "backend `tpu` is not a compiled-in leaf",
-            vec![],
+            vec![("backend", "tpu")],
         ),
         (
             FmirImageError::ArtifactAbiVersionMismatch {
@@ -179,7 +177,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 accepted: 4,
             },
             Some("fmir_image_artifact_abi_version_unsupported"),
-            "declares ABI version 1; the accepted version is 4",
             vec![("backend", "metal"), ("actual", "1"), ("accepted", "4")],
         ),
         (
@@ -189,7 +186,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: 6,
             },
             Some("fmir_image_artifact_reflection_version_unsupported"),
-            "unsupported artifact reflection version 5 for backend `metal`; expected 6",
             vec![("backend", "metal"), ("actual", "5"), ("expected", "6")],
         ),
         (
@@ -198,29 +194,25 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "mixed".into(),
             },
             Some("fmir_image_artifact_combination_incompatible"),
-            "combination is incompatible: mixed",
-            vec![("backend", "metal")],
+            vec![("backend", "metal"), ("detail", "mixed")],
         ),
         (
             FmirImageError::DuplicateRequiredFeature {
                 feature: "simd".into(),
             },
             Some("fmir_image_artifact_duplicate_required_feature"),
-            "target feature `simd` more than once",
-            vec![],
+            vec![("feature", "simd")],
         ),
         (
             FmirImageError::DuplicateEntrypoint { entry: "k0".into() },
             Some("fmir_image_artifact_duplicate_entrypoint"),
-            "entrypoint `k0` more than once",
-            vec![],
+            vec![("entry", "k0")],
         ),
         (
             FmirImageError::NonAdmittedSelectedBackend {
                 backend: "tpu".into(),
             },
             Some("fmir_image_selected_backend_unsupported"),
-            "selection `tpu` names an unknown backend",
             vec![("backend", "tpu")],
         ),
         (
@@ -229,7 +221,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: 8,
             },
             Some("fmir_image_device_program_version_unsupported"),
-            "unsupported device-program wire version 3; expected 8",
             vec![("actual", "3"), ("expected", "8")],
         ),
         (
@@ -237,8 +228,7 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "truncated".into(),
             },
             Some("fmir_image_device_program_invalid"),
-            "invalid device program in image: truncated",
-            vec![],
+            vec![("detail", "truncated")],
         ),
         (
             FmirImageError::ExecutorPlanSectionVersionMismatch {
@@ -246,7 +236,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: 2,
             },
             Some("fmir_image_executor_plan_section_version_unsupported"),
-            "unsupported executor-plan section version 1; expected 2",
             vec![("actual", "1"), ("expected", "2")],
         ),
         (
@@ -254,8 +243,7 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "gap".into(),
             },
             Some("fmir_image_executor_plan_section_invalid"),
-            "invalid executor-plan section in image: gap",
-            vec![],
+            vec![("detail", "gap")],
         ),
         (
             FmirImageError::DistributedSectionVersionMismatch {
@@ -263,7 +251,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: 5,
             },
             Some("fmir_image_distributed_section_version_unsupported"),
-            "unsupported distributed-section version 4; expected 5",
             vec![("actual", "4"), ("expected", "5")],
         ),
         (
@@ -271,16 +258,14 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "rank".into(),
             },
             Some("fmir_image_distributed_section_invalid"),
-            "invalid distributed section in image: rank",
-            vec![],
+            vec![("detail", "rank")],
         ),
         (
             FmirImageError::DistributedSectionEquivalenceMismatch {
                 detail: "plan".into(),
             },
             Some("fmir_image_distributed_section_equivalence_mismatch"),
-            "distributed plan mismatch in image: plan",
-            vec![],
+            vec![("detail", "plan")],
         ),
         (
             FmirImageError::DistributedSectionHashMismatch {
@@ -288,8 +273,7 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 recomputed: "r2".into(),
             },
             Some("fmir_image_distributed_section_hash_mismatch"),
-            "logical-plan hash e1 does not match the delivered plan (recomputed r2)",
-            vec![],
+            vec![("expected", "e1"), ("recomputed", "r2")],
         ),
         (
             FmirImageError::SessionSectionVersionMismatch {
@@ -297,7 +281,6 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 expected: 2,
             },
             Some("fmir_image_session_section_version_unsupported"),
-            "unsupported session-section version 1; expected 2",
             vec![("actual", "1"), ("expected", "2")],
         ),
         (
@@ -305,23 +288,22 @@ fn every_device_and_section_decode_failure_keeps_its_issue_and_numbers() {
                 detail: "cadence".into(),
             },
             Some("fmir_image_session_section_invalid"),
-            "invalid session section in image: cadence",
-            vec![],
+            vec![("detail", "cadence")],
         ),
     ];
-    for (error, issue, fragment, args) in cases {
+    for (error, issue, args) in cases {
         let name = format!("{error:?}");
         let diagnostic = one(error, "fmir");
         assert_eq!(arg(&diagnostic, "issue"), issue, "{name}");
-        assert!(
-            diagnostic.message.contains(fragment),
-            "{name}: {}",
-            diagnostic.message
-        );
         assert_eq!(diagnostic.file, path().display().to_string(), "{name}");
-        for (key, value) in args {
-            assert_eq!(arg(&diagnostic, key), Some(value), "{name}: {key}");
-        }
+        let expected: Vec<(&str, &str)> = args;
+        let carried: Vec<(&str, &str)> = diagnostic
+            .args
+            .iter()
+            .filter(|arg| arg.name != "issue")
+            .map(|arg| (arg.name, arg.value.as_str()))
+            .collect();
+        assert_eq!(carried, expected, "{name}");
     }
 }
 
@@ -334,7 +316,7 @@ fn a_parse_failure_without_an_issue_code_is_a_plain_diagnostic() {
         version_issue: "v",
     };
     let diagnostics = fmir_image_decode_error(FmirImageError::Parse("eof".into()), &path(), &style);
-    assert_eq!(diagnostics[0].message, "could not decode fmir image: eof");
+    assert_eq!(arg(&diagnostics[0], "detail"), Some("eof"));
     assert_eq!(arg(&diagnostics[0], "issue"), None);
 }
 
@@ -392,11 +374,7 @@ fn the_text_loader_refuses_with_named_diagnostics() {
         arg(&garbage[0], "issue"),
         Some("fmir_text_image_parse_failed")
     );
-    assert!(
-        garbage[0]
-            .message
-            .starts_with("could not parse fmir-text image")
-    );
+    assert!(arg(&garbage[0], "detail").is_some());
 
     let stale = load(&text_image(
         FMIR_TEXT_TARGET_NAME,
@@ -417,10 +395,11 @@ fn the_text_loader_refuses_with_named_diagnostics() {
         PACKAGE_MIR_ARTIFACT_VERSION,
         &program,
     ));
-    assert!(
-        wrong_target[0]
-            .message
-            .contains("fmir-text image target must be")
+    assert_eq!(arg(&wrong_target[0], "issue"), None);
+    assert_eq!(arg(&wrong_target[0], "found"), Some(FMIR_TARGET_NAME));
+    assert_eq!(
+        arg(&wrong_target[0], "expected"),
+        Some(FMIR_TEXT_TARGET_NAME)
     );
 
     let good = text_image(
@@ -431,22 +410,17 @@ fn the_text_loader_refuses_with_named_diagnostics() {
     let other_toolchain = load_fmir_text_image(&good, &path(), "0.0.1")
         .err()
         .expect("refused");
-    assert!(
-        other_toolchain[0]
-            .message
-            .contains("unsupported fmir-text image toolchain")
-    );
+    assert_eq!(arg(&other_toolchain[0], "issue"), None);
+    assert_eq!(arg(&other_toolchain[0], "found"), Some(TOOLCHAIN));
+    assert_eq!(arg(&other_toolchain[0], "expected"), Some("0.0.1"));
 
     let bad_program = load(&text_image(
         FMIR_TEXT_TARGET_NAME,
         PACKAGE_MIR_ARTIFACT_VERSION,
         "{not json",
     ));
-    assert!(
-        bad_program[0]
-            .message
-            .starts_with("could not decode fmir-text MIR program")
-    );
+    assert_eq!(arg(&bad_program[0], "issue"), None);
+    assert!(arg(&bad_program[0], "detail").is_some());
 }
 
 #[test]
@@ -461,12 +435,15 @@ fn the_binary_loader_refuses_a_stale_version_and_garbage() {
         arg(&error[0], "issue"),
         Some("fmir_image_version_unsupported")
     );
-    assert!(error[0].message.contains("unsupported fmir image version"));
+    assert_eq!(
+        arg(&error[0], "actual"),
+        Some((PACKAGE_MIR_ARTIFACT_VERSION + 1).to_string().as_str())
+    );
 
     let error = load_fmir_image(&[0xff, 0xff], &path(), TOOLCHAIN)
         .err()
         .expect("refused");
-    assert!(error[0].message.starts_with("could not decode fmir image"));
+    assert!(arg(&error[0], "detail").is_some());
     assert_eq!(arg(&error[0], "issue"), None);
 }
 

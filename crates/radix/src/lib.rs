@@ -21,6 +21,8 @@ pub mod module {
     pub use radix_module::llvm_host;
     #[cfg(feature = "mir-core")]
     pub use radix_module::mir;
+    #[cfg(feature = "mir-clif")]
+    pub use radix_module::{ClifEngine, ClifJitOutput, ClifRuntimeTable};
     pub use radix_module::{
         CompileResult, Compiler, Config, Diagnostic, FaberOutput, GoOutput, HaskellOutput, Output,
         PythonOutput, RustOutput, Session, SwiftOutput, Target, TypeScriptOutput, WarnPolicy,

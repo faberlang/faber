@@ -61,6 +61,7 @@ pub mod complexity;
 pub(crate) mod coverage;
 pub mod decimal_integer_literal;
 pub mod definite_assignment;
+pub mod device_region;
 pub mod exhaustive;
 pub(crate) mod filum_independence;
 pub mod float_literal_fold;
@@ -74,6 +75,7 @@ mod kernel_legality_body;
 mod kernel_legality_types;
 pub mod kernel_namespace;
 pub mod kernel_requirements;
+pub mod kernel_tier;
 pub mod leading_underscore;
 pub mod ledger_gate;
 pub mod lint;
@@ -248,8 +250,16 @@ mod iuncta_hole_test;
 mod kernel_legality_test;
 
 #[cfg(test)]
+#[path = "device_region_test.rs"]
+mod device_region_test;
+
+#[cfg(test)]
 #[path = "kernel_requirements_test.rs"]
 mod kernel_requirements_test;
+
+#[cfg(test)]
+#[path = "kernel_tier_test.rs"]
+mod kernel_tier_test;
 
 #[cfg(test)]
 #[path = "kernel_namespace_test.rs"]

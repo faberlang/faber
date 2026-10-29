@@ -299,7 +299,7 @@ fn expanded_render_degrades_missing_file_and_span() {
 
     assert_eq!(
         render_expanded(&diagnostic),
-        "info[uncoded] tool <unknown>: target ignored\nphase: tool\nfile: <unknown>\nspan: <none>"
+        "info[uncoded] tool <unknown>\nphase: tool\nfile: <unknown>\nspan: <none>\nmessage: target ignored"
     );
 }
 
@@ -312,7 +312,7 @@ fn expanded_batch_uses_blank_line_separators() {
 
     assert_eq!(
         render_expanded_diagnostics(&diagnostics),
-        "error[uncoded] tool a.fab: first\nphase: tool\nfile: a.fab\nspan: <none>\n\nwarning[uncoded] tool b.fab: second\nphase: tool\nfile: b.fab\nspan: <none>"
+        "error[uncoded] tool a.fab\nphase: tool\nfile: a.fab\nspan: <none>\nmessage: first\n\nwarning[uncoded] tool b.fab\nphase: tool\nfile: b.fab\nspan: <none>\nmessage: second"
     );
 }
 
@@ -374,7 +374,7 @@ fn expanded_render_with_pack_uses_explicit_pack_template_text() {
 
     assert_eq!(
         render_expanded_with_pack(&diagnostic, &pack).expect("pack expanded render"),
-        "error[PARSE011] parse token.fab: MSG:salve:KW_FUNCTIO\nphase: parse\nfile: token.fab\nspan: <none>\nhelp: HELP:TY_TEXTUS"
+        "error[PARSE011] parse token.fab\nphase: parse\nfile: token.fab\nspan: <none>\nmessage: MSG:salve:KW_FUNCTIO\nhelp: HELP:TY_TEXTUS"
     );
 }
 
@@ -395,7 +395,7 @@ fn expanded_batch_render_with_pack_keeps_default_text_when_template_missing() {
 
     assert_eq!(
         render_expanded_diagnostics_with_pack(&diagnostics, &pack).expect("pack expanded batch"),
-        "error[PARSE011] parse token.fab: MSG:salve:KW_FUNCTIO\nphase: parse\nfile: token.fab\nspan: <none>\nhelp: HELP:TY_TEXTUS\n\nwarning[WARN999] tool tool.fab\nphase: tool\nfile: tool.fab\nspan: <none>"
+        "error[PARSE011] parse token.fab\nphase: parse\nfile: token.fab\nspan: <none>\nmessage: MSG:salve:KW_FUNCTIO\nhelp: HELP:TY_TEXTUS\n\nwarning[WARN999] tool tool.fab\nphase: tool\nfile: tool.fab\nspan: <none>"
     );
 }
 

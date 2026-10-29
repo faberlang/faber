@@ -142,6 +142,8 @@ pub enum StmtKind {
     Fac(FacStmt),
     /// `redde` return.
     Redde(ReddeStmt),
+    /// `redde filum` / `return thread`: end the current lane iteration.
+    ReddeFilum(ReddeFilumStmt),
     /// `rumpe` break.
     Rumpe(RumpeStmt),
     /// `perge` continue.
@@ -934,11 +936,23 @@ pub struct CustodiClause {
     pub span: Span,
 }
 
+/// The modifier slot of a `fac` block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FacModifier {
+    /// Plain `fac { … }`.
+    None,
+    /// `fac omnia` (en `do all`): launches inside defer their faults to the
+    /// block's exit.
+    Omnia,
+    /// `fac machina` (en `do device`): a checked device-resident region.
+    Machina,
+}
+
 #[derive(Debug)]
 pub struct FacStmt {
-    /// `fac omnia` marker (en `do all`): surface-only intent flag; the
-    /// construct keeps plain `fac` host semantics.
-    pub omnia: bool,
+    /// The word directly after `fac`: `omnia` (en `do all`) or `machina`
+    /// (en `do device`). Neither changes the construct's host control flow.
+    pub modifier: FacModifier,
     pub body: BlockStmt,
     pub catch: Option<CapeClause>,
     pub while_: Option<Box<Expr>>,
@@ -946,6 +960,13 @@ pub struct FacStmt {
 
 #[derive(Debug)]
 pub struct ReddeStmt {
+    pub value: Option<Box<Expr>>,
+}
+
+/// `redde filum` / `return thread` — end the current thread lane.
+#[derive(Debug)]
+pub struct ReddeFilumStmt {
+    /// Parsed so the semantic pass can diagnose the forbidden value explicitly.
     pub value: Option<Box<Expr>>,
 }
 
@@ -1991,7 +2012,7 @@ pub enum TypeExprKind {
     Tensor(Box<TypeExpr>, FiguraExpr),
     /// Indexed sparse tensor: `sparsa<T, Figura>`.
     Sparsa(Box<TypeExpr>, FiguraExpr),
-    /// Register-class vector: `vector<T, N>`.
+    /// Register-class vector: `vector<T, size N>`.
     Vector(Box<TypeExpr>, FiguraExpr),
     /// Register-class matrix: `matrix<T, [R, C]>`.
     Matrix(Box<TypeExpr>, FiguraExpr),
@@ -2086,6 +2107,73 @@ pub struct RadixLaneAnnotation {
     pub lane: Symbol,
 }
 
+/// The safety tier of a kernel (operator ruling 2026-10-28,
+/// `docs/factory/faber-language-decisions/kernel-math-tiers-ruling-2026-10-28.md`).
+///
+/// The tiers are ordered and cumulative: `Unsafe` includes everything
+/// `Relaxed` allows. They are one three-state choice, never independent
+/// flags. The identities are the Latin keyword keys (`laxus`, `intutus`);
+/// every reader locale spells them through its pack (en `relaxed` /
+/// `unsafe`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum KernelTier {
+    /// IEEE-correct float math with FMA contraction, reduction reordering and
+    /// published-bound transcendentals; unproven index checks stay.
+    #[default]
+    Default,
+    /// Adds approximate `/` and `sqrt`, fast transcendentals, flush-to-zero
+    /// and reassociation of ordinary float expressions.
+    Relaxed,
+    /// Adds removal of the index checks the compiler cannot prove.
+    Unsafe,
+}
+
+impl KernelTier {
+    /// The Latin keyword identity written in the HIR annotation and looked up
+    /// in the locale packs; `None` for the default tier, which has no word.
+    #[must_use]
+    pub const fn identity(self) -> Option<&'static str> {
+        match self {
+            Self::Default => None,
+            Self::Relaxed => Some("laxus"),
+            Self::Unsafe => Some("intutus"),
+        }
+    }
+
+    /// Resolve a keyword identity back to its tier.
+    #[must_use]
+    pub fn from_identity(identity: &str) -> Option<Self> {
+        match identity {
+            "laxus" => Some(Self::Relaxed),
+            "intutus" => Some(Self::Unsafe),
+            _ => None,
+        }
+    }
+
+    /// Stable lower-case name used by reports (`default`, `relaxed`,
+    /// `unsafe`); this is a report label, not a source spelling.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Relaxed => "relaxed",
+            Self::Unsafe => "unsafe",
+        }
+    }
+
+    /// Whether the tier allows relaxed float math (`Relaxed` and `Unsafe`).
+    #[must_use]
+    pub const fn allows_relaxed_math(self) -> bool {
+        !matches!(self, Self::Default)
+    }
+
+    /// Whether the tier allows dropping unproven index checks (`Unsafe`).
+    #[must_use]
+    pub const fn allows_unchecked_indexing(self) -> bool {
+        matches!(self, Self::Unsafe)
+    }
+}
+
 /// Structured `@ nucleum` annotation, with the optional `fragment` modifier.
 /// The modifier is typed data on this family, not an untyped annotation
 /// argument; `fragment` remains distinct from graphics `@ fragment`. The
@@ -2095,6 +2183,12 @@ pub struct NucleumAnnotation {
     /// True when the `fragment` modifier is present (`@ nucleum fragment` or
     /// `@ nucleum { fragment = verum }`).
     pub is_fragment: bool,
+    /// The kernel safety tier the author chose (`@ nucleum laxus`,
+    /// `@ nucleum intutus`); [`KernelTier::Default`] when no tier word is
+    /// written. Only the sugar form carries a tier, and never together with
+    /// `fragment`: a fragment composes into an entry and takes that entry's
+    /// tier.
+    pub tier: KernelTier,
     /// True when the braced record form (`@ nucleum { … }`) was authored;
     /// re-emission keeps the authored brace shape.
     pub braced: bool,

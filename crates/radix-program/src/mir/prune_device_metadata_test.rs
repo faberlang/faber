@@ -60,6 +60,8 @@ fn row(parent: u32, ordinal: u32) -> MirDeviceFunctionMetadata {
         visibility: MirFunctionVisibility::Private,
         origin: MirFunctionOrigin::SyntheticKernelClosure,
         lane_domain_local: None,
+        refused_backends: Default::default(),
+        tier: radix_mir::device::KernelTier::Default,
     }
 }
 

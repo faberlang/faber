@@ -1,5 +1,5 @@
 //! Need, unit 15: the tensor↔vector conversions
-//! (`tf32[3] ↦ vector<f32, 3>` and `vector<f32, 3> ↦ tf32[3]`) run on the MIR
+//! (`tf32[3] ↦ vector<f32, size 3>` and `vector<f32, size 3> ↦ tf32[3]`) run on the MIR
 //! runner. Unit 16 adds the tensor↔matrix crossing: a tensor flattens and
 //! builds the register matrix row-major, and a matrix converts back to the
 //! target tensor's extents.
@@ -36,7 +36,7 @@ fn tensor_family_conversio_tensor_to_vector_runs() {
     let body = format!(
         "{F32_LIST}\n\
          let tf32[3] t ← seed ↦ tf32[3]\n\
-         let vector<f32, 3> w ← t ↦ vector<f32, 3>\n\
+         let vector<f32, size 3> w ← t ↦ vector<f32, size 3>\n\
          print w[1]"
     );
     assert_eq!(ok(&body), ["2.0"]);
@@ -44,7 +44,7 @@ fn tensor_family_conversio_tensor_to_vector_runs() {
 
 #[test]
 fn tensor_family_conversio_vector_to_tensor_runs() {
-    let body = "let vector<f32, 3> w ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>\n\
+    let body = "let vector<f32, size 3> w ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>\n\
                 let tf32[3] t ← w ↦ tf32[3]\n\
                 print t";
     assert_eq!(ok(body), ["[1.0, 2.0, 3.0]"]);

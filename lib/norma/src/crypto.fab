@@ -410,16 +410,7 @@ fn xor_pad(list<b8> key, int block, int mask) → list<b8> {
 
 @ private
 fn concat_bytes(list<b8> a, list<b8> b) → list<b8> {
-    mut list<u8> out ← []
-    mut int i ← 0
-    while i ≺ a.length() {
-        out.append((a.get(i) coalesce (0 ∷ b8)) ↦ u8)
-        i ← i + 1
-    }
-    i ← 0
-    while i ≺ b.length() {
-        out.append((b.get(i) coalesce (0 ∷ b8)) ↦ u8)
-        i ← i + 1
-    }
-    return out ↦ list<b8>
+    mut list<b8> out ← copy a
+    out.extend(b)
+    return out
 }

@@ -988,17 +988,10 @@ impl<'de> VariantAccess<'de> for VariantDeserializer {
     }
     fn tuple_variant<V: Visitor<'de>>(
         self,
-        _len: usize,
+        len: usize,
         visitor: V,
     ) -> Result<V::Value, MsgpackError> {
-        match self.take_value()? {
-            Value::Array(items) => visitor.visit_seq(SeqDeserializer {
-                iter: items.into_iter(),
-            }),
-            other => Err(MsgpackError::Decode(format!(
-                "tuple variant payload must be an array, found {other:?}"
-            ))),
-        }
+        self.take_value()?.deserialize_tuple(len, visitor)
     }
     fn struct_variant<V: Visitor<'de>>(
         self,
@@ -1202,19 +1195,24 @@ impl<'de> Deserializer<'de> for Value {
 
     fn deserialize_tuple<V: Visitor<'de>>(
         self,
-        _len: usize,
+        len: usize,
         visitor: V,
     ) -> Result<V::Value, MsgpackError> {
-        self.deserialize_seq(visitor)
+        match &self {
+            Value::Array(items) if items.len() == len => self.deserialize_seq(visitor),
+            _ => Err(MsgpackError::Decode(format!(
+                "expected a tuple of length {len}"
+            ))),
+        }
     }
 
     fn deserialize_tuple_struct<V: Visitor<'de>>(
         self,
         _name: &'static str,
-        _len: usize,
+        len: usize,
         visitor: V,
     ) -> Result<V::Value, MsgpackError> {
-        self.deserialize_seq(visitor)
+        self.deserialize_tuple(len, visitor)
     }
 
     fn deserialize_map<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, MsgpackError> {

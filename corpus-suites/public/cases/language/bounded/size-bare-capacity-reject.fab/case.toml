@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/bounded/size-bare-capacity-reject.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/size-bare-capacity-reject.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "capacity_needs_size"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "capacity_needs_size"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "capacity_needs_size"

@@ -221,6 +221,14 @@ pub struct ManifestDevice {
     /// locate the toolkit; they never configure the build).
     #[serde(default)]
     pub cuda_libdevice: Option<String>,
+
+    /// The kernel safe switch (operator ruling 2026-10-28): when true, every
+    /// kernel runs at the default tier whatever its `@ kernel relaxed` or
+    /// `@ kernel unsafe` annotation says. It can only lower a tier. `faber
+    /// run --safe` and `faber build --safe` set it for one command; no
+    /// environment variable does.
+    #[serde(default)]
+    pub safe: bool,
 }
 
 /// Configuration for shader artifact packaging.
@@ -588,6 +596,19 @@ pub fn manifest_device_cuda_libdevice(
     }
     let base = manifest_path.parent().unwrap_or_else(|| Path::new("."));
     Ok(Some(base.join(path)))
+}
+
+/// Whether kernels run at the default tier for the package that owns
+/// `input_path`: the `--safe` flag, or `[device] safe = true` in its
+/// `faber.toml`. A manifest that cannot be read counts as not set here; the
+/// package config reports it.
+#[must_use]
+pub fn resolve_safe_kernels(cli_safe: bool, input_path: &Path) -> bool {
+    cli_safe
+        || input_manifest(input_path)
+            .ok()
+            .flatten()
+            .is_some_and(|(manifest, _)| manifest.device.safe)
 }
 
 /// Resolve the explicit CUDA libdevice path for the package that owns

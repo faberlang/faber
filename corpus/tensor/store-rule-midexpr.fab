@@ -32,8 +32,8 @@ main {
     let tu8[1, 2] p ← (m + n) / 2
     print p.flatten()
 
-    let vector<u8, 2> va ← [200, 10] ↦ vector<u8, 2>
-    let vector<u16, 2> vc ← (va + 100) / 2
+    let vector<u8, size 2> va ← [200, 10] ↦ vector<u8, size 2>
+    let vector<u16, size 2> vc ← (va + 100) / 2
     print vc
 
     let matrix<u8, [1, 2]> ma ← [[200, 10]] ↦ matrix<u8, [1, 2]>

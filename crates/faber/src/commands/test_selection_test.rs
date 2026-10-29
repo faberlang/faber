@@ -100,8 +100,14 @@ fn list_report_does_not_execute_and_json_contains_duration() {
     assert_eq!(json["cases"][0]["status"], "listed");
     assert_eq!(json["cases"][0]["duration_ms"], 17);
     assert!(json["cases"][0]["gap"].is_null());
-    assert!(json["census"]["blocked"].as_array().unwrap().is_empty());
-    assert!(json["census"]["gaps"].as_array().unwrap().is_empty());
+    assert_eq!(
+        json["census"]["blocked"].as_array().unwrap(),
+        &[] as &[serde_json::Value]
+    );
+    assert_eq!(
+        json["census"]["gaps"].as_array().unwrap(),
+        &[] as &[serde_json::Value]
+    );
 }
 
 fn blocked_result(unit: &str, name: &str, suite: &str, reason: &str) -> CaseResult {

@@ -1,6 +1,6 @@
 //! S0-G2 — alias value transparency proofs.
 //!
-//! A transparent alias (`typus Vector<magnitudo N> = vector<f32, N>`) is
+//! A transparent alias (`typus Vector<magnitudo N> = vector<f32, size N>`) is
 //! value-transparent: intrinsic methods, glyph operators, `↦` literal
 //! conversions, and builtin↔alias assignment check against the substituted
 //! builtin carrier, while genuine width mismatches keep the builtin
@@ -18,7 +18,7 @@ use crate::{
     passes::visibility_annotation::VisibilityTier,
 };
 
-const LOCAL_ALIASES: &str = "typus Vector<magnitudo N> = vector<f32, N>
+const LOCAL_ALIASES: &str = "typus Vector<magnitudo N> = vector<f32, magnitudo N>
 typus Matrix<magnitudo R, magnitudo C> = matrix<f32, [R, C]>
 ";
 
@@ -70,8 +70,8 @@ fn builtin_value_assigns_to_alias_annotation() {
     test_support::assert_accepts(&format!(
         "{LOCAL_ALIASES}\
 functio probe() → f32 {{
-    sit vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    sit vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    sit vector<f32, magnitudo 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>
+    sit vector<f32, magnitudo 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
     sit Matrix<4, 3> outer ← s ⊗ t
     redde (outer · t).productum(s)
 }}"
@@ -119,7 +119,7 @@ functio probe() → f32 {{
 
 #[test]
 fn wrong_width_literal_conversio_keeps_builtin_diagnostic() {
-    // Same identity as `[1.0, 2.0] ↦ vector<f32, 3>`.
+    // Same identity as `[1.0, 2.0] ↦ vector<f32, size 3>`.
     test_support::assert_rejects_with_issue(
         &format!(
             "{LOCAL_ALIASES}\
@@ -138,8 +138,8 @@ fn builtin_to_alias_wrong_width_assignment_still_rejects() {
         &format!(
             "{LOCAL_ALIASES}\
 functio probe() → f32 {{
-    sit vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    sit vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit vector<f32, magnitudo 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
+    sit vector<f32, magnitudo 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>
     sit Matrix<4, 3> bad ← s ⊗ t
     redde bad.productum(bad)
 }}"
@@ -188,7 +188,7 @@ fn applied_nominal_receiver_keeps_unknown_method() {
     // application does not expose the carrier's intrinsic surface.
     test_support::assert_rejects_with_issue(
         "genus Capsula<magnitudo N> {
-    varia vector<f32, N> lanes
+    varia vector<f32, magnitudo N> lanes
 }
 
 functio probe(Capsula<3> c) → f32 {
@@ -253,8 +253,8 @@ fn imported_alias_application_is_value_transparent() {
         r#"importa ex "./gmt" gmt
 
 functio probe() → f32 {
-    sit vector<f32, 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    sit vector<f32, 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    sit vector<f32, magnitudo 4> s ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>
+    sit vector<f32, magnitudo 3> t ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
     sit gmt.Matrix<4, 3> outer ← s ⊗ t
     redde (outer · t).productum(s)
 }"#,
@@ -272,8 +272,8 @@ fn imported_alias_wrong_width_still_rejects() {
         r#"importa ex "./gmt" gmt
 
 functio probe() → f32 {
-    sit vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    sit vector<f32, 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    sit vector<f32, magnitudo 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, magnitudo 3>
+    sit vector<f32, magnitudo 4> t ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>
     sit gmt.Matrix<4, 3> bad ← s ⊗ t
     redde (bad · t).productum(t)
 }"#,

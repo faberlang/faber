@@ -93,12 +93,12 @@ fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     for source in [
         r#"incipit {
     sit textus raw ← "a"
-    sit textus<8> text ← raw ↦ textus<8>
+    sit textus<magnitudo 8> text ← raw ↦ textus<magnitudo 8>
     sit _ bad ← text[8]
     nota bad
 }"#,
         r"incipit {
-    sit ascii<8> text ← 'a'
+    sit ascii<magnitudo 8> text ← 'a'
     sit _ bad ← text[-1]
     nota bad
 }",
@@ -250,10 +250,11 @@ fn bounded_lista_hole_solves_from_literal_witness() {
 }
 
 #[test]
-fn explicit_bounded_lista_literal_checks_capacity() {
+fn explicit_bounded_lista_literal_uses_capacity_as_its_maximum() {
     assert_accepts_la("incipit { sit lista<numerus, magnitudo 2> xs ← [1, 2] }");
+    assert_accepts_la("incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2] }");
     assert_rejects_with_issue_la(
-        "incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2] }",
+        "incipit { sit lista<numerus, magnitudo 3> xs ← [1, 2, 3, 4] }",
         "incompatible_tensor_index",
     );
 }
@@ -299,9 +300,28 @@ fn bounded_lista_hole_without_literal_witness_still_reports_sem014() {
 
 #[test]
 fn bounded_lista_parameter_widening_stays_explicit() {
+    // A list value of capacity 2 does not implicitly widen to capacity 3.
     assert_rejects_with_issue_la(
         r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
+incipit {
+    sit lista<numerus, magnitudo 2> pair ← [1, 2]
+    consume(pair)
+}",
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn bounded_lista_literal_argument_takes_the_parameter_cell() {
+    // A literal is built for its destination cell, as `[]` is: a short literal
+    // against a capacity-3 parameter fits it, a longer one is refused by name.
+    assert_accepts_la(
+        r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
 incipit { consume([1, 2]) }",
+    );
+    assert_rejects_with_issue_la(
+        r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
+incipit { consume([1, 2, 3, 4]) }",
         "argument_type_mismatch",
     );
 }

@@ -136,6 +136,12 @@ pub struct Config {
     /// gates kernel admission (kernel-purity owns that).
     pub kernel_complexity_budget: Option<u32>,
 
+    /// The kernel safe switch (`faber run --safe`, `faber build --safe`,
+    /// `safe = true` in `faber.toml`): every kernel runs at the default tier
+    /// whatever its annotation says. It can only lower a tier. No environment
+    /// variable sets it.
+    pub deny_kernel_tiers: bool,
+
     /// Keep the author's constant expressions as written: analysis does not
     /// fold literal-only float expressions to one literal (F9 ruling 31). Set
     /// by the Faber re-emit behind `faber format` and `faber convert`, which
@@ -154,6 +160,11 @@ pub struct Config {
     /// spelling through these maps; every other path ignores them. Empty by
     /// default, in which case a stage-body library call fails closed.
     pub target_bindings: TargetBindings,
+
+    /// How the `clif` target produces code: an object file for the linker
+    /// (the default) or an in-memory image for `faber run --target clif-jit`.
+    #[cfg(feature = "mir-clif")]
+    pub clif_engine: crate::ClifEngine,
 }
 
 impl Default for Config {
@@ -178,9 +189,12 @@ impl Default for Config {
             import_path_templates: None,
             complexity_budget: None,
             kernel_complexity_budget: None,
+            deny_kernel_tiers: false,
             keep_authored_constants: false,
             defer_imported_praefixum: false,
             target_bindings: TargetBindings::default(),
+            #[cfg(feature = "mir-clif")]
+            clif_engine: crate::ClifEngine::default(),
         }
     }
 }
@@ -301,6 +315,13 @@ impl Config {
         self
     }
 
+    /// Run every kernel at the default tier (the `--safe` switch).
+    #[must_use]
+    pub fn with_safe_kernels(mut self) -> Self {
+        self.deny_kernel_tiers = true;
+        self
+    }
+
     /// Select the output mode for codegen (Swift only).
     #[must_use]
     pub fn with_output_mode(mut self, mode: OutputMode) -> Self {
@@ -312,6 +333,14 @@ impl Config {
     #[must_use]
     pub fn with_module_name(mut self, module_name: Option<String>) -> Self {
         self.module_name = module_name;
+        self
+    }
+
+    /// Select how the `clif` target produces code.
+    #[cfg(feature = "mir-clif")]
+    #[must_use]
+    pub fn with_clif_engine(mut self, engine: crate::ClifEngine) -> Self {
+        self.clif_engine = engine;
         self
     }
 

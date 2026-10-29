@@ -94,13 +94,13 @@ fn limes_requires_a_shifted_view() {
 #[test]
 fn custom_limes_policy_requires_plain_instance_callbacks() {
     accepts(&format!(
-        "interface EdgePolicy<C> {{ fn remap(C coord) → C }}\nclass ZeroGhost implements EdgePolicy<vector<int, 1>> {{ fn remap(vector<int, 1> coord) → vector<int, 1> {{ return [0] ↦ vector<int, 1> }} }}\nmain {{\n{}\nlet tf32[3] mapped ← base.shift([1]).edge<ZeroGhost>()\n}}",
+        "interface EdgePolicy<C> {{ fn remap(C coord) → C }}\nclass ZeroGhost implements EdgePolicy<vector<int, size 1>> {{ fn remap(vector<int, size 1> coord) → vector<int, size 1> {{ return [0] ↦ vector<int, size 1> }} }}\nmain {{\n{}\nlet tf32[3] mapped ← base.shift([1]).edge<ZeroGhost>()\n}}",
         tensor_seed()
     ));
 
     rejects_with_issue(
         &format!(
-            "class InvalidPolicy {{ fn remap(vector<int, 1> coord) → int {{ return 0 }} }}\nmain {{\n{}\nlet tf32[3] invalid ← base.shift([1]).edge<InvalidPolicy>()\n}}",
+            "class InvalidPolicy {{ fn remap(vector<int, size 1> coord) → int {{ return 0 }} }}\nmain {{\n{}\nlet tf32[3] invalid ← base.shift([1]).edge<InvalidPolicy>()\n}}",
             tensor_seed()
         ),
         "tensor_limes_policy_invalid",

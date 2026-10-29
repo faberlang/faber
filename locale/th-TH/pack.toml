@@ -101,6 +101,7 @@ axis = "แกน"
 lege = "อ่าน"
 lineam = "บรรทัด"
 omnia = "ทั้งหมด"
+machina = "อุปกรณ์"
 scriptum = "จารึก"
 sparge = "กระจาย"
 ut = "ในชื่อ"
@@ -149,6 +150,8 @@ brevis = "สั้น"
 descriptio = "คำอธิบาย"
 longum = "ยาว"
 lane = "เลน"
+laxus = "ผ่อนปรน"
+intutus = "ไม่ปลอดภัย"
 ubique = "โกลบอล"
 annotatio = "คำอธิบายประกอบ"
 versio = "เวอร์ชัน"
@@ -199,7 +202,7 @@ instans = "อินสแตนซ์"
 objectum = "ออบเจ็กต์"
 quidlibet = "อะไรก็ได้"
 lista = "รายการ"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "ตาราง"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "สมุดบัญชี"
@@ -705,6 +708,22 @@ help = "ใช้ `@ {expected}` สำหรับ locale ของไฟล์
 message = "การประกาศมี annotation `@ nucleum` มากกว่าหนึ่งรายการ"
 help = "เก็บ annotation nucleum ไว้เพียงรายการเดียว"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "คำอธิบายประกอบ `@ {nucleum}` ระบุระดับมากกว่าหนึ่งระดับ"
+help = "เขียน `{laxus}` หรือ `{intutus}` อย่างใดอย่างหนึ่ง หรือไม่เขียนเพื่อใช้ระดับเริ่มต้น"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` ไม่ใช่ระดับของเคอร์เนล"
+help = "ระดับที่มีคือ `{laxus}` และ `{intutus}` ไม่เขียนเพื่อใช้ระดับเริ่มต้น"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "`@ {nucleum} {fragment}` ไม่รับระดับ"
+help = "ส่วนย่อยใช้ระดับของเคอร์เนลที่นำไปประกอบ ให้ใส่ระดับที่เคอร์เนลนั้น"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "ระดับเคอร์เนลต้องใช้กับฟังก์ชันเคอร์เนล"
+help = "เขียนระดับที่การประกาศฟังก์ชัน `@ {nucleum}` หรือลบออก"
+
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "fragment `@ nucleum` ขัดแย้งกับ graphics fragment annotation"
 help = "ลบ fragment annotation รายการใดรายการหนึ่ง"
@@ -724,6 +743,10 @@ help = "ใช้ {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "ในลูป '{fac}' ต้องเขียน '{cape}' ก่อน '{dum}'"
 help = "เขียนตัวจัดการก่อนเงื่อนไข: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "บล็อก '{fac}' รับคำปรับได้หนึ่งคำ ไม่ใช้ '{omnia}' ร่วมกับ '{machina}'"
+help = "'{machina}' ส่งมอบข้อผิดพลาดทั้งหมดหนึ่งครั้งเมื่อจบบล็อกอยู่แล้ว ให้ตัด '{omnia}' ออก"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "เครื่องหมายจุลภาคไม่ใช้คั่นหัวข้อของ '{discerne}' อีกต่อไป"
@@ -799,7 +822,7 @@ help = "ระบุชื่อ hint ต่อจาก via ทันที เ
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "convert hint ไม่ใช่อาร์กิวเมนต์ชนิด"
-help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `u32 via Le`, `ascii<8> via Hex`, `littera via Code`"
+help = "เขียน hint เป็นอนุประโยค via หลังเป้าหมาย: `u32 via Le`, `ascii<{magnitudo} 8> via Hex`, `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "convert hint ไม่ได้ตามหลังเป้าหมายในวงเล็บแหลม"
@@ -1257,6 +1280,14 @@ help = "เขียนช่วงบนรายการ เช่น {lista}
 message = "จำนวนของรายการเขียนหลัง `{magnitudo}`"
 help = "เขียน `{lista}<int, {magnitudo} 4>` สำหรับไม่เกิน 4 รายการ หรือ `{lista}<int, {magnitudo} 1…8>` สำหรับช่วง; ช่วงเปล่า ๆ จำกัดค่า ไม่ใช่จำนวน"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "ความจุเขียนหลัง `{magnitudo}`"
+help = "เขียน `{queue}<int, {magnitudo} 4>`, `{stack}<int, {magnitudo} 4>`, `{textus}<{magnitudo} 8>` หรือ `{ascii}<{magnitudo} 8>` สำหรับความจุไม่เกินจำนวนนั้น; ตัวเลขเปล่า ๆ ไม่ใช่ความจุ"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "จำนวนเลนของเวกเตอร์เขียนหลัง `{magnitudo}`"
+help = "เขียน `{vector}<f32, {magnitudo} 4>` สำหรับสี่เลน; รูปย่อ `vf32[4]` ไม่เปลี่ยน"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "รูปแบบ callable ใน annotation '{annotation_posture}' ขัดกับรูปแบบที่เขียนไว้ '{written_posture}'"
 help = "แก้โครงสร้าง AST สำหรับ lowering"
@@ -1283,11 +1314,11 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue ต้องมีพารามิเตอร์ชนิดหนึ่งหรือสองตัว"
-help = "ใช้ queue<T> หรือ queue<T, N>"
+help = "ใช้ queue<T> หรือ queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack ต้องมีพารามิเตอร์ชนิดหนึ่งหรือสองตัว"
-help = "ใช้ stack<T> หรือ stack<T, N>"
+help = "ใช้ stack<T> หรือ stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "discerne casu ต้องมีแพตเทิร์น"
@@ -1455,7 +1486,7 @@ help = "แก้โครงสร้าง AST สำหรับ lowering"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
-help = "textus<N>, ascii<N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+help = "textus<{magnitudo} N>, ascii<{magnitudo} N> และ {lista}<b8, {magnitudo} N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace ไม่ได้ส่งออก qualified type"
@@ -1581,10 +1612,6 @@ help = "แก้ไขโครงสร้าง AST สำหรับกา�
 message = "width marker ไม่รับพารามิเตอร์"
 help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 ไม่รองรับในเคอร์เนล nucleum"
-help = "ใช้ชนิดค่าของเคอร์เนลที่รองรับ"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "extent จำนวนเต็มของเคอร์เนล {extent} ไม่ได้รับการพิสูจน์ว่าอยู่ในช่วงที่ย้ายพอร์ตได้"
 help = "จำกัดค่า extent ให้อยู่ในช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
@@ -1597,9 +1624,25 @@ help = "ใช้ f32 สำหรับค่าทศนิยมของเ�
 message = "การเก็บค่าที่มีความกว้าง {width} อาจ trap ในเคอร์เนล nucleum"
 help = "พิสูจน์ว่าการเก็บค่าอยู่ในช่วง หรือใช้เซลล์แบบ wrapping หรือ saturating"
 
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "ความกว้างจำนวนเต็ม {width} เกินความกว้างของเคอร์เนล nucleum ที่รองรับ"
-help = "ใช้ความกว้างจำนวนเต็มไม่เกิน 32 บิต"
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "ขอบเขต '{fac} {machina}' ต้องไม่ซ้อน '{fac} {machina}' อีกชั้น"
+help = "เก็บขอบเขตอุปกรณ์ไว้หนึ่งชั้นและเรียก kernel จากในนั้นโดยตรง"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' ออกจากขอบเขต '{fac} {machina}' ขอบเขตนี้ยังไม่มีคำสำหรับออก"
+help = "จบขอบเขตก่อนแล้วค่อยตัดสินใจ หรือย้ายการออกไปนอกบล็อก"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "ลูป lane ('{construct}') ตรงในขอบเขต '{fac} {machina}' ยังไม่ได้สร้าง"
+help = "เรียก kernel จากขอบเขตสำหรับงานแบบขนาน"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "ขอบเขต '{fac} {machina}' ยังจัดสรร tensor ไม่ได้ ({construct})"
+help = "จัดสรร tensor ก่อนขอบเขตแล้วใช้ภายใน"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' ในขอบเขต '{fac} {machina}' อ่านค่าที่คำนวณบนอุปกรณ์ การควบคุมลูปบนอุปกรณ์ยังไม่ได้สร้าง"
+help = "ให้เงื่อนไข ขอบเขต และอาร์กิวเมนต์สเกลาร์ใช้ค่าที่รู้ก่อนขอบเขต และอ่านผลจากอุปกรณ์หลังขอบเขต"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "extent ตัวกลางของเคอร์เนล {extent} เกินช่วงจำนวนเต็มที่ย้ายพอร์ตได้"
@@ -2202,11 +2245,11 @@ message = "ชนิดสมาชิกเวกเตอร์ไม่ตร
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, N>"
+message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, ขนาด N>"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector ต้องมีความกว้าง ใช้ vector<T, 4> หรือ vf32[4]"
+message = "vector ต้องมีความกว้าง ใช้ vector<T, ขนาด 4> หรือ vf32[4]"
 help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2448,6 +2491,10 @@ help = "ลบรายการอาร์กิวเมนต์ชนิด
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "ต้องใช้องค์ประกอบ numeric ของ lista"
 help = "ใช้องค์ประกอบ numeric สำหรับ intrinsic ของ lista นี้"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "`extend` ต้องใช้ตัวรับเป็น list ธรรมดา; list ที่มีขอบเขตหรือกำหนดช่วงความยาวขยายในที่เดิมไม่ได้"
+help = "ใช้ extend กับ list ที่ไม่มีขอบเขต หรือเพิ่มทีละองค์ประกอบด้วย `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "เมธอด `.เรียงแล้ว(คีย์)` แบบมีคีย์ถูกลบแล้ว ให้ใช้นิพจน์การเรียง"
@@ -2808,6 +2855,10 @@ help = "ใช้ chorda หรือ helper การแปลงไบต์�
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "การแปลงจาก {lista}<b8> เป็น fractus ไม่ได้ระบุไว้ (ความกว้าง IEEE และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
 help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
+message = "tensor ของเรคคอร์ดอ่านไบต์ตามเลย์เอาต์ little-endian ของเรคคอร์ด; เขียน `via Le` ไม่ใช่ `via Be`"
+help = "เขียน {lista}<b8> ↦ tensor<Record, [n]> via Le; สมาชิกเรคคอร์ดมีลำดับไบต์เดียวที่เลย์เอาต์กำหนด"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3677,6 +3728,7 @@ argminima = "ดัชนีค่าต่ําสุด"
 continet = "ประกอบด้วย"
 cumulata = "สะสม"
 decapita = "ลบตัวแรก"
+extende = "ขยาย"
 filtrata = "กรอง"
 immerge = "จม"
 inversa = "ผกผัน"
@@ -3826,7 +3878,19 @@ help = "`{rumpe}` หยุดลูป `{filum}` ไม่ได้: แต่�
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` ไม่สามารถออกจากลูป `{filum}` ได้"
-help = "`{redde}` ออกจากลูป `{filum}` ไม่ได้: แต่ละเลนทำงานอย่างเป็นอิสระ หากต้องการค่าเดียวจากเลนให้ใช้ `{reducta}` หากต้องการหยุดที่ขีดจำกัด ให้คำนวณขีดจำกัดก่อนแล้ววนลูปถึงขีดจำกัดนั้น"
+help = "`{redde} {filum}` จบเลนนี้ได้จากทุกระดับ และ `{perge}` ทำเช่นนั้นได้ที่ระดับบนสุดของเลน"
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` ใช้ได้เฉพาะภายในบอดีของลูปเลนเธรด"
+help = "ใช้ `{redde} {filum}` เฉพาะภายในบอดีของลูป `{filum}`"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` ไม่รับค่า"
+help = "ลบค่าออก เลนส่งผลลัพธ์ผ่านสโตร์ของตน"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "`{redde} {filum}` ในบอดีที่ซ้อนกันไม่สามารถจบเลนรอบนอกได้"
+help = "ใช้ในบอดีของเลนเอง ไม่ใช่ในคลosureหรือบอดี reduction ที่ซ้อนกัน"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "เนื้อหาของการลดรูปเรียกได้เฉพาะอินทรินซิกของอุปกรณ์ ฟรากเมนต์ และตัวช่วยเคอร์เนลส่วนตัว: {reason}"
@@ -3838,150 +3902,198 @@ help = "รักษาพจน์ให้บริสุทธิ์ เข�
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิด"
+help = "เพิ่ม `>` ปิดท้ายหลังอาร์กิวเมนต์ชนิด"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "ต้องมี '(' ก่อนพารามิเตอร์ของชนิดฟังก์ชัน"
+help = "เริ่มชนิดฟังก์ชันด้วย `(` ก่อนชนิดพารามิเตอร์"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ของชนิดฟังก์ชัน"
+help = "ปิดรายการพารามิเตอร์ด้วย `)` ก่อนลูกศรคืนค่า `→`"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "ต้องมี '→' ก่อนชนิดคืนค่าของฟังก์ชัน"
+help = "เขียน `→` ระหว่างรายการพารามิเตอร์กับชนิดคืนค่า"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "ต้องมี '<' หลังชื่อตัวครอบชนิดตัวเลข"
+help = "ใช้ชนิดความกว้างแบบเปล่า เช่น `i32` หรือ `f32`; ชนิดตัวเลขไม่ใช้ `<...>` อีกต่อไป"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "ต้องมี ':' หลังป้ายกำกับสมาชิกทูเพิล"
+help = "คั่นป้ายกำกับชนิดทูเพิลกับชนิดด้วย `:`, เช่น `tuple<name: string>`"
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "ต้องมี ':' หลังป้ายกำกับสมาชิก ratio"
+help = "คั่นป้ายกำกับฟิลด์เรกคอร์ดกับชนิดด้วย `:`, เช่น `record<name: string>`"
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "ต้องมี ']' หลังมิติรูปร่าง"
+help = "ปิดมิติของรูปร่างด้วย `]`, เช่น `tf32[2, 3]`"
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "ต้องมี ')' หลังรูปร่างในวงเล็บ"
+help = "ปิดนิพจน์ขนาดในวงเล็บด้วย `)`, เช่น `{magnitudo} (n + 1)`"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "ต้องมี '←' หลัง binding ที่ค้าง"
+help = "หลัง binding `{figendum}` หรือ `{variandum}` ให้ใช้ `←` ก่อนนิพจน์ future"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "ต้องมี '[' เปิดแพตเทิร์น binding ของอาร์เรย์"
+help = "เริ่ม binding ของอาร์เรย์ด้วย `[`, เช่น `{sit} [first, second] ← values`"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "ต้องมี ']' ปิดแพตเทิร์น binding ของอาร์เรย์"
+help = "ปิด binding ของอาร์เรย์ด้วย `]`, เช่น `{sit} [first, second] ← values`"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "ต้องมีวงเล็บปีกกาเปิดแพตเทิร์น binding ของออบเจ็กต์"
+help = "เริ่ม binding ของออบเจ็กต์ด้วย `{{`, เช่น `{sit} {{ name } ← value`"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "ต้องมีวงเล็บปีกกาปิดแพตเทิร์น binding ของออบเจ็กต์"
+help = "ปิด binding ของออบเจ็กต์ด้วย `}`, เช่น `{sit} {{ name } ← value`"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "ต้องมี '(' ก่อนพารามิเตอร์ของการประกาศฟังก์ชัน"
+help = "เขียนพารามิเตอร์ฟังก์ชันในวงเล็บหลังชื่อ: `{functio} greet(string name)`"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ของการประกาศฟังก์ชัน"
+help = "ปิดรายการพารามิเตอร์หลังพารามิเตอร์สุดท้าย เช่น `{functio} greet(string name)`"
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี class"
+help = "ปิดคลาสหลังสมาชิก เช่น `{genus} Name {{ {sit} int value }`"
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี interface"
+help = "เริ่มบอดี interface ด้วย `{{`, เช่น `{implendum} Name {{ {functio} method() }`"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "ต้องมี '(' ก่อนพารามิเตอร์ของเมธอด interface"
+help = "เขียนพารามิเตอร์เมธอด interface ในวงเล็บ: `{functio} method(string name)`"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ของเมธอด interface"
+help = "ปิดรายการพารามิเตอร์เมธอดหลังพารามิเตอร์สุดท้าย: `{functio} method(string name)`"
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี interface"
+help = "ปิด interface หลังลายเซ็นเมธอด เช่น `{implendum} Name {{ {functio} method() }`"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "ต้องมี '=' ก่อนค่าของ type alias"
+help = "เขียน type alias ด้วย `=`, เช่น `{typus} Name = string`"
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี schema"
+help = "เริ่มบอดี schema ด้วย `{{`, เช่น `{schema} Name {{ {columna} int id }`"
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี schema"
+help = "ปิด schema หลังคอลัมน์ เช่น `{schema} Name {{ {columna} int id }`"
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี enum"
+help = "เริ่มบอดี enum ด้วย `{{`, เช่น `{ordo} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี enum"
+help = "ปิด enum หลังสมาชิก เช่น `{ordo} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี union"
+help = "เริ่มบอดี union ด้วย `{{`, เช่น `{discretio} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ variant ของ union"
+help = "ปิด payload ของ variant หลังฟิลด์ เช่น `Circle {{ int radius }`"
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี union"
+help = "ปิด union หลัง variant เช่น `{discretio} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "ต้องมีวงเล็บปีกกาเปิดเรกคอร์ดการนำเข้า"
+help = "เริ่มเรกคอร์ดการนำเข้าด้วย `{{`, เช่น `{importa} {{ {ex} = \"norma:console\" }`"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "ต้องมี '=' หลังชื่อฟิลด์การนำเข้า"
+help = "คั่นฟิลด์นำเข้ากับค่าด้วย `=`, เช่น `{ex} = \"norma:console\"`"
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของเรกคอร์ดการนำเข้า"
+help = "ปิดเรกคอร์ดการนำเข้าหลังฟิลด์ เช่น `{importa} {{ {ex} = \"norma:console\" }`"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี probandum"
+help = "เริ่มบอดีชุดทดสอบด้วย `{{`, เช่น `{probandum} \"suite\" {{`"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี probandum"
+help = "ปิดชุดทดสอบด้วย `}` หลังการทดสอบและฮุกตั้งค่า"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "ต้องมีวงเล็บปีกกาเปิดฟิลด์ annotation"
+help = "ใช้ annotation ที่ครอบด้วยวงเล็บปีกกาสำหรับฟิลด์ เช่น `@{cli} {{ name = \"runner\" }`"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "ต้องมี '=' หลังชื่อฟิลด์ annotation"
+help = "คั่นฟิลด์ annotation กับค่าด้วย `=`, เช่น `@{cli} {{ name = \"runner\" }`"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ annotation"
+help = "ปิด annotation ที่ครอบด้วยวงเล็บปีกกาหลังฟิลด์ เช่น `@{cli} {{ name = \"runner\" }`"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "ต้องมีวงเล็บปีกกาเปิดฟิลด์ annotation ของ nucleum"
+help = "ใช้ตัวเลือกเคอร์เนลในวงเล็บปีกกา เช่น `@{nucleum} {{ {fragment} = {verum} }`"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "ต้องมี '=' หลังชื่อฟิลด์ annotation ของ nucleum"
+help = "คั่นตัวเลือกเคอร์เนลกับค่าด้วย `=`, เช่น `@{nucleum} {{ {fragment} = {verum} }`"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ annotation ของ nucleum"
+help = "ปิดตัวเลือกเคอร์เนลในวงเล็บปีกกาหลังฟิลด์ เช่น `@{nucleum} {{ {fragment} = {verum} }`"
 
 [diagnostics.PARSE001.issues.block_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบล็อก"
+help = "เริ่มบล็อกหลังส่วนหัว เช่น `{si} ready {{ {tacet} }`"
 
 [diagnostics.PARSE001.issues.block_end]
 message = "ต้องมีวงเล็บปีกกาปิดบล็อก"
+help = "ปิดบล็อกด้วย `}` หลังคำสั่ง"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "ต้องมี '>' หลังพารามิเตอร์ generic"
+help = "ปิดรายการพารามิเตอร์ generic ด้วย `>`, เช่น `{functio} identity<T>(T value)`"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของ contract"
+help = "ปิดอาร์กิวเมนต์ชนิดของ contract ด้วย `>`, เช่น `Contract<Type>`"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "ต้องมี '[' หลัง 'apud'"
+help = "ใส่พิกัดการวนซ้ำในวงเล็บเหลี่ยมหลัง `{apud}`, เช่น `{itera} {ex} values {apud} [i] {sit} value`"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "ต้องมี ']' หลังพิกัด 'apud'"
+help = "ปิดรายการพิกัดด้วย `]` หลังชื่อพิกัด"
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "ต้องมี '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "ต้องมี reduction source หลัง reduction operator"
+help = "เขียน `{ex} source` หลังตัวดำเนินการ reduction"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "ต้องมี '{lege}' หรือ '{lineam}'"
+help = "ใช้ `{lege}` เพื่ออ่านอินพุตทั้งหมด หรือ `{lineam}` เพื่ออ่านหนึ่งบรรทัด"
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "ต้องมีตัวระบุ"
@@ -4029,30 +4141,39 @@ help = "เขียนจำนวนเต็มหรือสตริงห
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี elige"
+help = "เขียน `{elige} value {{ ... }` โดยใส่กรณี `{casu}` ไว้ด้านใน"
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังกรณีของ elige"
+help = "ปิดบอดี `{elige}` หลังกรณี `{casu}` และแขนง `{ceterum}` ที่ไม่บังคับ"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี discerne"
+help = "เขียน `{discerne} value {{ ... }` โดยใส่แขนงรูปแบบ `{casu}` ไว้ด้านใน"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังแขนงของ discerne"
+help = "ปิดบอดี `{discerne}` หลังแขนง `{casu}` และแขนง `{ceterum}` ที่ไม่บังคับ"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี custodi"
+help = "เริ่มบอดีด้วย `{custodi} {{` แล้วเพิ่มอนุประโยค `{si}` อย่างน้อยหนึ่งรายการ"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังอนุประโยคของ custodi"
+help = "ปิดบอดี `{custodi}` หลังอนุประโยค `{si}`"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "ต้องมี '✗' หลังค่าของเงื่อนไข"
+help = "ใส่ `✗` ระหว่างค่าของ then และ else"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียก"
+help = "ปิดรายการอาร์กิวเมนต์ของการเรียกด้วย `)`"
 
 [diagnostics.PARSE001.issues.index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนี"
+help = "ปิดนิพจน์ดัชนีด้วย `]`"
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "วงเล็บดัชนีรับเพียงหนึ่งนิพจน์; พิกัดที่แยกจากกันไม่ใช่ช่องต่อแกน"
@@ -4060,99 +4181,131 @@ help = "เขียนพิกัดเป็นรายการในวง
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "ต้องมี ']' หลัง gradient selector"
+help = "ปิดรายการ selector ในวงเล็บเหลี่ยมหลังรายการด้วย `]`"
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนีแบบ optional"
+help = "จบดัชนีแบบ optional เป็น `value?[index]`"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบ optional"
+help = "จบการเรียกแบบ optional เป็น `value?(arguments)`"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนีแบบไม่เป็น null"
+help = "จบดัชนีแบบ non-null เป็น `value![index]`"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบไม่เป็น null"
+help = "จบการเรียกแบบ non-null เป็น `value!(arguments)`"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้าง"
+help = "ปิดฟิลด์ของตัวสร้างด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "ต้องมี ']' หลังองค์ประกอบของตัวสร้างที่อนุมาน"
+help = "ปิดรายการสมาชิกของตัวสร้างที่อนุมานด้วย `]`"
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "ต้องมี ']' หลังองค์ประกอบของอาร์เรย์"
+help = "ปิดลิเทอรัลรายการด้วย `]` หลังสมาชิก"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "ต้องมี ')' หลังนิพจน์ในวงเล็บ"
+help = "ปิดนิพจน์ในวงเล็บด้วย `)`"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "ต้องมี '<' หลัง 'ratio'"
+help = "เขียนอาร์กิวเมนต์ชนิดแบบมีป้ายกำกับหลัง `record`, เช่น `record<label: Type>`"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของ ratio"
+help = "ปิดอาร์กิวเมนต์ชนิดของเรกคอร์ดด้วย `>` ก่อนฟิลด์"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "ต้องมีวงเล็บปีกกาเปิด หลังอาร์กิวเมนต์ชนิดของ ratio"
+help = "หลังอาร์กิวเมนต์ชนิดของเรกคอร์ด ให้เริ่มฟิลด์ด้วย `{{`"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของ ratio"
+help = "ปิดฟิลด์เรกคอร์ดด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้างแบบมีชนิด"
+help = "ปิดฟิลด์ของตัวสร้างแบบมีชนิดด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของ finge"
+help = "ปิดฟิลด์ variant ด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "ต้องมี '<' หลัง 'iuncta'"
+help = "เขียนอาร์กิวเมนต์ชนิดของทูเพิลหลัง `{iuncta}`, เช่น `{iuncta}<T, U>`"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "ต้องมี '[' หลังอาร์กิวเมนต์ชนิดของ iuncta"
+help = "หลังอาร์กิวเมนต์ชนิด ให้เขียนรายการค่าทูเพิลในวงเล็บเหลี่ยม"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "ต้องมี ']' หลังองค์ประกอบของ iuncta"
+help = "ปิดรายการค่าทูเพิลด้วย `]` หลังสมาชิก"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ clausura"
+help = "ปิดรายการพารามิเตอร์ด้วย `)` ก่อนลายเซ็นที่ไม่บังคับและ `∴`"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "ต้องมี '∴' หลังลายเซ็น clausura"
+help = "หลังลายเซ็น closure ให้เขียน `∴` แล้วตามด้วยนิพจน์หรือบล็อก `{fac}`"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "ต้องมี ')' หลังตัวเปิด ad"
+help = "ปิดนิพจน์ตัวเปิดที่ไม่บังคับด้วย `)` หลังค่า"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "ต้องมี ':' หลังป้ายกำกับอาร์กิวเมนต์"
+help = "ในการเรียก template ให้ใส่ `:` ระหว่างป้ายกำกับอาร์กิวเมนต์กับค่า"
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "ต้องมี ']' หลังคีย์ออบเจ็กต์แบบคำนวณ"
+help = "ปิดคีย์ฟิลด์ที่คำนวณด้วย `]` ก่อนเขียน `= value`"
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "ต้องมี ':' หลังคีย์ JSON"
+help = "ใส่ `:` ระหว่างคีย์ JSON ที่อยู่ในเครื่องหมายคำพูดกับค่าของแต่ละคีย์"
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังออบเจ็กต์ JSON"
+help = "ปิดออบเจ็กต์ JSON ด้วย `}` หลังสมาชิก"
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "ต้องมี ']' หลังอาร์เรย์ JSON"
+help = "ปิดอาร์เรย์ JSON ด้วย `]` หลังค่า"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้างที่อนุมาน"
+help = "ปิดตัวสร้างที่อนุมานด้วย `}`"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของการเรียก"
+help = "ปิดรายการอาร์กิวเมนต์ชนิดด้วย '>' ก่อน '(' ของการเรียก"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "ต้องมี '<' ก่อนอาร์กิวเมนต์ชนิดของตัวสร้าง"
+help = "เพิ่ม '<' ก่อนอาร์กิวเมนต์ชนิดของตัวสร้าง"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของตัวสร้าง"
+help = "ปิดรายการอาร์กิวเมนต์ชนิดของตัวสร้างด้วย '>'"
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "ต้องมี '(' หลัง 'scriptum'"
+help = "เริ่มการเรียก `{scriptum}` ด้วย '('"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์ของ scriptum"
+help = "ปิดการเรียก `{scriptum}` ด้วย ')' หลังอาร์กิวเมนต์"
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
@@ -4216,5 +4369,26 @@ help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink
 [diagnostics.INFO001]
 message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "เคอร์เนล `{kernel}` ทำงานบนเลนเดียว"
+help = "ใช้ฟังก์ชัน `@ {nucleum}` พร้อมลูป `{itera}` และส่วน `{filum}` เมื่อแต่ละเลนควรจัดการหนึ่งรายการ"
+
+[diagnostics.INFO001.issues.not_split]
+message = "เคอร์เนล `{kernel}` ทำงานบนพาร์ติชันเดียวจาก {partitions} พาร์ติชัน: {reason}"
+help = "ตรวจสอบเหตุผล: การแยกต้องมีกริดเลนเชิงเส้น ช่วงของเลน และการเขียนที่จำกัดอยู่ในช่วงของแต่ละเลน"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "เคอร์เนล `{kernel}`: การแบ่งไปยัง {partitions} พาร์ติชันขึ้นอยู่กับรูปร่างขณะรันไทม์"
+help = "เลือกรูปร่างขณะทำงานที่ทำให้กริดเลนและการเขียนมีช่วงตรงกัน เพื่อให้แบ่งได้อย่างคาดเดาได้"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "เคอร์เนล `{kernel}` ทำงานเป็นการเรียกแบบลำดับครั้งเดียวบน CPU worker หนึ่งตัว"
+help = "สำหรับงานแยกอิสระต่อรายการ ให้ใช้ฟังก์ชัน `@ {nucleum}` พร้อมลูป `{itera}` และส่วน `{filum}`"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "เคอร์เนล `{kernel}` ไม่ได้ถูกวางบนอุปกรณ์ {device}: {reason}"
+help = "ตรวจสอบเหตุผลและใช้รูปแบบเคอร์เนลที่อุปกรณ์ที่เลือกสนับสนุน"
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "เคอร์เนล `{kernel}`: {kind} ข้าม {partitions} พาร์ติชันสามารถหลีกเลี่ยงได้: {avoidable} ({reason})"
+help = "ทำตามเหตุผลจากการตรวจสอบเพื่อค้นหาการพึ่งพา ให้การอ่านและเขียนแบบแบ่งพาร์ทิชันอยู่ภายในเลน และใช้เลย์เอาต์บัฟเฟอร์ที่ตรงกันเมื่อทำได้"

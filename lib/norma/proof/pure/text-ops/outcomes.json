@@ -21,12 +21,6 @@
       "diagnostic_contains": "cannot use \"a\" (untyped string constant) as *string value in argument ",
       "reason": "The Go emitter types an optional string parameter (`string optional`) as `*string` but passes the argument bare at a namespace call (`text.Keep_between(.., \"a\", ..)`), so the Go build rejects it; wrapping optional arguments at namespace calls is an open emitter unit."
     },
-    "ts": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "ts_trap_expression_unsupported",
-      "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
-    },
     "llvm": {
       "outcome": "known-fail",
       "phase": "build",

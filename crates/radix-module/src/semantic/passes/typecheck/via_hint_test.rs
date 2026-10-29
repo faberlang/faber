@@ -161,21 +161,21 @@ const ROWS: &[Row] = &[
     },
     Row {
         name: "ascii Hex",
-        frame: "functio f(u32 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u32 n) → ascii<magnitudo 8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Hex>",
-        via: "↦ ascii<8> via Hex",
+        via: "↦ ascii<magnitudo 8> via Hex",
     },
     Row {
         name: "ascii Bin",
-        frame: "functio f(u8 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u8 n) → ascii<magnitudo 8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Bin>",
-        via: "↦ ascii<8> via Bin",
+        via: "↦ ascii<magnitudo 8> via Bin",
     },
     Row {
         name: "ascii Oct",
-        frame: "functio f(u16 n) → ascii<8> {{ redde n {} ⊥ '--' }}",
+        frame: "functio f(u16 n) → ascii<magnitudo 8> {{ redde n {} ⊥ '--' }}",
         legacy: "↦ ascii<8, Oct>",
-        via: "↦ ascii<8> via Oct",
+        via: "↦ ascii<magnitudo 8> via Oct",
     },
     Row {
         name: "ascii solved hole",
@@ -333,8 +333,8 @@ fn via_on_a_target_that_takes_no_hint_is_a_structured_error() {
 fn a_register_target_takes_a_via_hint() {
     // The register windows carry `Be`/`Le` in the clause like any other target.
     for source in [
-        "functio w(lista<b8> c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4> via Be }",
-        "functio o(vector<u32, 4> v) → lista<b8, magnitudo 16> { redde v ↦ lista<b8, magnitudo 16> via Le }",
+        "functio w(lista<b8> c) → vector<u32, magnitudo 4> { redde c[0‥16] ↦ vector<u32, magnitudo 4> via Be }",
+        "functio o(vector<u32, magnitudo 4> v) → lista<b8, magnitudo 16> { redde v ↦ lista<b8, magnitudo 16> via Le }",
     ] {
         let diagnostics = diagnostics_with(latin_config(), source);
         assert!(
@@ -347,8 +347,8 @@ fn a_register_target_takes_a_via_hint() {
 #[test]
 fn the_retired_register_tail_is_rejected_pointing_at_the_clause() {
     for source in [
-        "functio w(lista<b8> c) → vector<u32, 4> { redde c[0‥16] ↦ vector<u32, 4><Be> }",
-        "functio o(vector<u32, 4> v) → lista<b8, magnitudo 16> { redde v ↦ lista<b8, magnitudo 16><Le> }",
+        "functio w(lista<b8> c) → vector<u32, magnitudo 4> { redde c[0‥16] ↦ vector<u32, magnitudo 4><Be> }",
+        "functio o(vector<u32, magnitudo 4> v) → lista<b8, magnitudo 16> { redde v ↦ lista<b8, magnitudo 16><Le> }",
     ] {
         assert_issue(&diagnostics_with(latin_config(), source), "conversio_hint_tail_argument");
     }

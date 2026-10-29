@@ -7,7 +7,7 @@ use radix_types::vocabulary::{CapabilityGap, Lowerability};
 use radix_types::{Type, TypeTable};
 
 use crate::capability::{SLUG_CLIF_SUBSET, classify_clif_reachable};
-use crate::lower::{ProgramInput, StructMeta, lower_program};
+use crate::lower::{JitProgram, ProgramInput, StructMeta, lower_program, lower_program_jit};
 
 /// A relocatable native object for the host triple.
 #[derive(Debug, Clone)]
@@ -54,16 +54,18 @@ impl ClifError {
     }
 }
 
-/// Emit a native object for `validated`.
-///
-/// # Errors
-///
-/// Returns [`ClifError`] naming the first gap when the program is outside the
-/// CLIF subset, or the failing shape when the lowering declines late.
-pub fn emit_object(
-    validated: &ValidatedMir<'_>,
-    interner: &Interner,
-) -> Result<ClifObject, ClifError> {
+/// Everything the lowering reads that validation derives: the entry, the
+/// output words and the `genus` metadata. Both routes build it the same way,
+/// after the same capability pre-pass.
+struct Prepared {
+    entry: Option<radix_mir::MirFunctionId>,
+    tokens: [String; 4],
+    table: TypeTable,
+    structs: StructMeta,
+}
+
+/// Classify `validated` against the CLIF subset and gather the lowering inputs.
+fn prepare(validated: &ValidatedMir<'_>, interner: &Interner) -> Result<Prepared, ClifError> {
     let program = validated.program();
     let types = validated.validation().types.as_table();
     let entry = MirNames::new(program, types, interner)
@@ -121,7 +123,61 @@ pub fn emit_object(
         }
     }
     structs.optional_params = optional_params(program, &mut table);
-    emit_program(program, &table, interner, entry, tokens, &structs)
+    Ok(Prepared {
+        entry,
+        tokens,
+        table,
+        structs,
+    })
+}
+
+/// Emit a native object for `validated`.
+///
+/// # Errors
+///
+/// Returns [`ClifError`] naming the first gap when the program is outside the
+/// CLIF subset, or the failing shape when the lowering declines late.
+pub fn emit_object(
+    validated: &ValidatedMir<'_>,
+    interner: &Interner,
+) -> Result<ClifObject, ClifError> {
+    let prepared = prepare(validated, interner)?;
+    emit_program(
+        validated.program(),
+        &prepared.table,
+        interner,
+        prepared.entry,
+        prepared.tokens,
+        &prepared.structs,
+    )
+}
+
+/// Compile `validated` into this process's memory.
+///
+/// The same capability pre-pass and the same lowering as [`emit_object`]; only
+/// the module the functions are defined in differs. `runtime` is the explicit
+/// table of the runtime's `extern "C"` entry points: every runtime symbol the
+/// program imports must be listed.
+///
+/// # Errors
+///
+/// Returns the identical [`ClifError`] [`emit_object`] returns for a program
+/// outside the CLIF subset, or the failing shape when the lowering declines.
+pub fn emit_jit(
+    validated: &ValidatedMir<'_>,
+    interner: &Interner,
+    runtime: &[(&str, *const u8)],
+) -> Result<JitProgram, ClifError> {
+    let prepared = prepare(validated, interner)?;
+    let input = ProgramInput {
+        structs: &prepared.structs,
+        program: validated.program(),
+        types: &prepared.table,
+        interner,
+        entry: prepared.entry,
+        tokens: prepared.tokens.clone(),
+    };
+    lower_program_jit(&input, runtime).map_err(|decline| ClifError::late_decline(&decline.shape))
 }
 
 /// `ty` as an optional: unchanged when it already admits none.

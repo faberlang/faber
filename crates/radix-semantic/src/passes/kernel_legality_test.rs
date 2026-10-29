@@ -132,8 +132,8 @@ fn a_text_literal_selector_on_a_device_intrinsic_is_legal() {
 @ nucleum
 @ publica
 functio swizzled(f32 x) → f32 {
-    sit vector<f32, 4> a ← [x, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    sit vector<f32, 4> b ← a.swizzle("wzyx")
+    sit vector<f32, magnitudo 4> a ← [x, 2.0, 3.0, 4.0] ↦ vector<f32, magnitudo 4>
+    sit vector<f32, magnitudo 4> b ← a.swizzle("wzyx")
     redde x
 }
 "#,
@@ -621,7 +621,7 @@ const RAW_LANE_ID: &str = "nucleum_raw_lane_id";
 /// The local declaration that binds one builtin call with its natural type.
 fn lane_id_local(builtin: radix_types::MirKernelBuiltin) -> String {
     let ty = if builtin.returns_vector() {
-        "vector<u32, 3>"
+        "vector<u32, magnitudo 3>"
     } else {
         "u32"
     };
@@ -713,7 +713,7 @@ fn lane_warnings(source: &str) -> Vec<SemanticError> {
 fn a_kernel_parameter_named_after_every_thread_id_builtin_is_rejected() {
     for builtin in radix_types::MirKernelBuiltin::ALL {
         let ty = if builtin.returns_vector() {
-            "vector<u32, 3>"
+            "vector<u32, magnitudo 3>"
         } else {
             "u32"
         };

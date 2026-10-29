@@ -165,7 +165,55 @@ pub(crate) struct DeviceSpanMetadata {
     /// classified as avoidable, with that kind's counters.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) avoidable: Vec<DeviceSpanAvoidableMetadata>,
+    /// What the partitions can hold and what they held (the capacity rule):
+    /// the sum and the smallest of the partition budgets, the bytes held
+    /// replicated and as slabs, and each partition's peak. A peak above
+    /// `min_budget` proves a slab did the work. Absent on a logical device
+    /// that does not allocate per partition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) capacity: Option<DeviceSpanCapacityMetadata>,
+    /// How every live logical buffer was held, by logical buffer id.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) placement: Vec<DeviceSpanPlacementMetadata>,
     pub(crate) entries: Vec<DeviceSpanEntryMetadata>,
+}
+
+/// The capacity rule's numbers (`device.runtime.span.capacity`).
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanCapacityMetadata {
+    /// The sum of the partition budgets: the bound on a working set of slabs.
+    pub(crate) sum_budget: u64,
+    /// The smallest partition budget: the bound on any one replica.
+    pub(crate) min_budget: u64,
+    /// Logical bytes of the live buffers held as replicas.
+    pub(crate) replicated_bytes: u64,
+    /// Logical bytes of the live buffers held as slabs (halos not counted).
+    pub(crate) slab_bytes: u64,
+    /// Each partition's peak allocated bytes, in partition order.
+    pub(crate) peak_per_partition: Vec<u64>,
+}
+
+/// How one logical buffer was held (`device.runtime.span.placement[]`):
+/// `layout` is `replica` or `slab`; a slab has its cut `axis` and `align`
+/// (rows per alignment unit); `shares` are the bytes each partition owns, in
+/// partition order; `forced_by` names the binding that kept a slab-eligible
+/// buffer a replica.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceSpanPlacementMetadata {
+    pub(crate) buffer: u64,
+    pub(crate) bytes: u64,
+    pub(crate) layout: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) axis: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) align: Option<u64>,
+    pub(crate) shares: Vec<u64>,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub(crate) halo_bytes: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) forced_by: Option<String>,
 }
 
 /// How bytes move from partition `from` to partition `to` (`peer`,
@@ -500,6 +548,30 @@ impl DeviceSpanMetadata {
                 })
                 .collect(),
             avoidable: Vec::new(),
+            capacity: span
+                .capacity
+                .as_ref()
+                .map(|capacity| DeviceSpanCapacityMetadata {
+                    sum_budget: capacity.sum_budget,
+                    min_budget: capacity.min_budget,
+                    replicated_bytes: capacity.replicated_bytes,
+                    slab_bytes: capacity.slab_bytes,
+                    peak_per_partition: capacity.peak_per_partition.clone(),
+                }),
+            placement: span
+                .placement
+                .iter()
+                .map(|row| DeviceSpanPlacementMetadata {
+                    buffer: row.buffer,
+                    bytes: row.bytes,
+                    layout: row.layout.as_str().to_owned(),
+                    axis: row.axis,
+                    align: row.align_rows,
+                    shares: row.shares.clone(),
+                    halo_bytes: row.halo_bytes,
+                    forced_by: row.forced_by.clone(),
+                })
+                .collect(),
             entries: span
                 .entries
                 .iter()

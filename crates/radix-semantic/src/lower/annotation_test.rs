@@ -50,12 +50,12 @@ fn stack_holding_ignotum_is_not_concrete() {
 
 #[test]
 fn bounded_queue_holding_ignotum_is_not_concrete() {
-    assert_member_is_not_concrete("queue<ignotum, 8>");
+    assert_member_is_not_concrete("queue<ignotum, magnitudo 8>");
 }
 
 #[test]
 fn bounded_stack_holding_ignotum_is_not_concrete() {
-    assert_member_is_not_concrete("stack<ignotum, 8>");
+    assert_member_is_not_concrete("stack<ignotum, magnitudo 8>");
 }
 
 #[test]
@@ -68,8 +68,8 @@ fn concrete_collections_stay_admitted() {
     for member in [
         "queue<textus>",
         "stack<textus>",
-        "queue<textus, 8>",
-        "stack<textus, 8>",
+        "queue<textus, magnitudo 8>",
+        "stack<textus, magnitudo 8>",
         "tabulae<textus, numerus>",
     ] {
         assert_member_is_concrete(member);

@@ -1,0 +1,26 @@
++++
+locale = "en"
+term = "itera-filum-return-thread"
+kind = "reject"
+category = "loop"
+grammar = ["itera_stmt", "apud_clause", "filum_clause", "redde_stmt", "expression"]
+canonical = false
+summary = "`return thread` ends one lane of a `thread` loop; written anywhere else it is refused."
+no_expected = "rejects"
+diagnostic = "SEM010:return_thread_outside_lane"
++++
+
+# This exemplum intentionally fails to compile: `return thread` (la `redde
+# filum`) ends the current lane of a `thread` loop, from any depth of that lane's
+# body. Outside a lane body there is no lane to end, so it is refused. It is
+# refused too when it carries a value (`return_thread_with_value`: lanes deliver
+# results through their stores) and inside a closure or reduction body nested in
+# the lane (`return_thread_in_nested_body`: that body is not the lane). Plain
+# `return` in a lane body stays refused (`return_in_thread_body`).
+fn run() → void {
+    return thread
+}
+
+main {
+    run()
+}

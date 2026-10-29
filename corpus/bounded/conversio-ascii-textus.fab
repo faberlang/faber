@@ -4,17 +4,17 @@ kind = "operator-group"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "conversion"
 canonical = false
-summary = "Bounded ascii<N> widens to unbounded textus: ascii<8> ↦ string."
-syntax = "ascii<N> ↦ string"
+summary = "Bounded ascii<size N> widens to unbounded textus: ascii<size 8> ↦ string."
+syntax = "ascii<size N> ↦ string"
 related = ["↦", "ascii", "textus"]
 locale = "en"
 +++
 # =============================================================================
-# ↦ — bounded ascii<N> widens to unbounded textus
+# ↦ — bounded ascii<size N> widens to unbounded textus
 # =============================================================================
 #
 # What this teaches:
-#   • Width release — a bounded `ascii<8>` converts to the unbounded
+#   • Width release — a bounded `ascii<size 8>` converts to the unbounded
 #     `string` surface with `↦`; the widened value is an ordinary textus
 #   • Distinct types — the bounded cord is not implicitly assignable to
 #     `string`; the conversion is explicit
@@ -22,13 +22,13 @@ locale = "en"
 # Common mistakes:
 #   • writing `string s ← a` without `↦` — widening a bounded cord is
 #     conversion-only
-#   • reading `ascii<N>` capacity as the runtime length — `longitudo` stays
+#   • reading `ascii<size N>` capacity as the runtime length — `longitudo` stays
 #     the current length
 #
 # See also: ↦, ascii, textus
 # =============================================================================
 
-# conversio — ascii<N> ↦ textus
+# conversio — ascii<size N> ↦ textus
 #
 # GRAMMAR:
 #   convertExpr :← expr '↦' 'string'
@@ -37,7 +37,7 @@ locale = "en"
 #   conversio-ascii-textus.expected — the widened textus value.
 
 main {
-    let ascii<8> a ← 'ab'
+    let ascii<size 8> a ← 'ab'
     let string s ← a ↦ string
     print s
 }

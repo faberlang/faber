@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/lista/ranged-short-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/ranged-short-literal.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+check_only = true

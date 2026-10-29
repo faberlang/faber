@@ -1,0 +1,66 @@
++++
+term = "nucleum"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "nucleum_modifier", "nucleum_tier", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "call_expr", "call_suffix", "argument_list", "argument", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "kernel"
+canonical = false
+summary = "A kernel runs at one of three ordered safety tiers: the default `@ kernel`, `@ kernel relaxed` and `@ kernel unsafe`."
+syntax = "@ kernel [relaxed | unsafe]"
+related = ["nucleum", "publica"]
+locale = "en"
++++
+# =============================================================================
+# nucleum — the kernel safety tiers
+# =============================================================================
+#
+# What this teaches:
+#   • `@ kernel` is the default tier: IEEE-correct float math (with FMA
+#     contraction, reordered reductions and published-bound transcendentals)
+#     and every index check the compiler cannot prove stays
+#   • `@ kernel relaxed` adds approximate `/` and `sqrt`, fast
+#     transcendentals, flushing denormals to zero and reassociating float
+#     expressions
+#   • `@ kernel unsafe` includes `relaxed` and also drops the index checks the
+#     compiler cannot prove; an out-of-range access is undefined behaviour
+#   • The tiers are one ordered choice, never independent flags: `unsafe`
+#     already allows everything `relaxed` allows
+#   • Integer results stay exact at every tier, and an explicit check the
+#     author wrote (a `trapping` store, an `is_finite` test, a bounds test)
+#     always runs
+#   • `faber run --safe`, `faber build --safe` and `safe = true` under
+#     `[device]` in `faber.toml` run every kernel at the default tier; they
+#     can only lower a tier
+#
+# Common mistakes:
+#   • writing two tier words (`@ kernel relaxed unsafe`) — `unsafe` already
+#     includes `relaxed`
+#   • putting a tier on a `fragment` or on anything but a kernel function
+#
+# See also: nucleum, publica
+# =============================================================================
+
+@ kernel
+@ public
+fn scale_default(f32 x) → f32 {
+    return x * 2.0
+}
+
+@ kernel relaxed
+@ public
+fn scale_relaxed(f32 x) → f32 {
+    return x * 2.0
+}
+
+@ kernel unsafe
+@ public
+fn scale_unsafe(f32 x) → f32 {
+    return x * 2.0
+}
+
+fn tier_count() → int {
+    return 3
+}
+
+main {
+    print tier_count()
+}

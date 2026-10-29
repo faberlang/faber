@@ -99,7 +99,7 @@ compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_bl
 # [044] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') return_clause? alternate_exit_clause?
 # [045] fac_block
-fac_block ::= '执行' block_stmt cape_clause?
+fac_block ::= '执行' fac_modifier? block_stmt cape_clause?
 # [046] clausura_legacy_expr
 clausura_legacy_expr ::= '闭包' clausura_params? ('→' type_annotation)? (':' expression | block_stmt)
 # [047] clausura_params
@@ -139,458 +139,464 @@ nucleum_sugar ::= '@' '内核' nucleum_modifier? NEWLINE
 # [064] nucleum_braced
 nucleum_braced ::= '@' '内核' '{' nucleum_field_list? '}'
 # [065] nucleum_modifier
-nucleum_modifier ::= '片段'
-# [066] nucleum_field_list
+nucleum_modifier ::= '片段' | nucleum_tier
+# [066] nucleum_tier
+nucleum_tier ::= '宽松' | '不安全'
+# [067] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# [067] nucleum_field
+# [068] nucleum_field
 nucleum_field ::= '片段' '=' ('真' | '假')
-# [068] radix_annotation
+# [069] radix_annotation
 radix_annotation ::= '@' 'radix' radix_directive NEWLINE
-# [069] radix_directive
+# [070] radix_directive
 radix_directive ::= '车道' STRING | 'backward' STRING | 'contract' STRING | '类型' IDENTIFIER '传入' concrete_type+
-# [070] ad_annotation
+# [071] ad_annotation
 ad_annotation ::= '@' '调用' ASCII_STRING NEWLINE
-# [071] nondum_annotation
+# [072] nondum_annotation
 nondum_annotation ::= '@' '不稳定' NON_NEWLINE_TOKEN* NEWLINE | '@' '不稳定' '{' annotation_field_list? '}'
-# [072] implendum_decl
+# [073] implendum_decl
 implendum_decl ::= '契约' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# [073] implendum_method_decl
+# [074] implendum_method_decl
 implendum_method_decl ::= annotation* '函数' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# [074] typus_decl
+# [075] typus_decl
 typus_decl ::= '类型' IDENTIFIER generic_params? '=' type_annotation
-# [075] ordo_decl
+# [076] ordo_decl
 ordo_decl ::= '枚举' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# [076] enum_member
+# [077] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# [077] discretio_decl
+# [078] discretio_decl
 discretio_decl ::= '判别' IDENTIFIER generic_params? '{' union_fields? variant (',' variant)* '}'
-# [078] union_fields
+# [079] union_fields
 union_fields ::= annotation+ field_decl union_member*
-# [079] union_member
+# [080] union_member
 union_member ::= annotation* field_decl
-# [080] variant
+# [081] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# [081] variant_fields
+# [082] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# [082] schema_decl
+# [083] schema_decl
 schema_decl ::= '架构' IDENTIFIER '{' (schema_column (NEWLINE schema_column)*)? '}'
-# [083] schema_column
+# [084] schema_column
 schema_column ::= '列' type_annotation IDENTIFIER (':' IDENTIFIER)?
-# [084] importa_decl
+# [085] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# [085] importa_record
+# [086] importa_record
 importa_record ::= '导入' '{' import_field_list '}'
-# [086] import_field_list
+# [087] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# [087] import_field
+# [088] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# [088] ex_field
+# [089] ex_field
 ex_field ::= '取自' '=' STRING
-# [089] visibilitas_field
+# [090] visibilitas_field
 visibilitas_field ::= '可见性' '=' publica
-# [090] nomen_field
+# [091] nomen_field
 nomen_field ::= '名称' '=' IDENTIFIER
-# [091] ut_field
+# [092] ut_field
 ut_field ::= '作为' '=' IDENTIFIER
-# [092] omnia_field
+# [093] omnia_field
 omnia_field ::= '全部' '=' IDENTIFIER
-# [093] importa_sugar
+# [094] importa_sugar
 importa_sugar ::= '导入' ('取自' | import_target) STRING publica? (named_import | wildcard_import | selective_import)?
-# [094] import_target
+# [095] import_target
 import_target ::= IDENTIFIER
-# [095] publica
+# [096] publica
 publica ::= '公开'
-# [096] named_import
+# [097] named_import
 named_import ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [097] wildcard_import
+# [098] wildcard_import
 wildcard_import ::= '*' '作为' IDENTIFIER
-# [098] selective_import
+# [099] selective_import
 selective_import ::= '常量' import_value_binding (',' import_value_binding)*
-# [099] import_value_binding
+# [100] import_value_binding
 import_value_binding ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [100] type_annotation
+# [101] type_annotation
 type_annotation ::= union_hole_type | concrete_type
-# [101] concrete_type
+# [102] concrete_type
 concrete_type ::= intersection_type ('∪' intersection_type)*
-# [102] union_hole_type
+# [103] union_hole_type
 union_hole_type ::= ('借自' | '变量' | '拥有' | '拷贝')? '∪'
-# [103] intersection_type
+# [104] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# [104] owned_type
+# [105] owned_type
 owned_type ::= ('借自' | '变量' | '拥有' | '拷贝')? base_type
-# [105] base_type
+# [106] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | failable_promissum_type | qualified_type type_arguments?
-# [106] failable_promissum_type
+# [107] failable_promissum_type
 failable_promissum_type ::= IDENTIFIER '<' type_annotation alternate_exit_clause '>'
-# [107] ratio_type
+# [108] ratio_type
 ratio_type ::= 'ratio' '<' ('*' | labeled_type_argument (',' labeled_type_argument)*) '>'
-# [108] hole_type
+# [109] hole_type
 hole_type ::= '_'
-# [109] qualified_type
+# [110] qualified_type
 qualified_type ::= type_head ('.' IDENTIFIER)*
-# [110] type_head
+# [111] type_head
 type_head ::= IDENTIFIER | '模数'
-# [111] type_arguments
+# [112] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# [112] type_argument
+# [113] type_argument
 type_argument ::= labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# [113] labeled_type_argument
+# [114] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# [114] range_argument
+# [115] range_argument
 range_argument ::= range_bound range_glyph range_bound
-# [115] sized_range_argument
+# [116] sized_range_argument
 sized_range_argument ::= '维度' range_argument
-# [116] range_glyph
+# [117] range_glyph
 range_glyph ::= '‥' | '…'
-# [117] range_bound
+# [118] range_bound
 range_bound ::= '-'? NATURAL | '-'? '∞' | '维度'? IDENTIFIER
-# [118] width_type_sugar
+# [119] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# [119] shape_suffix
+# [120] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
-# [120] figura
+# [121] figura
 figura ::= spelled_lift | figura_product (('+' | '-') NATURAL)*
-# [121] spelled_lift
+# [122] spelled_lift
 spelled_lift ::= '维度' lift_extent
-# [122] lift_extent
+# [123] lift_extent
 lift_extent ::= NATURAL | '-' NATURAL | '(' figura ')' | IDENTIFIER | '[' figura_list? ']'
-# [123] figura_product
+# [124] figura_product
 figura_product ::= figura_primary ('/' NATURAL)*
-# [124] figura_primary
+# [125] figura_primary
 figura_primary ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']' | '(' figura ')'
-# [125] figura_list
+# [126] figura_list
 figura_list ::= figura (',' figura)*
-# [126] function_type
+# [127] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# [127] type_list
+# [128] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# [128] si_stmt
+# [129] si_stmt
 si_stmt ::= '如果' si_tail
-# [129] si_tail
+# [130] si_tail
 si_tail ::= expression arm ('否则如果' si_tail | secus_clause)?
-# [130] secus_clause
+# [131] secus_clause
 secus_clause ::= '否则' else_arm
-# [131] arm
+# [132] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [132] else_arm
+# [133] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# [133] dum_stmt
+# [134] dum_stmt
 dum_stmt ::= '当' expression (block_stmt | ergo_joint statement) cape_clause?
-# [134] itera_stmt
+# [135] itera_stmt
 itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? filum_clause? ('设' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
-# [135] itera_binding
+# [136] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
-# [136] apud_clause
+# [137] apud_clause
 apud_clause ::= '在' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# [137] elige_stmt
+# [138] elige_stmt
 elige_stmt ::= '选择' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# [138] casu_elige_clause
+# [139] casu_elige_clause
 casu_elige_clause ::= '情况' expression (block_stmt | ergo_joint statement)
-# [139] ceterum_clause
+# [140] ceterum_clause
 ceterum_clause ::= '默认' (block_stmt | ergo_joint statement)
-# [140] discerne_stmt
+# [141] discerne_stmt
 discerne_stmt ::= '匹配' '全部'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [141] discriminants
+# [142] discriminants
 discriminants ::= subject_path ('且' subject_path)*
-# [142] subject_path
+# [143] subject_path
 subject_path ::= IDENTIFIER ('.' IDENTIFIER)*
-# [143] casu_variant_clause
+# [144] casu_variant_clause
 casu_variant_clause ::= '情况' patterns (block_stmt | ergo_joint statement)
-# [144] patterns
+# [145] patterns
 patterns ::= pattern ('且' pattern)*
-# [145] pattern
+# [146] pattern
 pattern ::= pattern_atom ('或' pattern_atom)*
-# [146] pattern_atom
+# [147] pattern_atom
 pattern_atom ::= '_' | negated_number | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [147] negated_number
+# [148] negated_number
 negated_number ::= '-' NUMBER
-# [148] type_pattern
+# [149] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# [149] ut_pattern
+# [150] ut_pattern
 ut_pattern ::= ('作为' IDENTIFIER) | (('设' | '变量') pattern_binding (',' pattern_binding)*)
-# [150] pattern_binding
+# [151] pattern_binding
 pattern_binding ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [151] custodi_stmt
+# [152] custodi_stmt
 custodi_stmt ::= '守护' '{' si_guard_clause+ '}'
-# [152] si_guard_clause
+# [153] si_guard_clause
 si_guard_clause ::= '如果' expression (block_stmt | ergo_joint statement)
-# [153] ex_stmt
+# [154] ex_stmt
 ex_stmt ::= '取自' expression ('设' | '变量') extract_fields
-# [154] extract_fields
+# [155] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# [155] extract_field
+# [156] extract_field
 extract_field ::= IDENTIFIER ('作为' IDENTIFIER)?
-# [156] ceteri_field
+# [157] ceteri_field
 ceteri_field ::= '其余' IDENTIFIER
-# [157] redde_stmt
-redde_stmt ::= '返回' expression?
-# [158] reddet_stmt
+# [158] redde_stmt
+redde_stmt ::= '返回' ('线程' expression? | expression?)
+# [159] reddet_stmt
 reddet_stmt ::= '等返' expression
-# [159] tacebit_stmt
+# [160] tacebit_stmt
 tacebit_stmt ::= '等弃' expression
-# [160] cede_stmt
+# [161] cede_stmt
 cede_stmt ::= '让出' expression
-# [161] rumpe_stmt
+# [162] rumpe_stmt
 rumpe_stmt ::= '中断'
-# [162] perge_stmt
+# [163] perge_stmt
 perge_stmt ::= '继续'
-# [163] tacet_stmt
+# [164] tacet_stmt
 tacet_stmt ::= '静默'
-# [164] iace_stmt
+# [165] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# [165] iace_expr
+# [166] iace_expr
 iace_expr ::= ('抛错' | '崩溃') expression
-# [166] iace_guarded_expr
+# [167] iace_guarded_expr
 iace_guarded_expr ::= ('抛错' | '崩溃') expression NO_NEWLINE '如果' expression
-# [167] cape_clause
+# [168] cape_clause
 cape_clause ::= '捕获' IDENTIFIER block_stmt
-# [168] adfirma_stmt
+# [169] adfirma_stmt
 adfirma_stmt ::= '断言' expression ('崩溃' expression)?
-# [169] requirit_stmt
+# [170] requirit_stmt
 requirit_stmt ::= '需求' expression '抛错' expression
-# [170] reice_stmt
+# [171] reice_stmt
 reice_stmt ::= '拒绝' expression '抛错' expression
-# [171] expression
+# [172] expression
 expression ::= assignment
-# [172] transfer
+# [173] transfer
 transfer ::= ternary ('⇇' ternary)?
-# [173] sink_into
+# [174] sink_into
 sink_into ::= transfer ('⇜' ternary)?
-# [174] value_marker
+# [175] value_marker
 value_marker ::= '拥有' | '拷贝'
-# [175] assignment
+# [176] assignment
 assignment ::= sink_into ('←' '拷贝'? assignment | '↤' assignment via_clause? inline_default?)?
-# [176] inc_dec_stmt
+# [177] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [177] place
+# [178] place
 place ::= call_expr
-# [178] ternary
+# [179] ternary
 ternary ::= aut_expr ('✓' expression '✗' aut_expr)?
-# [179] aut_expr
+# [180] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
-# [180] et_expr
+# [181] et_expr
 et_expr ::= equality (('且') equality)*
-# [181] equality
+# [182] equality
 equality ::= comparison equality_tail*
-# [182] equality_tail
+# [183] equality_tail
 equality_tail ::= ('≡' | '≢' | '≅' | '≇' | '≈' | '≉') comparison | ('是' | '非' '是') type_annotation
-# [183] comparison
+# [184] comparison
 comparison ::= format_expr (('≺' | '≻' | '≤' | '≥' | '∈' | '∉') format_expr)*
-# [184] format_expr
+# [185] format_expr
 format_expr ::= bitwise_or_expr ('¶' STRING)?
-# [185] bitwise_or_expr
+# [186] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# [186] bitwise_xor_expr
+# [187] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# [187] bitwise_and_expr
+# [188] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# [188] shift_expr
+# [189] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# [189] range_expr
+# [190] range_expr
 range_expr ::= additive_expr range_tail?
-# [190] range_tail
+# [191] range_tail
 range_tail ::= ('‥' | '…' | '迄' | '到') additive_expr ('步' additive_expr)?
-# [191] additive_expr
+# [192] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
-# [192] multiplicative_expr
+# [193] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '÷' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
-# [193] vel_expr
+# [194] vel_expr
 vel_expr ::= unary_expr ('兜底' vel_rhs)*
-# [194] vel_rhs
+# [195] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# [195] vel_range_tail
+# [196] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | '迄' | '到') unary_expr ('步' unary_expr)?
-# [196] unary_expr
+# [197] unary_expr
 unary_expr ::= ('-' | '¬' | '非' | '√' | '∛' | '∜') unary_expr | rounding_expr | finge_expr | cast_expr
-# [197] rounding_expr
+# [198] rounding_expr
 rounding_expr ::= '⌊' expression ('⌋' | '⌉') | '⌈' expression '⌉'
-# [198] gradient_expr
+# [199] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# [199] gradient_selection
+# [200] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# [200] gradient_place
+# [201] gradient_place
 gradient_place ::= expression
-# [201] cast_expr
+# [202] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)* inline_default?
-# [202] conversio_expr
+# [203] conversio_expr
 conversio_expr ::= '↦' (type_annotation | interval_target) via_clause? inline_default?
-# [203] interval_target
+# [204] interval_target
 interval_target ::= range_expr
-# [204] via_clause
+# [205] via_clause
 via_clause ::= '经由' IDENTIFIER
-# [205] inline_default
+# [206] inline_default
 inline_default ::= '⊥' unary_expr
-# [206] call_expr
+# [207] call_expr
 call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
-# [207] call_suffix
+# [208] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# [208] member_suffix
+# [209] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [209] transpose_suffix
+# [210] transpose_suffix
 transpose_suffix ::= 'ᵀ'
-# [210] optional_suffix
+# [211] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# [211] non_null_suffix
+# [212] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# [212] argument_list
+# [213] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [213] argument
+# [214] argument
 argument ::= template_argument | (call_marker | '轴')? '展开'? expression
-# [214] call_marker
+# [215] call_marker
 call_marker ::= '借自' | '变量' | '拥有' | '拷贝'
-# [215] template_argument
+# [216] template_argument
 template_argument ::= '展开'? IDENTIFIER ':' expression
-# [216] literal
+# [217] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '缺失' | '∞' | 'nan'
-# [217] regex_literal
+# [218] regex_literal
 regex_literal ::= REGEX_TYPE_WORD REGEX_BODY | '_' REGEX_BODY
-# [218] primary
+# [219] primary
 primary ::= IDENTIFIER | literal | regex_literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | reducta_expr | scan_expr | sort_expr | capta_expr | '(' expression ')'
-# [219] ad_expr
+# [220] ad_expr
 ad_expr ::= '调用' ASCII_STRING ad_opener?
-# [220] ad_opener
+# [221] ad_opener
 ad_opener ::= '(' expression ')'
-# [221] array_literal
+# [222] array_literal
 array_literal ::= '[' array_element_list? ']'
-# [222] array_element_list
+# [223] array_element_list
 array_element_list ::= array_element (',' array_element)*
-# [223] array_element
+# [224] array_element
 array_element ::= argument | '_'
-# [224] iuncta_expr
+# [225] iuncta_expr
 iuncta_expr ::= '元组' type_arguments '[' argument_list? ']'
-# [225] json_literal
+# [226] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# [226] json_member
+# [227] json_member
 json_member ::= STRING ':' json_value
-# [227] typed_constructor
+# [228] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}' construction_source? | hole_type '{' field_list? '}' construction_source? | type_annotation json_literal | hole_type json_literal | '{' field_list '}' construction_source? | type_annotation '[' array_element_list? ']'
-# [228] field_list
+# [229] field_list
 field_list ::= field_init (',' field_init)*
-# [229] field_init
+# [230] field_init
 field_init ::= (field_key '=' expression) | IDENTIFIER
-# [230] field_key
+# [231] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# [231] construction_source
+# [232] construction_source
 construction_source ::= '取自' call_expr
-# [232] json_value
+# [233] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# [233] json_object
+# [234] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# [234] json_array
+# [235] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# [235] json_string
+# [236] json_string
 json_string ::= STRING
-# [236] json_number
+# [237] json_number
 json_number ::= NUMBER
-# [237] finge_expr
+# [238] finge_expr
 finge_expr ::= '构造' qualified_ident ('{' field_list? '}')? ('∷' type_annotation)?
-# [238] qualified_ident
+# [239] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# [239] praefixum_expr
+# [240] praefixum_expr
 praefixum_expr ::= '前缀' block_stmt
-# [240] scriptum_expr
+# [241] scriptum_expr
 scriptum_expr ::= '格式化' '(' STRING (',' expression)* ')'
-# [241] lege_expr
+# [242] lege_expr
 lege_expr ::= '读取' '行'?
-# [242] reducta_expr
-reducta_expr ::= '归约' '经由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
-# [243] reducta_op
+# [243] reducta_expr
+reducta_expr ::= '归约' '经由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body)? reducta_identity?
+# [244] reducta_op
 reducta_op ::= '求和' | '求积' | '最大' | '最小' | '最大值索引' | '最小值索引' | '全部' | '任一' | '计数' | '第一个'
-# [244] reducta_group
-reducta_group ::= '按' expression
-# [245] reducta_body
+# [245] reducta_group
+reducta_group ::= '按' (group_key | '[' expression (',' expression)* ']')
+# [246] group_key
+group_key ::= unary_expr
+# [247] reducta_body
 reducta_body ::= ('设' | '变量') IDENTIFIER block_stmt
-# [246] reducta_identity
+# [248] reducta_identity
 reducta_identity ::= '兜底' expression
-# [247] scan_expr
+# [249] scan_expr
 scan_expr ::= 'scan' '经由' scan_op ('total' ('inclusive' | 'exclusive'))? '取自' expression apud_clause scan_group? scan_order_clause? filum_clause '设' IDENTIFIER block_stmt
-# [248] scan_op
+# [250] scan_op
 scan_op ::= '求和' | '求积' | '最大' | '最小' | '全部' | '任一' | '计数'
-# [249] scan_group
+# [251] scan_group
 scan_group ::= '按' expression
-# [250] scan_order_clause
+# [252] scan_order_clause
 scan_order_clause ::= 'order' ('升序' | '降序')
-# [251] sort_expr
+# [253] sort_expr
 sort_expr ::= '排序' '经由' sort_direction ('取自' | '借自') expression sort_body?
-# [252] sort_direction
+# [254] sort_direction
 sort_direction ::= '升序' | '降序'
-# [253] sort_body
+# [255] sort_body
 sort_body ::= ('设' | '变量') IDENTIFIER block_stmt
-# [254] filum_clause
+# [256] filum_clause
 filum_clause ::= '线程' IDENTIFIER
-# [255] capta_expr
+# [257] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [256] object_pattern
+# [258] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [257] pattern_property
+# [259] pattern_property
 pattern_property ::= '其余'? IDENTIFIER ('作为' IDENTIFIER)?
-# [258] array_pattern
+# [260] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [259] array_pattern_element
+# [261] array_pattern_element
 array_pattern_element ::= '_' | '其余'? IDENTIFIER
-# [260] nota_stmt
+# [262] nota_stmt
 nota_stmt ::= ('显示' | '查看' | '警告' | '写入') expression (',' expression)*
-# [261] entry_header
+# [263] entry_header
 entry_header ::= ('参数' IDENTIFIER)? ('退出' expression)?
-# [262] incipit_stmt
+# [264] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [263] incipiet_stmt
+# [265] incipiet_stmt
 incipiet_stmt ::= '异步入口' entry_header block_stmt
-# [264] probandum_decl
+# [266] probandum_decl
 probandum_decl ::= '验题' STRING proba_modifier* '{' probandum_body '}'
-# [265] probandum_body
+# [267] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [266] proba_stmt
+# [268] proba_stmt
 proba_stmt ::= '测试' STRING proba_modifier* block_stmt
-# [267] proba_modifier
+# [269] proba_modifier
 proba_modifier ::= '预期失败' | '跳过' STRING | '预期' STRING | '仅' | '标签' STRING | '时限' NATURAL | '计量' | '重复' NATURAL | '易碎' NATURAL | '仅于' STRING
-# [268] praepara_block
+# [270] praepara_block
 praepara_block ::= ('备置' | '异步备置' | '收尾' | '异步收尾') '全部'? block_stmt
-# [269] fac_stmt
-fac_stmt ::= '执行' block_stmt cape_clause? ('当' expression)?
-# [270] IDENTIFIER
+# [271] fac_stmt
+fac_stmt ::= '执行' fac_modifier? block_stmt cape_clause? ('当' expression)?
+# [272] fac_modifier
+fac_modifier ::= '全部' | '设备'
+# [273] IDENTIFIER
 IDENTIFIER ::=
-# [271] NUMBER
+# [274] NUMBER
 NUMBER ::=
-# [272] NATURAL
+# [275] NATURAL
 NATURAL ::=
-# [273] STRING
+# [276] STRING
 STRING ::=
-# [274] ASCII_STRING
+# [277] ASCII_STRING
 ASCII_STRING ::=
-# [275] BACKTICK_STRING
+# [278] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [276] OCTETI_STRING
+# [279] OCTETI_STRING
 OCTETI_STRING ::=
-# [277] REGEX_TYPE_WORD
+# [280] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [278] REGEX_BODY
+# [281] REGEX_BODY
 REGEX_BODY ::=
-# [279] NEWLINE
+# [282] NEWLINE
 NEWLINE ::=
-# [280] WIDTH_MARKER
+# [283] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [281] LISTA_WIDTH_SUGAR
+# [284] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [282] TENSOR_WIDTH_SUGAR
+# [285] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [283] SPARSA_WIDTH_SUGAR
+# [286] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [284] VECTOR_WIDTH_SUGAR
+# [287] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [285] MATRIX_WIDTH_SUGAR
+# [288] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [286] FRONTMATTER_DELIMITER
+# [289] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [287] TOML_LINES
+# [290] TOML_LINES
 TOML_LINES ::=
-# [288] ANNOTATION_NAME
+# [291] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [289] ANNOTATION_FIELD_NAME
+# [292] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [290] NON_NEWLINE_TOKEN
+# [293] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [291] NO_NEWLINE
+# [294] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -685,6 +691,7 @@ NO_NEWLINE ::=
 | [`nucleum_sugar`](#nucleum-sugar) | `#内核-sugar` | live |
 | [`nucleum_braced`](#nucleum-braced) | `#内核-braced` | live |
 | [`nucleum_modifier`](#nucleum-modifier) | `#内核-modifier` | live |
+| [`nucleum_tier`](#nucleum-tier) | `#内核-tier` | live |
 | [`nucleum_field_list`](#nucleum-field-list) | `#内核-field-list` | live |
 | [`nucleum_field`](#nucleum-field) | `#内核-field` | live |
 | [`radix_annotation`](#radix-annotation) | `#radix-annotation` | live |
@@ -864,6 +871,7 @@ NO_NEWLINE ::=
 | [`reducta_expr`](#reducta-expr) | `#归约-expr` | live |
 | [`reducta_op`](#reducta-op) | `#归约-op` | live |
 | [`reducta_group`](#reducta-group) | `#归约-group` | live |
+| [`group_key`](#group-key) | `#group-key` | live |
 | [`reducta_body`](#reducta-body) | `#归约-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#归约-identity` | live |
 | [`scan_expr`](#scan-expr) | `#scan-expr` | live |
@@ -889,6 +897,7 @@ NO_NEWLINE ::=
 | [`proba_modifier`](#proba-modifier) | `#测试-modifier` | live |
 | [`praepara_block`](#praepara-block) | `#备置-block` | live |
 | [`fac_stmt`](#fac-stmt) | `#执行-stmt` | live |
+| [`fac_modifier`](#fac-modifier) | `#执行-modifier` | live |
 
 ## Lexicon Appendix {#lexicon}
 
@@ -990,11 +999,14 @@ productions. It is not a second keyword authority.
 | Declarations | `异步入口` | async entrypoint |
 | Declarations | `入口` | entrypoint |
 | Comptime | `嵌入` | build-time file embed |
+| Annotation | `不安全` | kernel tier `@ 内核 不安全` (en `unsafe`); contextual |
 | Control | `遍历` | for |
 | Objects | `元组` | tuple type/constructor |
 | Annotation | `车道` | `@ radix` compiler-lane directive |
+| Annotation | `宽松` | kernel tier `@ 内核 宽松` (en `relaxed`); contextual |
 | Builtin | `读取` | read |
 | Builtin | `行` | line |
+| Control | `设备` | device region modifier after `执行` (en `device`); contextual |
 | Declarations | `维度` | size/index generic parameter |
 | Expression | `最大` | maximum reduction operator (en `max`) |
 | Testing | `计量` | benchmark |
@@ -1369,6 +1381,8 @@ construction literal (`Genus { field = value }`).
 braced `片段 = 真` / `假`), not a fused annotation name and not the
 graphics `@ 片段` stage. Standalone `@ 片段` is unchanged.
 
+A kernel runs at one of three ordered safety tiers (operator ruling 2026-10-28, `docs/factory/faber-language-decisions/kernel-math-tiers-ruling-2026-10-28.md`). `@ 内核` is the default tier. `@ 内核 宽松` (en `@ kernel relaxed`) adds approximate `/` and `sqrt`, fast transcendentals, flush-to-zero and float reassociation. `@ 内核 不安全` (en `@ kernel unsafe`) includes `宽松` and also drops the index checks the compiler cannot prove, so an out-of-range access is undefined behaviour. The words are contextual and claimed only after `@ 内核`, so `relaxed` and `unsafe` stay ordinary identifiers elsewhere. A second tier word is `duplicate_nucleum_tier`, an unknown word `unknown_nucleum_tier`, a tier on a `片段` `nucleum_tier_on_fragment` (a fragment uses the tier of the entry that composes it), and a tier on anything but a kernel function `nucleum_tier_non_kernel`. The tier is sugar only; the braced form carries `片段` alone. `faber run --safe`, `faber build --safe` and `safe = true` under `[device]` in `faber.toml` run every kernel at the default tier; they can only lower a tier and no environment variable controls them.
+
 The `车道` clause of the `内核` annotation (`@ 内核 车道 "x"`, braced `@ 内核 { 车道 = "x" }`) was removed (K7): the compiler rejects it with `nucleum_lane_removed`, and `片段` is the only modifier or field. `@ radix 车道` is a different annotation and is unaffected.
 
 Braced annotation records (`@ futura { }`, `@ optio { binding = verbose, ... }`)
@@ -1632,8 +1646,8 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
 - A call-site argument list (`callTypeArgs`) carries each explicit size argument behind the `size` marker (la `维度`), the way the call echoes `轴` and `mut`/`拥有`/`拷贝`: `take<size 2, size 2>(a)`, `construct<int, size [4]>(xs)`, `f<size n>(x)`. The grammar still parses the bare forms (a natural, a bracketed shape, a dimension term such as `n + 1`) so the checker can name the missing marker: a bare natural, shape, dimension term or caller `size` name in a call list is `SEM057 size_marker_required`, and a `size` argument on a callee that declares no `size` parameter is `SEM057 size_marker_unexpected` (one past the declared `size` parameters is an arity miss, `wrong_number_of_type_arguments`). The list binds by marker: a `size` argument binds the next `size` parameter of the callee and an unmarked argument the next type parameter, the two cursors advancing independently, so `mk<int, size 4>(xs)` binds `fn mk<T, size N>` and a list of only `size` arguments (`construct<size [4]>(xs)`) leaves every type to inference. The operand decides the binding time: `size 4` and `size [2, 3]` are compile-time witnesses and a shape travels as one argument (`tensor.construct<int, size [4]>(xs)`, checked against its store as a scalar size is: `tensor<int, [5]>` is `SEM010 incompatible_tensor_index`); `size n` of an in-scope integer stays the run-time extent described above, checked at its store; `size D` of a caller `size` parameter forwards it. A shape inside a call list holds natural literals only: a `_` hole, a name, a run-time lift or a nested term in it is `size_shape_dimension_unsupported`, and `size [..]` outside a call's list is `size_shape_outside_call_args`. An unmarked name or `_` stays a type there; the callee decides which type parameter it binds.
-- Applied `NATURAL` arguments are `维度` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, 维度 N>` (the `维度` marker is required on a list), `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
-- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `经由` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
+- Applied `NATURAL` arguments are `维度` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, 维度 N>`, `queue<T, 维度 N>`, `stack<T, 维度 N>`, `textus<维度 N>`, `ascii<维度 N>`. The `维度` marker is required on all five: a bare `queue<T, N>`, `stack<T, N>`, `textus<N>` or `ascii<N>` is retired by name (`SEM008 capacity_needs_size`; a bare list count is `SEM008 list_count_needs_size`). The `_` hole stays bare. Width markers such as `i32` and `f32` stay the separate `widthTypeSugar` production below.
+- **Convert hints are not type arguments (D11.9).** A hint (`Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code`) is a `经由` clause on the `↦` conversion, never a further argument of the target type (see Runtime conversion). The retired spellings are parse errors with a pointer at the clause: a hint as a further type argument of a scalar head (`ascii<N, Hex>`, `littera<Code>`; the wrapped numeric heads `numerus<W, Hex>` and `fractus<f64, Be>` are rejected whole as `numeric_wrapper_retired`, see Sized primitives) is `conversio_hint_type_argument`, and a bracketed hint tail after the target (`lista<b8, 16><Le>`, `vector<u32, 维度 4><Be>`) is `conversio_hint_tail_argument`. Only scalar heads are checked, so a user type named like a hint stays a legal argument of a collection target (`↦ lista<Code>`).
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
 - `labeledTypeArgument` is the optional label prefix on `元组` type arguments only (`元组<gx: f32, T>`; mixed labeled/unlabeled legal). A label in a non-`元组` list (`f<gx: T>(x)`, `lista<gx: T>`) is a parse error. Absence is the only unlabeled form; there is no `_: T` spelling. Keyword spellings are legal labels under the contextual law (`元组<常量: A>`).
@@ -1676,9 +1690,9 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | Faber      | Meaning |
 | ---------- | ------- |
 | `textus`   | Unicode string |
-| `textus<N>` | shipped; bounded Unicode string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `textus<维度 N>` | shipped; bounded Unicode string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `textus<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `ascii`    | ASCII-only string |
-| `ascii<N>` | shipped; bounded ASCII string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `ascii<维度 N>` | shipped; bounded ASCII string; `N` is a `维度` / `NATURAL` capacity, not a width marker. `ascii<_>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `littera`  | en `char`; one Unicode scalar value (D10.1–10.2): a 4-byte value that never allocates (Rust `char`, Go `rune`). Element of `textus` / `ascii` iteration and of `textus[i]` / `ascii[i]` indexing. Grapheme clusters are norma library work, not this type. |
 | `forma`    | captured template + params |
 | `numerus`  | integer (default `i64`) |
@@ -1694,7 +1708,7 @@ functio apply((numerus) → numerus ⇥ textus op, numerus n) → numerus ⇥ te
 | `ignotum`  | unknown |
 
 Bare `textus` / `ascii` remain the unbounded productions. The
-shipped forms `textus<N>` and `ascii<N>` take
+shipped forms `textus<维度 N>` and `ascii<维度 N>` take
 one `维度` / `NATURAL` applied argument. That `N` is capacity, not a
 width marker and not a language-wide default. `_` in that slot (`ascii<_>`,
 `textus<_>`, `lista<T, _>`) is a capacity hole: the form stays
@@ -1712,9 +1726,9 @@ compile time.
 **A byte string is `lista<b8>`**: the list of raw
 bytes; it is not a list of numbers, so `lista<b8>` converts to `lista<u8>`
 only with an explicit `↦` and never widens to `lista<int>` or `lista<b16>`.
-`ascii<1>` is an ordinary ASCII string of
+`ascii<维度 1>` is an ordinary ASCII string of
 length one (the type of `'x'`), not a separate character type; it widens
-implicitly `ascii<1> → littera → textus` (D10.5), so `s[i] ≡ '\n'` keeps
+implicitly `ascii<维度 1> → littera → textus` (D10.5), so `s[i] ≡ '\n'` keeps
 working across the chain.
 
 A sized numeric type is written as its **bare width marker** (not a user type parameter): `i8`, `i16`, `i32`, `i64`, `u8`, `u16`, `u32`, `u64`, `d64`, `inf` (the integer family) and `f16`, `bf16`, `f32`, `f64` (the float family). The three policy words wrap a marker and keep their `<W>` argument:
@@ -2160,16 +2174,16 @@ matrix and the numeric model; this file states only the language.
 | `lista<T>`     | array    |
 | `lista<T, 维度 N>`  | shipped; bounded array; `N` is a `维度` / `NATURAL` capacity, not a width marker (a bare `lista<T, N>` is `SEM008 list_count_needs_size`). `lista<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `queue<T>`     | shipped; unbounded FIFO queue |
-| `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `维度` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `queue<T, 维度 N>`  | shipped; bounded FIFO queue; `N` is a `维度` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `stack<T>`     | shipped; unbounded LIFO stack |
-| `stack<T, N>`  | shipped; bounded LIFO stack; `N` is a `维度` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
+| `stack<T, 维度 N>`  | shipped; bounded LIFO stack; `N` is a `维度` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`; otherwise run-time bound — admitted, scheduled (K14), not shipped). |
 | `tabula<K,V>`  | map      |
 | `tabulae<K,V>` | ledger: a map that keeps its entries in insertion order (en `ledger`); `tabula` and `tabulae` sit one letter apart on purpose, "two shades of the same thing" (Roman account books were `tabulae`). Parses and type-checks in every type slot a map is accepted; every operation on a ledger value is refused (`ledger_operation_not_implemented`) until the operations land. |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
 | `cursor<T>`    | iterator |
 | `tensor<T, Figura>` | dense homogeneous buffer whose shape `Figura` is part of the type: element type and rank are static, and each extent is a size that is a compile-time value today (shipped) and may be bound at run time once K14 lands (admitted, scheduled, not shipped); numeric methods require numeric element types |
-| `vector<T, N>` | register-class numeric vector with static width `N` (single dimension, not buffer-backed) |
+| `vector<T, 维度 N>` | register-class numeric vector with static width `N` (single dimension, not buffer-backed). The long form writes its lane count after the `维度` marker, as a list writes its count: a bare `vector<T, 4>` or `vector<T, N>` is retired by name (`SEM008 vector_width_needs_size`, a clean break with no alias). The `vf32[4]` shorthand, a bracketed `vector<T, [4]>` and the `_` hole are unchanged: the brackets already mark an extent |
 | `matrix<T, [R, C]>` | register-class numeric matrix with exactly two static dimensions (not buffer-backed and not a tensor alias) |
 | `atomic<T>` | storage-sensitive atomic cell; v1 accepts `i32` / `u32` elements only and access must go through atomic methods |
 | `sparsa<T, Figura>` | sparse homogeneous buffer whose shape `Figura` is part of the type (element type and rank static; extents compile-time today, run-time-bindable once K14 lands — admitted, scheduled, not shipped); omitted coordinates equal zero; numeric methods require numeric element types |
@@ -2182,13 +2196,13 @@ An expression shape list can contain `_`, as in `row.expanded([_, 64])`. These s
 
 Extents follow the same binding-time rule as capacities (see the capacity paragraph above): an unmarked extent is a compile-time value and a `_` extent infers from a witness; a spelled lift (`size N`, the `spelled_lift` rule) marks a run-time extent, bound at run time and checked at its store. Rank and layout stay static.
 
-`vacua` is the default empty instance of the declared type on the left, whatever that type is. A list, map, or set gets the empty collection. A dense `tensor<T, Figura>`, `vector<T, N>`, or `matrix<T, [R, C]>` gets its zero, so `tf32[2, 3] blank ← vacua` means exactly `tf32[2, 3] blank ← tf32[2, 3] {}`: the shape is the declared shape and every element is zero. That holds wherever the type is known (a declaration, an assignment target, a parameter, a return). Every extent must be resolved, as for the typed zero: a `_` extent, a non-literal vector width or matrix extent, or an affine extent (`[N+1]`) leaves nothing to build and is refused with `SEM011 vacua_requires_resolved_extents`. `vacua` for `tensor<T, []>` produces a rank-0 tensor (one default-initialized element slot, its zero). `vacua` for `sparsa<T, Figura>` (any shape) produces an all-zero sparse tensor with no stored entries.
+`vacua` is the default empty instance of the declared type on the left, whatever that type is. A list, map, or set gets the empty collection. A dense `tensor<T, Figura>`, `vector<T, 维度 N>`, or `matrix<T, [R, C]>` gets its zero, so `tf32[2, 3] blank ← vacua` means exactly `tf32[2, 3] blank ← tf32[2, 3] {}`: the shape is the declared shape and every element is zero. That holds wherever the type is known (a declaration, an assignment target, a parameter, a return). Every extent must be resolved, as for the typed zero: a `_` extent, a non-literal vector width or matrix extent, or an affine extent (`[N+1]`) leaves nothing to build and is refused with `SEM011 vacua_requires_resolved_extents`. `vacua` for `tensor<T, []>` produces a rank-0 tensor (one default-initialized element slot, its zero). `vacua` for `sparsa<T, Figura>` (any shape) produces an all-zero sparse tensor with no stored entries.
 `matrix<T, Figura>` requires exactly two dimensions; bare `matrix<T>` and one- or three-axis matrix shapes are rejected.
 `atomic<T>` requires `T` to be `i32` or `u32` in v1. Atomic cells are not interchangeable with their element type; use `load`, `store`, `exchange`, and `compare_exchange` receiver methods.
 Construct multi-dimensional tensors via `structa` / `↦`, or build the typed zero with `Type {}` (below).
 
-**The typed zero `Type {}`.** The zero of a type is written as the type followed by empty braces; it is the `typed_constructor` rule (`Genus { field = value }`) applied to every type: `{}` means build a value and override nothing, so every part takes its default. It is legal for `tensor<T, Figura>`, `vector<T, N>`, `matrix<T, [R, C]>` and their prefixed sugar (`tf32[2, 3] {}`, `vf32[4] {}`, `mf32[2, 2] {}`), including a tensor whose element is a vector (`tensor<vector<f32, 4>, [H, W]> {}`) and extents that are size parameters; a vector width and a matrix extent must be literals (`constructor_register_extent_requires_literal`). It is a value expression, so it can be a receiver (`tf32[4] {}.reple(1.5)`). Where the type is already declared, `vacua` is sugar for it: `T x ← vacua` and `T x ← T {}` are the same value for a tensor, vector, or matrix `T`. The bare type as a value (`← tf32[2, 3]`) is retired and refused with `PARSE030 constructor_requires_empty_braces`; `Type []` is refused by the same diagnostic; `lista<…> {}` is refused by name (`constructor_type_not_claimed`); a call-form constructor is refused (`constructor_store_position_only`). The stated bracket constructor `lista<T>[1, 2]` builds a list whose element type is `T` and may leave a type-argument slot as a hole its elements solve (`lista<_>[1, 2]` infers the element, `元组<_, string>[1, "x"]` the first tuple slot); a slot the elements cannot solve is a named error (`cannot_infer_empty_list_element_type` for `lista<_>[]`, `expression_type_mismatch` for `元组<_, string>[1, 2]`). Like every constructor it is a store-position form, so `f(lista<int>[1, 2])` is `constructor_store_position_only` and the value must be bound to a name first, while `lista<…> {}` stays refused by name. A bracket literal is the same constructor with the type left out: the bare `[1, 2]` is a hole with a default, so in a typed cell it takes the cell's bracket type — `const lista<int> xs ← [1, 2]`, `const copia<int> s ← [1, 2]` (en `set<int>`) and `const 元组<int, int> t ← [1, 2]` build the list, the set and the tuple the cell declares; a set collapses its duplicates, and `_ [1, 2]` is the hole with no default that must be solved from context (`const copia<int> s ← _ [1, 2]`). There is no fill form: data enters a typed value by conversion (`↦`), never by the constructor. **The inferred constructor `_ { … }`.** With the hole type `_` before the braces the constructor builds the expected type, so the type is not written; it takes fields (`_ { name = value }`), entries (`_ { "key": value }`, the `json_literal` members) or the empty `{}`, and without an expected type it is `SEM016 inferred_constructor_no_expected_type`. The braces alone carry the same meaning: `{ field = value }` leaves the type slot out, which implies the hole, and the cell supplies the type; the bare form claims as a constructor only when its head member is a `field = value` init, while `{"key": value}` stays a JSON literal. An empty `{}` or `[]` has no contents to borrow a default from and needs a typed cell (`const copia<int> s ← []`, `const lista<int> xs ← []`, `const json j ← {}`); with no typed cell it is `SEM016 inferred_constructor_no_expected_type`, and `vacua` (en `empty`) is the contents-free spelling of the same empty value wherever the type is declared. A stated type before a keyed literal builds that type (`json { … }`, `map<K, V> { … }`), a bare keyed literal needs a typed cell. `*` is the field-list hole, legal only as the sole argument of `record<...>` (la `ratio<...>`): `record<*>` is the whole field list, solved from the shape, `record<g: f32, *>` is `ratio_field_list_hole_not_sole`, and `record<_>` stays `ratio_type_arg_label_required`; a bare `{ field = value }` with no typed cell is `record<*>` (a record), while `_ { … }` has no default.
-`Type(...)` is not a construction form: `vector<f32, 4>(...)`, `matrix<f32, [2, 2]>(...)`, `tensor<f32, [2, 2]>(...)`, and scalar forms such as `numerus("42")` are rejected. Use `value ↦ Type`, named library constructors, or `Genus { field = value }` records.
+**The typed zero `Type {}`.** The zero of a type is written as the type followed by empty braces; it is the `typed_constructor` rule (`Genus { field = value }`) applied to every type: `{}` means build a value and override nothing, so every part takes its default. It is legal for `tensor<T, Figura>`, `vector<T, 维度 N>`, `matrix<T, [R, C]>` and their prefixed sugar (`tf32[2, 3] {}`, `vf32[4] {}`, `mf32[2, 2] {}`), including a tensor whose element is a vector (`tensor<vector<f32, 维度 4>, [H, W]> {}`) and extents that are size parameters; a vector width and a matrix extent must be literals (`constructor_register_extent_requires_literal`). It is a value expression, so it can be a receiver (`tf32[4] {}.reple(1.5)`). Where the type is already declared, `vacua` is sugar for it: `T x ← vacua` and `T x ← T {}` are the same value for a tensor, vector, or matrix `T`. The bare type as a value (`← tf32[2, 3]`) is retired and refused with `PARSE030 constructor_requires_empty_braces`; `Type []` is refused by the same diagnostic; `lista<…> {}` is refused by name (`constructor_type_not_claimed`); a call-form constructor is refused (`constructor_store_position_only`). The stated bracket constructor `lista<T>[1, 2]` builds a list whose element type is `T` and may leave a type-argument slot as a hole its elements solve (`lista<_>[1, 2]` infers the element, `元组<_, string>[1, "x"]` the first tuple slot); a slot the elements cannot solve is a named error (`cannot_infer_empty_list_element_type` for `lista<_>[]`, `expression_type_mismatch` for `元组<_, string>[1, 2]`). Like every constructor it is a store-position form, so `f(lista<int>[1, 2])` is `constructor_store_position_only` and the value must be bound to a name first, while `lista<…> {}` stays refused by name. A bracket literal is the same constructor with the type left out: the bare `[1, 2]` is a hole with a default, so in a typed cell it takes the cell's bracket type — `const lista<int> xs ← [1, 2]`, `const copia<int> s ← [1, 2]` (en `set<int>`) and `const 元组<int, int> t ← [1, 2]` build the list, the set and the tuple the cell declares; a set collapses its duplicates, and `_ [1, 2]` is the hole with no default that must be solved from context (`const copia<int> s ← _ [1, 2]`). There is no fill form: data enters a typed value by conversion (`↦`), never by the constructor. **The inferred constructor `_ { … }`.** With the hole type `_` before the braces the constructor builds the expected type, so the type is not written; it takes fields (`_ { name = value }`), entries (`_ { "key": value }`, the `json_literal` members) or the empty `{}`, and without an expected type it is `SEM016 inferred_constructor_no_expected_type`. The braces alone carry the same meaning: `{ field = value }` leaves the type slot out, which implies the hole, and the cell supplies the type; the bare form claims as a constructor only when its head member is a `field = value` init, while `{"key": value}` stays a JSON literal. An empty `{}` or `[]` has no contents to borrow a default from and needs a typed cell (`const copia<int> s ← []`, `const lista<int> xs ← []`, `const json j ← {}`); with no typed cell it is `SEM016 inferred_constructor_no_expected_type`, and `vacua` (en `empty`) is the contents-free spelling of the same empty value wherever the type is declared. A stated type before a keyed literal builds that type (`json { … }`, `map<K, V> { … }`), a bare keyed literal needs a typed cell. `*` is the field-list hole, legal only as the sole argument of `record<...>` (la `ratio<...>`): `record<*>` is the whole field list, solved from the shape, `record<g: f32, *>` is `ratio_field_list_hole_not_sole`, and `record<_>` stays `ratio_type_arg_label_required`; a bare `{ field = value }` with no typed cell is `record<*>` (a record), while `_ { … }` has no default.
+`Type(...)` is not a construction form: `vector<f32, 维度 4>(...)`, `matrix<f32, [2, 2]>(...)`, `tensor<f32, [2, 2]>(...)`, and scalar forms such as `numerus("42")` are rejected. Use `value ↦ Type`, named library constructors, or `Genus { field = value }` records.
 
 Tensor index/shape intrinsic slots (`accipe`, `ponde`, `forma`, `crea`, `structa`) accept integer lists that fit the canonical `lista<numerus>` / `&[i64]` runtime boundary at call sites (e.g. `lista<u32>` for GPU thread ids; not `lista<u64>`). This is a structural exception scoped to those slots — it does not widen the signed↔unsigned numeric lattice (see Index vector parameter policy in `tensor-intrinsics.md`).
 
@@ -2220,7 +2234,7 @@ marker prefixed with `l`, `t`, `s`, `v`, and `m`, respectively.
 | `lf32`, `lu32`, `li64`, … | `lista<f32>`, `lista<u32>`, `lista<i64>`, … | none |
 | `tf32`, `tf32[2, 3]`, `ti64[N]` | `tensor<f32, _>`, `tensor<f32, [2, 3]>`, `tensor<i64, [N]>` | optional `Figura` |
 | `sf32`, `sf32[2, 3]`, `si64[N]` | `sparsa<f32, _>`, `sparsa<f32, [2, 3]>`, `sparsa<i64, [N]>` | optional `Figura` |
-| `vf32`, `vf32[4]`, `vu32[3]` | `vector<f32, _>`, `vector<f32, 4>`, `vector<u32, 3>` | optional single width |
+| `vf32`, `vf32[4]`, `vu32[3]` | `vector<f32, _>`, `vector<f32, 维度 4>`, `vector<u32, 维度 3>` | optional single width |
 | `mf32[4, 4]`, `mf16[2, 2]`, `mu32[3, 3]` | `matrix<f32, [4, 4]>`, `matrix<f16, [2, 2]>`, `matrix<u32, [3, 3]>` | **required**, two dimensions |
 
 Bracket shapes: `[]` is rank-0, `[2, 3]` is a fixed shape, and no bracket infers
@@ -2271,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `遍历 取自...设`/`遍历 取自...变量` = for-of (values)
 - `遍历 借自...设`/`遍历 借自...变量` = for-in (keys)
 - `遍历 范围 range 设/变量 i` = range iteration (e.g. `遍历 范围 0‥10 步 2 设 i { 显示 i }`; `步` belongs to the range expression)
+- In an `遍历 ... 线程` lane body, `返回 线程` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `返回` stays forbidden there; `返回 线程` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `继续` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `步`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down
@@ -2336,7 +2351,7 @@ is inside an entry.
 - A method that changes the shape or order of the collection, called directly
   on that collection inside its own loop, is rejected
   (`SEM011 loop_collection_shape_change`). That covers `lista` `appende`,
-  `decapita`, `detrahe`, `inverte` and `ordina`, `copia` `adde` and `dele`, and
+  `extende`, `decapita`, `detrahe`, `inverte` and `ordina`, `copia` `adde` and `dele`, and
   `tabula` `pone` (even when it would only update a value) and `dele`. A
   worklist that must see its own additions uses a queue with `当`.
 - A bracket store is not checked at compile time. `xs[i] ← v` and `m[k] ← v`
@@ -2565,7 +2580,7 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
   strftime-style patterns (norma work, if ever).
 - **Left out on purpose:** thousands separators (country-aware, so library
   work, not this operator) and computed specs (D2.2).
-- **Split from `↦`:** `↦ ascii<N> 经由 Hex` is exact conversion — fixed width,
+- **Split from `↦`:** `↦ ascii<维度 N> 经由 Hex` is exact conversion — fixed width,
   fails if the value does not fit; `¶` is display — width is a minimum that
   grows to fit, and never fails.
 - **No word twin:** `¶` is the same glyph in every locale, like `✓ ✗`.
@@ -2576,7 +2591,7 @@ only the parts that make sense: `[fill][align][sign][0][width][.precision][kind]
 
 **Edge-case outputs (D2.7):** `NaN` / `∞` / `-∞` print as `NaN`, `∞`, `-∞`
 (precision does not apply); a negative number in hex/bin/oct prints sign plus
-digits (`-42 ¶ "x"` = `-2a`), not two's complement (`↦ ascii<N> 经由 Hex` stays
+digits (`-42 ¶ "x"` = `-2a`), not two's complement (`↦ ascii<维度 N> 经由 Hex` stays
 the strict tool and rejects negatives); `textus` width counts `littera`
 (characters), not screen columns (an emoji with a skin-tone modifier counts as
 2; screen-width alignment is library work); `instans` outside years 0–9999
@@ -2606,7 +2621,7 @@ The `↦` glyph (U+21A6, "rightwards arrow from bar") is the runtime value conve
 - `"22" ↦ numerus` → Rust: `"22".parse::<i64>().unwrap()`
 - `"bad" ↦ numerus ⊥ 0` → Rust: `"bad".parse::<i64>().unwrap_or(0)`
 - `42 ↦ textus` → Rust: `42.to_string()`
-- `n ↦ ascii<N> 经由 Hex|Bin|Oct` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
+- `n ↦ ascii<维度 N> 经由 Hex|Bin|Oct` — shipped; fixed-width lowercase digits, zero-padded to `N`, with overflow and negative sources rejected.
 - `n ↦ ascii<_> 经由 Hex|Bin|Oct` — shipped for const-foldable numerus sources; the hole is solved to the source digit count. Runtime sources leave the hole unsolved and require explicit `N`.
 
 **The `经由` clause (D11.9).** A convert hint is a clause on the conversion, not a type argument: `"ff" ↦ i32 经由 Hex`, `65 ↦ littera 经由 Code`, `lista<b8>[0‥2] ↦ u16 经由 Le ↦ b16 ↦ f16 ↦ f32`. The grammar is `conversio_expr := '↦' type_annotation via_clause? inline_default?` and `via_clause := '经由' IDENTIFIER`.
@@ -2623,10 +2638,10 @@ The hint selects the conversion row. `Hex` / `Bin` / `Oct` / `Be` / `Le` / `Code
 - `"ff" ↦ i32 经由 Hex` — shipped; text parse at radix 16 (`Bin` = 2, `Oct` = 8). Hex/Bin/Oct text parse is unchanged by endian hints.
 - `lista<b8>[lo‥hi] ↦ W 经由 Be` / `… ↦ W 经由 Le` — endian unpack of an exact-width window (`W` is `i16` / `i32` / `i64` / `u16` / `u32` / `u64`; window length 2 / 4 / 8). Shipped on rust, the MIR runner, Go, and TypeScript. TypeScript `i64`/`u64` stay fail-closed (JS number is not exact). A `lista<b8>` itself has no endian; `lista<b8> ↦ u32` without `经由 Be` / `经由 Le` stays rejected. A short window fails (no pad).
 - `lista<b8>[lo‥hi] ↦ f32 经由 Be|Le` / `… ↦ f64 经由 Be|Le` — shipped alongside the integer rows (float endian unpack of an exact-width window, 4 / 8 bytes; same fail rules: exact window required, a short window fails, `经由 Be` / `经由 Le` mandatory).
-- `lista<b8> ↦ tensor<E, [d1, …, dk]> 经由 Le` / `… 经由 Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, 维度 N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `维度 n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`. The `经由 Le` / `经由 Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `octeti_to_tensor_unspecified`; an element outside the set is `octeti_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`捕获`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `octeti_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_octeti_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse `tensor ↦ lista<b8> 经由 Be|Le` is not available. `lista<f32> 经由 Le` stays rejected (`SEM016` `unsupported_conversio`); the tensor row is the only bulk endian decode. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> 经由 Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> 经由 Be` prints `[258, 772]` where `经由 Le` prints `[513, 1027]`.
+- `lista<b8> ↦ tensor<E, [d1, …, dk]> 经由 Le` / `… 经由 Be` — bulk faithful reinterpretation of a byte string as a typed tensor (shipped on the checker and the MIR runner). The source is `lista<b8>` or the bounded `lista<b8, 维度 N>`; each target extent is a literal or a run-time size read from an in-scope binding (`size n`, la `维度 n`); `E` is `u8` / `i8` / `i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`, or a genus with a fixed byte layout (a record row, below). The `经由 Le` / `经由 Be` hint is required for every element wider than 8 bits (no hint, or any other hint, is `SEM016` `list_b8_to_tensor_unspecified`; an element outside the set is `list_b8_to_tensor_element_unsupported`) and is forbidden on an 8-bit element (`u8`, `i8`), which has no byte order (a clause written on one is `SEM016` `bits_via_clause_not_allowed`). Element `i` occupies bytes `[i·w, (i+1)·w)` for element width `w`, in row-major order (last index fastest), read in the byte order of the hint. It is pure bit reinterpretation with no numeric conversion: NaN payloads, `-0.0` and subnormals survive exactly, as in the scalar window rows. The byte length must be exactly `product(shape) · w`, with no truncation and no padding; a mismatch is a recoverable error (`捕获`, `⊥` and `⇥` apply, and outside `main` a bare `↦` needs a handler), and a compile error (`SEM016` `list_b8_to_tensor_length_mismatch`) when the source length is statically known (a `|...|` literal or a constant window). A run-time extent (`tensor<f32, [2, size n]>`, with `n` an in-scope binding) is checked when the conversion runs: the byte length must equal `product(shape) · w` for the extent values at that point, with the same recoverable error on a mismatch as for literal extents. On Rust a `size` parameter or an expression extent (`size (n - 1)`) is still declined by name (`rust_list_b8_to_tensor_runtime_extent_unsupported`); read a local binding instead. The reverse is the whole-tensor byte encode, `tensor<E, shape> ↦ lista<b8> 经由 Be|Le`: every element, in row-major order, becomes its `E`-width bytes in the byte order of the hint, so the byte count is the element count times the width and a round trip returns the tensor (shipped on the MIR runner and Rust; Go, TypeScript, Swift and several MIR targets decline it by name). The list form `lista<E> ↦ lista<b8> 经由 Be|Le` below is its list counterpart. A genus element (`tensor<Block, [n]>`, where `Block` is a non-generic genus whose fields all have a fixed size: sized numerics, register vectors and fixed-size `lista<…, 维度 N>`; a nested genus, text or a nullable field has no fixed layout) is a record row: it takes `经由 Le` only, because the row's byte image is the little-endian layout of its fields (`经由 Be` is `SEM016` `list_b8_to_tensor_record_big_endian`, and no hint is `list_b8_to_tensor_unspecified`). The row width comes from that layout, so the byte length must be a whole number of rows and exactly `product(shape) · row width`; the checker cannot see the layout, so every length mismatch is a recoverable run-time failure with a stable issue (`runner_list_b8_to_tensor_record_truncated`, `…_trailing_bytes`, `…_misaligned`, `…_overflow`), and a genus with no fixed layout is refused by name (`list_b8_to_tensor_record_layout_refused`). The runner keeps the rows as the bytes and decodes one only when an element is read; a field store through an element (`t[[i]].f ← v`, also `↑`/`↓`) decodes the row, changes the field and stores the whole element back into the tensor, so the write is never lost. Worked example: `|00 00 80 3f 00 00 00 40 00 00 40 40 00 00 80 40 00 00 a0 40 00 00 c0 40| ↦ tensor<f32, [2, 3]> 经由 Le` prints `[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]`, and `|01 02 03 04| ↦ tensor<u16, [2]> 经由 Be` prints `[258, 772]` where `经由 Le` prints `[513, 1027]`.
 - `lista<bN> ↦ lista<E>` / `lista<E> ↦ lista<bN>` — bulk conversion between a raw-bits list and a numeric list (a `经由 Le` / `经由 Be` clause exactly when the bit width changes, and never when it stays the same). A same-width conversion (`lista<b8> ↦ lista<u8>`, `lista<b16> ↦ lista<u16>`, the signed twins, and back) takes no clause at any width, and a clause written on one is `SEM016` `bits_via_clause_not_allowed`. A width change (`lista<b8> ↦ lista<u16>`, `lista<u16> ↦ lista<b8>`, `lista<b8> ↦ lista<b16>`, `lista<b8> ↦ lista<f32>`) requires the clause (`SEM016` `bits_via_clause_required`): each source element is written as width/8 bytes in the byte order of the clause and the byte stream is regrouped at the target width, so `lista<b8> ↦ lista<u16> 经由 Le` of `[1, 2, 3, 4]` is `[513, 1027]` and `经由 Be` is `[258, 772]`. A byte total that is not a whole number of target elements is a recoverable run-time error (`bits list length mismatch`). Shipped on the checker and the MIR runner; every emitter refuses the width-changing form by name. The `lista<b8> ↦ tensor<E, [shape]>` row above follows the same rule (no clause on an 8-bit element).
 - `经由 Bits` — **retired**. A bit pattern is a `bN` value (`b8`, `b16`, `b32`, `b64`), and the one rule is: from a number, `↦` converts the value; from bits, `↦` to a same-width type reads those bits as that type. A float to its pattern is `x ↦ b32` (b16 for f16 and bf16, b64 for f64); a pattern to a float is `p ↦ f32`; a number that holds a pattern says so in one step, `u16 ↦ b16 ↦ f16`. `n ↦ f32` on a `u32` stays the value conversion. Every `经由 Bits` spelling is `SEM016` (`conversio_via_bits_retired`), whose help names the `↦ bN` replacement.
-- `W ↦ lista<b8, 维度 N> 经由 Be` / `… ↦ lista<b8, 维度 N> 经由 Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, 维度 N>` whose `N` equals the source element's byte width. The `经由 Le` / `经由 Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, 维度 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, 维度 N>`. Register targets take the clause today: `v ↦ lista<b8, 维度 16> 经由 Le`, `corpus[0‥16] ↦ vector<u32, 4> 经由 Be`.
+- `W ↦ lista<b8, 维度 N> 经由 Be` / `… ↦ lista<b8, 维度 N> 经由 Le` — shipped on the checker, the MIR runner and Rust, for a sized numeric source `W` (`i16` / `u16` / `i32` / `u32` / `i64` / `u64` / `f32` / `f64`) and a target `lista<b8, 维度 N>` whose `N` equals the source element's byte width. The `经由 Le` / `经由 Be` hint is required: no hint, or any other hint, is `SEM016` `numeric_to_octeti_unspecified`, and a wrong `N` is `SEM016` `octeti_endian_width_mismatch`. The row cannot fail — no recovery channel, no `⊥` — and it is bit-exact: two's-complement integers and IEEE-754 bits, so NaN payloads and `-0.0` survive the round trip. An unsized `int` source, an 8-bit source (write `x ↦ b8`, with no clause; there is no `lista<b8, 维度 1>` row) and an unsized `lista<b8>` target keep `numeric_to_octeti_unspecified`. Go declines the row by name (`go_scalar_octeti_conversio_unsupported`), and the other targets refuse bounded `lista<b8, 维度 N>`. Register targets take the clause today: `v ↦ lista<b8, 维度 16> 经由 Le`, `corpus[0‥16] ↦ vector<u32, 维度 4> 经由 Be`.
 - `'A' ↦ u32 经由 Code` — shipped; the code point as a `u32` (`u32` holds every code point, as Rust's `char as u32`); the source must be `littera`. `65 ↦ littera 经由 Code` — shipped; builds the character for that code point, failing above U+10FFFF and on a surrogate. `Code` is a `经由` hint like `Hex`/`Le`; any other hint on these targets, or a source/target type other than `littera`/`u32`, is `SEM016` (`code_hint_pair_mismatch`).
 - `n ↦ textus` / `n ↦ ascii` / `n ↦ littera` — a number's digits (D10.6): `7 ↦ textus` = `"7"`, `7 ↦ ascii` = `"7"`, `7 ↦ littera` = `'7'`; `littera` fails outside 0–9 (`42 ↦ littera` fails, two letters).
 - `littera ↦ numerus` — parses the digit, failing otherwise (as `"22" ↦ numerus` parses).
@@ -2965,7 +2980,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } 取自 source`.
 ### Special Expressions
 
 
-`归约 经由 <op> 取自 source [在 [coords]] [按 key | 按 [key, …]] ([线程 f] (常量 | 变量) x { 返回 term } | 兜底 identity)?` is the general reduction form. The optional tail is either a body (with an optional `线程`) or a bodiless identity; without either, the source elements are the terms. `经由` is mandatory and selects exactly one of `求和`, `求积`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, `计数`, or `第一个`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `经由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.归约(f)` (en `xs.reduce(f)`).
+`归约 经由 <op> 取自 source [在 [coords]] [按 key | 按 [key, …]] ([线程 f] (常量 | 变量) x { 返回 term })? [兜底 identity]?` is the general reduction form. The optional body may carry an optional `线程`; the optional identity follows the body or, when there is no body, the source. Without a body, the source elements are the terms. `经由` is mandatory and selects exactly one of `求和`, `求积`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, `计数`, or `第一个`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `经由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.归约(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `在 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(常量 | 变量) IDENTIFIER '{'` follows, so a declaration such as `常量 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `返回` term per element. Without a body, each source element is the term. `线程 f` requires a body and a kernel context; it retains the existing sum path, while other `线程` operators fail closed by name until their lowering is implemented. Without `线程`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2983,9 +2998,11 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 
 **List predicate methods.** `xs.all(pred)`, `xs.any(pred)` and `xs.find(pred)` (la `全部`, `任一`, `reperta`) are list methods that take a closure, not reduction operators. They evaluate the predicate left to right in list order, once per element, and stop at the first decisive element: the first false for `all`, the first true for `any`, the first true for `find`. No element after the decisive one is visited, so a predicate side effect or error after it never runs; this is the opposite of the tensor `reduce 经由 first`, which runs the predicate on every element. `all` is `true` and `any` is `false` for an empty list. `find` returns `T ∪ none` (la `T ∪ nihil`): the first element for which the predicate holds, or `none` when no element matches or the list is empty. The result stays optional even for a bounded list whose minimum size is at least one, because a match is not guaranteed. `xs.first()` (la `primus`) is unchanged, and `find` on a regex (la `inventa`) is a different method found by the receiver type.
 
+**List join.** `xs.extend(ys)` (la `extende`) appends every element of the list `ys` to `xs`, in `ys` order, in place, and yields nothing. `ys` is a list of the receiver's element type: a plain `lista<T>`, or a fixed-capacity or length-ranged list of `T`; a bounded byte buffer `lista<b8, 维度 N>` joins a `lista<b8>`, which is how per-element sized encodes (`x ↦ lista<b8, 维度 4> 经由 Le`) are chained into one byte string. The receiver changes, so it must be `mut`; the argument is only read, and its length is read once before the first element is appended, so `xs.extend(xs)` appends the original elements exactly once. The receiver must be a plain `lista<T>`: a bounded or length-ranged receiver is refused (`SEM011` `extend_requires_plain_list`), because a push past its capacity is the `appende` failure that reports on `⇥`. Inside a loop over `xs`, `xs.extend(…)` is the same shape change as `xs.append(…)` (`loop_collection_shape_change`). The Swift and Python targets decline it by name.
+
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
-`按 key` groups terms into a new result tensor; it does not mutate the source or key tensor. The clause takes either one key expression or a bracketed coordinate list `按 [i, j]` (en `步 [i, j]`) with one key per axis of the result. One key (`按 k`, the same as `按 [k]`) keeps the rank-one result `tensor<R, [K]>`; a list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. The list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `按 [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `求和`, `求积`, `计数`, `全部`, and `任一` have empty-bucket identities; grouped `最大` and `最小` require `兜底 identity`. Grouped `最大值索引` and `最小值索引` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
+`按 key` or `按 [key, …]` groups terms into a new result tensor; it does not mutate the source or key tensor. A bare key is one key, while the bracketed form requires a non-empty expression list, with one key per axis of the result. One key (`按 k` or `按 [k]`) keeps the rank-one result `tensor<R, [K]>`; a bracketed list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. A bare key stops before `coalesce` (la `兜底`), so a following identity belongs to the reduction. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. A multi-key list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `按 [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `求和`, `求积`, `计数`, `全部`, and `任一` have empty-bucket identities; grouped `最大` and `最小` require `兜底 identity`. Grouped `最大值索引` and `最小值索引` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
 
 The axis sugar `t.求和(轴 n)` (en `t.sum(轴 n)`) on a tensor of literal rank 2 to 8 is the grouped sum whose key list is the coordinates other than `n`, in order. `n` is a compile-time constant in `0..rank`, and the result is the receiver shape with axis `n` removed.
 
@@ -3259,6 +3276,9 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `执行 { ... }` is the explicit `do` block and executes its body once.
 - `执行 { ... } 当 condition` is the post-test loop form; postfix `当` attaches only to `执行`, not arbitrary preceding blocks.
 - `捕获` is an attachment shared by several structured forms, not a semantic mode owned by `执行`. A plain `执行` is often used when an otherwise unattached block needs a local handler: `执行 { ... } 捕获 err { ... }`.
+- The modifier slot directly after `执行` holds `全部` (en `do all`) or `设备` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- `执行 全部 { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `捕获` once, at the block's exit (or, with a `当` tail, at each back edge).
+- `执行 设备 { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `执行 全部` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `当` / `遍历 范围` loops are unchanged. Captures are classified by writes (a captured `传入` scalar or genus is device state). The block's own `捕获` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `当` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `执行 设备` (`fac_machina_nested`), a `返回` / `中断` / `继续` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `线程` loop or `归约` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `执行 全部`, so every device route is unchanged.
 
 ---
 
@@ -3270,7 +3290,6 @@ typing, and lowering work is complete; each row records that state.
 
 | Construct | State |
 | --------- | ----- |
-| `执行 全部 { … } 捕获 e { … }` (en `do all`) | admitted (FLD K1); `执行 全部` is `PARSE001` |
 | Superscript powers `x²`, `r⁻¹` | planned goal; the lexer rejects the superscript digits (`LEX004`) |
 | Multi-subject `匹配` lowering | parses and is coverage-checked; lowered only by the Rust emitter |
 | Run-time capacities and extents (`[H, W]`, `_`) | admitted (FLD K14); today every extent and capacity is a compile-time value |

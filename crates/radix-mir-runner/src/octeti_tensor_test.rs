@@ -149,7 +149,7 @@ fn octeti_tensor_runtime_extent_without_shape_operand_is_internal() {
     let err = convert_extents(vec![0_u8; 24], F32, runtime_extents(), None, "Le", None)
         .expect_err("no shape operand");
     assert_eq!(err.code, "runner_internal");
-    assert_eq!(err.issue, "octeti_tensor_shape_operand_missing");
+    assert_eq!(err.issue, "list_b8_to_tensor_shape_operand_missing");
 }
 
 #[test]
@@ -457,5 +457,379 @@ fn tensor_octeti_round_trips_bit_for_bit_for_every_element_and_order() {
             let back = round_trip(bytes.clone(), (primitive, width), &[2, 2], hint);
             assert_eq!(back, bytes, "{primitive:?} {width:?} via {hint}");
         }
+    }
+}
+
+// --- record (fixed-layout genus) elements --------------------
+//
+// A neutral 34-byte record: an `f16` head and 32 `i8` slots, the same shape any
+// block-quantized weight library would declare. Nothing here names a format.
+
+mod record {
+    use super::*;
+    use handroll::FxHashMap;
+    use radix_lexer::Symbol;
+    use radix_mir::MirValidationContext;
+    use std::io::{Read, Seek, SeekFrom, Write};
+
+    const GENUS: DefId = DefId(9);
+    const ROW: usize = 34;
+    const HEAD: Symbol = Symbol(100_000);
+    const SLOTS: Symbol = Symbol(99_999);
+    const ISSUE_OVERFLOW: &str = "runner_list_b8_to_tensor_record_overflow";
+    const ISSUE_MISALIGNED: &str = "runner_list_b8_to_tensor_record_misaligned";
+    const ISSUE_TRUNCATED: &str = "runner_list_b8_to_tensor_record_truncated";
+    const ISSUE_TRAILING: &str = "runner_list_b8_to_tensor_record_trailing_bytes";
+
+    /// The IEEE half bits of the small multiples of 0.5 the fixtures use.
+    fn half_bits(value: f32) -> u16 {
+        crate::f32_to_f16_rn(value)
+    }
+
+    /// Row `i`: head `(i + 1) / 2` as an `f16`, slot `j` = `7 i + j - 40`.
+    fn row(i: usize) -> Vec<u8> {
+        let mut bytes = half_bits((i + 1) as f32 * 0.5).to_le_bytes().to_vec();
+        bytes.extend((0..32).map(|j| (7 * i as i32 + j - 40) as i8 as u8));
+        bytes
+    }
+
+    fn rows(count: usize) -> Vec<u8> {
+        (0..count).flat_map(row).collect()
+    }
+
+    struct Fixture {
+        types: TypeTable,
+        element: TypeId,
+    }
+
+    fn q_record() -> Fixture {
+        let mut types = TypeTable::new();
+        let element = types.intern(radix_types::Type::Struct(GENUS));
+        Fixture { types, element }
+    }
+
+    /// Run `octeti ↦ tensor<record, extents> via hint` over `bytes`.
+    fn convert(
+        fixture: &Fixture,
+        field_types: &[(Symbol, TypeId)],
+        bytes: Vec<u8>,
+        extents: Vec<IndexExpr>,
+        shape: Option<Vec<i64>>,
+        hint: &str,
+        recovery: Option<&MirOperand>,
+    ) -> Result<Value, RunnerError> {
+        let mut types = fixture.types.clone();
+        let dim_ids: Vec<_> = extents
+            .into_iter()
+            .map(|extent| types.intern_index(extent))
+            .collect();
+        let shape_index = types.intern_index(IndexExpr::Tuple(dim_ids));
+        let target = types.tensor_with_shape(fixture.element, shape_index);
+        let mut interner = Interner::new();
+        let hint_sym = interner.intern(hint);
+        let mut context = MirValidationContext::new(&types);
+        let order: Vec<Symbol> = field_types.iter().map(|(name, _)| *name).collect();
+        let declared: FxHashMap<Symbol, MirType> = field_types
+            .iter()
+            .map(|(name, ty)| (*name, MirType::semantic(*ty)))
+            .collect();
+        context.struct_fields.insert(GENUS, declared);
+        context.struct_field_order.insert(GENUS, order);
+        let mut program = MirProgram::new();
+        program.functions.push(MirFunction {
+            id: MirFunctionId(0),
+            source: None,
+            name: None,
+            params: vec![],
+            locals: vec![],
+            temps: vec![],
+            blocks: vec![],
+            return_ty: MirType::semantic(TypeId(0)),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        });
+        let mut host = crate::host::BufferHost::default();
+        let mut runner = crate::Runner::new(&program, &context, &types, &interner, &mut host);
+        let fn0 = program.functions.first().unwrap();
+        runner.push_frame(fn0.id, MirBlockId(0));
+        runner.convert_octeti_to_tensor(
+            bytes,
+            target,
+            shape,
+            &[hint_sym],
+            recovery,
+            Span::default(),
+        )
+    }
+
+    fn q_fields(fixture: &mut Fixture) -> Vec<(Symbol, TypeId)> {
+        let f16 = fixture
+            .types
+            .sized_numeric(Primitive::Fractus, NumericWidth::F16);
+        let i8 = fixture
+            .types
+            .sized_numeric(Primitive::Numerus, NumericWidth::I8);
+        let capacity = fixture.types.intern_index(IndexExpr::Literal(32));
+        let slots = fixture.types.bounded_array(i8, capacity);
+        vec![(HEAD, f16), (SLOTS, slots)]
+    }
+
+    fn load(
+        count: u64,
+        bytes: Vec<u8>,
+        hint: &str,
+        recovery: Option<&MirOperand>,
+    ) -> Result<Value, RunnerError> {
+        let mut fixture = q_record();
+        let fields = q_fields(&mut fixture);
+        convert(
+            &fixture,
+            &fields,
+            bytes,
+            vec![IndexExpr::Literal(count)],
+            None,
+            hint,
+            recovery,
+        )
+    }
+
+    fn field(value: &Value, name: Symbol) -> Value {
+        let Value::Struct(def, fields) = value else {
+            panic!("expected a struct row, got {value:?}");
+        };
+        assert_eq!(*def, GENUS);
+        fields.borrow().get(&name).cloned().expect("field")
+    }
+
+    fn slots(value: &Value) -> Vec<i64> {
+        let Value::Array(items) = field(value, SLOTS) else {
+            panic!("slots are an array");
+        };
+        items
+            .borrow()
+            .iter()
+            .map(|item| match item {
+                Value::Int(v) => *v,
+                other => panic!("slot is {other:?}"),
+            })
+            .collect()
+    }
+
+    #[test]
+    fn record_tensor_keeps_the_input_bytes_as_typed_rows() {
+        let bytes = rows(5);
+        let t = tensor(load(5, bytes.clone(), "Le", None).expect("record tensor"));
+        let t = t.borrow();
+        assert_eq!(t.shape, vec![5]);
+        assert_eq!(t.data.len(), 5);
+        assert_eq!(t.data.record_size(), Some(ROW));
+        assert_eq!(
+            t.data.kind(),
+            None,
+            "a record row is not a scalar dense kind"
+        );
+        // The host bytes are the input bytes, row for row.
+        assert_eq!(t.data.as_le_bytes(0..5).expect("bytes"), bytes);
+        assert_eq!(
+            t.data.as_le_bytes(1..3).expect("rows 1..3"),
+            bytes[ROW..3 * ROW]
+        );
+        // Nothing was boxed or stored element by element to get there.
+        assert_eq!(t.data.boxed_elements(), 0);
+        assert_eq!(t.data.element_stores(), 0);
+        assert!(t.data.with_values(|_| ()).is_none(), "not boxed Values");
+    }
+
+    #[test]
+    fn record_rows_read_back_as_struct_values() {
+        let t = tensor(load(5, rows(5), "Le", None).expect("record tensor"));
+        let t = t.borrow();
+        for i in 0..5 {
+            let row = t.data.get(i).expect("row");
+            assert_eq!(
+                field(&row, HEAD),
+                Value::Float((i + 1) as f64 * 0.5),
+                "head {i}"
+            );
+            let want: Vec<i64> = (0..32).map(|j| 7 * i as i64 + j - 40).collect();
+            assert_eq!(slots(&row), want, "slots {i}");
+        }
+        assert!(t.data.get(5).is_none(), "past the end");
+    }
+
+    #[test]
+    fn record_rows_store_back_through_the_layout() {
+        let t = tensor(load(3, rows(3), "Le", None).expect("record tensor"));
+        let t = t.borrow();
+        let from = t.data.get(2).expect("row 2");
+        assert!(t.data.set(0, &from));
+        assert_eq!(t.data.as_le_bytes(0..1).expect("row 0"), row(2));
+        // A slot outside i8 is refused and leaves the row alone.
+        let Value::Struct(def, fields) = t.data.get(1).expect("row 1") else {
+            panic!("struct row");
+        };
+        let slots_value = Value::Array(Rc::new(RefCell::new(vec![Value::Int(128); 32])));
+        fields.borrow_mut().insert(SLOTS, slots_value);
+        assert!(!t.data.set(1, &Value::Struct(def, fields)));
+        assert_eq!(t.data.as_le_bytes(1..2).expect("row 1"), row(1));
+        assert!(!t.data.set(3, &from), "out of bounds");
+    }
+
+    #[test]
+    fn record_tensor_run_time_extent_reads_the_shape_operand() {
+        let mut fixture = q_record();
+        let fields = q_fields(&mut fixture);
+        let value = convert(
+            &fixture,
+            &fields,
+            rows(6),
+            runtime_extents(),
+            Some(vec![2, 3]),
+            "Le",
+            None,
+        )
+        .expect("run-time extent record decode");
+        let t = tensor(value);
+        assert_eq!(t.borrow().shape, vec![2, 3]);
+        assert_eq!(t.borrow().data.len(), 6);
+    }
+
+    #[test]
+    fn record_tensor_names_truncation_misalignment_trailing_bytes_and_overflow() {
+        let cases: [(&str, Vec<u8>, &str); 3] = [
+            ("truncated", rows(3)[..2 * ROW].to_vec(), ISSUE_TRUNCATED),
+            (
+                "misaligned",
+                rows(3)[..3 * ROW - 1].to_vec(),
+                ISSUE_MISALIGNED,
+            ),
+            ("trailing", rows(4), ISSUE_TRAILING),
+        ];
+        for (name, bytes, issue) in cases {
+            let err = load(3, bytes, "Le", None).expect_err(name);
+            assert_eq!(err.code, "runner_conversion", "{name}");
+            assert_eq!(err.issue, issue, "{name}");
+        }
+        let err = load(3, Vec::new(), "Le", None).expect_err("empty input");
+        assert_eq!(err.issue, ISSUE_TRUNCATED);
+        assert_eq!(err.arg("record_bytes"), Some("34"));
+        assert_eq!(err.arg("expected"), Some("102"));
+        assert_eq!(err.arg("actual"), Some("0"));
+
+        let mut fixture = q_record();
+        let fields = q_fields(&mut fixture);
+        for dims in [vec![i64::MAX, 2], vec![-1]] {
+            let extents = dims
+                .iter()
+                .map(|_| IndexExpr::Runtime(RuntimeExtentId::ScalarBinding(DefId(7))))
+                .collect();
+            let err = convert(
+                &fixture,
+                &fields,
+                rows(1),
+                extents,
+                Some(dims.clone()),
+                "Le",
+                None,
+            )
+            .expect_err("overflow");
+            assert_eq!(err.issue, ISSUE_OVERFLOW, "{dims:?}");
+            assert_eq!(err.arg("expected"), Some("overflow"));
+        }
+    }
+
+    #[test]
+    fn record_tensor_failures_recover_with_a_default() {
+        let recovery = MirOperand::Constant(MirConstant::Int(42));
+        for bytes in [
+            rows(2)[..ROW].to_vec(),
+            rows(2)[..ROW + 1].to_vec(),
+            rows(3),
+        ] {
+            let value = load(2, bytes, "Le", Some(&recovery)).expect("recovered");
+            assert_eq!(value, Value::Int(42));
+        }
+        let ok = load(2, rows(2), "Le", Some(&recovery)).expect("ok");
+        assert!(matches!(ok, Value::Tensor(_)));
+    }
+
+    #[test]
+    fn record_tensor_is_little_endian_only() {
+        let err = load(1, rows(1), "Be", None).expect_err("Be");
+        assert_eq!(err.issue, "list_b8_to_tensor_record_big_endian");
+    }
+
+    #[test]
+    fn record_tensor_refuses_a_genus_without_a_fixed_layout() {
+        let mut fixture = q_record();
+        let f64_ty = fixture
+            .types
+            .sized_numeric(Primitive::Fractus, NumericWidth::F64);
+        let err = convert(
+            &fixture,
+            &[(HEAD, f64_ty)],
+            vec![0; 8],
+            vec![IndexExpr::Literal(1)],
+            None,
+            "Le",
+            None,
+        )
+        .expect_err("f64 field has no device layout");
+        assert_eq!(err.issue, "list_b8_to_tensor_record_layout_refused");
+    }
+
+    /// A bounded range of a real file loads as record rows: the tensor's host
+    /// bytes are exactly the range (no wider copy), and a range cut short by the
+    /// end of the file is the named truncation.
+    #[test]
+    fn real_file_range_loads_as_record_rows_and_truncates_by_name() {
+        let path = std::env::temp_dir().join(format!(
+            "faber-record-range-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let (lead, count, tail) = (13_usize, 4_usize, 9_usize);
+        let body = rows(count);
+        let mut file = std::fs::File::create(&path).expect("create fixture");
+        file.write_all(&vec![0xee; lead]).expect("lead");
+        file.write_all(&body).expect("rows");
+        file.write_all(&vec![0xdd; tail]).expect("tail");
+        drop(file);
+
+        let read_range = |offset: u64, length: u64| -> Vec<u8> {
+            let mut file = std::fs::File::open(&path).expect("open fixture");
+            file.seek(SeekFrom::Start(offset)).expect("seek");
+            let mut bytes = Vec::new();
+            file.take(length)
+                .read_to_end(&mut bytes)
+                .expect("read range");
+            bytes
+        };
+
+        let range = read_range(lead as u64, (count * ROW) as u64);
+        assert_eq!(range, body, "the range is exactly the rows");
+        let t = tensor(load(count as u64, range, "Le", None).expect("range loads"));
+        {
+            let t = t.borrow();
+            assert_eq!(t.data.as_le_bytes(0..count).expect("bytes"), body);
+            assert_eq!(t.data.boxed_elements(), 0);
+            assert_eq!(t.data.element_stores(), 0);
+        }
+
+        // Ask for one row more than the file holds: the read stops at the end
+        // of the file, short of the shape and off the row grid.
+        let cut = read_range(lead as u64, ((count + 1) * ROW) as u64);
+        assert_eq!(cut.len(), count * ROW + tail);
+        let err = load(count as u64 + 1, cut, "Le", None).expect_err("cut short");
+        assert_eq!(err.issue, ISSUE_MISALIGNED);
+
+        // A range that ends on a row boundary but short of the shape.
+        let short = read_range(lead as u64, ((count - 1) * ROW) as u64);
+        let err = load(count as u64, short, "Le", None).expect_err("short");
+        assert_eq!(err.issue, ISSUE_TRUNCATED);
+        std::fs::remove_file(&path).expect("remove fixture");
     }
 }

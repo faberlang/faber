@@ -20,13 +20,13 @@ no_expected = "declaration-only"
 
 type IntQueue = queue<int>
 
-type BoundedIntQueue = queue<int, 8>
+type BoundedIntQueue = queue<int, size 8>
 
 type TextStack = stack<string>
 
-type BoundedTextStack = stack<string, 8>
+type BoundedTextStack = stack<string, size 8>
 
-fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string, 8> bounded_s) → void {
+fn accepts(queue<int> q, queue<int, size 8> bounded_q, stack<string> s, stack<string, size 8> bounded_s) → void {
 }
 
 # =============================================================================
@@ -50,8 +50,8 @@ fn queue_length(queue<int> input) → int {
 }
 
 # Bounded push remains a recoverable alternate exit; an empty pop yields `null`.
-fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
-    mut queue<int, 2> q ← copy input
+fn bounded_queue_push(queue<int, size 2> input) → void ⇥ string {
+    mut queue<int, size 2> q ← copy input
     q.append(1)
 }
 
@@ -101,10 +101,10 @@ fn stack_sub(stack<int> left, stack<int> right) → stack<int> {
     return left - right
 }
 
-fn bounded_queue_min(queue<int, 8> left, queue<int, 3> right) → queue<int, 3> {
+fn bounded_queue_min(queue<int, size 8> left, queue<int, size 3> right) → queue<int, size 3> {
     return left ⊘ right
 }
 
-fn bounded_stack_min(stack<int, 5> left, stack<int, 2> right) → stack<int, 2> {
+fn bounded_stack_min(stack<int, size 5> left, stack<int, size 2> right) → stack<int, size 2> {
     return left + right
 }

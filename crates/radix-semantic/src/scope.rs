@@ -31,10 +31,11 @@
 
 use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceConstValue, InterfaceGenericParam,
-    InterfaceLibraryIdentity, InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceNominalKind, InterfaceStructExport, InterfaceUnavailable,
-    import_interface_callable_with_resolver, import_interface_type_with_resolver,
+    FileExportKind, FileInterface, FileInterfaceError, InterfaceConstValue,
+    InterfaceDeviceContract, InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMemberKind,
+    InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceStructExport,
+    InterfaceUnavailable, import_interface_callable_with_resolver,
+    import_interface_type_with_resolver,
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
@@ -338,6 +339,10 @@ pub struct ImportedFileInterface {
     /// `@ nondum` gates of exported functions, keyed like `exports` (the
     /// consumer-visible member spelling).
     unavailable: FxHashMap<LexSymbol, Vec<InterfaceUnavailable>>,
+    /// Device (`@ nucleum`) contracts of exported functions, keyed like
+    /// `exports`. Semantic-only: the FHIR wire does not carry it, and a
+    /// resolver rebuilt from a snapshot has none.
+    device_contracts: FxHashMap<LexSymbol, InterfaceDeviceContract>,
 }
 
 /// Remapped contract for a single imported file export.
@@ -1260,6 +1265,7 @@ impl Resolver {
                     const_members: FxHashSet::default(),
                     const_values: FxHashMap::default(),
                     unavailable: FxHashMap::default(),
+                    device_contracts: FxHashMap::default(),
                 },
             );
         }
@@ -1492,6 +1498,9 @@ impl Resolver {
                             imported.exports.insert(member, exported.clone());
                             if let Some(gates) = gates {
                                 imported.unavailable.insert(member, gates.clone());
+                            }
+                            if let Some(contract) = &callable.device {
+                                imported.device_contracts.insert(member, contract.clone());
                             }
                             if let Some(policy_def) = policy_def {
                                 imported
@@ -2278,6 +2287,26 @@ impl Resolver {
         let interface = self.file_interfaces.get(&namespace)?;
         let key = self.file_interface_export_key(interface, member)?;
         interface.unavailable.get(&key).map(Vec::as_slice)
+    }
+
+    /// Device (`@ nucleum`) contract of the imported function a post-HIR
+    /// canonical member name resolves to; `None` for an ordinary function or
+    /// a member that is not a function.
+    #[must_use]
+    pub fn namespace_file_device_contract_canonical(
+        &self,
+        namespace: LexSymbol,
+        canonical: LexSymbol,
+    ) -> Option<&InterfaceDeviceContract> {
+        if self
+            .namespace_member_rejection_issue(namespace, canonical)
+            .is_some()
+        {
+            return None;
+        }
+        let interface = self.file_interfaces.get(&namespace)?;
+        let key = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        interface.device_contracts.get(&key)
     }
 
     /// `@ nondum` gates of the imported function a post-HIR canonical member
@@ -4306,6 +4335,7 @@ impl Resolver {
                                 )
                             })
                             .collect(),
+                        device_contracts: FxHashMap::default(),
                     },
                 )
             })

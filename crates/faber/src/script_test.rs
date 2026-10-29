@@ -161,7 +161,7 @@ fn run_source_surfaces_runner_errors() {
     assert!(matches!(error, RunSourceError::Stepper(_)));
 }
 
-// VEC-5b: a run-time index on a `vector<T, N>` is a checked lane select. The
+// VEC-5b: a run-time index on a `vector<T, size N>` is a checked lane select. The
 // loop runs the in-range lanes; an index past the width ends the run with the
 // same runner failure an out-of-range `lista` index produces (the
 // checked-index law), after the lines printed before the trap.
@@ -180,12 +180,12 @@ fn runner_failure_issue(source: &str) -> (Vec<String>, String) {
 fn vector_runtime_index_sums_the_lanes_then_traps_like_a_lista() {
     let (printed, vector_issue) = runner_failure_issue(
         r"
-fn lane(vector<f32, 3> v, int i) → f32 {
+fn lane(vector<f32, size 3> v, int i) → f32 {
     return v[i]
 }
 
 main {
-    let vector<f32, 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    let vector<f32, size 3> v ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
     mut f32 sum ← 0.0
     mut int i ← 0
     while i ≺ 3 {

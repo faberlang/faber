@@ -101,6 +101,7 @@ axis = "محور"
 lege = "اقرأ"
 lineam = "سطرا"
 omnia = "الكل"
+machina = "جهاز"
 scriptum = "حرر"
 sparge = "انشر"
 ut = "كـ"
@@ -149,6 +150,8 @@ brevis = "مختصر"
 descriptio = "وصف"
 longum = "مفصل"
 lane = "مسار"
+laxus = "مسترخ"
+intutus = "غير_آمن"
 ubique = "عمومي"
 annotatio = "تعليق_توضيحي"
 versio = "إصدار"
@@ -199,7 +202,7 @@ instans = "لحظة"
 objectum = "كائن"
 quidlibet = "مهما"
 lista = "قائمة"
-# Shipped bounded forms: lista<T, magnitudo N>, textus<N>, ascii<N>.
+# Shipped bounded forms: lista<T, magnitudo N>, textus<magnitudo N>, ascii<magnitudo N>.
 tabula = "جدول"
 # PROVISIONAL: the ledger spelling below is unvalidated by a reader of this language (need, O4).
 tabulae = "دفتر"
@@ -705,6 +708,22 @@ help = "استخدم `@ {expected}` للغة القارئ في هذا الملف
 message = "يوجد في الإعلان أكثر من تعليمة `@ nucleum`"
 help = "أبقِ على تعليمة nucleum واحدة"
 
+[diagnostics.PARSE018.issues.duplicate_nucleum_tier]
+message = "تحدد التعليمة `@ {nucleum}` أكثر من مستوى واحد"
+help = "اكتب `{laxus}` أو `{intutus}`، أو لا تكتب شيئا للمستوى الافتراضي"
+
+[diagnostics.PARSE018.issues.unknown_nucleum_tier]
+message = "`{name}` ليس مستوى للنواة"
+help = "المستويان هما `{laxus}` و`{intutus}`؛ لا تكتب شيئا للمستوى الافتراضي"
+
+[diagnostics.PARSE018.issues.nucleum_tier_on_fragment]
+message = "لا يقبل `@ {nucleum} {fragment}` مستوى"
+help = "يتبع الجزء مستوى النواة التي تركبه؛ ضع المستوى على تلك النواة"
+
+[diagnostics.PARSE018.issues.nucleum_tier_non_kernel]
+message = "يتطلب مستوى النواة دالة نواة"
+help = "اكتب المستوى على إعلان دالة `@ {nucleum}`، أو احذفه"
+
 [diagnostics.PARSE018.issues.nucleum_fragment_conflicts_with_fragment]
 message = "جزء `@ nucleum` يتعارض مع تعليمة جزء رسومي"
 help = "أزل إحدى تعليمتي الجزء"
@@ -724,6 +743,10 @@ help = "استخدم {replacement}"
 [diagnostics.PARSE020.issues.fac_cape_after_dum]
 message = "يجب أن يأتي '{cape}' قبل '{dum}' في حلقة '{fac}'"
 help = "اكتب المعالج قبل الشرط: {fac} … {cape} … {dum} …"
+
+[diagnostics.PARSE020.issues.fac_modifier_redundant]
+message = "تقبل كتلة '{fac}' كلمة تعديل واحدة، لا '{omnia}' و'{machina}' معا"
+help = "'{machina}' يسلّم كل الأخطاء مرة واحدة عند نهاية الكتلة؛ احذف '{omnia}'"
 
 [diagnostics.PARSE020.issues.discerne_subject_comma_retired]
 message = "لم تعد الفاصلة تفصل بين موضوعات '{discerne}'"
@@ -799,7 +822,7 @@ help = "سمِّ التلميح مباشرة بعد via، مثل `x ↦ u32 via 
 
 [diagnostics.PARSE030.issues.conversio_hint_type_argument]
 message = "تلميح التحويل ليس معامل نوع"
-help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<8> via Hex`، `littera via Code`"
+help = "اكتب التلميح كجملة via بعد الهدف: `u32 via Le`، `ascii<{magnitudo} 8> via Hex`، `littera via Code`"
 
 [diagnostics.PARSE030.issues.conversio_hint_tail_argument]
 message = "تلميح التحويل لا يتبع الهدف بين قوسين زاويين"
@@ -1245,6 +1268,14 @@ help = "اكتب النطاق على القائمة، مثل {lista}<int, {magni
 message = "يُكتب عدد عناصر القائمة بعد `{magnitudo}`"
 help = "اكتب `{lista}<int, {magnitudo} 4>` لأربعة عناصر على الأكثر، أو `{lista}<int, {magnitudo} 1…8>` لنطاق؛ النطاق المجرد يحدّ قيمة لا عددًا"
 
+[diagnostics.SEM008.issues.capacity_needs_size]
+message = "تُكتب السعة بعد `{magnitudo}`"
+help = "اكتب `{queue}<int, {magnitudo} 4>` أو `{stack}<int, {magnitudo} 4>` أو `{textus}<{magnitudo} 8>` أو `{ascii}<{magnitudo} 8>` لسعة بهذا القدر على الأكثر؛ الرقم المجرد ليس سعة"
+
+[diagnostics.SEM008.issues.vector_width_needs_size]
+message = "يُكتب عدد مسارات المتجه بعد `{magnitudo}`"
+help = "اكتب `{vector}<f32, {magnitudo} 4>` لأربعة مسارات؛ الصيغة المختصرة `vf32[4]` لا تتغير"
+
 [diagnostics.SEM008.issues.callable_posture_conflict]
 message = "يتعارض نمط الدالة في التعليق التوضيحي '{annotation_posture}' مع النمط المكتوب '{written_posture}'"
 help = "أصلح بنية AST للتخفيض"
@@ -1271,11 +1302,11 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue يتطلب معامل نوع واحدا أو اثنين"
-help = "استخدم queue<T> أو queue<T, N>"
+help = "استخدم queue<T> أو queue<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.stack_arity]
 message = "stack يتطلب معامل نوع واحدا أو اثنين"
-help = "استخدم stack<T> أو stack<T, N>"
+help = "استخدم stack<T> أو stack<T, {magnitudo} N>"
 
 [diagnostics.SEM008.issues.discerne_casu_pattern_required]
 message = "{discerne} {casu} يتطلب نمطا"
@@ -1443,7 +1474,7 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.primitive_params]
 message = "primitive type لا يقبل parameters"
-help = "textus<N> و ascii<N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
+help = "textus<{magnitudo} N> و ascii<{magnitudo} N> و {lista}<b8, {magnitudo} N> أشكال محدودة مشحونة"
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "namespace لا يصدر qualified type"
@@ -1569,10 +1600,6 @@ help = "أصلح تركيب AST للتخفيض"
 message = "width marker لا يقبل parameters"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 غير مدعوم في نواة nucleum"
-help = "استخدم نوع قيمة نواة مدعوما"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "امتداد العدد الصحيح للنواة {extent} غير مثبت ليتسع في المدى المحمول"
 help = "قيّد الامتداد بقيم ضمن مدى الأعداد الصحيحة المحمول"
@@ -1585,9 +1612,25 @@ help = "استخدم f32 لقيم النواة العائمة"
 message = "التخزين بعرض {width} قد يسبب فخا داخل نواة nucleum"
 help = "أثبت أن التخزين ضمن المدى أو استخدم خلية wrapping أو saturating"
 
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "عرض العدد الصحيح {width} يتجاوز عرض نواة nucleum المدعوم"
-help = "استخدم عرض عدد صحيح لا يتجاوز 32 بت"
+[diagnostics.SEM008.issues.fac_machina_nested]
+message = "لا يجوز أن تحتوي منطقة '{fac} {machina}' على '{fac} {machina}' أخرى"
+help = "أبقِ منطقة جهاز واحدة واستدعِ kernel منها مباشرة"
+
+[diagnostics.SEM008.issues.nucleum_block_exit_crosses_boundary]
+message = "'{construct}' يغادر منطقة '{fac} {machina}'؛ لا توجد للمنطقة كلمة خروج بعد"
+help = "أنهِ المنطقة ثم قرر بعدها، أو انقل الخروج خارج الكتلة"
+
+[diagnostics.SEM008.issues.nucleum_region_lane_loop_not_built]
+message = "حلقة lane ('{construct}') مباشرة في منطقة '{fac} {machina}' لم تُبنَ بعد"
+help = "استدعِ kernel من المنطقة للعمل المتوازي"
+
+[diagnostics.SEM008.issues.nucleum_region_alloc_not_built]
+message = "لا تستطيع منطقة '{fac} {machina}' تخصيص tensor بعد ({construct})"
+help = "خصص الـ tensor قبل المنطقة واستخدمه داخلها"
+
+[diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
+message = "'{construct}' في منطقة '{fac} {machina}' يقرأ قيمة حُسبت على الجهاز؛ التحكم بالحلقات على الجهاز لم يُبنَ بعد"
+help = "اجعل الشروط والحدود والوسائط العددية من قيم معروفة قبل المنطقة، واقرأ نتائج الجهاز بعدها"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "امتداد القيمة الوسيطة للنواة {extent} يتجاوز مدى الأعداد الصحيحة المحمول"
@@ -2190,11 +2233,11 @@ message = "عدم تطابق في vector element type"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.vector_incomplete]
-message = "vector يتطلب element type و width؛ استخدم vector<T, N>"
+message = "vector يتطلب element type و width؛ استخدم vector<T, حجم N>"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.vector_missing_width]
-message = "vector يتطلب width؛ استخدم vector<T, 4> أو vf32[4]"
+message = "vector يتطلب width؛ استخدم vector<T, حجم 4> أو vf32[4]"
 help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
 
 [diagnostics.SEM010.issues.gradient_expression_unsupported]
@@ -2436,6 +2479,10 @@ help = "أزل قائمة type argument الصريحة"
 [diagnostics.SEM011.issues.numeric_lista_elements_required]
 message = "numeric {lista} elements مطلوبة"
 help = "استخدم numeric elements لـ {lista} intrinsic هذا"
+
+[diagnostics.SEM011.issues.extend_requires_plain_list]
+message = "يتطلب `extend` مستقبلًا من نوع list عادية؛ لا يمكن لقائمة محدودة أو محددة الطول أن تنمو في مكانها"
+help = "مدّد قائمة غير محدودة، أو ألحق عنصرًا واحدًا في كل مرة باستخدام `append`"
 
 [diagnostics.SEM011.issues.sorted_key_retired]
 message = "تمت إزالة الطريقة `.مرتب(مفتاح)` ذات المفتاح؛ استخدم تعبير الفرز"
@@ -2796,6 +2843,10 @@ help = "استخدم chorda أو explicit byte conversion helpers"
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "conversion من {lista}<b8> إلى {fractus} غير محدد (IEEE width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
 help = "استخدم chorda أو explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
+message = "يقرأ tensor السجلات بياناته وفق تخطيط السجل little-endian؛ اكتب `via Le` وليس `via Be`"
+help = "اكتب {lista}<b8> ↦ tensor<Record, [n]> via Le؛ لعنصر السجل ترتيب بايتات واحد يحدده تخطيطه"
 
 [diagnostics.SEM016.issues.code_hint_pair_mismatch]
 message = "the Code hint converts only littera ↦ u32 via Code (read a code point) and numerus ↦ littera via Code (build one)"
@@ -3809,6 +3860,7 @@ argminima = "فهرس_الأصغر"
 continet = "يحتوي"
 cumulata = "تراكمي"
 decapita = "احذف_الأول"
+extende = "ألحق_الكل"
 filtrata = "رشح"
 immerge = "اغمر"
 inversa = "معكوس"
@@ -3958,7 +4010,19 @@ help = "لا يمكن لـ `{rumpe}` إيقاف حلقة `{filum}`: المسار
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`"
-help = "لا يمكن لـ `{redde}` مغادرة حلقة `{filum}`: المسارات تعمل باستقلال. للحصول على قيمة واحدة من المسارات استخدم `{reducta}`؛ وللتوقف عند حدّ، احسب الحدّ أولاً ثم كرّر حتى بلوغه."
+help = "يُنهي `{redde} {filum}` هذا المسار من أي عمق، ويُنهي `{perge}` المسار عند مستواه الأعلى."
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "لا يصح `{redde} {filum}` إلا داخل جسم حلقة مسارات"
+help = "استخدم `{redde} {filum}` داخل جسم حلقة `{filum}` فقط"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "لا يأخذ `{redde} {filum}` قيمة"
+help = "احذف القيمة؛ تنشر المسارات نتائجها عبر مخازنها"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "لا يستطيع `{redde} {filum}` داخل جسم متداخل إنهاء المسار الخارجي"
+help = "استخدم `{redde} {filum}` في جسم المسار نفسه، لا في إغلاق أو جسم اختزال متداخل"
 
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "يمكن لجسم الاختزال استدعاء الدوال الجوهرية للجهاز والمقاطع والمساعدات الخاصة بالنواة فقط: {reason}"
@@ -3970,150 +4034,198 @@ help = "أبقِ الحدّ نقيًا: اكتب فقط في المتغيرات 
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "مطلوب '>' بعد معاملات النوع"
+help = "أضف `>` الختامي بعد معاملات النوع."
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "مطلوب '(' قبل معلمات نوع الدالة"
+help = "ابدأ نوع الدالة بـ `(` قبل أنواع معاملاتها."
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "مطلوب ')' بعد معلمات نوع الدالة"
+help = "أغلق قائمة المعاملات بـ `)` قبل سهم الإرجاع `→`."
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "مطلوب '→' قبل نوع الإرجاع للدالة"
+help = "اكتب `→` بين قائمة المعاملات ونوع الإرجاع."
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "مطلوب '<' بعد اسم الغلاف العددي"
+help = "استخدم نوع عرض مباشرًا مثل `i32` أو `f32`؛ لم تعد الأنواع العددية تأخذ `<...>`."
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "مطلوب ':' بعد تسمية عنصر الصف"
+help = "افصل تسمية نوع الصف عن نوعه باستخدام `:`، كما في `tuple<name: string>`."
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "مطلوب ':' بعد تسمية عنصر ratio"
+help = "افصل تسمية حقل السجل عن نوعه باستخدام `:`، كما في `record<name: string>`."
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "مطلوب ']' بعد أبعاد الشكل"
+help = "أغلق أبعاد الشكل بـ `]`، كما في `tf32[2, 3]`."
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "مطلوب ')' بعد الشكل بين القوسين"
+help = "أغلق تعبير الحجم المحاط بقوسين بـ `)`، كما في `{magnitudo} (n + 1)`."
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "مطلوب '←' بعد الربط المنتظر"
+help = "بعد ربط `{figendum}` أو `{variandum}`، استخدم `←` قبل تعبير المستقبل."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "مطلوب '[' لبدء نمط ربط المصفوفة"
+help = "ابدأ ربط المصفوفة بـ `[`، كما في `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "مطلوب ']' لإنهاء نمط ربط المصفوفة"
+help = "أغلق ربط المصفوفة بـ `]`، كما في `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "مطلوب قوس فتح لنمط ربط الكائن"
+help = "ابدأ ربط الكائن بـ `{{`، كما في `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "مطلوب قوس إغلاق لنمط ربط الكائن"
+help = "أغلق ربط الكائن بـ `}`، كما في `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "مطلوب '(' قبل معلمات تصريح الدالة"
+help = "اكتب معاملات الدالة بين قوسين بعد الاسم: `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "مطلوب ')' بعد معلمات تصريح الدالة"
+help = "أغلق قائمة المعاملات بعد معاملها الأخير، كما في `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "مطلوب قوس إغلاق بعد جسم الصنف"
+help = "أغلق الصنف بعد أعضائه، كما في `{genus} Name {{ {sit} int value }`."
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "مطلوب قوس فتح لجسم interface"
+help = "ابدأ جسم الواجهة بـ `{{`، كما في `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "مطلوب '(' قبل معلمات method الـ interface"
+help = "اكتب معاملات أسلوب الواجهة بين قوسين: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "مطلوب ')' بعد معلمات method الـ interface"
+help = "أغلق قائمة معاملات الأسلوب بعد آخر معامل: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "مطلوب قوس إغلاق بعد جسم interface"
+help = "أغلق الواجهة بعد تواقيع أساليبها، كما في `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "مطلوب '=' قبل قيمة الاسم المستعار للنوع"
+help = "اكتب اسمًا مستعارًا للنوع باستخدام `=`، كما في `{typus} Name = string`."
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "مطلوب قوس فتح لجسم schema"
+help = "ابدأ جسم المخطط بـ `{{`، كما في `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "مطلوب قوس إغلاق بعد جسم schema"
+help = "أغلق المخطط بعد أعمدته، كما في `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "مطلوب قوس فتح لجسم enum"
+help = "ابدأ جسم التعداد بـ `{{`، كما في `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "مطلوب قوس إغلاق بعد جسم enum"
+help = "أغلق التعداد بعد أعضائه، كما في `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "مطلوب قوس فتح لجسم union"
+help = "ابدأ جسم الاتحاد بـ `{{`، كما في `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول variants الخاصة بـ union"
+help = "أغلق حمولة البديل بعد حقولها، كما في `Circle {{ int radius }`."
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "مطلوب قوس إغلاق بعد جسم union"
+help = "أغلق الاتحاد بعد بدائله، كما في `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "مطلوب قوس فتح لـ import record"
+help = "ابدأ سجل الاستيراد بـ `{{`، كما في `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "مطلوب '=' بعد اسم حقل الاستيراد"
+help = "افصل حقل الاستيراد عن قيمته باستخدام `=`, كما في `{ex} = \"norma:console\"`."
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "مطلوب قوس إغلاق بعد حقول import record"
+help = "أغلق سجل الاستيراد بعد حقوله، كما في `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "مطلوب قوس فتح لجسم probandum"
+help = "ابدأ جسم مجموعة الاختبارات بـ `{{`، كما في `{probandum} \"suite\" {{`."
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "مطلوب قوس إغلاق بعد جسم probandum"
+help = "أغلق مجموعة الاختبارات بـ `}` بعد الاختبارات وخطافات الإعداد."
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "مطلوب قوس فتح لحقول التعليمة"
+help = "استخدم تعليمة محاطة بأقواس للحقول، مثل `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "مطلوب '=' بعد اسم حقل التعليمة"
+help = "افصل حقل التعليمة عن قيمته باستخدام `=`, كما في `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول التعليمة"
+help = "أغلق التعليمة المحاطة بأقواس بعد حقولها، كما في `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "مطلوب قوس فتح لحقول تعليمة nucleum"
+help = "استخدم خيارات نواة محاطة بأقواس، مثل `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "مطلوب '=' بعد اسم حقل تعليمة nucleum"
+help = "افصل خيار النواة عن قيمته باستخدام `=`, كما في `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول تعليمة nucleum"
+help = "أغلق خيارات النواة المحاطة بأقواس بعد حقولها، كما في `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.block_start]
 message = "مطلوب قوس فتح للكتلة"
+help = "ابدأ الكتلة بعد رأسها، كما في `{si} ready {{ {tacet} }`."
 
 [diagnostics.PARSE001.issues.block_end]
 message = "مطلوب قوس إغلاق لإنهاء الكتلة"
+help = "أغلق الكتلة بـ `}` بعد عباراتها."
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "مطلوب '>' بعد المعاملات العامة"
+help = "أغلق قائمة المعاملات العامة بـ `>`، كما في `{functio} identity<T>(T value)`."
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "مطلوب '>' بعد معاملات نوع contract"
+help = "أغلق معاملات نوع العقد بـ `>`، كما في `Contract<Type>`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "مطلوب '[' بعد 'apud'"
+help = "ضع إحداثيات التكرار بين أقواس مربعة بعد `{apud}`، كما في `{itera} {ex} values {apud} [i] {sit} value`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "مطلوب ']' بعد إحداثيات 'apud'"
+help = "أغلق قائمة الإحداثيات بـ `]` بعد أسمائها."
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "مطلوب '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "مطلوب مصدر الاختزال بعد معامل الاختزال"
+help = "اكتب `{ex} source` بعد عامل الاختزال."
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "مطلوب '{lege}' أو '{lineam}'"
+help = "استخدم `{lege}` لقراءة كل المدخلات، أو `{lineam}` لقراءة سطر واحد."
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "مطلوب معرّف"
@@ -4161,30 +4273,39 @@ help = "اكتب عددا صحيحا أو سلسلة بعد '='"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "مطلوب قوس فتح لجسم elige"
+help = "اكتب `{elige} value {{ ... }` مع حالات `{casu}` في الداخل."
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "مطلوب قوس إغلاق بعد حالات elige"
+help = "أغلق جسم `{elige}` بعد حالات `{casu}` وفرع `{ceterum}` الاختياري."
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "مطلوب قوس فتح لجسم discerne"
+help = "اكتب `{discerne} value {{ ... }` مع فروع الأنماط `{casu}` في الداخل."
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "مطلوب قوس إغلاق بعد فروع discerne"
+help = "أغلق جسم `{discerne}` بعد فروع `{casu}` وفرع `{ceterum}` الاختياري."
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "مطلوب قوس فتح لجسم custodi"
+help = "ابدأ الجسم بـ `{custodi} {{` وأضف بندًا واحدًا أو أكثر من `{si}`."
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "مطلوب قوس إغلاق بعد بنود custodi"
+help = "أغلق جسم `{custodi}` بعد بنود `{si}`."
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "مطلوب '✗' بعد قيمة الشرط"
+help = "ضع `✗` بين قيمة فرع then وقيمة فرع else."
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "مطلوب ')' بعد وسائط الاستدعاء"
+help = "أغلق قائمة وسائط الاستدعاء بـ `)`."
 
 [diagnostics.PARSE001.issues.index_end]
 message = "مطلوب ']' بعد تعبير الفهرس"
+help = "أغلق تعبير الفهرسة بـ `]`."
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "قوس الفهرس يأخذ تعبيرًا واحدًا؛ الإحداثيات المنفصلة ليست خانات لكل محور"
@@ -4192,99 +4313,131 @@ help = "اكتب الإحداثيات كقائمة بين قوسين، مثل m[
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "مطلوب ']' بعد gradient selectors"
+help = "أغلق قائمة المحددات المحاطة بأقواس مربعة بعد عناصرها بـ `]`."
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "مطلوب ']' بعد تعبير الفهرس الاختياري"
+help = "أكمل فهرسة اختيارية بصيغة `value?[index]`."
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "مطلوب ')' بعد وسائط الاستدعاء الاختيارية"
+help = "أكمل استدعاءً اختياريًا بصيغة `value?(arguments)`."
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "مطلوب ']' بعد تعبير الفهرس غير null"
+help = "أكمل فهرسة غير فارغة بصيغة `value![index]`."
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "مطلوب ')' بعد وسائط الاستدعاء غير null"
+help = "أكمل استدعاءً غير فارغ بصيغة `value!(arguments)`."
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول المنشئ"
+help = "أغلق حقول المنشئ بـ `}` بعد الحقل الأخير."
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "مطلوب ']' بعد عناصر المنشئ المستنتَج"
+help = "أغلق قائمة عناصر المنشئ المستنتج بـ `]`."
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "مطلوب ']' بعد عناصر المصفوفة"
+help = "أغلق قائمة القيم الحرفية بـ `]` بعد عناصرها."
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "مطلوب ')' بعد التعبير بين القوسين"
+help = "أغلق التعبير المحاط بقوسين بـ `)`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "مطلوب '<' بعد 'ratio'"
+help = "اكتب معاملات النوع ذات التسميات بعد `record`، كما في `record<label: Type>`."
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "مطلوب '>' بعد معاملات نوع ratio"
+help = "أغلق معاملات نوع السجل بـ `>` قبل حقوله."
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "مطلوب قوس فتح بعد معاملات نوع ratio"
+help = "بعد معاملات نوع السجل، ابدأ حقوله بـ `{{`."
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول ratio"
+help = "أغلق حقول السجل بـ `}` بعد الحقل الأخير."
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول المنشئ المنمط"
+help = "أغلق حقول المنشئ ذي النوع المحدد بـ `}` بعد الحقل الأخير."
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "مطلوب قوس إغلاق بعد حقول finge"
+help = "أغلق حقول البديل بـ `}` بعد الحقل الأخير."
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "مطلوب '<' بعد 'iuncta'"
+help = "اكتب معاملات نوع الصف بعد `{iuncta}`، كما في `{iuncta}<T, U>`."
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "مطلوب '[' بعد معاملات نوع iuncta"
+help = "بعد معاملات النوع، اكتب قائمة قيم الصف بين أقواس مربعة."
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "مطلوب ']' بعد عناصر iuncta"
+help = "أغلق قائمة قيم الصف بـ `]` بعد عناصرها."
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "مطلوب ')' بعد معلمات الإغلاق"
+help = "أغلق قائمة المعاملات بـ `)` قبل التوقيع الاختياري و`∴`."
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "مطلوب '∴' بعد توقيع الإغلاق"
+help = "بعد توقيع الإغلاق، اكتب `∴` ثم تعبيرًا أو كتلة `{fac}`."
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "مطلوب ')' بعد opener الـ ad"
+help = "أغلق تعبير الفاتح الاختياري بـ `)` بعد قيمته."
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "مطلوب ':' بعد تسمية الوسيطة"
+help = "في استدعاء قالب، ضع `:` بين تسمية الوسيط وقيمته."
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "مطلوب ']' بعد المفتاح المحسوب للكائن"
+help = "أغلق مفتاح الحقل المحسوب بـ `]` قبل كتابة `= value`."
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "مطلوب ':' بعد مفتاح JSON"
+help = "ضع `:` بين كل مفتاح JSON مقتبس وقيمته."
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "مطلوب قوس إغلاق بعد كائن JSON"
+help = "أغلق كائن JSON بـ `}` بعد أعضائه."
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "مطلوب ']' بعد مصفوفة JSON"
+help = "أغلق مصفوفة JSON بـ `]` بعد قيمها."
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "مطلوب قوس إغلاق بعد حقول المنشئ المستنتَج"
+help = "أغلق المنشئ المستنتج بـ `}`."
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "مطلوب '>' بعد معاملات نوع الاستدعاء"
+help = "أغلق قائمة معاملات النوع باستخدام '>' قبل '('."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "مطلوب '<' قبل معاملات نوع المنشئ"
+help = "أضف '<' قبل معاملات نوع المنشئ."
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "مطلوب '>' بعد معاملات نوع المنشئ"
+help = "أغلق قائمة معاملات نوع المنشئ باستخدام '>'."
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "مطلوب '(' بعد 'scriptum'"
+help = "ابدأ استدعاء `{scriptum}` بـ '('."
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "مطلوب ')' بعد وسائط scriptum"
+help = "أغلق استدعاء `{scriptum}` بـ ')' بعد وسائطه."
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
@@ -4348,5 +4501,26 @@ help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum �
 [diagnostics.INFO001]
 message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "النواة `{kernel}` تعمل على مسار واحد"
+help = "استخدم دالة `@ {nucleum}` مع حلقة `{itera}` وبند `{filum}` عندما ينبغي لكل خيط معالجة عنصر."
+
+[diagnostics.INFO001.issues.not_split]
+message = "النواة `{kernel}` تعمل على قسم واحد من {partitions} أقسام: {reason}"
+help = "تحقق من السبب: يتطلب التقسيم شبكة خيوط خطية، ونطاقًا للخيط، وحصر الكتابات في نطاق كل خيط."
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "النواة `{kernel}`: انقسامها على {partitions} أقسام يعتمد على الأشكال وقت التشغيل"
+help = "اختر أشكالًا وقت التشغيل تمنح شبكة الخيوط وكتابتها نطاقات متطابقة لضمان تقسيم متوقع."
+
+[diagnostics.INFO001.issues.whole_call]
+message = "النواة `{kernel}` تعمل كاستدعاء تسلسلي واحد على عامل CPU واحد"
+help = "للعمل المستقل لكل عنصر، استخدم دالة `@ {nucleum}` مع حلقة `{itera}` وبند `{filum}`."
+
+[diagnostics.INFO001.issues.not_placed]
+message = "النواة `{kernel}` غير موضوعة على الجهاز {device}: {reason}"
+help = "تحقق من السبب واستخدم صيغة نواة يدعمها الجهاز المحدد."
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "النواة `{kernel}`: يمكن تجنّب {kind} عبر الأقسام الـ {partitions}: {avoidable} ({reason})"
+help = "اتبع سبب التدقيق للعثور على الاعتمادية. أبقِ القراءات والكتابات المقسمة محلية للخيط، واستخدم تخطيطات مخازن متطابقة حيث أمكن."

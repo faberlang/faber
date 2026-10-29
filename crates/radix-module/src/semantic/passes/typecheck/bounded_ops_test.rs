@@ -12,8 +12,8 @@ fn bounded_ops_longitudo_and_vacua_are_len_not_capacity() {
     assert_accepts_la(
         r"functio probe(
     lista<numerus, magnitudo 8> xs,
-    textus<8> t,
-    ascii<8> a,
+    textus<magnitudo 8> t,
+    ascii<magnitudo 8> a,
     lista<b8, magnitudo 8> o
 ) → vacuum {
     sit numerus n_xs ← xs.longitudo()
@@ -49,8 +49,8 @@ fn bounded_ops_accipe_and_sectio_typecheck() {
     assert_accepts_la(
         r"functio probe(
     lista<numerus, magnitudo 8> xs,
-    textus<8> t,
-    ascii<8> a,
+    textus<magnitudo 8> t,
+    ascii<magnitudo 8> a,
     lista<b8, magnitudo 8> o
 ) → vacuum ⇥ textus {
     sit numerus ∪ nihil got ← xs.accipe(0)
@@ -96,7 +96,7 @@ fn bounded_ops_appende_requires_alternate_exit() {
     assert_rejects_with_issue_la(
         r#"functio grow() → vacuum {
     varia textus raw ← "ab"
-    varia textus<8> t ← raw ↦ textus<8>
+    varia textus<magnitudo 8> t ← raw ↦ textus<magnitudo 8>
     t.appende('c')
 }
 
@@ -107,7 +107,7 @@ incipit {
     );
     assert_rejects_with_issue_la(
         r"functio grow() → vacuum {
-    varia ascii<8> a ← 'ab'
+    varia ascii<magnitudo 8> a ← 'ab'
     a.appende('c')
 }
 
@@ -141,12 +141,12 @@ fn bounded_ops_appende_propagates_on_textus_channel() {
 
 functio grow_textus() → vacuum ⇥ textus {
     varia textus raw ← "ab"
-    varia textus<8> t ← raw ↦ textus<8>
+    varia textus<magnitudo 8> t ← raw ↦ textus<magnitudo 8>
     t.appende('c')
 }
 
 functio grow_ascii() → vacuum ⇥ textus {
-    varia ascii<8> a ← 'ab'
+    varia ascii<magnitudo 8> a ← 'ab'
     a.appende('c')
 }
 
@@ -178,15 +178,15 @@ fn bounded_ops_equality_ignores_spare_slots() {
     assert_accepts_la(
         r#"incipit {
     sit textus raw ← "ab"
-    sit textus<8> a ← raw ↦ textus<8>
-    sit textus<8> b ← raw ↦ textus<8>
+    sit textus<magnitudo 8> a ← raw ↦ textus<magnitudo 8>
+    sit textus<magnitudo 8> b ← raw ↦ textus<magnitudo 8>
     si a ≡ b { nota 1 }
 }"#,
     );
     assert_accepts_la(
         r"incipit {
-    sit ascii<8> a ← 'ab'
-    sit ascii<8> b ← 'ab'
+    sit ascii<magnitudo 8> a ← 'ab'
+    sit ascii<magnitudo 8> b ← 'ab'
     si a ≡ b { nota 1 }
 }",
     );
@@ -213,7 +213,7 @@ incipit {
         EXACT_EQ_ISSUE,
     );
     assert_rejects_with_issue_la(
-        r"functio same(textus<8> a, textus<4> b) → bivalens {
+        r"functio same(textus<magnitudo 8> a, textus<magnitudo 4> b) → bivalens {
     redde a ≡ b
 }
 
@@ -223,7 +223,7 @@ incipit {
         EXACT_EQ_ISSUE,
     );
     assert_rejects_with_issue_la(
-        r"functio same(ascii<8> a, ascii<4> b) → bivalens {
+        r"functio same(ascii<magnitudo 8> a, ascii<magnitudo 4> b) → bivalens {
     redde a ≡ b
 }
 

@@ -81,28 +81,28 @@ targets = ["rust"]
         provider.join("src/vectors.fab"),
         r#"@ public
 class Box<size N> {
-    mut vector<f32, N> minima
-    mut vector<f32, N> maxima
+    mut vector<f32, size N> minima
+    mut vector<f32, size N> maxima
 }
 
 @ public
-fn add<size N>(vector<f32, N> a, vector<f32, N> b) → vector<f32, N> {
+fn add<size N>(vector<f32, size N> a, vector<f32, size N> b) → vector<f32, size N> {
     return a.added(b)
 }
 
 @ public
-fn dot<size N>(vector<f32, N> a, vector<f32, N> b) → f32 {
+fn dot<size N>(vector<f32, size N> a, vector<f32, size N> b) → f32 {
     return a.dot(b)
 }
 
 @ public
-fn cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+fn cross(vector<f32, size 3> a, vector<f32, size 3> b) → vector<f32, size 3> {
     return a.cross(b)
 }
 
 @ public
-fn lane(vector<f32, 3> a) → f32 {
-    let vector<f32, 3> swapped ← a.swizzle("zyx")
+fn lane(vector<f32, size 3> a) → f32 {
+    let vector<f32, size 3> swapped ← a.swizzle("zyx")
     return swapped.dot(a)
 }
 
@@ -112,7 +112,7 @@ fn multiply(matrix<f32, [3, 2]> a, matrix<f32, [2, 3]> b) → matrix<f32, [3, 3]
 }
 
 @ public
-fn box_minima<size N>(Box<N> b) → vector<f32, N> {
+fn box_minima<size N>(Box<N> b) → vector<f32, size N> {
     return b.minima
 }
 "#,
@@ -129,22 +129,22 @@ locale = "en"
 import from "probevectors:vectors" gmt
 
 fn imported() → f32 {
-    let vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    let vector<f32, 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, 3>
-    let vector<f32, 3> s ← gmt.add(a, b)
-    let vector<f32, 3> x ← gmt.cross(a, b)
+    let vector<f32, size 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    let vector<f32, size 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, size 3>
+    let vector<f32, size 3> s ← gmt.add(a, b)
+    let vector<f32, size 3> x ← gmt.cross(a, b)
     return (s.dot(b) + x.dot(a)) + gmt.lane(a)
 }
 
-fn imported_signature() → vector<f32, 4> {
-    let vector<f32, 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
-    let vector<f32, 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, 4>
+fn imported_signature() → vector<f32, size 4> {
+    let vector<f32, size 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, size 4>
+    let vector<f32, size 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, size 4>
     return gmt.add(a, b)
 }
 
 fn imported_shapes() → matrix<f32, [3, 3]> {
-    let vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
-    let vector<f32, 2> narrow ← [1.0, 2.0] ↦ vector<f32, 2>
+    let vector<f32, size 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, size 3>
+    let vector<f32, size 2> narrow ← [1.0, 2.0] ↦ vector<f32, size 2>
     let matrix<f32, [3, 2]> outer ← s ⊗ narrow
     let matrix<f32, [2, 3]> inner ← narrow ⊗ s
     return gmt.multiply(outer, inner)
@@ -3471,6 +3471,86 @@ functio limes() → iuncta<numerus, numerus> {
             crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus),
             crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus),
         ])
+    );
+}
+
+#[test]
+fn interface_snapshot_preserves_callable_and_storage_types() {
+    // These signatures exercise portable type forms that cannot be inferred
+    // from ordinary nominal/primitive exports: closures, two-channel promises,
+    // atomics, and shaped sparse tensors.
+    let (program, interner) = super::parse_program_for_namespace_exports(
+        "producer.fab",
+        r#"+++
+locale = "la"
++++
+@ publica
+functio callback((numerus) → fractus handler) → numerus { redde 1 }
+
+@ publica
+functio pending(promissum<numerus ⇥ textus> value) → promissum<numerus ⇥ textus> { redde value }
+
+@ publica
+functio cells(atomic<numerus> cell, sparsa<fractus, [2, 3]> values) → fractus { redde 0.0 }
+"#,
+        Some(&la_locale_pack()),
+    )
+    .expect("parse producer source");
+    let interface = super::file_interface_for_program(&program, &interner, None);
+
+    let callback = interface.exports.get("callback").expect("callback export");
+    let crate::file_interface::FileExportKind::Function(callback) = &callback.kind else {
+        panic!("callback must export as a function");
+    };
+    let crate::file_interface::InterfaceTypeSnapshot::Func(handler) = &callback.params[0].ty else {
+        panic!("function-typed parameter must retain its callable signature");
+    };
+    assert_eq!(handler.params.len(), 1);
+    assert_eq!(
+        handler.params[0].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus)
+    );
+    assert_eq!(
+        *handler.ret,
+        crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Fractus)
+    );
+
+    let pending = interface.exports.get("pending").expect("pending export");
+    let crate::file_interface::FileExportKind::Function(pending) = &pending.kind else {
+        panic!("pending must export as a function");
+    };
+    let promise = crate::file_interface::InterfaceTypeSnapshot::PromissumFailable(
+        Box::new(crate::file_interface::InterfaceTypeSnapshot::Primitive(
+            crate::semantic::Primitive::Numerus,
+        )),
+        Box::new(crate::file_interface::InterfaceTypeSnapshot::Primitive(
+            crate::semantic::Primitive::Textus,
+        )),
+    );
+    assert_eq!(pending.params[0].ty, promise);
+    assert_eq!(*pending.ret, promise);
+
+    let cells = interface.exports.get("cells").expect("cells export");
+    let crate::file_interface::FileExportKind::Function(cells) = &cells.kind else {
+        panic!("cells must export as a function");
+    };
+    assert_eq!(
+        cells.params[0].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Atomic(Box::new(
+            crate::file_interface::InterfaceTypeSnapshot::Primitive(crate::semantic::Primitive::Numerus),
+        ))
+    );
+    assert_eq!(
+        cells.params[1].ty,
+        crate::file_interface::InterfaceTypeSnapshot::Sparsa(
+            Box::new(crate::file_interface::InterfaceTypeSnapshot::Primitive(
+                crate::semantic::Primitive::Fractus,
+            )),
+            crate::file_interface::InterfaceIndexSnapshot::Tuple(vec![
+                crate::file_interface::InterfaceIndexSnapshot::Literal(2),
+                crate::file_interface::InterfaceIndexSnapshot::Literal(3),
+            ]),
+        )
     );
 }
 

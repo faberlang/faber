@@ -461,8 +461,8 @@ fn text_into_inf_is_failable_and_inf_into_text_is_total() {
 fn inf_packs_into_ascii_digits_through_a_radix_hint() {
     test_support::assert_accepts_la(&conversion(
         "inf a",
-        "ascii<40>",
-        "a ↦ ascii<40> via Hex ⊥ 'x'",
+        "ascii<magnitudo 40>",
+        "a ↦ ascii<magnitudo 40> via Hex ⊥ 'x'",
     ));
 }
 

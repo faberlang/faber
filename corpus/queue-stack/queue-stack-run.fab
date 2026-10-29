@@ -19,8 +19,8 @@ locale = "en"
 #     so the same two appends come back reversed.
 #   • Empty pop is `T ∪ none` — the last `remove_first()` / `remove_last()`
 #     prints `none`; it does not trap.
-#   • Bounded push is recoverable — a third append into `queue<int, 2>` or
-#     `stack<int, 2>` reports on the `⇥` channel, so a `do`/`catch` turns it
+#   • Bounded push is recoverable — a third append into `queue<int, size 2>` or
+#     `stack<int, size 2>` reports on the `⇥` channel, so a `do`/`catch` turns it
 #     into a printed line. A push at capacity in `main` would be fatal.
 #   • Elementwise arithmetic — `+` pairs two collections by live length and
 #     broadcasts a scalar (`2 * a`); a length mismatch aborts after the
@@ -30,15 +30,15 @@ locale = "en"
 # (re-pointable, writable) with the type slot always written; a loop binder is
 # `let x` with no type slot. `const` is compile-time only.
 
-fn push_bounded(queue<int, 2> q0) → void ⇥ string {
-    mut queue<int, 2> q ← copy q0
+fn push_bounded(queue<int, size 2> q0) → void ⇥ string {
+    mut queue<int, size 2> q ← copy q0
     q.append(1)
     q.append(2)
     q.append(3)
 }
 
-fn push_bounded_stack(stack<int, 2> s0) → void ⇥ string {
-    mut stack<int, 2> s ← copy s0
+fn push_bounded_stack(stack<int, size 2> s0) → void ⇥ string {
+    mut stack<int, size 2> s ← copy s0
     s.append(1)
     s.append(2)
     s.append(3)
@@ -81,14 +81,14 @@ main {
     # ---------------------------------------------------------------------
     # C3 — bounded push at capacity rides the `⇥` channel, not a panic
     # ---------------------------------------------------------------------
-    mut queue<int, 2> bq ← empty
+    mut queue<int, size 2> bq ← empty
     do {
         push_bounded(bq)
         print "no trap"
     } catch err {
         print "capacity reported"
     }
-    mut stack<int, 2> bs ← empty
+    mut stack<int, size 2> bs ← empty
     do {
         push_bounded_stack(bs)
     } catch err {

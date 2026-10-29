@@ -1,0 +1,25 @@
++++
+term = "?("
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "type_annotation", "owned_type", "base_type", "expression", "literal", "nota_stmt", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "call_expr", "call_suffix", "argument_list", "argument", "function_type", "optional_suffix"]
+category = "type"
+summary = "A mut argument passed through an optional function call updates the caller's place."
+syntax = "<expression>?(<args>)"
+related = ["?(", "?[", "?."]
+locale = "en"
++++
+# A mut argument through an optional call updates its caller.
+
+type Op = (mut list<int>) → int
+
+fn push(mut list<int> xs) → int {
+    xs.append(9)
+    return xs.length()
+}
+
+main {
+    let Op ∪ none f ← push
+    mut list<int> xs ← []
+    print f?(mut xs)
+    print xs.length()
+}

@@ -41,7 +41,7 @@ enum SlotPolicy {
 enum ContainerCarrier {
     /// `tensor<E, ..>` and `sparsa<E, ..>`, both carried as `Value::Tensor`.
     Sequence,
-    /// `vector<E, N>` carried as `Value::Vector`.
+    /// `vector<E, size N>` carried as `Value::Vector`.
     Vector,
     /// `matrix<E, [R, C]>` carried as `Value::Matrix`.
     Matrix,

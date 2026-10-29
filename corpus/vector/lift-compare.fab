@@ -35,36 +35,36 @@ locale = "en"
 #
 # EXPECTED stdout: see lift-compare.expected
 
-fn below(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
+fn below(vector<f32, size 3> a, vector<f32, size 3> b) → vector<bool, size 3> {
     return a ≺ b
 }
 
-fn at_least(vector<f32, 3> a, f32 s) → vector<bool, 3> {
+fn at_least(vector<f32, size 3> a, f32 s) → vector<bool, size 3> {
     return a ≥ s
 }
 
-fn bigger_than(f32 s, vector<f32, 3> a) → vector<bool, 3> {
+fn bigger_than(f32 s, vector<f32, size 3> a) → vector<bool, size 3> {
     return s ≻ a
 }
 
-fn lane_equal(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
+fn lane_equal(vector<f32, size 3> a, vector<f32, size 3> b) → vector<bool, size 3> {
     return a ≅ b
 }
 
-fn lane_apart(vector<f32, 3> a, vector<f32, 3> b) → vector<bool, 3> {
+fn lane_apart(vector<f32, size 3> a, vector<f32, size 3> b) → vector<bool, size 3> {
     return a ≇ b
 }
 
-fn clamped(vector<f32, 3> a, f32 limit) → vector<f32, 3> {
+fn clamped(vector<f32, size 3> a, f32 limit) → vector<f32, size 3> {
     return (a ≻ limit) ✓ limit ✗ a
 }
 
 main {
-    let vector<f32, 3> a ← [1.0, 5.0, 3.0] ↦ vector<f32, 3>
-    let vector<f32, 3> b ← [4.0, 5.0, 2.0] ↦ vector<f32, 3>
-    let vector<bool, 3> lt ← below(a, b)
+    let vector<f32, size 3> a ← [1.0, 5.0, 3.0] ↦ vector<f32, size 3>
+    let vector<f32, size 3> b ← [4.0, 5.0, 2.0] ↦ vector<f32, size 3>
+    let vector<bool, size 3> lt ← below(a, b)
     print lt
-    let vector<bool, 3> big ← at_least(a, 3.0)
+    let vector<bool, size 3> big ← at_least(a, 3.0)
     print big
     print bigger_than(3.0, a)
     print lane_equal(a, b)

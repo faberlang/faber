@@ -23,7 +23,7 @@ fn ascii_scalar_index_binds_littera() {
 fn ascii_scalar_index_is_not_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(ascii s) → vacuum {
-    sit ascii<1> c ← s[0]
+    sit ascii<magnitudo 1> c ← s[0]
     nota c
 }",
         INIT_MISMATCH,
@@ -33,7 +33,7 @@ fn ascii_scalar_index_is_not_ascii_one() {
 #[test]
 fn bounded_ascii_scalar_index_binds_littera() {
     test_support::assert_accepts_la(
-        "functio f(ascii<4> s) → vacuum {
+        "functio f(ascii<magnitudo 4> s) → vacuum {
     sit littera c ← s[1]
     nota c
 }",
@@ -45,7 +45,7 @@ fn bounded_ascii_scalar_index_binds_littera() {
 fn textus_scalar_index_keeps_ascii_one() {
     test_support::assert_accepts_la(
         "functio f(textus s) → vacuum {
-    sit ascii<1> c ← s[0]
+    sit ascii<magnitudo 1> c ← s[0]
     nota c
 }",
     );
@@ -68,7 +68,7 @@ fn itera_ex_textus_element_is_not_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
     itera ex s sit c {
-        sit ascii<1> x ← c
+        sit ascii<magnitudo 1> x ← c
         nota x
     }
 }",
@@ -207,7 +207,7 @@ fn octeti_elements_are_b8() {
 fn textus_cursor_is_not_cursor_of_ascii_one() {
     test_support::assert_rejects_with_issue_la(
         "functio f(textus s) → vacuum {
-    sit cursor<ascii<1>> k ← s.cursor()
+    sit cursor<ascii<magnitudo 1>> k ← s.cursor()
     nota k
 }",
         INIT_MISMATCH,
