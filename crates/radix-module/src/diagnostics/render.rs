@@ -205,10 +205,14 @@ fn render_expanded_text(diag: &Diagnostic, pack: Option<&LocalePack>) -> Result<
 
     let text = diagnostic_display_text(diag, pack)?;
     let safe_text = SanitizedDiagnosticText::from_display_text(text.as_ref());
-    let mut output = expanded_header(severity, &label, diag.phase, file, &span, safe_text.message());
+    let mut output = expanded_header(severity, &label, diag.phase, file, &span, None);
 
     if let Some(line) = &diag.source_line {
         write!(output, "\nsource: {}", bidi_isolate_code(&sanitize_snippet_text(line))).ok();
+    }
+
+    if let Some(message) = safe_text.message() {
+        write!(output, "\nmessage: {message}").ok();
     }
 
     if let Some(help) = safe_text.help() {

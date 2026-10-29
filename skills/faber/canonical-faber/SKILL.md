@@ -86,8 +86,8 @@ finding. The live tree always wins over this library.
    flag a spelling as non-idiomatic before locale resolution — surface
    spellings are pack facts, not style.
 2. **Separate law from style.** Run `faber check <path>` on the target (from
-   the repo root: `cargo run -p faber -- check <path>`; add `--diagnostics` for the
-   message text). Compile errors are reported separately as compile findings;
+   the repo root: `cargo run -p faber -- check <path>`; the default output carries the
+   message and help; `--no-diagnostics` gives the compact form). Compile errors are reported separately as compile findings;
    this review proceeds over the legal code. That includes the retired forms
    the compiler now rejects: `static` (la `generis`) module constants and class
    members (`PARSE010 static_decl_retired` / `static_member_retired`), `var`

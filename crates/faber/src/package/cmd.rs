@@ -155,6 +155,17 @@ fn report_diagnostics_and_exit(
     crate::exit_status::exit_for_diagnostics(diagnostics);
 }
 
+fn report_diagnostics_and_exit_mode(
+    diagnostics: &[radix::module::Diagnostic],
+    locale_pack: Option<&radix::module::locale::LocalePack>,
+    message: &str,
+    mode: DiagnosticMode,
+) -> ! {
+    crate::postprocess::print_diagnostics(diagnostics, mode, locale_pack);
+    eprintln!("{message}");
+    crate::exit_status::exit_for_diagnostics(diagnostics);
+}
+
 /// Execute the user-facing `faber build` command.
 ///
 /// Package Rust builds emit a generated Cargo crate and then delegate binary
@@ -226,10 +237,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 &super::mir::faber_mir_seams(),
             ) {
                 Ok(artifact) => artifact,
-                Err(diagnostics) => report_diagnostics_and_exit(
+                Err(diagnostics) => report_diagnostics_and_exit_mode(
                     &diagnostics,
                     locale_pack.as_ref(),
                     "scena artifact build failed",
+                    command.diagnostic_mode,
                 ),
             };
             println!("{}", artifact.manifest_path.display());
@@ -249,10 +261,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 &super::mir::faber_mir_seams(),
             ) {
                 Ok(image) => image,
-                Err(diagnostics) => report_diagnostics_and_exit(
+                Err(diagnostics) => report_diagnostics_and_exit_mode(
                     &diagnostics,
                     locale_pack.as_ref(),
                     "fmir-text image build failed",
+                    command.diagnostic_mode,
                 ),
             };
             println!("{}", image.image_path.display());
@@ -272,10 +285,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 &super::mir::faber_mir_seams(),
             ) {
                 Ok(image) => image,
-                Err(diagnostics) => report_diagnostics_and_exit(
+                Err(diagnostics) => report_diagnostics_and_exit_mode(
                     &diagnostics,
                     locale_pack.as_ref(),
                     "fmir image build failed",
+                    command.diagnostic_mode,
                 ),
             };
             println!("{}", image.image_path.display());
@@ -293,10 +307,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
             &super::faber_analysis_seams(),
         ) {
             Ok(artifact) => artifact,
-            Err(diagnostics) => report_diagnostics_and_exit(
+            Err(diagnostics) => report_diagnostics_and_exit_mode(
                 &diagnostics,
                 locale_pack.as_ref(),
                 "fhir package build failed",
+                command.diagnostic_mode,
             ),
         };
         #[cfg(feature = "hir-fhir")]
@@ -323,9 +338,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
             let build = match build_host_program_in(&config, &input_path, profile, &command.out_dir)
             {
                 Ok(build) => build,
-                Err(diagnostics) => {
-                    super::build_recipe::report_and_exit(&diagnostics, locale_pack.as_ref())
-                }
+                Err(diagnostics) => super::build_recipe::report_and_exit_mode(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    command.diagnostic_mode,
+                ),
             };
             println!("{}", build.binary_path.display());
             return;
@@ -354,10 +371,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 &super::faber_analysis_seams(),
             ) {
                 Ok(build) => build,
-                Err(diagnostics) => report_diagnostics_and_exit(
+                Err(diagnostics) => report_diagnostics_and_exit_mode(
                     &diagnostics,
                     locale_pack.as_ref(),
                     "wasm package build failed",
+                    command.diagnostic_mode,
                 ),
             };
             println!("{}", build.manifest.output.display());
@@ -376,10 +394,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         {
             let code = match compile_package_metal_text(&config, &input_path) {
                 Ok(code) => code,
-                Err(diagnostics) => report_diagnostics_and_exit(
+                Err(diagnostics) => report_diagnostics_and_exit_mode(
                     &diagnostics,
                     locale_pack.as_ref(),
                     "metal-text package build failed",
+                    command.diagnostic_mode,
                 ),
             };
             let output_path = radix::services::build_output_path(
@@ -429,9 +448,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 println!("{}", program.launcher.display());
                 return;
             }
-            Err(diagnostics) => {
-                super::build_recipe::report_and_exit(&diagnostics, locale_pack.as_ref())
-            }
+            Err(diagnostics) => super::build_recipe::report_and_exit_mode(
+                &diagnostics,
+                locale_pack.as_ref(),
+                command.diagnostic_mode,
+            ),
         }
     }
 
@@ -454,12 +475,13 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 format,
                 linter,
                 locale_pack.as_ref(),
+                command.diagnostic_mode,
             ) {
                 Ok(program) => {
                     println!("{}", program.binary.display());
                     return;
                 }
-                Err(failure) => failure.exit(locale_pack.as_ref()),
+                Err(failure) => failure.exit(locale_pack.as_ref(), command.diagnostic_mode),
             }
         }
     }
@@ -473,7 +495,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
 
     crate::postprocess::print_diagnostics(
         &result.diagnostics,
-        DiagnosticMode::Normal,
+        command.diagnostic_mode,
         locale_pack.as_ref(),
     );
 
@@ -535,16 +557,22 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
             super::rust_runtime_plan_for_package,
         ) {
             Ok(plan) => plan,
-            Err(diagnostics) => report_diagnostics_and_exit(
+            Err(diagnostics) => report_diagnostics_and_exit_mode(
                 &diagnostics,
                 locale_pack.as_ref(),
                 "runtime plan failed",
+                command.diagnostic_mode,
             ),
         };
         if let Some(diagnostic) =
             package_host_selection_diagnostic(&runtime_plan, &layout.manifest_path)
         {
-            report_diagnostics_and_exit(&[diagnostic], locale_pack.as_ref(), "runtime plan failed");
+            report_diagnostics_and_exit_mode(
+                &[diagnostic],
+                locale_pack.as_ref(),
+                "runtime plan failed",
+                command.diagnostic_mode,
+            );
         }
         // G4: emit native-binding library crates before the application crate links them.
         match super::library_link::emit_linked_library_crates(&layout.package_root, &layout) {
@@ -554,10 +582,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                     .map(|lib| (lib.crate_name, lib.crate_root))
                     .collect();
             }
-            Err(diagnostics) => report_diagnostics_and_exit(
+            Err(diagnostics) => report_diagnostics_and_exit_mode(
                 &diagnostics,
                 locale_pack.as_ref(),
                 "library dependency graph failed",
+                command.diagnostic_mode,
             ),
         }
         let package_code = crate::postprocess::postprocess_code(
@@ -608,10 +637,11 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 return;
             }
             Ok(_) => {}
-            Err(diagnostics) => report_diagnostics_and_exit(
+            Err(diagnostics) => report_diagnostics_and_exit_mode(
                 &diagnostics,
                 locale_pack.as_ref(),
                 "runtime plan failed",
+                command.diagnostic_mode,
             ),
         }
     }
@@ -899,6 +929,7 @@ pub fn cmd_check_package(
                 radix::module::diagnostics::render_expanded_diagnostics(&diagnostics)
             ),
         }
+        crate::postprocess::print_explain_footer(&diagnostics);
     }
 
     for diag in &diagnostics {
@@ -1022,6 +1053,7 @@ fn exit_does_not_lower(
             None => radix::module::diagnostics::render_expanded_diagnostics(diagnostics),
         };
         eprintln!("{rendered}");
+        crate::postprocess::print_explain_footer(diagnostics);
     } else {
         for diag in diagnostics {
             eprintln!("{}", radix::module::diagnostics::render_plain(diag));

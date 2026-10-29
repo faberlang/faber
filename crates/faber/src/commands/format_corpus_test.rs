@@ -18,6 +18,7 @@ use radix::module::driver::faber_format::test_gate::{
 use radix::module::driver::reemit_faber;
 use radix::module::lexer::TokenKind;
 use radix::module::syntax::StmtKind;
+use radix::services::DiagnosticMode;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -421,13 +422,13 @@ fn format_width_unset_is_byte_identical_to_the_canonical_corpus() {
         let source = fs::read_to_string(&fixture).expect("read fixture source");
         let expected = fs::read_to_string(corpus_dir().join(format!("{stem}.format.expected")))
             .expect("read expectation");
-        let canonical = format_single_doc(&fixture, &source, None)
+        let canonical = format_single_doc(&fixture, &source, None, DiagnosticMode::Normal)
             .unwrap_or_else(|status| panic!("{stem}: format failed with status {status}"));
         assert_eq!(
             canonical, expected,
             "{stem}: no width must not change output"
         );
-        let wide = format_single_doc(&fixture, &source, width(100_000))
+        let wide = format_single_doc(&fixture, &source, width(100_000), DiagnosticMode::Normal)
             .unwrap_or_else(|status| panic!("{stem}: wide format failed with status {status}"));
         assert_eq!(
             wide, expected,
@@ -455,7 +456,12 @@ fn format_width_60_roundtrips_format_corpus() {
                     continue;
                 }
             };
-            let wrapped = match format_single_doc(&fixture, &source, width(columns)) {
+            let wrapped = match format_single_doc(
+                &fixture,
+                &source,
+                width(columns),
+                DiagnosticMode::Normal,
+            ) {
                 Ok(wrapped) => wrapped,
                 Err(status) => {
                     failures.push(format!(
@@ -499,7 +505,7 @@ fn format_width_60_roundtrips_format_corpus() {
                 Err(detail) => failures.push(format!("{stem}@{columns} re-emit: {detail}")),
             }
             // Idempotent under the same width.
-            match format_single_doc(&fixture, &wrapped, width(columns)) {
+            match format_single_doc(&fixture, &wrapped, width(columns), DiagnosticMode::Normal) {
                 Ok(again) if again == wrapped => {}
                 Ok(_) => failures.push(format!(
                     "{stem}@{columns}: wrapped format is not idempotent"
@@ -526,8 +532,10 @@ fn format_width_60_roundtrips_format_corpus() {
 fn format_width_wraps_the_long_lines_fixture() {
     let fixture = corpus_dir().join("long-lines.fab");
     let source = fs::read_to_string(&fixture).expect("read fixture source");
-    let canonical = format_single_doc(&fixture, &source, None).expect("canonical");
-    let wrapped = format_single_doc(&fixture, &source, width(60)).expect("wrapped");
+    let canonical =
+        format_single_doc(&fixture, &source, None, DiagnosticMode::Normal).expect("canonical");
+    let wrapped =
+        format_single_doc(&fixture, &source, width(60), DiagnosticMode::Normal).expect("wrapped");
     let over = |text: &str| {
         text.lines()
             .filter(|line| line.chars().count() > 60)
@@ -552,9 +560,9 @@ fn format_width_1_wraps_real_exempla_without_changing_them() {
             .join("../../corpus")
             .join(relative);
         let source = fs::read_to_string(&path).expect("read exemplum");
-        let canonical = format_single_doc(&path, &source, None)
+        let canonical = format_single_doc(&path, &source, None, DiagnosticMode::Normal)
             .unwrap_or_else(|status| panic!("{relative}: canonical status {status}"));
-        let wrapped = format_single_doc(&path, &source, width(1))
+        let wrapped = format_single_doc(&path, &source, width(1), DiagnosticMode::Normal)
             .unwrap_or_else(|status| panic!("{relative}: width 1 status {status}"));
         let (_, _, again) = canonical_pipeline(&path, &wrapped)
             .unwrap_or_else(|detail| panic!("{relative}: wrapped re-emit: {detail}"));

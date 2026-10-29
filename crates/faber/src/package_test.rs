@@ -401,6 +401,7 @@ fn manifest_target_command_probe() {
                 deny_codes: Vec::new(),
                 locale: None,
                 diagnostics_locale: None,
+                diagnostic_mode: radix::services::DiagnosticMode::Normal,
             },
             false,
             false,

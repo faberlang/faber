@@ -298,6 +298,10 @@ pub struct DocArgs {
 /// Arguments for `faber format`.
 #[derive(clap::Args, Debug)]
 pub struct FormatArgs {
+    /// Use compact diagnostics instead of the default message and help
+    #[arg(long)]
+    pub no_diagnostics: bool,
+
     /// Files or directories to format (default: current package directory).
     ///
     /// Each root resolves the package that contains it (nearest faber.toml,
@@ -335,6 +339,10 @@ pub struct FormatArgs {
 /// Arguments for `faber convert`.
 #[derive(clap::Args, Debug)]
 pub struct ConvertArgs {
+    /// Use compact diagnostics instead of the default message and help
+    #[arg(long)]
+    pub no_diagnostics: bool,
+
     /// Files or directories to convert (default: current directory)
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
@@ -394,6 +402,10 @@ pub struct FieldModifierCodemodArgs {
 /// Arguments for `faber build`.
 #[derive(clap::Args, Debug)]
 pub struct BuildArgs {
+    /// Use compact diagnostics instead of the default message and help
+    #[arg(long)]
+    pub no_diagnostics: bool,
+
     /// Output target language
     #[arg(short = 't', long = "target", value_enum)]
     pub target: Option<FaberCliTarget>,
@@ -551,9 +563,9 @@ pub struct CostArgs {
 /// Arguments for `faber check`.
 #[derive(clap::Args, Debug)]
 pub struct CheckArgs {
-    /// Print expanded phase-aware diagnostics instead of normal check output
+    /// Use compact diagnostics instead of the default message and help
     #[arg(long)]
-    pub diagnostics: bool,
+    pub no_diagnostics: bool,
 
     /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]
@@ -743,6 +755,10 @@ pub enum RunTarget {
 /// execution route.
 #[derive(clap::Args, Debug)]
 pub struct RunArgs {
+    /// Use compact diagnostics instead of the default message and help
+    #[arg(long)]
+    pub no_diagnostics: bool,
+
     /// Path to run (defaults to current directory)
     #[arg(default_value = ".")]
     pub path: PathBuf,
@@ -883,6 +899,10 @@ pub enum TestOutputFormat {
 /// Arguments for `faber test` (MIR runner — no Cargo / rustc on the package).
 #[derive(clap::Args, Debug)]
 pub struct TestArgs {
+    /// Use compact diagnostics instead of the default message and help
+    #[arg(long)]
+    pub no_diagnostics: bool,
+
     /// Package path or single `.fab` / `.proba` file to test
     #[arg(default_value = ".")]
     pub path: PathBuf,
