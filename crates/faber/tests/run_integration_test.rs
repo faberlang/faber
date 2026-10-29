@@ -3529,7 +3529,12 @@ fn run_cpu_device_kernel_fault_prints_one_coded_error() {
         "0",
     ]);
     assert_eq!(status.code(), Some(70), "{stderr}");
-    assert!(stdout.starts_with(CPU_DEVICE_RECEIPT_PREFIX), "{stdout}");
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+        "the cpu device receipt is reported on stderr:\n{stderr}"
+    );
     let errors = error_lines(&stderr);
     assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
     assert!(
@@ -3562,7 +3567,12 @@ fn run_cpu_device_region_fault_ends_the_run_once() {
         "3",
     ]);
     assert_eq!(status.code(), Some(70), "{stderr}");
-    assert!(stdout.starts_with(CPU_DEVICE_RECEIPT_PREFIX), "{stdout}");
+    assert!(
+        stderr
+            .lines()
+            .any(|line| line.starts_with(CPU_DEVICE_RECEIPT_PREFIX)),
+        "the cpu device receipt is reported on stderr:\n{stderr}"
+    );
     let errors = error_lines(&stderr);
     assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
     assert!(
@@ -3610,7 +3620,7 @@ fn assert_single_lane_device_fault_classes_match_reference(
     for (index, &(read, write, mode)) in SINGLE_LANE_KERNEL_FAULT_CASES.iter().enumerate() {
         let args = ["run", "--device", device, &path, "--", read, write, mode];
         let (stdout, stderr, status) = run_faber_status(&args);
-        if !stdout.starts_with(receipt_prefix) {
+        if !stderr.lines().any(|line| line.starts_with(receipt_prefix)) {
             assert_eq!(
                 index, 0,
                 "{device} disappeared between fault cases:\n{stdout}\n{stderr}"
