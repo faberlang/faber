@@ -3301,7 +3301,7 @@ help = "apply % against a scalar; there is no elementwise remainder between two 
 
 [diagnostics.SEM011.issues.aggregate_equality_scalar_operand]
 message = "`≡` compares whole values, and a {kind} is never equal to a number"
-help = "For numeric aggregates, use `≅` to compare each element with the scalar; use `≡` or `≢` only to compare whole values of the same type"
+help = "use `≅` for a per-element mask (`a ≅ 2.0`), or compare a reduction"
 
 [diagnostics.SEM011.issues.aggregate_equality_shape_mismatch]
 message = "{kind} shapes differ: `{left}` and `{right}`; `≡` requires identical types"
@@ -3361,7 +3361,7 @@ help = "Write this control character as an ASCII Unicode escape, such as `\\u{{1
 
 [diagnostics.SEM011.issues.ascii_literal_too_long]
 message = "ascii literal exceeds the maximum payload of 64 bytes"
-help = "Shorten it, increase `{ascii}` capacity up to 64, or use unbounded `{ascii}` or `{textus}` for longer text"
+help = "shorten the ascii literal or use a string literal instead"
 
 [diagnostics.SEM011.issues.boolean_operands_required]
 message = "boolean operands required"
@@ -3461,11 +3461,11 @@ help = "use × only with two width-3 vectors; use ⊙ for an elementwise product
 
 [diagnostics.SEM011.issues.glyph_hadamard_shapes_mismatch]
 message = "operator {op} requires identical operand shapes"
-help = "make the operands of {op} the same shape; reshape one with `.reshape(...)` when their element counts match"
+help = "use `↦` to reshape the operands to identical shapes before applying {op}"
 
 [diagnostics.SEM011.issues.glyph_transpose_operands_unsupported]
 message = "ᵀ applies only to tensor values"
-help = "apply postfix ᵀ only to a rank-2 tensor or matrix"
+help = "apply ᵀ to a tensor value"
 
 [diagnostics.SEM011.issues.glyph_transpose_rank1_no_row_column_distinction]
 message = "rank-1 transpose has no row/column distinction"
@@ -3729,11 +3729,11 @@ help = "index {lista} values with int"
 
 [diagnostics.SEM011.issues.indexing_requires_array_or_map]
 message = "indexing requires array or map"
-help = "index only {lista}, map, tensor, string, or {ignotum} values"
+help = "index only {lista}, map, tensor, string, or ignotum values"
 
 [diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
 message = "tensor index vector requires {lista} of integer elements"
-help = "pass a {lista} whose elements are integers"
+help = "use {lista} of supported integer index elements"
 
 [diagnostics.SEM011.issues.tensor_scalar_index_rank]
 message = "tensor scalar index requires rank-1; use a {lista}<integer> for rank-N"
@@ -3757,7 +3757,7 @@ help = "use numeric tensor or sparse element types"
 
 [diagnostics.SEM011.issues.tensor_approx_comparison_deferred]
 message = "{op} on a {kind} is not admitted yet"
-help = "use exact comparisons such as ≅ or ≇; approximate tensor comparisons are not supported yet"
+help = "compare with an ordering or exact comparison, or compare the elements in tooling"
 
 [diagnostics.SEM011.issues.tensor_lift_decimal_element_unsupported]
 message = "elementwise operators on tensors do not support decimal elements yet"
@@ -3917,7 +3917,7 @@ help = "add an explicit type annotation"
 
 [diagnostics.SEM014.issues.cannot_infer_empty_list_element_type]
 message = "cannot infer the element type of an empty list"
-help = "Give the empty list an element type, for example `{lista}<T> items ← []`"
+help = "declare a list<T> local initialized with empty, or ascribe [] to list<T> before converting it"
 
 [diagnostics.SEM014.issues.cannot_infer_expression_type]
 message = "cannot infer expression type"
@@ -3953,7 +3953,7 @@ help = "ensure built-in frame types are registered before typechecking"
 
 [diagnostics.SEM014.issues.vacua_requires_declared_type]
 message = "empty requires an explicit declared type"
-help = "Declare the collection type, for example `{lista}<T> items ← {vacua}`"
+help = "add a declared collection type for empty"
 
 [diagnostics.SEM014.issues.bounded_capacity_unsolved]
 message = "bounded capacity could not be inferred"
@@ -4009,7 +4009,7 @@ help = "Use a literal vector width; a bounded list's capacity must match it"
 
 [diagnostics.SEM016.issues.matrix_materialize_unsupported]
 message = "matrix materialization requires a lista source with matching element type"
-help = "Convert a flat list with matching elements to `matrix<T, [R, C]>`; literal sources need literal dimensions"
+help = "materialize a lista of matrix cells with `↦ matrix<T, [R, C]>`; a literal source needs a literal shape"
 
 [diagnostics.SEM016.issues.valor_to_regex_unsupported]
 message = "{valor} to regex conversion has no default pattern; use `{valor} ↦ string ↦ regex`"
