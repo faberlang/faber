@@ -5748,123 +5748,163 @@ message = "expected '<' after the numeric wrapper name"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "expected ':' after the tuple element label"
+help = "Separate a tuple type label from its type with `:`, as in `tuple<name: string>`."
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "expected ':' after the ratio element label"
+help = "Separate a record field label from its type with `:`, as in `record<name: string>`."
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "expected ']' after shape dimensions"
+help = "Close the shape dimensions with `]`, as in `tf32[2, 3]`."
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "expected ')' after the parenthesized shape"
+help = "Close the parenthesized size expression with `)`, as in `{magnitudo} (n + 1)`."
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "expected '←' after the awaited binding"
+help = "After a `{figendum}` or `{variandum}` binding, use `←` before the future expression."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "expected '[' to start the array binding pattern"
+help = "Start an array binding with `[`, as in `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "expected ']' to end the array binding pattern"
+help = "Close the array binding with `]`, as in `{sit} [first, second] ← values`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "expected an opening brace for the object binding pattern"
+help = "Start an object binding with `{`, as in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "expected a closing brace for the object binding pattern"
+help = "Close the object binding with `}`, as in `{sit} {{ name } ← value`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "expected '(' before function declaration parameters"
+help = "Write function parameters in parentheses after the name: `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "expected ')' after function declaration parameters"
+help = "Close the parameter list after its last parameter, as in `{functio} greet(string name)`."
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "expected a closing brace after the class body"
+help = "Close the class after its members, as in `{genus} Name {{ {sit} int value }`."
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "expected an opening brace for the interface body"
+help = "Start the interface body with `{`, as in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "expected '(' before interface method parameters"
+help = "Write interface method parameters in parentheses: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "expected ')' after interface method parameters"
+help = "Close the method parameter list after its last parameter: `{functio} method(string name)`."
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "expected a closing brace after the interface body"
+help = "Close the interface after its method signatures, as in `{implendum} Name {{ {functio} method() }`."
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "expected '=' before the type alias value"
+help = "Write a type alias with `=`, as in `{typus} Name = string`."
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "expected an opening brace for the schema body"
+help = "Start the schema body with `{`, as in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "expected a closing brace after the schema body"
+help = "Close the schema after its columns, as in `{schema} Name {{ {columna} int id }`."
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "expected an opening brace for the enum body"
+help = "Start the enum body with `{`, as in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "expected a closing brace after the enum body"
+help = "Close the enum after its members, as in `{ordo} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "expected an opening brace for the union body"
+help = "Start the union body with `{`, as in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "expected a closing brace after the union variant fields"
+help = "Close a variant payload after its fields, as in `Circle {{ int radius }`."
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "expected a closing brace after the union body"
+help = "Close the union after its variants, as in `{discretio} Name {{ First, Second }`."
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "expected an opening brace for the import record"
+help = "Start an import record with `{`, as in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "expected '=' after the import field name"
+help = "Separate an import field from its value with `=`, as in `{ex} = \"norma:console\"`."
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "expected a closing brace after the import record fields"
+help = "Close the import record after its fields, as in `{importa} {{ {ex} = \"norma:console\" }`."
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "expected an opening brace for the probandum body"
+help = "Start a test suite body with `{`, as in `{probandum} \"suite\" {{`."
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "expected a closing brace after the probandum body"
+help = "Close the test suite with `}` after its tests and setup hooks."
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "expected an opening brace for the annotation fields"
+help = "Use a braced annotation for fields, such as `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "expected '=' after the annotation field name"
+help = "Separate an annotation field from its value with `=`, as in `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "expected a closing brace after the annotation fields"
+help = "Close a braced annotation after its fields, as in `@{cli} {{ name = \"runner\" }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "expected an opening brace for the nucleum annotation fields"
+help = "Use braced kernel options, such as `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "expected '=' after the nucleum annotation field name"
+help = "Separate the kernel option from its value with `=`, as in `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "expected a closing brace after the nucleum annotation fields"
+help = "Close the braced kernel options after their fields, as in `@{nucleum} {{ {fragment} = {verum} }`."
 
 [diagnostics.PARSE001.issues.block_start]
 message = "expected an opening brace for the block"
+help = "Start the block after its header, as in `{si} ready {{ {tacet} }`."
 
 [diagnostics.PARSE001.issues.block_end]
 message = "expected a closing brace to end the block"
+help = "Close the block with `}` after its statements."
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "expected '>' after generic parameters"
+help = "Close the generic parameter list with `>`, as in `{functio} identity<T>(T value)`."
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "expected '>' after contract type arguments"
+help = "Close a contract's type arguments with `>`, as in `Contract<Type>`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "expected '[' after 'apud'"
+help = "Put the iteration coordinates in brackets after `{apud}`, as in `{itera} {ex} values {apud} [i] {sit} value`."
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "expected ']' after the 'apud' coordinates"
