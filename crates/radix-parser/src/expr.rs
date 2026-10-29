@@ -1910,10 +1910,14 @@ impl Parser {
         };
         let group = if self.is_keyword_key("pro") {
             self.advance();
-            if !self.check(&TokenKind::LBracket) {
-                return Err(self.invalid_expression_error("expected_expression"));
-            }
-            Some(Box::new(self.parse_primary()?))
+            let group = if self.check(&TokenKind::LBracket) {
+                self.parse_primary()?
+            } else {
+                // GRAMMAR: group_key := unary. Stopping above `vel` leaves
+                // the reduction's optional identity for `reducta_identity`.
+                self.parse_unary_inner()?
+            };
+            Some(Box::new(group))
         } else {
             None
         };

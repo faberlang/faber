@@ -39,7 +39,7 @@ fn reduction_head_requires_via_and_known_operator() {
 #[test]
 fn reduction_node_owns_optional_clauses_and_body() {
     let result = parse_ok(
-        "functio t(tensor<numerus, [8]> xs) → numerus { reducta via summa ex xs apud [i] pro [i] sit x { redde x } }",
+        "functio t(tensor<numerus, [8]> xs) → numerus { reducta via summa ex xs apud [i] pro i sit x { redde x } }",
     );
     let program = result.program.expect("program");
     let StmtKind::Func(function) = &program.statements[0].kind else {
@@ -102,9 +102,9 @@ fn grouped_reduction_identity_follows_keys_and_body() {
 }
 
 #[test]
-fn grouped_reduction_requires_bracketed_key_list() {
+fn grouped_reduction_requires_a_key_after_pro() {
     assert_parse_error_issue(
-        "functio t(tensor<numerus, [4]> xs) → tensor<numerus, [2]> { reducta via summa ex xs apud [i] pro i }",
+        "functio t(tensor<numerus, [4]> xs) → tensor<numerus, [2]> { reducta via summa ex xs apud [i] pro }",
         "expected_expression",
     );
 }

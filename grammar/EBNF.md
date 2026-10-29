@@ -497,102 +497,104 @@ reducta_expr ::= 'reducta' 'via' reducta_op 'ex' expression apud_clause? reducta
 # [243] reducta_op
 reducta_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'argmaxima' | 'argminima' | 'omnia' | 'quilibet' | 'numeratio' | 'prima'
 # [244] reducta_group
-reducta_group ::= 'pro' '[' expression (',' expression)* ']'
-# [245] reducta_body
+reducta_group ::= 'pro' (group_key | '[' expression (',' expression)* ']')
+# [245] group_key
+group_key ::= unary_expr
+# [246] reducta_body
 reducta_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
-# [246] reducta_identity
+# [247] reducta_identity
 reducta_identity ::= 'vel' expression
-# [247] scan_expr
+# [248] scan_expr
 scan_expr ::= 'scan' 'via' scan_op ('scan_total' ('scan_inclusive' | 'scan_exclusive'))? 'ex' expression apud_clause scan_group? scan_order_clause? filum_clause 'sit' IDENTIFIER block_stmt
-# [248] scan_op
+# [249] scan_op
 scan_op ::= 'summa' | 'factum' | 'maxima' | 'minima' | 'omnia' | 'quilibet' | 'numeratio'
-# [249] scan_group
+# [250] scan_group
 scan_group ::= 'pro' expression
-# [250] scan_order_clause
+# [251] scan_order_clause
 scan_order_clause ::= 'scan_order' ('ascendens' | 'descendens')
-# [251] sort_expr
+# [252] sort_expr
 sort_expr ::= 'ordinata' 'via' sort_direction ('ex' | 'de') expression sort_body?
-# [252] sort_direction
+# [253] sort_direction
 sort_direction ::= 'ascendens' | 'descendens'
-# [253] sort_body
+# [254] sort_body
 sort_body ::= ('sit' | 'varia') IDENTIFIER block_stmt
-# [254] filum_clause
+# [255] filum_clause
 filum_clause ::= 'filum' IDENTIFIER
-# [255] capta_expr
+# [256] capta_expr
 capta_expr ::= 'capta' block_stmt
-# [256] object_pattern
+# [257] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [257] pattern_property
+# [258] pattern_property
 pattern_property ::= 'ceteri'? IDENTIFIER ('ut' IDENTIFIER)?
-# [258] array_pattern
+# [259] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [259] array_pattern_element
+# [260] array_pattern_element
 array_pattern_element ::= '_' | 'ceteri'? IDENTIFIER
-# [260] nota_stmt
+# [261] nota_stmt
 nota_stmt ::= ('nota' | 'vide' | 'mone' | 'scribe') expression (',' expression)*
-# [261] entry_header
+# [262] entry_header
 entry_header ::= ('argumenta' IDENTIFIER)? ('exitus' expression)?
-# [262] incipit_stmt
+# [263] incipit_stmt
 incipit_stmt ::= 'incipit' entry_header block_stmt
-# [263] incipiet_stmt
+# [264] incipiet_stmt
 incipiet_stmt ::= 'incipiet' entry_header block_stmt
-# [264] probandum_decl
+# [265] probandum_decl
 probandum_decl ::= 'probandum' STRING proba_modifier* '{' probandum_body '}'
-# [265] probandum_body
+# [266] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [266] proba_stmt
+# [267] proba_stmt
 proba_stmt ::= 'proba' STRING proba_modifier* block_stmt
-# [267] proba_modifier
+# [268] proba_modifier
 proba_modifier ::= 'erratur' | 'omitte' STRING | 'futurum' STRING | 'solum' | 'tag' STRING | 'temporis' NATURAL | 'metior' | 'repete' NATURAL | 'fragilis' NATURAL | 'solum_in' STRING
-# [268] praepara_block
+# [269] praepara_block
 praepara_block ::= ('praepara' | 'praeparabit' | 'postpara' | 'postparabit') 'omnia'? block_stmt
-# [269] fac_stmt
+# [270] fac_stmt
 fac_stmt ::= 'fac' fac_modifier? block_stmt cape_clause? ('dum' expression)?
-# [270] fac_modifier
+# [271] fac_modifier
 fac_modifier ::= 'omnia' | 'machina'
-# [271] IDENTIFIER
+# [272] IDENTIFIER
 IDENTIFIER ::=
-# [272] NUMBER
+# [273] NUMBER
 NUMBER ::=
-# [273] NATURAL
+# [274] NATURAL
 NATURAL ::=
-# [274] STRING
+# [275] STRING
 STRING ::=
-# [275] ASCII_STRING
+# [276] ASCII_STRING
 ASCII_STRING ::=
-# [276] BACKTICK_STRING
+# [277] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [277] OCTETI_STRING
+# [278] OCTETI_STRING
 OCTETI_STRING ::=
-# [278] REGEX_TYPE_WORD
+# [279] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [279] REGEX_BODY
+# [280] REGEX_BODY
 REGEX_BODY ::=
-# [280] NEWLINE
+# [281] NEWLINE
 NEWLINE ::=
-# [281] WIDTH_MARKER
+# [282] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [282] LISTA_WIDTH_SUGAR
+# [283] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [283] TENSOR_WIDTH_SUGAR
+# [284] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [284] SPARSA_WIDTH_SUGAR
+# [285] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [285] VECTOR_WIDTH_SUGAR
+# [286] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [286] MATRIX_WIDTH_SUGAR
+# [287] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [287] FRONTMATTER_DELIMITER
+# [288] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [288] TOML_LINES
+# [289] TOML_LINES
 TOML_LINES ::=
-# [289] ANNOTATION_NAME
+# [290] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [290] ANNOTATION_FIELD_NAME
+# [291] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [291] NON_NEWLINE_TOKEN
+# [292] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [292] NO_NEWLINE
+# [293] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -866,6 +868,7 @@ NO_NEWLINE ::=
 | [`reducta_expr`](#reducta-expr) | `#reducta-expr` | live |
 | [`reducta_op`](#reducta-op) | `#reducta-op` | live |
 | [`reducta_group`](#reducta-group) | `#reducta-group` | live |
+| [`group_key`](#group-key) | `#group-key` | live |
 | [`reducta_body`](#reducta-body) | `#reducta-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#reducta-identity` | live |
 | [`scan_expr`](#scan-expr) | `#scan-expr` | live |
@@ -2969,7 +2972,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } ex source`.
 ### Special Expressions
 
 
-`reducta via <op> ex source [apud [coords]] [pro [key, …]] ([filum f] (fixum | varia) x { redde term })? [vel identity]?` is the general reduction form. The optional body may carry an optional `filum`; the optional identity follows the body or, when there is no body, the source. Without a body, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, `numeratio`, or `prima`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
+`reducta via <op> ex source [apud [coords]] [pro key | pro [key, …]] ([filum f] (fixum | varia) x { redde term })? [vel identity]?` is the general reduction form. The optional body may carry an optional `filum`; the optional identity follows the body or, when there is no body, the source. Without a body, the source elements are the terms. `via` is mandatory and selects exactly one of `summa`, `factum`, `maxima`, `minima`, `argmaxima`, `argminima`, `omnia`, `quilibet`, `numeratio`, or `prima`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `via` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.reducta(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `apud [coords]` binds one integer coordinate per source axis. A body is claimed only when `(fixum | varia) IDENTIFIER '{'` follows, so a declaration such as `fixum numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `redde` term per element. Without a body, each source element is the term. `filum f` requires a body and a kernel context; it retains the existing sum path, while other `filum` operators fail closed by name until their lowering is implemented. Without `filum`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2991,7 +2994,7 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
-`pro [key, …]` groups terms into a new result tensor; it does not mutate the source or key tensor. The clause requires a non-empty bracketed expression list, with one key per axis of the result; a bare `pro key` is not part of the syntax. One key (`pro [k]`) keeps the rank-one result `tensor<R, [K]>`; a list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. The list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `pro [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `summa`, `factum`, `numeratio`, `omnia`, and `quilibet` have empty-bucket identities; grouped `maxima` and `minima` require `vel identity`. Grouped `argmaxima` and `argminima` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
+`pro key` or `pro [key, …]` groups terms into a new result tensor; it does not mutate the source or key tensor. A bare key is one key, while the bracketed form requires a non-empty expression list, with one key per axis of the result. One key (`pro k` or `pro [k]`) keeps the rank-one result `tensor<R, [K]>`; a bracketed list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. A bare key stops before `coalesce` (la `vel`), so a following identity belongs to the reduction. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. A multi-key list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `pro [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `summa`, `factum`, `numeratio`, `omnia`, and `quilibet` have empty-bucket identities; grouped `maxima` and `minima` require `vel identity`. Grouped `argmaxima` and `argminima` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
 
 The axis sugar `t.summa(axis n)` (en `t.sum(axis n)`) on a tensor of literal rank 2 to 8 is the grouped sum whose key list is the coordinates other than `n`, in order. `n` is a compile-time constant in `0..rank`, and the result is the receiver shape with axis `n` removed.
 

@@ -497,102 +497,104 @@ reducta_expr ::= 'ลดรูป' 'ผ่านทาง' reducta_op 'ออก
 # [243] reducta_op
 reducta_op ::= 'ผลรวม' | 'ผลคูณ' | 'สูงสุด' | 'ต่ำสุด' | 'ดัชนีค่าสูงสุด' | 'ดัชนีค่าต่ําสุด' | 'ทั้งหมด' | 'ใดก็ได้' | 'นับ' | 'ตัวแรก'
 # [244] reducta_group
-reducta_group ::= 'ตาม' '[' expression (',' expression)* ']'
-# [245] reducta_body
+reducta_group ::= 'ตาม' (group_key | '[' expression (',' expression)* ']')
+# [245] group_key
+group_key ::= unary_expr
+# [246] reducta_body
 reducta_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
-# [246] reducta_identity
+# [247] reducta_identity
 reducta_identity ::= 'หรือว่าง' expression
-# [247] scan_expr
+# [248] scan_expr
 scan_expr ::= 'scan' 'ผ่านทาง' scan_op ('total' ('inclusive' | 'exclusive'))? 'ออก' expression apud_clause scan_group? scan_order_clause? filum_clause 'กำหนด' IDENTIFIER block_stmt
-# [248] scan_op
+# [249] scan_op
 scan_op ::= 'ผลรวม' | 'ผลคูณ' | 'สูงสุด' | 'ต่ำสุด' | 'ทั้งหมด' | 'ใดก็ได้' | 'นับ'
-# [249] scan_group
+# [250] scan_group
 scan_group ::= 'ตาม' expression
-# [250] scan_order_clause
+# [251] scan_order_clause
 scan_order_clause ::= 'order' ('น้อยไปมาก' | 'มากไปน้อย')
-# [251] sort_expr
+# [252] sort_expr
 sort_expr ::= 'เรียง' 'ผ่านทาง' sort_direction ('ออก' | 'จาก') expression sort_body?
-# [252] sort_direction
+# [253] sort_direction
 sort_direction ::= 'น้อยไปมาก' | 'มากไปน้อย'
-# [253] sort_body
+# [254] sort_body
 sort_body ::= ('กำหนด' | 'แปร') IDENTIFIER block_stmt
-# [254] filum_clause
+# [255] filum_clause
 filum_clause ::= 'เส้นใย' IDENTIFIER
-# [255] capta_expr
+# [256] capta_expr
 capta_expr ::= 'ดัก' block_stmt
-# [256] object_pattern
+# [257] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [257] pattern_property
+# [258] pattern_property
 pattern_property ::= 'ที่เหลือ'? IDENTIFIER ('ในชื่อ' IDENTIFIER)?
-# [258] array_pattern
+# [259] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [259] array_pattern_element
+# [260] array_pattern_element
 array_pattern_element ::= '_' | 'ที่เหลือ'? IDENTIFIER
-# [260] nota_stmt
+# [261] nota_stmt
 nota_stmt ::= ('บันทึก' | 'ดู' | 'เตือน' | 'เขียน') expression (',' expression)*
-# [261] entry_header
+# [262] entry_header
 entry_header ::= ('อาร์กิวเมนต์' IDENTIFIER)? ('ทางออก' expression)?
-# [262] incipit_stmt
+# [263] incipit_stmt
 incipit_stmt ::= 'เริ่ม' entry_header block_stmt
-# [263] incipiet_stmt
+# [264] incipiet_stmt
 incipiet_stmt ::= 'เริ่มอะซิงก์' entry_header block_stmt
-# [264] probandum_decl
+# [265] probandum_decl
 probandum_decl ::= 'ทดสอบชุด' STRING proba_modifier* '{' probandum_body '}'
-# [265] probandum_body
+# [266] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [266] proba_stmt
+# [267] proba_stmt
 proba_stmt ::= 'ทดสอบ' STRING proba_modifier* block_stmt
-# [267] proba_modifier
+# [268] proba_modifier
 proba_modifier ::= 'คาดหวัง_ล้มเหลว' | 'ละเว้น' STRING | 'ค้าง' STRING | 'เฉพาะ' | 'แท็ก' STRING | 'เวลา' NATURAL | 'วัด' | 'ทำซ้ำ' NATURAL | 'เปราะบาง' NATURAL | 'เฉพาะใน' STRING
-# [268] praepara_block
+# [269] praepara_block
 praepara_block ::= ('เตรียม' | 'จะเตรียม' | 'หลังเตรียม' | 'จะหลังเตรียม') 'ทั้งหมด'? block_stmt
-# [269] fac_stmt
+# [270] fac_stmt
 fac_stmt ::= 'ทำ' fac_modifier? block_stmt cape_clause? ('ขณะ' expression)?
-# [270] fac_modifier
+# [271] fac_modifier
 fac_modifier ::= 'ทั้งหมด' | 'อุปกรณ์'
-# [271] IDENTIFIER
+# [272] IDENTIFIER
 IDENTIFIER ::=
-# [272] NUMBER
+# [273] NUMBER
 NUMBER ::=
-# [273] NATURAL
+# [274] NATURAL
 NATURAL ::=
-# [274] STRING
+# [275] STRING
 STRING ::=
-# [275] ASCII_STRING
+# [276] ASCII_STRING
 ASCII_STRING ::=
-# [276] BACKTICK_STRING
+# [277] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [277] OCTETI_STRING
+# [278] OCTETI_STRING
 OCTETI_STRING ::=
-# [278] REGEX_TYPE_WORD
+# [279] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [279] REGEX_BODY
+# [280] REGEX_BODY
 REGEX_BODY ::=
-# [280] NEWLINE
+# [281] NEWLINE
 NEWLINE ::=
-# [281] WIDTH_MARKER
+# [282] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [282] LISTA_WIDTH_SUGAR
+# [283] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [283] TENSOR_WIDTH_SUGAR
+# [284] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [284] SPARSA_WIDTH_SUGAR
+# [285] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [285] VECTOR_WIDTH_SUGAR
+# [286] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [286] MATRIX_WIDTH_SUGAR
+# [287] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [287] FRONTMATTER_DELIMITER
+# [288] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [288] TOML_LINES
+# [289] TOML_LINES
 TOML_LINES ::=
-# [289] ANNOTATION_NAME
+# [290] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [290] ANNOTATION_FIELD_NAME
+# [291] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [291] NON_NEWLINE_TOKEN
+# [292] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [292] NO_NEWLINE
+# [293] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -866,6 +868,7 @@ NO_NEWLINE ::=
 | [`reducta_expr`](#reducta-expr) | `#ลดรูป-expr` | live |
 | [`reducta_op`](#reducta-op) | `#ลดรูป-op` | live |
 | [`reducta_group`](#reducta-group) | `#ลดรูป-group` | live |
+| [`group_key`](#group-key) | `#group-key` | live |
 | [`reducta_body`](#reducta-body) | `#ลดรูป-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#ลดรูป-identity` | live |
 | [`scan_expr`](#scan-expr) | `#scan-expr` | live |
@@ -2969,7 +2972,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } ออก source`
 ### Special Expressions
 
 
-`ลดรูป ผ่านทาง <op> ออก source [ที่ [coords]] [ตาม [key, …]] ([เส้นใย f] (คงที่ | แปร) x { คืน term })? [หรือว่าง identity]?` is the general reduction form. The optional body may carry an optional `เส้นใย`; the optional identity follows the body or, when there is no body, the source. Without a body, the source elements are the terms. `ผ่านทาง` is mandatory and selects exactly one of `ผลรวม`, `ผลคูณ`, `สูงสุด`, `ต่ำสุด`, `ดัชนีค่าสูงสุด`, `ดัชนีค่าต่ําสุด`, `ทั้งหมด`, `ใดก็ได้`, `นับ`, or `ตัวแรก`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `ผ่านทาง` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.ลดรูป(f)` (en `xs.reduce(f)`).
+`ลดรูป ผ่านทาง <op> ออก source [ที่ [coords]] [ตาม key | ตาม [key, …]] ([เส้นใย f] (คงที่ | แปร) x { คืน term })? [หรือว่าง identity]?` is the general reduction form. The optional body may carry an optional `เส้นใย`; the optional identity follows the body or, when there is no body, the source. Without a body, the source elements are the terms. `ผ่านทาง` is mandatory and selects exactly one of `ผลรวม`, `ผลคูณ`, `สูงสุด`, `ต่ำสุด`, `ดัชนีค่าสูงสุด`, `ดัชนีค่าต่ําสุด`, `ทั้งหมด`, `ใดก็ได้`, `นับ`, or `ตัวแรก`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `ผ่านทาง` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.ลดรูป(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `ที่ [coords]` binds one integer coordinate per source axis. A body is claimed only when `(คงที่ | แปร) IDENTIFIER '{'` follows, so a declaration such as `คงที่ numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `คืน` term per element. Without a body, each source element is the term. `เส้นใย f` requires a body and a kernel context; it retains the existing sum path, while other `เส้นใย` operators fail closed by name until their lowering is implemented. Without `เส้นใย`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2991,7 +2994,7 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
-`ตาม [key, …]` groups terms into a new result tensor; it does not mutate the source or key tensor. The clause requires a non-empty bracketed expression list, with one key per axis of the result; a bare `ตาม key` is not part of the syntax. One key (`ตาม [k]`) keeps the rank-one result `tensor<R, [K]>`; a list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. The list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `ตาม [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `ผลรวม`, `ผลคูณ`, `นับ`, `ทั้งหมด`, and `ใดก็ได้` have empty-bucket identities; grouped `สูงสุด` and `ต่ำสุด` require `หรือว่าง identity`. Grouped `ดัชนีค่าสูงสุด` and `ดัชนีค่าต่ําสุด` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
+`ตาม key` or `ตาม [key, …]` groups terms into a new result tensor; it does not mutate the source or key tensor. A bare key is one key, while the bracketed form requires a non-empty expression list, with one key per axis of the result. One key (`ตาม k` or `ตาม [k]`) keeps the rank-one result `tensor<R, [K]>`; a bracketed list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. A bare key stops before `coalesce` (la `หรือว่าง`), so a following identity belongs to the reduction. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. A multi-key list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `ตาม [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `ผลรวม`, `ผลคูณ`, `นับ`, `ทั้งหมด`, and `ใดก็ได้` have empty-bucket identities; grouped `สูงสุด` and `ต่ำสุด` require `หรือว่าง identity`. Grouped `ดัชนีค่าสูงสุด` and `ดัชนีค่าต่ําสุด` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
 
 The axis sugar `t.ผลรวม(แกน n)` (en `t.sum(แกน n)`) on a tensor of literal rank 2 to 8 is the grouped sum whose key list is the coordinates other than `n`, in order. `n` is a compile-time constant in `0..rank`, and the result is the receiver shape with axis `n` removed.
 
