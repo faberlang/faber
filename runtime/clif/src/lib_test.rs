@@ -188,3 +188,23 @@ fn arguments_skip_program_name_and_preserve_invalid_utf8() {
         vec!["ordinary".to_owned(), "bad�".to_owned()]
     );
 }
+
+/// An `f32`-tagged float cell carries the `f64` bits of the `f32`-rounded
+/// value: it renders at single precision and compares by its bits like any
+/// other float cell.
+#[test]
+fn f32_tagged_float_cells_render_and_compare_at_single_precision() {
+    let rounded = f64::from(0.1f32);
+    let bits = rounded.to_bits() as i64;
+    let list = list_new_from(vec![
+        (TAG_FLOAT32, bits),
+        (TAG_FLOAT, 0.1f64.to_bits() as i64),
+    ]);
+    let text = list_text(unsafe { &*list });
+    assert_eq!(text, "[0.1, 0.1]");
+    assert!(element_equal(TAG_FLOAT32, bits, bits));
+    assert_eq!(
+        element_order(TAG_FLOAT32, bits, (f64::from(0.2f32)).to_bits() as i64),
+        std::cmp::Ordering::Less
+    );
+}
