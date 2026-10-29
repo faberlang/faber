@@ -7,10 +7,10 @@ use crate::test_support::{
 };
 use crate::{SemanticError, SemanticErrorKind};
 
-const UNSPECIFIED: &str = "octeti_to_tensor_unspecified";
-const ELEMENT: &str = "octeti_to_tensor_element_unsupported";
-const LENGTH: &str = "octeti_to_tensor_length_mismatch";
-const RECORD_BIG_ENDIAN: &str = "octeti_to_tensor_record_big_endian";
+const UNSPECIFIED: &str = "list_b8_to_tensor_unspecified";
+const ELEMENT: &str = "list_b8_to_tensor_element_unsupported";
+const LENGTH: &str = "list_b8_to_tensor_length_mismatch";
+const RECORD_BIG_ENDIAN: &str = "list_b8_to_tensor_record_big_endian";
 const HANDLER: &str = "failable_conversio_requires_handler";
 
 fn arg<'a>(err: &'a SemanticError, name: &str) -> Option<&'a str> {
@@ -261,8 +261,8 @@ fn other_non_hint_targets_still_reject_a_via_hint() {
 
 // --- inverse: tensor ↦ octeti via Be|Le -----------------------------------
 
-const TENSOR_UNSPECIFIED: &str = "tensor_to_octeti_unspecified";
-const TENSOR_ELEMENT: &str = "tensor_to_octeti_element_unsupported";
+const TENSOR_UNSPECIFIED: &str = "tensor_to_list_b8_unspecified";
+const TENSOR_ELEMENT: &str = "tensor_to_list_b8_element_unsupported";
 
 #[test]
 fn tensor_to_octeti_is_accepted_for_every_element_and_order_and_is_infallible() {

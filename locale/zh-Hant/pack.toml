@@ -2884,7 +2884,7 @@ help = "使用 chorda 或明確的位元組轉換輔助工具"
 message = "從 {lista}<b8> 轉換為 fractus 未指定（IEEE 寬度與位元組序）；請改用 `chorda` 或明確的位元組動詞"
 help = "使用 chorda 或明確的位元組轉換輔助工具"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
 message = "記錄 tensor 依記錄的小端佈局讀取位元組；請寫 `via Le`，不要寫 `via Be`"
 help = "寫 {lista}<b8> ↦ tensor<Record, [n]> via Le；記錄元素只有一種位元組序，由其佈局決定"
 

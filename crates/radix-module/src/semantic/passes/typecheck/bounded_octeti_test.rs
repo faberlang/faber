@@ -202,7 +202,7 @@ incipit {
     assert!(!result.success(), "an unbound extent must not emit");
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
-            diagnostic.is_error() && diagnostic.issue() == Some("ts_octeti_tensor_shape_unresolved")
+            diagnostic.is_error() && diagnostic.issue() == Some("ts_list_b8_to_tensor_shape_unresolved")
         }),
         "diagnostics: {:?}",
         result.diagnostics

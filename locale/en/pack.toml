@@ -4071,27 +4071,27 @@ help = "ensure the value is nonnegative, then choose an unsigned width that fits
 message = "conversion from {lista}<b8> to float is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
 help = "read an exact-width byte window with an explicit order, e.g. `raw[0‥4] ↦ f32 via Le`"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_unspecified]
+[diagnostics.SEM016.issues.list_b8_to_tensor_unspecified]
 message = "conversion from {lista}<b8> to a tensor needs the byte order of each element; write `via Le` or `via Be`"
 help = "write `{lista}<b8> ↦ tensor<f32, [rows, cols]> via Le` (or via Be) for elements wider than 8 bits; `u8` and `i8` take no hint"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_element_unsupported]
+[diagnostics.SEM016.issues.list_b8_to_tensor_element_unsupported]
 message = "{lista}<b8> convert only to a tensor of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 elements"
 help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_length_mismatch]
+[diagnostics.SEM016.issues.list_b8_to_tensor_length_mismatch]
 message = "the {lista}<b8> length must equal the element count times the element width: expected {expected} bytes, found {actual}"
 help = "size the {lista}<b8> window to product(shape) times the element width, or change the tensor shape"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
 message = "a record tensor reads its bytes in the little-endian layout of the record; write `via Le`, not `via Be`"
 help = "write {lista}<b8> ↦ tensor<Record, [n]> via Le; a record element has one byte order, fixed by its layout"
 
-[diagnostics.SEM016.issues.tensor_to_octeti_unspecified]
+[diagnostics.SEM016.issues.tensor_to_list_b8_unspecified]
 message = "conversion from a tensor to {lista}<b8> needs the byte order of each element; write `via Le` or `via Be`"
 help = "write `tensor<f32, [rows, cols]> ↦ {lista}<b8> via Le` (or via Be) for elements wider than 8 bits; `u8` and `i8` take no hint"
 
-[diagnostics.SEM016.issues.tensor_to_octeti_element_unsupported]
+[diagnostics.SEM016.issues.tensor_to_list_b8_element_unsupported]
 message = "a tensor converts to {lista}<b8> only when its elements are u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64"
 help = "use one of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 as the tensor element type"
 

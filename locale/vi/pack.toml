@@ -2844,7 +2844,7 @@ help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte r
 message = "chuyển đổi từ {lista}<b8> sang fractus chưa được đặc tả (độ rộng IEEE và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
 help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
 message = "tensor bản ghi đọc byte theo bố cục little-endian của bản ghi; viết `via Le`, không viết `via Be`"
 help = "viết {lista}<b8> ↦ tensor<Record, [n]> via Le; phần tử bản ghi chỉ có một thứ tự byte, do bố cục của nó quy định"
 

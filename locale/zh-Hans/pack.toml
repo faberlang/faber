@@ -2888,7 +2888,7 @@ help = "使用 chorda 或显式 byte conversion helpers"
 message = "从 {lista}<b8> 到 fractus 的 conversion 未指定"
 help = "使用 chorda 或显式 byte conversion helpers"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
 message = "记录 tensor 按记录的小端布局读取字节；请写 `via Le`，不要写 `via Be`"
 help = "写 {lista}<b8> ↦ tensor<Record, [n]> via Le；记录元素只有一种字节序，由其布局决定"
 

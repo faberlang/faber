@@ -2856,7 +2856,7 @@ help = "chorda या स्पष्ट byte conversion helpers का उप�
 message = "{lista}<b8> से fractus में रूपांतरण निर्दिष्ट नहीं है (IEEE width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
 help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
 
-[diagnostics.SEM016.issues.octeti_to_tensor_record_big_endian]
+[diagnostics.SEM016.issues.list_b8_to_tensor_record_big_endian]
 message = "रिकॉर्ड tensor अपने bytes को रिकॉर्ड के little-endian लेआउट में पढ़ता है; `via Le` लिखें, `via Be` नहीं"
 help = "{lista}<b8> ↦ tensor<Record, [n]> via Le लिखें; रिकॉर्ड तत्व का एक ही byte क्रम होता है, जो उसके लेआउट से तय होता है"
 
