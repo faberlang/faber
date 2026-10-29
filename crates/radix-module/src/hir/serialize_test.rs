@@ -16,10 +16,7 @@ fn a_size_generic_application_under_a_union_gets_its_size_child() {
         head: HirTypeFormHead::Semantic(radix_syntax::TypeFormLevel::LONG),
         args: vec![HirTypeFormArg::Type(Box::new(HirTypeForm {
             ty: applied,
-            head: HirTypeFormHead::Named {
-                def_id: DefId(7),
-                path: Vec::new(),
-            },
+            head: HirTypeFormHead::Named { def_id: DefId(7), path: Vec::new() },
             args: Vec::new(),
             label: None,
         }))],
