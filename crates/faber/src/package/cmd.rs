@@ -205,7 +205,20 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
             command.locale.as_deref(),
             command.diagnostics_locale.as_deref(),
         ) {
-            Ok((config, pack)) => (config.with_warn_policy(warn_policy), pack),
+            Ok((config, locale_pack)) => (config.with_warn_policy(warn_policy), locale_pack),
+            Err(diag) => {
+                let diag = super::attach_path_diagnostic_context(diag);
+                fail_with_diagnostic(&diag)
+            }
+        }
+    } else if command.locale.is_some() || command.diagnostics_locale.is_some() {
+        match super::locale::single_file_build_config_with_locale(
+            target,
+            &input_path,
+            command.locale.as_deref(),
+            command.diagnostics_locale.as_deref(),
+        ) {
+            Ok((config, locale_pack)) => (config.with_warn_policy(warn_policy), locale_pack),
             Err(diag) => {
                 let diag = super::attach_path_diagnostic_context(diag);
                 fail_with_diagnostic(&diag)

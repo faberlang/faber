@@ -326,7 +326,7 @@ pub(crate) fn mir_issue_diag(
 /// (D3). An unavailable explicit device fails closed before anything lowers
 /// onto it; there is no fallback.
 ///
-/// Returns the discovery receipt line that was printed.
+/// Returns the discovery receipt line reported to stderr.
 ///
 /// # Errors
 /// Structured diagnostics: device admission (`E_DEVICE_UNAVAILABLE`,
@@ -652,8 +652,8 @@ fn run_declared_kernels_on_device_session<H: radix_mir_runner::Host + ?Sized>(
     .map_err(|failure| failure.into_session_failure(receipt))
 }
 
-/// An admitted, opened device session: the discovery receipt line has been
-/// printed, and the session waits for the lowered unit to dispatch.
+/// An admitted, opened device session: the discovery receipt has been
+/// reported to stderr, and the session waits for the lowered unit to dispatch.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub(crate) struct AdmittedDeviceSession {
     session: radix_device_core::session::DeviceSession,
@@ -665,7 +665,7 @@ pub(crate) struct AdmittedDeviceSession {
     pub(crate) trace_kernels: bool,
 }
 
-/// Open the selected device, print the discovery receipt, and pick the
+/// Open the selected device, report the discovery receipt to stderr, and pick the
 /// per-kernel image backend.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub(crate) fn admit_device_session(
@@ -675,11 +675,11 @@ pub(crate) fn admit_device_session(
     cpu: CpuDeviceShape,
 ) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
     let admitted = open_device_session(input, selection, registry, cpu)?;
-    println!("{}", admitted.receipt);
+    eprintln!("{}", admitted.receipt);
     Ok(admitted)
 }
 
-/// [`admit_device_session`] without printing the discovery receipt: a proba
+/// [`admit_device_session`] without reporting the discovery receipt: a proba
 /// route opens one session per case and keeps its report clean.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 fn open_device_session(
