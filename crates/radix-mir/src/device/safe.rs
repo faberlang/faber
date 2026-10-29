@@ -34,6 +34,7 @@ use crate::{
 };
 use crate::{MirLocalId, MirStructLayout, resolve_struct_layout};
 use handroll::FxHashMap;
+use radix_types::MirMathFunction;
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable};
 
 const SLUG_ABI: &str = "missing-abi-fact";
@@ -1218,7 +1219,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                     | MirCollectionOp::TensorFill
                                     | MirCollectionOp::TensorExpand
                                     | MirCollectionOp::TensorRelu
-                                    | MirCollectionOp::TensorGelu,
+                                    | MirCollectionOp::TensorGelu
+                                    // The math functions the Metal elementwise
+                                    // lane lowers per element (`t.sqrt()` /
+                                    // `t.exp()`); the other `MirMathFunction`
+                                    // members keep the named reject below.
+                                    | MirCollectionOp::TensorMath(MirMathFunction::Sqrt)
+                                    | MirCollectionOp::TensorMath(MirMathFunction::Exp),
                             )
                             | MirIntrinsic::FilumReduce(_)
                             | MirIntrinsic::Scan(_)
@@ -1234,7 +1241,13 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                 MirLiftOp::Add
                                 | MirLiftOp::Sub
                                 | MirLiftOp::Mul
-                                | MirLiftOp::Neg,
+                                | MirLiftOp::Neg
+                                // The float division lifts lower through the
+                                // same tensor-expr model (the TensorDiv arm's
+                                // semantics); the comparison and Mod lifts
+                                // keep the wildcard rejection below.
+                                | MirLiftOp::Div
+                                | MirLiftOp::TrueDiv,
                             ),
                         ..
                     },
