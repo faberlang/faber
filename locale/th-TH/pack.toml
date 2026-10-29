@@ -3902,150 +3902,198 @@ help = "รักษาพจน์ให้บริสุทธิ์ เข�
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิด"
+help = "เพิ่ม `>` ปิดท้ายหลังอาร์กิวเมนต์ชนิด"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "ต้องมี '(' ก่อนพารามิเตอร์ของชนิดฟังก์ชัน"
+help = "เริ่มชนิดฟังก์ชันด้วย `(` ก่อนชนิดพารามิเตอร์"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ของชนิดฟังก์ชัน"
+help = "ปิดรายการพารามิเตอร์ด้วย `)` ก่อนลูกศรคืนค่า `→`"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "ต้องมี '→' ก่อนชนิดคืนค่าของฟังก์ชัน"
+help = "เขียน `→` ระหว่างรายการพารามิเตอร์กับชนิดคืนค่า"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "ต้องมี '<' หลังชื่อตัวครอบชนิดตัวเลข"
+help = "ใช้ชนิดความกว้างแบบเปล่า เช่น `i32` หรือ `f32`; ชนิดตัวเลขไม่ใช้ `<...>` อีกต่อไป"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "ต้องมี ':' หลังป้ายกำกับสมาชิกทูเพิล"
+help = "คั่นป้ายกำกับชนิดทูเพิลกับชนิดด้วย `:`, เช่น `tuple<name: string>`"
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "ต้องมี ':' หลังป้ายกำกับสมาชิก ratio"
+help = "คั่นป้ายกำกับฟิลด์เรกคอร์ดกับชนิดด้วย `:`, เช่น `record<name: string>`"
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "ต้องมี ']' หลังมิติรูปร่าง"
+help = "ปิดมิติของรูปร่างด้วย `]`, เช่น `tf32[2, 3]`"
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "ต้องมี ')' หลังรูปร่างในวงเล็บ"
+help = "ปิดนิพจน์ขนาดในวงเล็บด้วย `)`, เช่น `{magnitudo} (n + 1)`"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "ต้องมี '←' หลัง binding ที่ค้าง"
+help = "หลัง binding `{figendum}` หรือ `{variandum}` ให้ใช้ `←` ก่อนนิพจน์ future"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "ต้องมี '[' เปิดแพตเทิร์น binding ของอาร์เรย์"
+help = "เริ่ม binding ของอาร์เรย์ด้วย `[`, เช่น `{sit} [first, second] ← values`"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "ต้องมี ']' ปิดแพตเทิร์น binding ของอาร์เรย์"
+help = "ปิด binding ของอาร์เรย์ด้วย `]`, เช่น `{sit} [first, second] ← values`"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "ต้องมีวงเล็บปีกกาเปิดแพตเทิร์น binding ของออบเจ็กต์"
+help = "เริ่ม binding ของออบเจ็กต์ด้วย `{{`, เช่น `{sit} {{ name } ← value`"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "ต้องมีวงเล็บปีกกาปิดแพตเทิร์น binding ของออบเจ็กต์"
+help = "ปิด binding ของออบเจ็กต์ด้วย `}`, เช่น `{sit} {{ name } ← value`"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "ต้องมี '(' ก่อนพารามิเตอร์ของการประกาศฟังก์ชัน"
+help = "เขียนพารามิเตอร์ฟังก์ชันในวงเล็บหลังชื่อ: `{functio} greet(string name)`"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ของการประกาศฟังก์ชัน"
+help = "ปิดรายการพารามิเตอร์หลังพารามิเตอร์สุดท้าย เช่น `{functio} greet(string name)`"
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี class"
+help = "ปิดคลาสหลังสมาชิก เช่น `{genus} Name {{ {sit} int value }`"
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี interface"
+help = "เริ่มบอดี interface ด้วย `{{`, เช่น `{implendum} Name {{ {functio} method() }`"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "ต้องมี '(' ก่อนพารามิเตอร์ของเมธอด interface"
+help = "เขียนพารามิเตอร์เมธอด interface ในวงเล็บ: `{functio} method(string name)`"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ของเมธอด interface"
+help = "ปิดรายการพารามิเตอร์เมธอดหลังพารามิเตอร์สุดท้าย: `{functio} method(string name)`"
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี interface"
+help = "ปิด interface หลังลายเซ็นเมธอด เช่น `{implendum} Name {{ {functio} method() }`"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "ต้องมี '=' ก่อนค่าของ type alias"
+help = "เขียน type alias ด้วย `=`, เช่น `{typus} Name = string`"
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี schema"
+help = "เริ่มบอดี schema ด้วย `{{`, เช่น `{schema} Name {{ {columna} int id }`"
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี schema"
+help = "ปิด schema หลังคอลัมน์ เช่น `{schema} Name {{ {columna} int id }`"
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี enum"
+help = "เริ่มบอดี enum ด้วย `{{`, เช่น `{ordo} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี enum"
+help = "ปิด enum หลังสมาชิก เช่น `{ordo} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี union"
+help = "เริ่มบอดี union ด้วย `{{`, เช่น `{discretio} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ variant ของ union"
+help = "ปิด payload ของ variant หลังฟิลด์ เช่น `Circle {{ int radius }`"
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี union"
+help = "ปิด union หลัง variant เช่น `{discretio} Name {{ First, Second }`"
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "ต้องมีวงเล็บปีกกาเปิดเรกคอร์ดการนำเข้า"
+help = "เริ่มเรกคอร์ดการนำเข้าด้วย `{{`, เช่น `{importa} {{ {ex} = \"norma:console\" }`"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "ต้องมี '=' หลังชื่อฟิลด์การนำเข้า"
+help = "คั่นฟิลด์นำเข้ากับค่าด้วย `=`, เช่น `{ex} = \"norma:console\"`"
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของเรกคอร์ดการนำเข้า"
+help = "ปิดเรกคอร์ดการนำเข้าหลังฟิลด์ เช่น `{importa} {{ {ex} = \"norma:console\" }`"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี probandum"
+help = "เริ่มบอดีชุดทดสอบด้วย `{{`, เช่น `{probandum} \"suite\" {{`"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังบอดี probandum"
+help = "ปิดชุดทดสอบด้วย `}` หลังการทดสอบและฮุกตั้งค่า"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "ต้องมีวงเล็บปีกกาเปิดฟิลด์ annotation"
+help = "ใช้ annotation ที่ครอบด้วยวงเล็บปีกกาสำหรับฟิลด์ เช่น `@{cli} {{ name = \"runner\" }`"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "ต้องมี '=' หลังชื่อฟิลด์ annotation"
+help = "คั่นฟิลด์ annotation กับค่าด้วย `=`, เช่น `@{cli} {{ name = \"runner\" }`"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ annotation"
+help = "ปิด annotation ที่ครอบด้วยวงเล็บปีกกาหลังฟิลด์ เช่น `@{cli} {{ name = \"runner\" }`"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "ต้องมีวงเล็บปีกกาเปิดฟิลด์ annotation ของ nucleum"
+help = "ใช้ตัวเลือกเคอร์เนลในวงเล็บปีกกา เช่น `@{nucleum} {{ {fragment} = {verum} }`"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "ต้องมี '=' หลังชื่อฟิลด์ annotation ของ nucleum"
+help = "คั่นตัวเลือกเคอร์เนลกับค่าด้วย `=`, เช่น `@{nucleum} {{ {fragment} = {verum} }`"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ annotation ของ nucleum"
+help = "ปิดตัวเลือกเคอร์เนลในวงเล็บปีกกาหลังฟิลด์ เช่น `@{nucleum} {{ {fragment} = {verum} }`"
 
 [diagnostics.PARSE001.issues.block_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบล็อก"
+help = "เริ่มบล็อกหลังส่วนหัว เช่น `{si} ready {{ {tacet} }`"
 
 [diagnostics.PARSE001.issues.block_end]
 message = "ต้องมีวงเล็บปีกกาปิดบล็อก"
+help = "ปิดบล็อกด้วย `}` หลังคำสั่ง"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "ต้องมี '>' หลังพารามิเตอร์ generic"
+help = "ปิดรายการพารามิเตอร์ generic ด้วย `>`, เช่น `{functio} identity<T>(T value)`"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของ contract"
+help = "ปิดอาร์กิวเมนต์ชนิดของ contract ด้วย `>`, เช่น `Contract<Type>`"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "ต้องมี '[' หลัง 'apud'"
+help = "ใส่พิกัดการวนซ้ำในวงเล็บเหลี่ยมหลัง `{apud}`, เช่น `{itera} {ex} values {apud} [i] {sit} value`"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "ต้องมี ']' หลังพิกัด 'apud'"
+help = "ปิดรายการพิกัดด้วย `]` หลังชื่อพิกัด"
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "ต้องมี '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "ต้องมี reduction source หลัง reduction operator"
+help = "เขียน `{ex} source` หลังตัวดำเนินการ reduction"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "ต้องมี '{lege}' หรือ '{lineam}'"
+help = "ใช้ `{lege}` เพื่ออ่านอินพุตทั้งหมด หรือ `{lineam}` เพื่ออ่านหนึ่งบรรทัด"
 
 [diagnostics.PARSE001.issues.expected_identifier]
 message = "ต้องมีตัวระบุ"
@@ -4093,30 +4141,39 @@ help = "เขียนจำนวนเต็มหรือสตริงห
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี elige"
+help = "เขียน `{elige} value {{ ... }` โดยใส่กรณี `{casu}` ไว้ด้านใน"
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังกรณีของ elige"
+help = "ปิดบอดี `{elige}` หลังกรณี `{casu}` และแขนง `{ceterum}` ที่ไม่บังคับ"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี discerne"
+help = "เขียน `{discerne} value {{ ... }` โดยใส่แขนงรูปแบบ `{casu}` ไว้ด้านใน"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังแขนงของ discerne"
+help = "ปิดบอดี `{discerne}` หลังแขนง `{casu}` และแขนง `{ceterum}` ที่ไม่บังคับ"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "ต้องมีวงเล็บปีกกาเปิดบอดี custodi"
+help = "เริ่มบอดีด้วย `{custodi} {{` แล้วเพิ่มอนุประโยค `{si}` อย่างน้อยหนึ่งรายการ"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังอนุประโยคของ custodi"
+help = "ปิดบอดี `{custodi}` หลังอนุประโยค `{si}`"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "ต้องมี '✗' หลังค่าของเงื่อนไข"
+help = "ใส่ `✗` ระหว่างค่าของ then และ else"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียก"
+help = "ปิดรายการอาร์กิวเมนต์ของการเรียกด้วย `)`"
 
 [diagnostics.PARSE001.issues.index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนี"
+help = "ปิดนิพจน์ดัชนีด้วย `]`"
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "วงเล็บดัชนีรับเพียงหนึ่งนิพจน์; พิกัดที่แยกจากกันไม่ใช่ช่องต่อแกน"
@@ -4124,99 +4181,131 @@ help = "เขียนพิกัดเป็นรายการในวง
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "ต้องมี ']' หลัง gradient selector"
+help = "ปิดรายการ selector ในวงเล็บเหลี่ยมหลังรายการด้วย `]`"
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนีแบบ optional"
+help = "จบดัชนีแบบ optional เป็น `value?[index]`"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบ optional"
+help = "จบการเรียกแบบ optional เป็น `value?(arguments)`"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "ต้องมี ']' หลังนิพจน์ดัชนีแบบไม่เป็น null"
+help = "จบดัชนีแบบ non-null เป็น `value![index]`"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์การเรียกแบบไม่เป็น null"
+help = "จบการเรียกแบบ non-null เป็น `value!(arguments)`"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้าง"
+help = "ปิดฟิลด์ของตัวสร้างด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "ต้องมี ']' หลังองค์ประกอบของตัวสร้างที่อนุมาน"
+help = "ปิดรายการสมาชิกของตัวสร้างที่อนุมานด้วย `]`"
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "ต้องมี ']' หลังองค์ประกอบของอาร์เรย์"
+help = "ปิดลิเทอรัลรายการด้วย `]` หลังสมาชิก"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "ต้องมี ')' หลังนิพจน์ในวงเล็บ"
+help = "ปิดนิพจน์ในวงเล็บด้วย `)`"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "ต้องมี '<' หลัง 'ratio'"
+help = "เขียนอาร์กิวเมนต์ชนิดแบบมีป้ายกำกับหลัง `record`, เช่น `record<label: Type>`"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของ ratio"
+help = "ปิดอาร์กิวเมนต์ชนิดของเรกคอร์ดด้วย `>` ก่อนฟิลด์"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "ต้องมีวงเล็บปีกกาเปิด หลังอาร์กิวเมนต์ชนิดของ ratio"
+help = "หลังอาร์กิวเมนต์ชนิดของเรกคอร์ด ให้เริ่มฟิลด์ด้วย `{{`"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของ ratio"
+help = "ปิดฟิลด์เรกคอร์ดด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้างแบบมีชนิด"
+help = "ปิดฟิลด์ของตัวสร้างแบบมีชนิดด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของ finge"
+help = "ปิดฟิลด์ variant ด้วย `}` หลังฟิลด์สุดท้าย"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "ต้องมี '<' หลัง 'iuncta'"
+help = "เขียนอาร์กิวเมนต์ชนิดของทูเพิลหลัง `{iuncta}`, เช่น `{iuncta}<T, U>`"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "ต้องมี '[' หลังอาร์กิวเมนต์ชนิดของ iuncta"
+help = "หลังอาร์กิวเมนต์ชนิด ให้เขียนรายการค่าทูเพิลในวงเล็บเหลี่ยม"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "ต้องมี ']' หลังองค์ประกอบของ iuncta"
+help = "ปิดรายการค่าทูเพิลด้วย `]` หลังสมาชิก"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "ต้องมี ')' หลังพารามิเตอร์ clausura"
+help = "ปิดรายการพารามิเตอร์ด้วย `)` ก่อนลายเซ็นที่ไม่บังคับและ `∴`"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "ต้องมี '∴' หลังลายเซ็น clausura"
+help = "หลังลายเซ็น closure ให้เขียน `∴` แล้วตามด้วยนิพจน์หรือบล็อก `{fac}`"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "ต้องมี ')' หลังตัวเปิด ad"
+help = "ปิดนิพจน์ตัวเปิดที่ไม่บังคับด้วย `)` หลังค่า"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "ต้องมี ':' หลังป้ายกำกับอาร์กิวเมนต์"
+help = "ในการเรียก template ให้ใส่ `:` ระหว่างป้ายกำกับอาร์กิวเมนต์กับค่า"
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "ต้องมี ']' หลังคีย์ออบเจ็กต์แบบคำนวณ"
+help = "ปิดคีย์ฟิลด์ที่คำนวณด้วย `]` ก่อนเขียน `= value`"
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "ต้องมี ':' หลังคีย์ JSON"
+help = "ใส่ `:` ระหว่างคีย์ JSON ที่อยู่ในเครื่องหมายคำพูดกับค่าของแต่ละคีย์"
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังออบเจ็กต์ JSON"
+help = "ปิดออบเจ็กต์ JSON ด้วย `}` หลังสมาชิก"
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "ต้องมี ']' หลังอาร์เรย์ JSON"
+help = "ปิดอาร์เรย์ JSON ด้วย `]` หลังค่า"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "ต้องมีวงเล็บปีกกาปิด หลังฟิลด์ของตัวสร้างที่อนุมาน"
+help = "ปิดตัวสร้างที่อนุมานด้วย `}`"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของการเรียก"
+help = "ปิดรายการอาร์กิวเมนต์ชนิดด้วย '>' ก่อน '(' ของการเรียก"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "ต้องมี '<' ก่อนอาร์กิวเมนต์ชนิดของตัวสร้าง"
+help = "เพิ่ม '<' ก่อนอาร์กิวเมนต์ชนิดของตัวสร้าง"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "ต้องมี '>' หลังอาร์กิวเมนต์ชนิดของตัวสร้าง"
+help = "ปิดรายการอาร์กิวเมนต์ชนิดของตัวสร้างด้วย '>'"
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "ต้องมี '(' หลัง 'scriptum'"
+help = "เริ่มการเรียก `{scriptum}` ด้วย '('"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "ต้องมี ')' หลังอาร์กิวเมนต์ของ scriptum"
+help = "ปิดการเรียก `{scriptum}` ด้วย ')' หลังอาร์กิวเมนต์"
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
@@ -4280,5 +4369,26 @@ help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink
 [diagnostics.INFO001]
 message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "เคอร์เนล `{kernel}` ทำงานบนเลนเดียว"
+help = "ใช้ฟังก์ชัน `@ {nucleum}` พร้อมลูป `{itera}` และส่วน `{filum}` เมื่อแต่ละเลนควรจัดการหนึ่งรายการ"
+
+[diagnostics.INFO001.issues.not_split]
+message = "เคอร์เนล `{kernel}` ทำงานบนพาร์ติชันเดียวจาก {partitions} พาร์ติชัน: {reason}"
+help = "ตรวจสอบเหตุผล: การแยกต้องมีกริดเลนเชิงเส้น ช่วงของเลน และการเขียนที่จำกัดอยู่ในช่วงของแต่ละเลน"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "เคอร์เนล `{kernel}`: การแบ่งไปยัง {partitions} พาร์ติชันขึ้นอยู่กับรูปร่างขณะรันไทม์"
+help = "เลือกรูปร่างขณะทำงานที่ทำให้กริดเลนและการเขียนมีช่วงตรงกัน เพื่อให้แบ่งได้อย่างคาดเดาได้"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "เคอร์เนล `{kernel}` ทำงานเป็นการเรียกแบบลำดับครั้งเดียวบน CPU worker หนึ่งตัว"
+help = "สำหรับงานแยกอิสระต่อรายการ ให้ใช้ฟังก์ชัน `@ {nucleum}` พร้อมลูป `{itera}` และส่วน `{filum}`"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "เคอร์เนล `{kernel}` ไม่ได้ถูกวางบนอุปกรณ์ {device}: {reason}"
+help = "ตรวจสอบเหตุผลและใช้รูปแบบเคอร์เนลที่อุปกรณ์ที่เลือกสนับสนุน"
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "เคอร์เนล `{kernel}`: {kind} ข้าม {partitions} พาร์ติชันสามารถหลีกเลี่ยงได้: {avoidable} ({reason})"
+help = "ทำตามเหตุผลจากการตรวจสอบเพื่อค้นหาการพึ่งพา ให้การอ่านและเขียนแบบแบ่งพาร์ทิชันอยู่ภายในเลน และใช้เลย์เอาต์บัฟเฟอร์ที่ตรงกันเมื่อทำได้"

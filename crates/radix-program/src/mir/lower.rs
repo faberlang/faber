@@ -456,7 +456,7 @@ fn collect_place_variant_defs(place: &MirPlace, variants: &mut Vec<DefId>) {
         match projection {
             MirProjection::VariantField { variant, .. } => variants.push(*variant),
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                collect_operand_variant_defs(operand, variants)
+                collect_operand_variant_defs(operand, variants);
             }
             MirProjection::Field(_)
             | MirProjection::ClosureCapture { .. }
@@ -4257,7 +4257,7 @@ pub(super) fn shift_place_ids(place: &mut MirPlace, offset: u32) {
                 shift_environment_id(environment, offset);
             }
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                shift_operand_ids(operand, offset)
+                shift_operand_ids(operand, offset);
             }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
@@ -5021,7 +5021,7 @@ fn scan_place_references(place: &MirPlace, scan: &mut MirReferenceScan) {
                 scan.environments.push(*environment);
             }
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                scan_operand_references(operand, scan)
+                scan_operand_references(operand, scan);
             }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
