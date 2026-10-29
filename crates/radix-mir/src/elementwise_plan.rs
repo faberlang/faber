@@ -18,6 +18,7 @@ use crate::{
 };
 use handroll::{FxHashMap, FxHashSet};
 use radix_lexer::Span;
+use radix_types::MirMathFunction;
 use radix_types::Type;
 use std::fmt;
 
@@ -636,6 +637,11 @@ fn named_elementwise_op(op: MirCollectionOp) -> Option<ElementwiseOp> {
         MirCollectionOp::TensorFill => Some(ElementwiseOp::Fill),
         MirCollectionOp::TensorRelu => Some(ElementwiseOp::Relu),
         MirCollectionOp::TensorGelu => Some(ElementwiseOp::Gelu),
+        // The math functions the elementwise emitters lower per element: the
+        // plan names they share with the admitted tensor unaries (the
+        // `ElementwiseOp` variants already exist for the `MirUnOp` seam).
+        MirCollectionOp::TensorMath(MirMathFunction::Sqrt) => Some(ElementwiseOp::Sqrt),
+        MirCollectionOp::TensorMath(MirMathFunction::Exp) => Some(ElementwiseOp::Exp),
         _ => None,
     }
 }
