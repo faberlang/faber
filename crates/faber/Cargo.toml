@@ -53,6 +53,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # Embedded reader-locale packs: gzip via flate2 (already in the workspace lock
 # through zip's deflate backend). Build-time compressor + runtime decoder.
 flate2 = "1"
+
 # `faber update`: public release lookup, verified archive download, and the
 # versioned install layout. HTTP(S) rides the shared `faber-leaf` client
 # (rustls TLS, already linked); the SHA-256 checksum is `handroll::sha256`.
@@ -62,6 +63,10 @@ semver = "1"
 handroll = { path = "../handroll" }
 # Shared native leaves (core-norma N2): plan-time `solum:*` classification.
 faber-leaf = { path = "../faber-leaf" }
+
+# Unix advisory locks protect shared llvm-host output and archive materialization.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
 
 [build-dependencies]
 flate2 = "1"
