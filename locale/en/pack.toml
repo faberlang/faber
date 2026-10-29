@@ -1245,7 +1245,7 @@ help = "write the hint as a via clause after the target: `{lista}<b8, {magnitudo
 
 [diagnostics.PARSE030.issues.conditional_nested]
 message = "a '✓ ✗' conditional cannot appear inside another '✓ ✗'"
-help = "use '{si}'/'{sin}', '{discerne}', or a function that '{redde}'s each case"
+help = "move the choices into `{si}`/`{sin}` or `{discerne}` statements, or use a helper function that `{redde}`s each value"
 
 [diagnostics.PARSE030.issues.format_spec_not_literal]
 message = "the '¶' format spec must be a string literal"
@@ -1277,11 +1277,11 @@ help = "write '↦ T ⊥ value' (or '↤ … ⊥ value'); '⇥' never takes a va
 
 [diagnostics.PARSE030.issues.praefixum_expression_form_retired]
 message = "`{praefixum}(expression)` is retired"
-help = "write a constant: `{fixum} T NAME = {praefixum}` followed by a block that ends in `{redde}` value"
+help = "write a constant initializer as `{fixum} T NAME = {praefixum} { … {redde} value }`"
 
 [diagnostics.PARSE030.issues.default_with_propagation]
 message = "an expression either propagates with '⇥' or defaults with '⊥', never both"
-help = "keep the '⊥' default, or drop it and let the error propagate"
+help = "keep `⊥` for a fallback, or remove it and propagate the error from a function with a `⇥` error channel"
 
 [diagnostics.PARSE030.issues.default_requires_failable]
 message = "'⊥' default follows a failable call or a conversion '↦ T' or '↤'"
@@ -1297,11 +1297,11 @@ help = "use ad 'route' (opener) ↦ T without a block"
 
 [diagnostics.PARSE030.issues.closure_block_body]
 message = "closure block body must use '{fac}'"
-help = "write the compact closure body after ∴ as {fac_body}"
+help = "use a closure block body after ∴ as `{fac} { ... }`"
 
 [diagnostics.PARSE030.issues.closure_fac_body_dum]
 message = "closure {fac} body cannot use '{dum}'"
-help = "remove {dum} from closure {fac} bodies"
+help = "put a `{dum}` loop inside the `{fac}` block instead of attaching it to the closure body"
 
 [diagnostics.PARSE030.issues.expression_too_long]
 message = "expression exceeds the parser limit of {limit} operators"
@@ -1361,11 +1361,11 @@ help = "use {lista}<...> for angle-bracket form"
 
 [diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
 message = "vector sugar uses bracket width"
-help = "write the width with vector sugar brackets"
+help = "use `vector<f32, size 4>` or the shorthand `vf32[4]`"
 
 [diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
 message = "{sugar} sugar uses bracket Figura"
-help = "write the shape with {sugar} width sugar brackets"
+help = "use square brackets for width sugar, not angle brackets"
 
 [diagnostics.PARSE040.issues.numeric_wrapper_retired]
 message = "`{form}` is a retired numeric type spelling"
@@ -1393,15 +1393,15 @@ help = "compare values with the equality family: `≡` (strict), `≅` (promoted
 
 [diagnostics.PARSE040.issues.nesting_too_deep]
 message = "source nests deeper than the parser limit of {limit}"
-help = "split the type into named bindings"
+help = "factor nested types into named type aliases"
 
 [diagnostics.PARSE040.issues.unexpected_cap_after_union_hole]
 message = "`∩` cannot follow a `∪` hole in a type"
-help = "write the union member before combining with `∩`"
+help = "a bare `∪` is a type hole; use concrete types before `∩`, such as `A ∩ B`"
 
 [diagnostics.PARSE040.issues.unexpected_cup_after_union_hole]
 message = "`∪` cannot follow a `∪` hole in a type"
-help = "remove the extra `∪` or write the member"
+help = "use bare `∪` by itself as a type hole, or write a member after a binary union: `A ∪ B`"
 
 [diagnostics.PARSE041]
 message = "invalid type annotation"
