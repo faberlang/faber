@@ -495,106 +495,108 @@ scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
 # [242] lege_expr
 lege_expr ::= '讀取' '行'?
 # [243] reducta_expr
-reducta_expr ::= '歸約' '經由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body | reducta_identity)?
+reducta_expr ::= '歸約' '經由' reducta_op '取自' expression apud_clause? reducta_group? (filum_clause? reducta_body)? reducta_identity?
 # [244] reducta_op
 reducta_op ::= '求和' | '求積' | '最大' | '最小' | '最大值索引' | '最小值索引' | '全部' | '任一' | '計數' | '第一個'
 # [245] reducta_group
-reducta_group ::= '按' expression
-# [246] reducta_body
+reducta_group ::= '按' (group_key | '[' expression (',' expression)* ']')
+# [246] group_key
+group_key ::= unary_expr
+# [247] reducta_body
 reducta_body ::= ('設為' | '變值') IDENTIFIER block_stmt
-# [247] reducta_identity
+# [248] reducta_identity
 reducta_identity ::= '或取' expression
-# [248] scan_expr
+# [249] scan_expr
 scan_expr ::= 'scan' '經由' scan_op ('total' ('inclusive' | 'exclusive'))? '取自' expression apud_clause scan_group? scan_order_clause? filum_clause '設為' IDENTIFIER block_stmt
-# [249] scan_op
+# [250] scan_op
 scan_op ::= '求和' | '求積' | '最大' | '最小' | '全部' | '任一' | '計數'
-# [250] scan_group
+# [251] scan_group
 scan_group ::= '按' expression
-# [251] scan_order_clause
+# [252] scan_order_clause
 scan_order_clause ::= 'order' ('升序' | '降序')
-# [252] sort_expr
+# [253] sort_expr
 sort_expr ::= '排序' '經由' sort_direction ('取自' | '從') expression sort_body?
-# [253] sort_direction
+# [254] sort_direction
 sort_direction ::= '升序' | '降序'
-# [254] sort_body
+# [255] sort_body
 sort_body ::= ('設為' | '變值') IDENTIFIER block_stmt
-# [255] filum_clause
+# [256] filum_clause
 filum_clause ::= '執行緒' IDENTIFIER
-# [256] capta_expr
+# [257] capta_expr
 capta_expr ::= '陷阱' block_stmt
-# [257] object_pattern
+# [258] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# [258] pattern_property
+# [259] pattern_property
 pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
-# [259] array_pattern
+# [260] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# [260] array_pattern_element
+# [261] array_pattern_element
 array_pattern_element ::= '_' | '其餘'? IDENTIFIER
-# [261] nota_stmt
+# [262] nota_stmt
 nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
-# [262] entry_header
+# [263] entry_header
 entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
-# [263] incipit_stmt
+# [264] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# [264] incipiet_stmt
+# [265] incipiet_stmt
 incipiet_stmt ::= '非同步入口' entry_header block_stmt
-# [265] probandum_decl
+# [266] probandum_decl
 probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
-# [266] probandum_body
+# [267] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# [267] proba_stmt
+# [268] proba_stmt
 proba_stmt ::= '測試' STRING proba_modifier* block_stmt
-# [268] proba_modifier
+# [269] proba_modifier
 proba_modifier ::= '預期失敗' | '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NATURAL | '測量' | '重複' NATURAL | '脆弱' NATURAL | '僅限於' STRING
-# [269] praepara_block
+# [270] praepara_block
 praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
-# [270] fac_stmt
+# [271] fac_stmt
 fac_stmt ::= '執行' fac_modifier? block_stmt cape_clause? ('當' expression)?
-# [271] fac_modifier
+# [272] fac_modifier
 fac_modifier ::= '全部' | '裝置'
-# [272] IDENTIFIER
+# [273] IDENTIFIER
 IDENTIFIER ::=
-# [273] NUMBER
+# [274] NUMBER
 NUMBER ::=
-# [274] NATURAL
+# [275] NATURAL
 NATURAL ::=
-# [275] STRING
+# [276] STRING
 STRING ::=
-# [276] ASCII_STRING
+# [277] ASCII_STRING
 ASCII_STRING ::=
-# [277] BACKTICK_STRING
+# [278] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [278] OCTETI_STRING
+# [279] OCTETI_STRING
 OCTETI_STRING ::=
-# [279] REGEX_TYPE_WORD
+# [280] REGEX_TYPE_WORD
 REGEX_TYPE_WORD ::=
-# [280] REGEX_BODY
+# [281] REGEX_BODY
 REGEX_BODY ::=
-# [281] NEWLINE
+# [282] NEWLINE
 NEWLINE ::=
-# [282] WIDTH_MARKER
+# [283] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [283] LISTA_WIDTH_SUGAR
+# [284] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [284] TENSOR_WIDTH_SUGAR
+# [285] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [285] SPARSA_WIDTH_SUGAR
+# [286] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [286] VECTOR_WIDTH_SUGAR
+# [287] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [287] MATRIX_WIDTH_SUGAR
+# [288] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [288] FRONTMATTER_DELIMITER
+# [289] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [289] TOML_LINES
+# [290] TOML_LINES
 TOML_LINES ::=
-# [290] ANNOTATION_NAME
+# [291] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [291] ANNOTATION_FIELD_NAME
+# [292] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [292] NON_NEWLINE_TOKEN
+# [293] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [293] NO_NEWLINE
+# [294] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -869,6 +871,7 @@ NO_NEWLINE ::=
 | [`reducta_expr`](#reducta-expr) | `#歸約-expr` | live |
 | [`reducta_op`](#reducta-op) | `#歸約-op` | live |
 | [`reducta_group`](#reducta-group) | `#歸約-group` | live |
+| [`group_key`](#group-key) | `#group-key` | live |
 | [`reducta_body`](#reducta-body) | `#歸約-body` | live |
 | [`reducta_identity`](#reducta-identity) | `#歸約-identity` | live |
 | [`scan_expr`](#scan-expr) | `#scan-expr` | live |
@@ -2976,7 +2979,7 @@ call arguments. Copy-with-changes is planned as `Genus { … } 取自 source`.
 ### Special Expressions
 
 
-`歸約 經由 <op> 取自 source [在 [coords]] [按 key | 按 [key, …]] ([執行緒 f] (定值 | 變值) x { 傳回 term } | 或取 identity)?` is the general reduction form. The optional tail is either a body (with an optional `執行緒`) or a bodiless identity; without either, the source elements are the terms. `經由` is mandatory and selects exactly one of `求和`, `求積`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, `計數`, or `第一個`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `經由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.歸約(f)` (en `xs.reduce(f)`).
+`歸約 經由 <op> 取自 source [在 [coords]] [按 key | 按 [key, …]] ([執行緒 f] (定值 | 變值) x { 傳回 term })? [或取 identity]?` is the general reduction form. The optional body may carry an optional `執行緒`; the optional identity follows the body or, when there is no body, the source. Without a body, the source elements are the terms. `經由` is mandatory and selects exactly one of `求和`, `求積`, `最大`, `最小`, `最大值索引`, `最小值索引`, `全部`, `任一`, `計數`, or `第一個`. Each operator uses its locale pack's existing method spelling, or its keyword spelling where there is no method row. The operator word is claimed only after `經由` and remains an ordinary identifier elsewhere. This does not change list folds such as `xs.歸約(f)` (en `xs.reduce(f)`).
 
 The source is a shaped tensor or matrix; lists keep their methods. An optional `在 [coords]` binds one integer coordinate per source axis. A body is claimed only when `(定值 | 變值) IDENTIFIER '{'` follows, so a declaration such as `定值 numerus x ← 1` on the next line remains a separate statement. The body must be pure and yield exactly one `傳回` term per element. Without a body, each source element is the term. `執行緒 f` requires a body and a kernel context; it retains the existing sum path, while other `執行緒` operators fail closed by name until their lowering is implemented. Without `執行緒`, the reduction is sequential in row-major order. The numeric store rule still applies: width policies are observed at stores or conversions, never in the middle of a reduction expression.
 
@@ -2998,7 +3001,7 @@ The source is a shaped tensor or matrix; lists keep their methods. An optional `
 
 For arg-extrema, ties choose the lowest coordinate in row-major order. A NaN never wins while a number participates; an all-NaN source keeps its first coordinate. Runner sum and product visit terms sequentially in row-major order. Device reassociation and its numeric tolerance belong to the device contract, not this grammar.
 
-`按 key` groups terms into a new result tensor; it does not mutate the source or key tensor. The clause takes either one key expression or a bracketed coordinate list `按 [i, j]` (en `每 [i, j]`) with one key per axis of the result. One key (`按 k`, the same as `按 [k]`) keeps the rank-one result `tensor<R, [K]>`; a list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. The list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `按 [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `求和`, `求積`, `計數`, `全部`, and `任一` have empty-bucket identities; grouped `最大` and `最小` require `或取 identity`. Grouped `最大值索引` and `最小值索引` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
+`按 key` or `按 [key, …]` groups terms into a new result tensor; it does not mutate the source or key tensor. A bare key is one key, while the bracketed form requires a non-empty expression list, with one key per axis of the result. One key (`按 k` or `按 [k]`) keeps the rank-one result `tensor<R, [K]>`; a bracketed list of N keys gives a result of rank N, `tensor<R, [K0, …, KN-1]>`, where `R` is the operator's result type. A bare key stops before `coalesce` (la `或取`), so a following identity belongs to the reduction. Each key is evaluated per element with the coordinates in scope and must be integral. The bucket extents come from the expected result type, so the key count must equal its rank (`reducta_group_rank_mismatch`), and a term lands in the row-major bucket its keys name. A multi-key list must be written as a literal `[k0, k1, …]` of plain keys: a key list held in a tensor or list value, an empty list, or a list with a spread element is refused (`reducta_group_keys_not_literal`). Inside the list a key is one scalar expression: `ka[i, j]` is `PARSE001` and `ka[i][j]` on a rank-two key tensor is `SEM011`, so read one rank-one key tensor per key, as in `按 [rows[i], cols[i]]`. A key outside its own extent uses the existing tensor-write failure. Grouped `求和`, `求積`, `計數`, `全部`, and `任一` have empty-bucket identities; grouped `最大` and `最小` require `或取 identity`. Grouped `最大值索引` and `最小值索引` are unsupported by name because their result is a coordinate, not a tensor element. The Rust, TypeScript, and Go targets emit the multi-key group and the MIR runner runs it; no other target is claimed for it here.
 
 The axis sugar `t.求和(軸 n)` (en `t.sum(軸 n)`) on a tensor of literal rank 2 to 8 is the grouped sum whose key list is the coordinates other than `n`, in order. `n` is a compile-time constant in `0..rank`, and the result is the receiver shape with axis `n` removed.
 

@@ -65,6 +65,51 @@ fn reduction_node_owns_optional_clauses_and_body() {
 }
 
 #[test]
+fn grouped_reduction_identity_follows_keys_and_body() {
+    let result = parse_ok(
+        "functio grouped(tensor<fractus, [4]> w, tensor<numerus, [4]> k) → tensor<fractus, [3]> { redde reducta via maxima ex w apud [i] pro [k[i]] vel 0.5 }\n\
+         functio with_body(tensor<fractus, [4]> w, tensor<numerus, [4]> k) → tensor<fractus, [3]> { redde reducta via maxima ex w apud [i] pro [k[i]] sit s { redde s } vel 0.5 }",
+    );
+    let program = result.program.expect("program");
+
+    for (index, has_body) in [(0, false), (1, true)] {
+        let StmtKind::Func(function) = &program.statements[index].kind else {
+            panic!("expected function declaration");
+        };
+        let StmtKind::Redde(return_stmt) = &function.body.as_ref().unwrap().statements[0].kind
+        else {
+            panic!("expected return statement");
+        };
+        let ExprKind::Reducta(reduction) = &return_stmt.value.as_ref().unwrap().kind else {
+            panic!("expected reduction node, not an outer coalesce");
+        };
+        assert!(matches!(
+            reduction.group.as_deref().map(|group| &group.kind),
+            Some(ExprKind::Array(_))
+        ));
+        assert_eq!(reduction.body.is_some(), has_body);
+        let Some(identity) = reduction.identity.as_deref() else {
+            panic!("the identity belongs to the reduction");
+        };
+        assert!(matches!(
+            identity.kind,
+            ExprKind::Literal(
+                radix_syntax::Literal::Float(value)
+                | radix_syntax::Literal::FloatText { value, .. }
+            ) if value == 0.5
+        ));
+    }
+}
+
+#[test]
+fn grouped_reduction_requires_a_key_after_pro() {
+    assert_parse_error_issue(
+        "functio t(tensor<numerus, [4]> xs) → tensor<numerus, [2]> { reducta via summa ex xs apud [i] pro }",
+        "expected_expression",
+    );
+}
+
+#[test]
 fn body_lookahead_does_not_claim_a_following_call() {
     let result =
         parse_ok("functio t(tensor<numerus, [4]> xs) → numerus { reducta via summa ex xs }");
