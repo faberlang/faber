@@ -2640,17 +2640,15 @@ fn interface_index_snapshot(figura: &FiguraExpr, interner: &crate::lexer::Intern
             .map(InterfaceIndexSnapshot::Tuple),
         FiguraExpr::Lift(lift) => match &**lift {
             // A spelled size lift snapshots like its payload: a literal
-            // folds, a name stays symbolic (same as `Var`), and a negative
-            // literal is rejected at resolve (no static snapshot).
+            // folds and a name stays symbolic (same as `Var`).
             radix_syntax::LiftExtent::Literal(value) => Some(InterfaceIndexSnapshot::Literal(*value)),
             radix_syntax::LiftExtent::Name(ident) => {
                 Some(InterfaceIndexSnapshot::Param(interner.resolve(ident.name).to_owned()))
             }
-            radix_syntax::LiftExtent::Negative { .. } => None,
+            // Negative literals are rejected at resolve; whole-shape lifts
+            // occur only in call type arguments, never in signatures.
+            radix_syntax::LiftExtent::Negative { .. } | radix_syntax::LiftExtent::Shape(_) => None,
             radix_syntax::LiftExtent::Paren(inner) => interface_index_snapshot(inner, interner),
-            // A whole-shape lift lives only in a call's type-argument list,
-            // never in a signature, so there is no interface snapshot.
-            radix_syntax::LiftExtent::Shape(_) => None,
         },
         FiguraExpr::Infer => None,
     }
@@ -2720,12 +2718,11 @@ fn parse_program_for_namespace_exports(
     code_pack: ReaderPackRef<'_>,
 ) -> Option<(Program, crate::lexer::Interner)> {
     let peeled = crate::driver::peel_raw_source(name, source).ok()?;
-    let lex_result = match code_pack {
-        Some(pack) => crate::lexer::lex_with_locale_pack(peeled.body, pack),
-        None => {
-            let pack = crate::driver::default_code_pack(&crate::driver::Config::default()).ok()?;
-            crate::lexer::lex_with_locale_pack(peeled.body, &pack)
-        }
+    let lex_result = if let Some(pack) = code_pack {
+        crate::lexer::lex_with_locale_pack(peeled.body, pack)
+    } else {
+        let pack = crate::driver::default_code_pack(&crate::driver::Config::default()).ok()?;
+        crate::lexer::lex_with_locale_pack(peeled.body, &pack)
     };
     if !lex_result.success() {
         return None;
