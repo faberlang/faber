@@ -937,6 +937,10 @@ pub fn cmd_check_package(
         );
     }
 
+    if fatal_errors == 0 && advice_target.is_some() {
+        print_region_report(&config, &input_path, command.diagnostic_mode);
+    }
+
     if fatal_errors == 0
         && let Some((device, partitions)) = advice_target
     {
@@ -1073,16 +1077,19 @@ fn print_device_advice(
 ) {
     let mut advice = Vec::new();
     let mut audit = Vec::new();
+    let mut placement = Vec::new();
     let mut failures = Vec::new();
     for unit in lowering_units(config, input_path) {
         match super::mir::with_check_lowered_package_mir(config, &unit, |lowered| {
             let rows = super::device::split_advice(lowered, device, partitions)?;
             let syncs = super::device::span_audit(lowered, device, partitions)?;
-            Ok((rows, syncs))
+            let table = super::device::placement_table(lowered, device, partitions)?;
+            Ok((rows, syncs, table))
         }) {
-            Ok(Ok((rows, syncs))) => {
+            Ok(Ok((rows, syncs, table))) => {
                 advice.extend(rows);
                 audit.extend(syncs);
+                placement.extend(table);
             }
             Ok(Err(errors)) | Err(errors) => failures.extend(errors),
         }
@@ -1095,6 +1102,8 @@ fn print_device_advice(
     advice.dedup();
     audit.sort();
     audit.dedup();
+    placement.sort();
+    placement.dedup();
     let file = input_path.display().to_string();
     let diagnostics: Vec<_> = advice
         .iter()
@@ -1123,6 +1132,93 @@ fn print_device_advice(
     } else {
         for diag in &diagnostics {
             eprintln!("{}", radix::module::diagnostics::render_plain(diag));
+        }
+    }
+    // The placement table is a table, not a diagnostic: one line per tensor.
+    if !placement.is_empty() {
+        eprintln!("placement ({partitions} partitions):");
+        for line in &placement {
+            eprintln!("  {line}");
+        }
+    }
+}
+
+/// Print one `info` row per device region (`do device` / `fac machina`) of the
+/// checked package: the names the block shares with the code around it,
+/// classified by writes, its kernel call sites, and its host syncs. The rows
+/// are advice (`INFO001`) and never change the exit status.
+fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: DiagnosticMode) {
+    let Ok(package) = radix::program::analyze::analyze_package(
+        config,
+        input_path,
+        &super::faber_analysis_seams(),
+    ) else {
+        return;
+    };
+    let mut rows = Vec::new();
+    for node in package.nodes.values() {
+        let analysis = &node.analysis;
+        let regions = &analysis.kernel_requirements.regions;
+        if regions.is_empty() {
+            continue;
+        }
+        let source = std::fs::read_to_string(&node.path).unwrap_or_default();
+        for region in regions {
+            let line = 1 + source
+                .as_bytes()
+                .iter()
+                .take(region.span.start as usize)
+                .filter(|byte| **byte == b'\n')
+                .count();
+            let render =
+                |bindings: &[radix::module::semantic::passes::device_region::RegionBinding]| {
+                    if bindings.is_empty() {
+                        return "none".to_owned();
+                    }
+                    bindings
+                        .iter()
+                        .map(|binding| format!("{}: {}", binding.name, binding.ty))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                };
+            let facts = &region.facts;
+            let launches = if facts.guarded_launches > 0 {
+                format!(
+                    "{} (up to {})",
+                    facts.loop_launches,
+                    facts.loop_launches + facts.guarded_launches
+                )
+            } else {
+                facts.loop_launches.to_string()
+            };
+            let message = format!(
+                "device region at line {line}: inputs [{}]; in-outs [{}]; launches per iteration {launches}, {} outside the loop; {} host syncs",
+                render(&facts.inputs),
+                render(&facts.in_outs),
+                facts.other_launches,
+                region.host_syncs,
+            );
+            let mut row = radix::module::diagnostics::Diagnostic::new(
+                radix::module::diagnostics::Severity::Info,
+                message,
+            )
+            .with_phase(radix::module::diagnostics::DiagnosticPhase::Codegen)
+            .with_code("INFO001");
+            node.path.display().to_string().clone_into(&mut row.file);
+            rows.push(row);
+        }
+    }
+    for row in &rows {
+        match mode {
+            DiagnosticMode::Diagnostics => {
+                eprintln!(
+                    "{}",
+                    radix::module::diagnostics::render_expanded_diagnostics(std::slice::from_ref(
+                        row
+                    ))
+                );
+            }
+            _ => eprintln!("{}", radix::module::diagnostics::render_plain(row)),
         }
     }
 }

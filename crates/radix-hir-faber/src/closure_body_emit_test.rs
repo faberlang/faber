@@ -111,13 +111,19 @@ fn fac_closure_blocks_keep_compact_form_and_marker() {
     for (kind, marker) in [
         (HirBreakableKind::Fac, "∴ fac {"),
         (HirBreakableKind::FacOmnia, "∴ fac omnia {"),
+        (HirBreakableKind::FacMachina, "∴ fac machina {"),
     ] {
         let code = render(0, block_body(Some(kind)));
         assert!(code.starts_with("() ") && code.contains(marker), "{code}");
         let ClausuraBody::Fac(fac) = parsed_body(&code, 0) else {
             panic!("expected explicit fac body: {code}");
         };
-        assert_eq!(fac.omnia, kind == HirBreakableKind::FacOmnia, "{code}");
+        let expected = match kind {
+            HirBreakableKind::FacOmnia => radix_syntax::FacModifier::Omnia,
+            HirBreakableKind::FacMachina => radix_syntax::FacModifier::Machina,
+            _ => radix_syntax::FacModifier::None,
+        };
+        assert_eq!(fac.modifier, expected, "{code}");
     }
 }
 

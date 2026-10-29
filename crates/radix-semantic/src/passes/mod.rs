@@ -61,6 +61,7 @@ pub mod complexity;
 pub(crate) mod coverage;
 pub mod decimal_integer_literal;
 pub mod definite_assignment;
+pub mod device_region;
 pub mod exhaustive;
 pub(crate) mod filum_independence;
 pub mod float_literal_fold;
@@ -246,6 +247,10 @@ mod iuncta_hole_test;
 #[cfg(test)]
 #[path = "kernel_legality_test.rs"]
 mod kernel_legality_test;
+
+#[cfg(test)]
+#[path = "device_region_test.rs"]
+mod device_region_test;
 
 #[cfg(test)]
 #[path = "kernel_requirements_test.rs"]

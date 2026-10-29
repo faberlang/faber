@@ -1,0 +1,177 @@
++++
+term = "si"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "si_stmt", "arm", "secus_clause", "else_arm", "itera_stmt", "elige_stmt", "casu_elige_clause", "ceterum_clause", "assignment", "place", "comparison", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+category = "branch"
+canonical = false
+summary = "An elif or else arm that binds a local inside a loop body leaves the rest of the iteration running."
+syntax = "if <cond> { let … } elif <cond> { let … } else { let … }"
+related = ["si", "sin", "secus", "itera"]
+locale = "en"
++++
+# =============================================================================
+# elif — a block-scoped binding in an elif or else arm, inside a loop
+# =============================================================================
+#
+# What this teaches:
+#   • An elif or else arm that declares a local runs as a statement of the
+#     enclosing block: the statements after the chain still run, and the
+#     loop keeps iterating
+#   • The same holds for every sibling shape: if/else, a three-step elif
+#     ladder, an if nested in an arm, a switch arm, a plain block, and a
+#     lone elif with no else
+#
+# Common mistakes:
+#   • Assuming the last arm of a chain ends the loop body or the function
+#
+# See also: si, sin, secus
+# =============================================================================
+
+# Every function collects one row per input, so a lost iteration shows up as
+# a short list.
+
+fn elif_chain(list<int> xs, string k) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        if k ≡ "a" {
+            let string t ← "A"
+            name ← t
+        }
+        elif k ≡ "b" {
+            let string t ← "B"
+            name ← t
+        }
+        out.append(name)
+    }
+    return out
+}
+
+fn if_else(list<int> xs, string k) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        if k ≡ "a" {
+            let string t ← "A"
+            name ← t
+        }
+        else {
+            let string t ← "other"
+            name ← t
+        }
+        out.append(name)
+    }
+    return out
+}
+
+fn ladder(list<int> xs) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        if x ≡ 1 {
+            let string t ← "one"
+            name ← t
+        }
+        elif x ≡ 2 {
+            let string t ← "two"
+            name ← t
+        }
+        elif x ≡ 3 {
+            let string t ← "three"
+            name ← t
+        }
+        else {
+            let string t ← "many"
+            name ← t
+        }
+        out.append(name)
+    }
+    return out
+}
+
+fn nested(list<int> xs, string k) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        if k ≡ "a" {
+            name ← "A"
+        }
+        else {
+            if x ≡ 1 {
+                let string t ← "inner-one"
+                name ← t
+            }
+            elif x ≡ 2 {
+                let string t ← "inner-two"
+                name ← t
+            }
+        }
+        out.append(name)
+    }
+    return out
+}
+
+fn arms(list<int> xs) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        switch x {
+            case 1 {
+                let string t ← "case-one"
+                name ← t
+            }
+            case 2 {
+                let string t ← "case-two"
+                name ← t
+            }
+            default {
+                let string t ← "case-other"
+                name ← t
+            }
+        }
+        out.append(name)
+    }
+    return out
+}
+
+fn block_scope(list<int> xs) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        do {
+            let string t ← "block"
+            name ← t
+        }
+        out.append(name)
+    }
+    return out
+}
+
+fn elif_value(int x) → string {
+    mut string name ← "none"
+    if x ≡ 1 {
+        name ← "A"
+    }
+    elif x ≡ 2 {
+        let string t ← "B"
+        name ← t
+    }
+    return name
+}
+
+main {
+    print elif_chain([1, 2, 3], "a").length()
+    print elif_chain([1, 2, 3], "b").length()
+    print elif_chain([1, 2, 3], "c").length()
+    print elif_chain([1, 2, 3], "b")
+    print if_else([1, 2, 3], "a")
+    print if_else([1, 2, 3], "z")
+    print ladder([1, 2, 3, 4])
+    print nested([1, 2, 3], "z")
+    print nested([1, 2, 3], "a")
+    print arms([1, 2, 3])
+    print block_scope([1, 2])
+    print elif_value(1)
+    print elif_value(2)
+    print elif_value(3)
+}
