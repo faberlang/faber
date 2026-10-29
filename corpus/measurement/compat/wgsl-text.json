@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 5,
-    "analyzable": 551
+    "analyzable": 556
   },
   "terms": [
     {
@@ -37,7 +37,7 @@
       "term": "?(",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 5
     },
     {
       "term": "?.",
@@ -499,7 +499,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 20
+      "analyzable": 21
     },
     {
       "term": "manifest",
@@ -535,7 +535,7 @@
       "term": "modulus<u64>",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 3
     },
     {
       "term": "modulus<u8>",
