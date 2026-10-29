@@ -458,6 +458,12 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
             SizedNumericOutcome::PhysicalScalar,
             SizedNumericOutcome::LoudError,
         ),
+        // Decimal d64 has an i64 stored carrier; its arithmetic remains a
+        // separate exact-decimal emission concern.
+        NumericWidth::D64 => (
+            SizedNumericOutcome::PhysicalScalar,
+            SizedNumericOutcome::LoudError,
+        ),
         NumericWidth::F16 | NumericWidth::F32 | NumericWidth::F64 => (
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::PhysicalScalar,
@@ -467,11 +473,6 @@ fn width_sub_table(width: NumericWidth) -> (SizedNumericOutcome, SizedNumericOut
         NumericWidth::BF16 => (
             SizedNumericOutcome::LoudError,
             SizedNumericOutcome::PhysicalScalar,
-        ),
-        // decimal-widths D1: decimals have no MIR scalar arm until D4/D5.
-        NumericWidth::D64 => (
-            SizedNumericOutcome::LoudError,
-            SizedNumericOutcome::LoudError,
         ),
         // inf track U4: `numerus<inf>` is the unsized `Magnus` scalar layout
         // (ruling 46); `fractus<inf>` is not a type and stays a loud error.
@@ -541,6 +542,15 @@ fn every_sized_numeric_width_matches_its_sub_table_row() {
             numerus_outcome,
             "numerus<{numerus_marker}>"
         );
+        if width == NumericWidth::D64 {
+            assert_eq!(
+                table
+                    .layout_for_type(MirType::semantic(numerus))
+                    .unwrap()
+                    .kind,
+                MirLayoutKind::Scalar(MirScalarLayout::I64)
+            );
+        }
         assert_eq!(
             resolve_outcome(&table, fractus),
             fractus_outcome,
