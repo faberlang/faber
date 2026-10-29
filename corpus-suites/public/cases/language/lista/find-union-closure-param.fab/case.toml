@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/lista/find-union-closure-param.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/find-union-closure-param.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
