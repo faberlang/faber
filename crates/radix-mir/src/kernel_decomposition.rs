@@ -1582,7 +1582,22 @@ fn source_return_tuple_fields(source: &MirFunction) -> Option<Vec<MirLocalId>> {
         return None;
     }
     let block = &source.blocks[0];
-    let return_local = crate::read_analysis::terminator_return_local(&block.terminator.kind)?;
+    let MirTerminatorKind::Return(Some(operand)) = &block.terminator.kind else {
+        return None;
+    };
+    // The returned place base: the local-return assembly resolves through the
+    // local; a TEMP-return assembly (the `return tuple<..> [...]` lowering
+    // constructs into a result temp) resolves through the same construct.
+    // Both shapes must resolve — a temp-shaped assembly the D-6 pass cannot
+    // see leaves a tuple-return last subchain without its field output set,
+    // and the kept live source assembly is then an aggregate the emitters
+    // refuse (the same two shapes the ABI's result-tuple scan and the
+    // constructor's `tuple_return_locals` resolve).
+    let returned = match operand {
+        MirOperand::Place(place) => place.base.clone(),
+        MirOperand::Temp(temp) => MirPlaceBase::Temp(*temp),
+        _ => return None,
+    };
     block.statements.iter().find_map(|statement| {
         let MirStatementKind::Construct {
             destination,
@@ -1591,7 +1606,7 @@ fn source_return_tuple_fields(source: &MirFunction) -> Option<Vec<MirLocalId>> {
         else {
             return None;
         };
-        if crate::read_analysis::place_local_base(destination) != Some(return_local) {
+        if destination.base != returned {
             return None;
         }
         if aggregate.kind != MirAggregateKind::Tuple {

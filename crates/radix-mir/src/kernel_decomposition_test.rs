@@ -2583,6 +2583,195 @@ fn tuple_return_fields_map_full_result_tuple_indices_to_locals() {
     );
 }
 
+/// A `dense_qkv`-shaped tuple-return body whose assembly lowers into a TEMP
+/// (the real `return tuple<..> [...]` lowering): three matmul recipes each
+/// forward their result temp into a stage local, the trailing `Construct`
+/// builds the result tuple into a tuple temp, and the terminator returns that
+/// temp. The D-6 field scan must resolve this shape exactly as it resolves the
+/// local-return companion assembly, or the last subchain keeps a live source
+/// tuple assembly the device emitters refuse.
+fn dense_qkv_temp_tuple_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    let tuple_ty =
+        MirType::semantic(types.tuple(vec![r2.semantic_id(), r2.semantic_id(), r2.semantic_id()]));
+    let span = test_span();
+    let matmul_to_temp = |args: [u32; 2], temp: MirTempId| MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace {
+                base: MirPlaceBase::Temp(temp),
+                projections: Vec::new(),
+            }),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(args[0]))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(args[1]))),
+                ],
+                return_ty: r2,
+            },
+        },
+        span,
+    };
+    let tuple_temp = MirTempId(3);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: [0, 1, 2, 3]
+            .into_iter()
+            .map(|id| MirParam {
+                local: MirLocalId(id),
+                name: None,
+                ty: r2,
+                mode: MirParamMode::Owned,
+                span,
+            })
+            .collect(),
+        locals: [4, 5, 6]
+            .into_iter()
+            .map(|id| MirLocal {
+                id: MirLocalId(id),
+                name: None,
+                ty: r2,
+                mutable: false,
+                span,
+            })
+            .collect(),
+        temps: vec![
+            MirTemp {
+                id: MirTempId(0),
+                ty: r2,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(1),
+                ty: r2,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(2),
+                ty: r2,
+                span,
+            },
+            MirTemp {
+                id: tuple_temp,
+                ty: tuple_ty,
+                span,
+            },
+        ],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                matmul_to_temp([0, 1], MirTempId(0)),
+                assign_from_temp(4, MirTempId(0), r2),
+                matmul_to_temp([0, 2], MirTempId(1)),
+                assign_from_temp(5, MirTempId(1), r2),
+                matmul_to_temp([0, 3], MirTempId(2)),
+                assign_from_temp(6, MirTempId(2), r2),
+                MirStatement {
+                    kind: MirStatementKind::Construct {
+                        destination: MirPlace {
+                            base: MirPlaceBase::Temp(tuple_temp),
+                            projections: Vec::new(),
+                        },
+                        aggregate: MirAggregate {
+                            kind: MirAggregateKind::Tuple,
+                            ty: tuple_ty,
+                            fields: MirAggregateFields::Ordered(vec![
+                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                    MirLocalId(4),
+                                ))),
+                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                    MirLocalId(5),
+                                ))),
+                                MirAggregateItem::Operand(MirOperand::Place(MirPlace::local(
+                                    MirLocalId(6),
+                                ))),
+                            ]),
+                        },
+                    },
+                    span,
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Temp(tuple_temp))),
+                span,
+            },
+            span,
+        }],
+        return_ty: tuple_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn temp_return_tuple_assembly_exposes_the_field_outputs() {
+    // The dense_qkv shape: the return assembly builds the tuple into a temp
+    // (the `return tuple<..> [...]` lowering), not into a stage local. The
+    // D-6 field scan resolves the temp-return shape, the last subchain
+    // exposes the one return-tuple field it writes, and the producer
+    // resolution lands every field on the subchain kernel whose output
+    // buffer carries it (the per-field result row the host assembles).
+    let mut types = TypeTable::new();
+    let function = dense_qkv_temp_tuple_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the dense_qkv body decomposes");
+    assert_eq!(
+        decomposition.subchains.len(),
+        3,
+        "one matmul subchain per field"
+    );
+
+    let fields = decomposition
+        .return_tuple_fields(&function)
+        .expect("a temp-return tuple assembly exposes its full result-tuple fields");
+    assert_eq!(
+        fields,
+        vec![MirLocalId(4), MirLocalId(5), MirLocalId(6)],
+        "full-tuple index i binds the local assembled into field i"
+    );
+    assert_eq!(
+        decomposition.producer_position(fields[0]),
+        Some((0, 0)),
+        "q (field 0) is produced by subchain 0's first output slot"
+    );
+    assert_eq!(
+        decomposition.producer_position(fields[1]),
+        Some((1, 0)),
+        "k (field 1) is produced by subchain 1's first output slot"
+    );
+    assert_eq!(
+        decomposition.producer_position(fields[2]),
+        Some((2, 0)),
+        "v (field 2) is produced by the last subchain's first output slot"
+    );
+    assert_eq!(
+        decomposition.subchains[2].outputs,
+        vec![MirLocalId(6)],
+        "the last subchain's output set is the return-tuple field it writes"
+    );
+
+    // The emission synthetic replaces the kept source assembly with its own
+    // output-set tuple (the 1-tuple the ABI's result-tuple contract
+    // recognizes), so the kept source construct is dead — the shape the
+    // device emitters accept.
+    let mut subchain_types =
+        TypeTable::from_snapshot(types.snapshot()).expect("a live table always restores");
+    decomposition.intern_output_tuple_types(&function, &mut subchain_types);
+    let synthetic = decomposition.subchain_function(&function, 2, &subchain_types);
+    let subchain_validation = MirValidationContext::new(&subchain_types);
+    assert_eq!(
+        crate::abi::result_tuple_count(&synthetic, &subchain_validation),
+        Some(1),
+        "the synthetic returns the output-set tuple, not the kept source assembly"
+    );
+}
+
 #[test]
 fn scalar_return_function_has_no_tuple_fields() {
     // A scalar-return function (the mlp_loss forward) exposes no full
