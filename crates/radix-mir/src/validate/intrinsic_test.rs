@@ -11,10 +11,17 @@ fn place(id: u32) -> MirOperand {
     MirOperand::Place(MirPlace::local(MirLocalId(id)))
 }
 
-fn runtime(intrinsic: MirIntrinsic, args: Vec<MirOperand>, return_ty: MirType) -> MirStatement {
+/// A runtime call whose result lands in `destination`; the validator requires a
+/// destination for every non-vacuum result.
+fn runtime(
+    intrinsic: MirIntrinsic,
+    args: Vec<MirOperand>,
+    return_ty: MirType,
+    destination: Option<u32>,
+) -> MirStatement {
     MirStatement {
         kind: MirStatementKind::RuntimeCall {
-            destination: None,
+            destination: destination.map(|id| MirPlace::local(MirLocalId(id))),
             call: MirRuntimeCall {
                 intrinsic,
                 args,
@@ -25,20 +32,26 @@ fn runtime(intrinsic: MirIntrinsic, args: Vec<MirOperand>, return_ty: MirType) -
     }
 }
 
-fn int(value: i64) -> MirOperand {
-    MirOperand::Constant(MirConstant::Int(value))
-}
-
 fn float(value: f64) -> MirOperand {
     MirOperand::Constant(MirConstant::Float(value))
 }
 
-fn atomic(op: MirAtomicOp, args: Vec<MirOperand>, result: MirType) -> MirStatement {
-    runtime(MirIntrinsic::Atomic(op), args, result)
+fn atomic(
+    op: MirAtomicOp,
+    args: Vec<MirOperand>,
+    result: MirType,
+    destination: Option<u32>,
+) -> MirStatement {
+    runtime(MirIntrinsic::Atomic(op), args, result, destination)
 }
 
-fn collection(op: crate::MirCollectionOp, result: MirType) -> MirStatement {
-    runtime(MirIntrinsic::Collection(op), vec![place(0)], result)
+fn collection(op: crate::MirCollectionOp, result: MirType, destination: u32) -> MirStatement {
+    runtime(
+        MirIntrinsic::Collection(op),
+        vec![place(0)],
+        result,
+        Some(destination),
+    )
 }
 
 fn program(types: &TypeTable, locals: Vec<MirLocal>, statements: Vec<MirStatement>) -> MirProgram {
@@ -93,33 +106,54 @@ fn local(id: u32, ty: MirType) -> MirLocal {
 #[test]
 fn atomic_operations_validate_matching_types_and_reject_mismatches() {
     let mut types = TypeTable::new();
-    let number_id = types.primitive(Primitive::Numerus);
+    // An atomic's element is a storage-class 32-bit integer; any other element has
+    // no atomic layout.
+    let number_id = types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32);
     let number = MirType::semantic(number_id);
     let atomic_ty = MirType::semantic(types.atomic(number_id));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let boolean = MirType::semantic(types.primitive(Primitive::Bivalens));
+    let text = MirType::semantic(types.primitive(Primitive::Textus));
     let receiver = place(0);
+    // Locals 1..=4 receive the non-vacuum results, typed as the calls return them; the
+    // i32 locals also serve as the well-typed value operands (an `int` literal is not
+    // an i32 operand).
+    let locals = vec![
+        local(0, atomic_ty),
+        local(1, number),
+        local(2, number),
+        local(3, boolean),
+        local(4, text),
+    ];
     let statements = vec![
-        atomic(MirAtomicOp::Load, vec![receiver.clone()], number),
-        atomic(MirAtomicOp::Store, vec![receiver.clone(), int(7)], vacuum),
+        atomic(MirAtomicOp::Load, vec![receiver.clone()], number, Some(1)),
+        atomic(
+            MirAtomicOp::Store,
+            vec![receiver.clone(), place(1)],
+            vacuum,
+            None,
+        ),
         atomic(
             MirAtomicOp::Exchange,
-            vec![receiver.clone(), int(8)],
+            vec![receiver.clone(), place(1)],
             number,
+            Some(2),
         ),
         atomic(
             MirAtomicOp::CompareExchange,
-            vec![receiver.clone(), int(8), int(9)],
+            vec![receiver.clone(), place(1), place(2)],
             boolean,
+            Some(3),
         ),
         atomic(
             MirAtomicOp::Store,
             vec![receiver.clone(), float(1.0)],
-            MirType::semantic(types.primitive(Primitive::Textus)),
+            text,
+            Some(4),
         ),
-        atomic(MirAtomicOp::Load, vec![receiver], vacuum),
+        atomic(MirAtomicOp::Load, vec![receiver], vacuum, None),
     ];
-    let mir = program(&types, vec![local(0, atomic_ty)], statements);
+    let mir = program(&types, locals, statements);
     let found = issues(&mir, &types);
 
     assert_eq!(
@@ -143,11 +177,16 @@ fn map_key_and_value_snapshots_preserve_their_element_types() {
     let wrong_list = MirType::semantic(types.array(number_id));
     let mir = program(
         &types,
-        vec![local(0, map_ty)],
         vec![
-            collection(crate::MirCollectionOp::Keys, number_list),
-            collection(crate::MirCollectionOp::Values, text_list),
-            collection(crate::MirCollectionOp::Values, wrong_list),
+            local(0, map_ty),
+            local(1, number_list),
+            local(2, text_list),
+            local(3, wrong_list),
+        ],
+        vec![
+            collection(crate::MirCollectionOp::Keys, number_list, 1),
+            collection(crate::MirCollectionOp::Values, text_list, 2),
+            collection(crate::MirCollectionOp::Values, wrong_list, 3),
         ],
     );
     let found = issues(&mir, &types);
@@ -160,7 +199,7 @@ fn map_key_and_value_snapshots_preserve_their_element_types() {
 
 #[test]
 fn shape_checks_validate_expression_trees_and_bad_witnesses() {
-    let mut types = TypeTable::new();
+    let types = TypeTable::new();
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let wrong_result = MirType::semantic(types.primitive(Primitive::Numerus));
     let nested = crate::MirShapeExpr::Product(vec![
@@ -192,10 +231,15 @@ fn shape_checks_validate_expression_trees_and_bad_witnesses() {
     };
     let mir = program(
         &types,
-        vec![],
+        vec![local(0, wrong_result)],
         vec![
-            runtime(MirIntrinsic::TensorShapeCheck(check), vec![], vacuum),
-            runtime(MirIntrinsic::TensorShapeSize(nested), vec![], wrong_result),
+            runtime(MirIntrinsic::TensorShapeCheck(check), vec![], vacuum, None),
+            runtime(
+                MirIntrinsic::TensorShapeSize(nested),
+                vec![],
+                wrong_result,
+                Some(0),
+            ),
         ],
     );
     let found = issues(&mir, &types);
