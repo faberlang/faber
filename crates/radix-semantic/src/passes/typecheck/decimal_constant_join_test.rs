@@ -3,9 +3,7 @@
 //! It needs at most 8 fractional digits and must lie in the `d64` range; a
 //! typed integer or float operand beside `d64` still needs `↦`.
 
-use crate::test_support::{
-    assert_accepts_la, assert_rejects_with_issue_la,
-};
+use crate::test_support::{assert_accepts_la, assert_rejects_with_issue_la};
 
 const D: &str = "d64";
 
