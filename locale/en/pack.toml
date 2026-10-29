@@ -1953,23 +1953,23 @@ help = "write a variant name or qualified variant, such as `Shape.Circle`"
 
 [diagnostics.SEM008.issues.empty_union_type]
 message = "empty union type"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.ex_destructuring_not_expanded]
 message = "ex destructuring should be expanded before statement lowering"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.figura_not_index_param]
 message = "name does not refer to an index parameter"
-help = "fix the AST construct for lowering"
+help = "Use a declared `{magnitudo}` parameter or an in-scope integer extent where run-time sizes are allowed."
 
 [diagnostics.SEM008.issues.figura_type_param_in_index]
 message = "type parameter cannot appear in index position"
-help = "fix the AST construct for lowering"
+help = "A type parameter cannot set a dimension; declare a `{magnitudo}` parameter instead."
 
 [diagnostics.SEM008.issues.figura_unknown_index]
 message = "unknown index variable in Figura"
-help = "fix the AST construct for lowering"
+help = "Declare the dimension as a `{magnitudo}` parameter, or use an in-scope integer value where run-time extents are allowed."
 
 [diagnostics.SEM008.issues.figura_arithmetic_invalid]
 message = "invalid Figura arithmetic: {reason}"
@@ -1977,39 +1977,39 @@ help = "dimensions are natural numbers, and division must be exact"
 
 [diagnostics.SEM008.issues.forma_builtin_missing]
 message = "builtin forma class is not registered"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.forma_literal_lowering_path]
 message = "forma template literals must lower through forma capture"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.forma_literal_pattern]
 message = "forma template literals are not valid in patterns"
-help = "fix the AST construct for lowering"
+help = "Use a supported literal or binding pattern; template literals are expressions, not patterns."
 
 [diagnostics.SEM008.issues.forma_params_field_missing]
 message = "builtin forma class is missing params field"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.forma_template_field_missing]
 message = "builtin forma class is missing template field"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.instans_precision_params]
 message = "instant accepts at most one precision marker"
-help = "fix the AST construct for lowering"
+help = "Use at most one precision marker, for example `instant<ms>`."
 
 [diagnostics.SEM008.issues.intervallum_arity]
 message = "range takes one bound and an optional compile-time step"
-help = "write range<T> or range<T, S>"
+help = "Write `range<T>` or `range<T, 2>` with one bound type and an optional positive integer-literal step."
 
 [diagnostics.SEM008.issues.intervallum_bound]
 message = "range bound type must be int or instant"
-help = "fix the AST construct for lowering"
+help = "Use an integer type or `instant` as the range bound."
 
 [diagnostics.SEM008.issues.intervallum_step_must_be_constant]
 message = "range step must be a positive integer literal"
-help = "write the compile-time step as an integer literal: range<int, 2>"
+help = "Use a positive integer literal for the compile-time step, such as `range<int, 2>`."
 
 [diagnostics.SEM008.issues.intervallum_step_bound_not_integer]
 message = "a stepped range takes integer bounds only"
@@ -2017,23 +2017,23 @@ help = "drop the step for instant bounds; write range<instant>"
 
 [diagnostics.SEM008.issues.atomic_arity]
 message = "atomic requires exactly one element type; use atomic<T>"
-help = "fix the AST construct for lowering"
+help = "Give `atomic` exactly one element type: `atomic<i32>` or `atomic<u32>`."
 
 [diagnostics.SEM008.issues.atomic_element]
 message = "atomic element type must be i32 or u32"
-help = "fix the AST construct for lowering"
+help = "Use `atomic<i32>` or `atomic<u32>`; other element types are not supported."
 
 [diagnostics.SEM008.issues.atomic_incomplete]
 message = "atomic requires one element type; use atomic<T>"
-help = "fix the AST construct for lowering"
+help = "Write one element type, `atomic<i32>` or `atomic<u32>`."
 
 [diagnostics.SEM008.issues.invalid_lowered_expression]
 message = "invalid expression produced during lowering"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.invalid_precision_marker]
 message = "instant accepts only ms, us, or ns as a precision marker"
-help = "fix the AST construct for lowering"
+help = "Use `ms`, `us`, or `ns`, for example `instant<ms>`."
 
 [diagnostics.SEM008.issues.removed_decimal_width_d32]
 message = "d32 is not a type"
@@ -2041,27 +2041,27 @@ help = "d32 was removed; use d64, the only decimal width"
 
 [diagnostics.SEM008.issues.nan_pattern]
 message = "a NaN pattern can never match: NaN is not equal to itself"
-help = "test for NaN with a {si} statement instead of a {casu} pattern"
+help = "Compare the value with itself using `≢` in a `{si}` statement."
 
 [diagnostics.SEM008.issues.json_valor_pattern]
 message = "JSON document literals are not valid in patterns"
-help = "fix the AST construct for lowering"
+help = "Bind the value with a supported pattern, then test it in a `{si}` branch; JSON document literals are not patterns."
 
 [diagnostics.SEM008.issues.kernel_glob_call_shape]
 message = "kernel glob calls must use `faber.<module>.<verb>`"
-help = "fix the AST construct for lowering"
+help = "The `faber:*` kernel namespace is retired; call the relevant function from its current `norma:<module>` library instead."
 
 [diagnostics.SEM008.issues.kernel_glob_named_alias]
 message = "`faber:*` must be imported with a named alias"
-help = "fix the AST construct for lowering"
+help = "The `faber:*` kernel namespace is retired; use a current `{importa} {ex} \"norma:<module>\" name` import instead."
 
 [diagnostics.SEM008.issues.kernel_unknown_module]
 message = "unknown faber kernel module '{module}'; see faber host manifest"
-help = "fix the AST construct for lowering"
+help = "The `faber:*` kernel namespace is retired; use a current `{importa} {ex} \"norma:<module>\" name` import instead."
 
 [diagnostics.SEM008.issues.labeled_actual_non_template_call]
 message = "labeled actual '{label}' is only legal at a template-call site"
-help = "use labeled actuals only when the callee is a string or forma template"
+help = "Use labeled actuals only when applying a string or template literal."
 
 [diagnostics.SEM008.issues.mixed_template_actuals_unsupported]
 message = "template application cannot mix labeled and positional actuals"
@@ -2069,43 +2069,43 @@ help = "fill the template entirely by position or entirely by label"
 
 [diagnostics.SEM008.issues.matrix_incomplete]
 message = "matrix requires element type and shape; use matrix<T, [R, C]>"
-help = "fix the AST construct for lowering"
+help = "Supply both the element type and a two-dimensional shape, for example `matrix<f32, [2, 2]>`."
 
 [diagnostics.SEM008.issues.matrix_missing_figura]
 message = "matrix requires a two-dimensional shape; use matrix<T, [R, C]>"
-help = "fix the AST construct for lowering"
+help = "Supply the two dimensions after the element type, for example `matrix<f32, [2, 2]>`."
 
 [diagnostics.SEM008.issues.matrix_shape_two_dim]
 message = "matrix shape must be exactly two dimensions"
-help = "fix the AST construct for lowering"
+help = "Use exactly two dimensions, for example `matrix<f32, [2, 2]>`."
 
 [diagnostics.SEM008.issues.missing_resolved_type_alias]
 message = "type alias is missing resolved type"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.missing_type_alias_symbol]
 message = "missing symbol for type alias"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.missing_type_symbol_info]
 message = "missing type symbol information"
-help = "fix the AST construct for lowering"
+help = "This is an internal compiler error; report it with a minimal example."
 
 [diagnostics.SEM008.issues.mutable_pattern_binding]
 message = "mutable pattern bindings are not lowered yet"
-help = "fix the AST construct for lowering"
+help = "Bind the pattern with `{sit}`, then initialize a `{varia}` local in the arm if you need to change the value."
 
 [diagnostics.SEM008.issues.nested_array_destructuring]
 message = "nested array destructuring is not lowered yet"
-help = "fix the AST construct for lowering"
+help = "Destructure one level at a time: bind the inner array first, then destructure that name on a later line."
 
 [diagnostics.SEM008.issues.nested_object_destructuring]
 message = "nested object destructuring is not lowered yet"
-help = "fix the AST construct for lowering"
+help = "Destructure one level at a time: bind the inner object first, then destructure that name on a later line."
 
 [diagnostics.SEM008.issues.nucleum_async]
 message = "a kernel cannot use {construct}: async and generator forms need the host"
-help = "make the kernel a plain synchronous function"
+help = "Move the async or generator work to a host function; kernel functions must remain synchronous."
 
 [diagnostics.SEM008.issues.nucleum_host_call]
 message = "kernel call to '{callee}' is not device-legal (reason: {reason})"
