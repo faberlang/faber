@@ -23,6 +23,6 @@ main {
     let d64 product ← a * epsilon
     print sum ≅ 1.50000001
     print difference ≅ 1.49999999
-    // 1.5 × 10^-8 is a half-way value; half-even stores 2 × 10^-8.
+    # 1.5 × 10^-8 is a half-way value; half-even stores 2 × 10^-8.
     print product ≅ 0.00000002
 }

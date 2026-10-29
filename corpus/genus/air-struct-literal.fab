@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "genus_decl", "
 category = "kernel"
 canonical = false
 summary = "An AIR-lane function returns a genus literal built from a parameter."
-syntax = "@ radix lane \"air\"; functio make(T x) → T { redde T { field = x } }"
+syntax = "@ radix lane \"air\"; fn make(T x) → T { return T { field = x } }"
 related = ["radix", "genus"]
 locale = "en"
 +++
@@ -19,11 +19,11 @@ locale = "en"
 # See also: radix, genus
 # =============================================================================
 
-genus Point { numerus x }
+class Point { let int x }
 
 @ radix lane "air"
-functio make(numerus x) → Point {
-    redde Point { x = x }
+fn make(int x) → Point {
+    return Point { x = x }
 }
 
 main {
