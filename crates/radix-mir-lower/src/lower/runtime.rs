@@ -6793,5 +6793,9 @@ mod sink_into_test;
 mod imported_default_test;
 
 #[cfg(test)]
+#[path = "unary_mut_param_test.rs"]
+mod unary_mut_param_test;
+
+#[cfg(test)]
 #[path = "omitted_optional_test.rs"]
 mod omitted_optional_test;
