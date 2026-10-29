@@ -294,8 +294,29 @@ impl Emitter<'_> {
         self.current = None;
         // Constants built at run time are set before the entry block runs.
         let mut body = items.initializers.clone();
+        let entry_exit = hir
+            .entry
+            .as_ref()
+            .and_then(|entry| radix_codegen_shared::entry_exit::entry_exit_expr(entry, self.types));
         if let Some(entry) = &hir.entry {
-            self.block(&mut body, entry)?;
+            if let Some(exit) = entry_exit {
+                // The exit expression is the entry block's result, not a
+                // statement: run the body first, then return its value to the
+                // process as C's `int` status.
+                let mut body_entry = entry.clone();
+                body_entry.expr = None;
+                self.block(&mut body, &body_entry)?;
+                let exit_value = self.expr(exit)?;
+                let exit_value = self.settle(exit_value, Ty::Int)?;
+                if exit_value.value != crate::expr::Value::Int {
+                    return Err(unsupported("entry exit value is not an integer"));
+                }
+                self.depth += 1;
+                self.line(&mut body, &format!("return (int)({});", exit_value.text));
+                self.depth -= 1;
+            } else {
+                self.block(&mut body, entry)?;
+            }
         }
         // A closure body is written as its own top-level function, so flush
         // the closures discovered by the function bodies and the entry block
