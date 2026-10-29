@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/tensor/copy-is-independent.fab"
+group = "language"
+input_root = "corpus"
+input = "tensor/copy-is-independent.fab"
+category = "tensor"
+domain = "tensors"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
