@@ -4065,15 +4065,15 @@ help = "increase N or convert the source to a width whose digit count fits"
 
 [diagnostics.SEM016.issues.ascii_pack_negative_source]
 message = "ascii format pack rejects negative sources; narrow to an unsigned width first"
-help = "convert to an unsigned numerus width before packing"
+help = "ensure the value is nonnegative, then choose an unsigned width that fits it before packing"
 
 [diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
 message = "conversion from {lista}<b8> to float is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
-help = "use chorda or explicit byte conversion helpers"
+help = "read an exact-width byte window with an explicit order, e.g. `raw[0‥4] ↦ f32 via Le`"
 
 [diagnostics.SEM016.issues.octeti_to_tensor_unspecified]
 message = "conversion from {lista}<b8> to a tensor needs the byte order of each element; write `via Le` or `via Be`"
-help = "write {lista}<b8> ↦ tensor<f32, [rows, cols]> via Le (or via Be); no other hint applies, and the hint is required for every element width"
+help = "write `{lista}<b8> ↦ tensor<f32, [rows, cols]> via Le` (or via Be) for elements wider than 8 bits; `u8` and `i8` take no hint"
 
 [diagnostics.SEM016.issues.octeti_to_tensor_element_unsupported]
 message = "{lista}<b8> convert only to a tensor of u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64 elements"
@@ -4089,7 +4089,7 @@ help = "write {lista}<b8> ↦ tensor<Record, [n]> via Le; a record element has o
 
 [diagnostics.SEM016.issues.tensor_to_octeti_unspecified]
 message = "conversion from a tensor to {lista}<b8> needs the byte order of each element; write `via Le` or `via Be`"
-help = "write tensor ↦ {lista}<b8> via Le (or via Be); no other hint applies, and the hint is required for every element width"
+help = "write `tensor<f32, [rows, cols]> ↦ {lista}<b8> via Le` (or via Be) for elements wider than 8 bits; `u8` and `i8` take no hint"
 
 [diagnostics.SEM016.issues.tensor_to_octeti_element_unsupported]
 message = "a tensor converts to {lista}<b8> only when its elements are u8, i8, i16, u16, i32, u32, i64, u64, f32, or f64"
@@ -4105,15 +4105,15 @@ help = "use one of Hex, Bin, Oct, Be, Le, or Code after via; Floor, Ceil, HalfEv
 
 [diagnostics.SEM016.issues.conversio_via_target_takes_no_hint]
 message = "this conversion target takes no convert hint"
-help = "drop the via clause; only numeric, ascii, char, vector, and {lista}<b8, {magnitudo} N> targets take a hint"
+help = "drop `via` here. Use it only where the conversion defines a hint, such as `↦ i32 via Hex`, `↦ f32 via Le`, or `↦ {ascii}<{magnitudo} N> via Hex`"
 
 [diagnostics.SEM016.issues.float_to_integer_requires_rounding]
 message = "a float or decimal does not convert to an integer without naming the rounding"
-help = "write `x ↦ int via Floor`, `via Ceil`, `via HalfEven` (ties to the even neighbour) or `via Trunc`; a `↤` site takes the same clause, `a ↤ x via Trunc`; or round first with ⌊x⌋, ⌈x⌉ or ⌊x⌉ and convert the result"
+help = "name a rounding rule, for example `x ↦ {numerus} via Floor` or `x ↦ {numerus} via HalfEven` (also `Ceil` and `Trunc`)"
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
-help = "write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`"
+help = "write `x ↦ b32` to capture an `f32` bit pattern; reinterpret a `u32` pattern with `u32 ↦ b32 ↦ f32`"
 
 [diagnostics.SEM016.issues.conversio_map_key_not_textus]
 message = "a map key converted to or from value must be text"
@@ -4121,27 +4121,27 @@ help = "write the map with `string` keys; a conversion never parses keys, and `@
 
 [diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
 message = "conversion from {lista}<b8> to bool has no default meaning; decode to string or compare the {lista}<b8> explicitly"
-help = "use chorda or explicit byte conversion helpers"
+help = "decode text bytes with `↦ {textus}` (UTF-8), or compare the byte values explicitly"
 
 [diagnostics.SEM016.issues.lista_to_textus_unsupported]
 message = "a list does not convert to a string; its element type does not say which text encoding it is"
-help = "convert to list<b8>, list<b16> or list<b32> first, then ↦ string (UTF-8, UTF-16 or UTF-32 decode, can fail); or show the list with the format string \"§\"(xs)"
+help = "write `{lista}<b8> ↦ {textus}` (UTF-8), `{lista}<b16> ↦ {textus}` (UTF-16) or `{lista}<b32> ↦ {textus}` (UTF-32); use `\"§\"(xs)` to display the list"
 
 [diagnostics.SEM016.issues.textus_to_lista_unsupported]
 message = "a string does not convert to a list; the element type does not say which encoding it is"
-help = "encode with ↦ list<b8> (or list<b16>/list<b32>) and work from the octets, or build the list of characters explicitly"
+help = "encode with `↦ {lista}<b8>`, `↦ {lista}<b16>` or `↦ {lista}<b32>` to choose UTF-8, UTF-16 or UTF-32; build a list of characters if that is what you need"
 
 [diagnostics.SEM016.issues.promissum_target_boundary]
 message = "conversion to promissum crosses the async/sync boundary; use `@ futura` or `.tum()` for async wrapping"
-help = "resolve or wrap the async value explicitly"
+help = "make the function `{fiet}` and return the value; its result is wrapped as `{promissum}<T>`"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
 message = "conversion from promissum crosses the async/sync boundary; bind the resolved value with `↢` in an async-capable body"
-help = "resolve or wrap the async value explicitly"
+help = "await it with `↢` inside a `{fiet}` body before using the resolved value"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]
 message = "sparse conversion has no default {lista} meaning; use densata() before {lista} conversion or an explicit sparse helper"
-help = "densify or use an explicit sparse helper"
+help = "call `.{densata}()` before converting to `{lista}`, or use sparse access methods when you need selected entries"
 
 [diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
 message = "tensor and sparse conversio requires the same element type; convert element width explicitly before changing representation"
@@ -4149,11 +4149,11 @@ help = "convert element widths explicitly before changing representation"
 
 [diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
 message = "tensor and sparse conversio requires the same Figura shape; reshape explicitly before `↦`"
-help = "reshape explicitly before converting"
+help = "for sparse input, call `.{densata}()` first; reshape and materialize to the target shape with `.{forma}(newshape).{materialize}()` before converting"
 
 [diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
 message = "tensor to scalar conversion has no default element pick; use `accipe(index)` for indexed reads"
-help = "index or reduce the tensor before converting"
+help = "read one element with `.{accipe}(index)` or reduce the tensor before converting"
 
 [diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
 message = "scalar to tensor conversion has no default broadcast shape; use `crea(shape, fill)` or `structa`"
@@ -4161,7 +4161,7 @@ help = "construct or fill the tensor explicitly"
 
 [diagnostics.SEM016.issues.tensor_shape_mismatch]
 message = "tensor shape conversion is not supported for this pair"
-help = "reshape explicitly before converting"
+help = "reshape and materialize the tensor to the target shape with `.{forma}(newshape).{materialize}()` before converting"
 
 [diagnostics.SEM016.issues.tensor_element_mismatch]
 message = "tensor element-type conversion is not supported for this pair"
@@ -4169,15 +4169,15 @@ help = "convert element widths explicitly before changing representation"
 
 [diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
 message = "propagating conversio failure requires a `string` alternate-exit channel"
-help = "declare the alternate-exit channel as string or provide inline recovery"
+help = "use `⇥ {textus}` as the alternate-exit channel, or provide inline recovery with `⊥`"
 
 [diagnostics.SEM016.issues.conversio_failure_channel_value_required]
 message = "propagating a sermo materialization failure requires a `value` alternate-exit channel"
-help = "declare the alternate-exit channel as value, unknown, or a registered value conversion"
+help = "declare the channel as `{valor}` or `{ignotum}`, or register an `@ {conversio}` row from `{valor}` to the channel's error type"
 
 [diagnostics.SEM016.issues.regex_operand_unsupported]
 message = "regex conversion requires string or ascii operand"
-help = "convert string or ascii values to regex"
+help = "make the operand a `{textus}` or `{ascii}` value, then convert it with `↦ {regex}`"
 
 [diagnostics.SEM016.issues.word_conversio_recovery_unsupported]
 message = "a conversion into wrapping or saturating cannot fail"
