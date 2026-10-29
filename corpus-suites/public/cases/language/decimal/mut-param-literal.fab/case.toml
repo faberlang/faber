@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/decimal/mut-param-literal.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/mut-param-literal.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
