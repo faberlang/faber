@@ -2189,7 +2189,7 @@ help = "remove unsupported parameters; bounded forms are `string<{magnitudo} N>`
 
 [diagnostics.SEM008.issues.qualified_type_not_exported]
 message = "qualified type is not exported by namespace"
-help = "export the type from its module with `@ public`, or import it directly by name"
+help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
 message = "qualified type prefix must name a namespace"
@@ -2317,7 +2317,7 @@ help = "This expression could not be lowered; try a supported form or report the
 
 [diagnostics.SEM008.issues.constructor_requires_extent_type]
 message = "construction applies to extent-bearing tensor types"
-help = "Use an extent-bearing type such as `tf32[2, 3] {}`; write a scalar zero as a value"
+help = "spell the shape, as in tf32[2, 3]"
 
 [diagnostics.SEM008.issues.constructor_extent_requires_term]
 message = "a constructor extent must name a size or a literal"
@@ -2325,7 +2325,7 @@ help = "Use a literal or a {magnitudo} name here; reserve `_` for an inferred ty
 
 [diagnostics.SEM008.issues.constructor_register_extent_requires_literal]
 message = "a vector width or matrix extent in a constructor must be a literal"
-help = "Use a literal vector width or matrix extent, as in `vf32[4] {}`"
+help = "spell the width as a number, as in vector<f32, size 4>"
 
 [diagnostics.SEM008.issues.constructor_affine_extent_unsupported]
 message = "constructor extents admit literals, size names, and spelled size lifts"
@@ -2541,7 +2541,7 @@ help = "Rename this local option or the global binding so their names differ."
 
 [diagnostics.SEM009.issues.missing_entry_argument]
 message = "@ cli programs must use an explicit '{incipit} argumenta <ident>' entry point"
-help = "Declare the root as `{incipit} {argumenta} args { ... }` so parsed arguments have a binding."
+help = "fix the CLI annotation contract before emitting runnable CLI code"
 
 [diagnostics.SEM009.issues.malformed_annotation]
 message = "{annotation} field `{field}` must be {expected}"
@@ -2625,7 +2625,7 @@ help = "use rust or the MIR runner, or drop the {route} call"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
-help = "end the sort body with `{redde}` and an orderable key, such as a number, text or bool"
+help = "give the sort a body that returns an orderable key, such as a number, text or bool"
 
 [diagnostics.SEM010.issues.sort_key_unordered]
 message = "the sort key has no natural order"
@@ -2805,11 +2805,11 @@ help = "divide with `÷` to get a float quotient, or convert an operand explicit
 
 [diagnostics.SEM010.issues.store_constant_out_of_range]
 message = "constant {value} does not fit {slot}"
-help = "choose a wider slot or a value that fits; if reduction or clamping is intended, use a `{modulus}<W>` or `{saturatus}<W>` slot"
+help = "write a value the slot holds"
 
 [diagnostics.SEM010.issues.numerus_literal_out_of_range]
 message = "integer literal is outside the numerus range"
-help = "For a value above {numerus} but no greater than `u64`, use a `u64` slot; for larger integers, use `inf`"
+help = "write a value from -9223372036854775808 to 9223372036854775807, store a larger non-negative value in a `u64` slot, or declare the slot `inf` to hold any integer"
 
 [diagnostics.SEM010.issues.bits_literal_out_of_range]
 message = "literal does not fit in the bits width"
@@ -3117,7 +3117,7 @@ help = "Put all request data in the opener; call `send<T>().finish()` to close t
 
 [diagnostics.SEM010.issues.sermo_typed_from_untyped]
 message = "a bare {sermo} carries {valor} frames and cannot become a typed conversation"
-help = "Keep a bare `{sermo}` bare, or open a Faber route with `ad 'route' (opener)` to get a typed conversation."
+help = "declare the binding as bare {sermo}, or open the conversation on a Faber route"
 
 [diagnostics.SEM010.issues.sermo_type_arguments_mismatch]
 message = "the conversation types do not match the declared {sermo}<O, R>"
