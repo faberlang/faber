@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/fractus/no-fused-multiply-add.fab"
+group = "language"
+input_root = "corpus"
+input = "fractus/no-fused-multiply-add.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
