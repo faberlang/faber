@@ -130,6 +130,7 @@ pub(super) fn cmd_run(args: RunArgs) {
                 std::slice::from_ref(diagnostic.as_ref()),
                 diagnostic_mode,
                 None,
+                eprint_route_diagnostics,
             );
             std::process::exit(status);
         }
@@ -197,11 +198,12 @@ fn interpret_path(
                     std::slice::from_ref(diagnostic.as_ref()),
                     diagnostic_mode,
                     None,
+                    eprint_archive_diagnostics,
                 );
                 exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
         };
-        let (config, diagnostics_locale_pack) = match script_package_config_with_diagnostics(
+        let (config, diagnostics_locale_pack) = match script_package_config(
             archive.package_input(),
             locale,
             diagnostics_locale,
@@ -213,6 +215,7 @@ fn interpret_path(
                     std::slice::from_ref(diagnostic.as_ref()),
                     diagnostic_mode,
                     None,
+                    eprint_archive_diagnostics,
                 );
                 exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
@@ -234,6 +237,7 @@ fn interpret_path(
                     &diagnostics,
                     diagnostic_mode,
                     diagnostics_locale_pack.as_ref(),
+                    eprint_archive_diagnostics,
                 );
                 drop(archive);
                 exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -249,6 +253,7 @@ fn interpret_path(
                         std::slice::from_ref(diagnostic.as_ref()),
                         diagnostic_mode,
                         None,
+                        eprint_archive_diagnostics,
                     );
                     drop(archive);
                     exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
@@ -268,6 +273,7 @@ fn interpret_path(
                         &diagnostics,
                         diagnostic_mode,
                         diagnostics_locale_pack.as_ref(),
+                        eprint_archive_diagnostics,
                     );
                     eprint_device_run_note(&diagnostics);
                     drop(archive);
@@ -293,6 +299,7 @@ fn interpret_path(
                             &diagnostics,
                             diagnostic_mode,
                             diagnostics_locale_pack.as_ref(),
+                            eprint_archive_diagnostics,
                         );
                         eprint_device_run_note(&diagnostics);
                         drop(archive);
@@ -312,6 +319,7 @@ fn interpret_path(
                 &diagnostics,
                 diagnostic_mode,
                 diagnostics_locale_pack.as_ref(),
+                eprint_archive_diagnostics,
             );
             eprint_device_run_note(&diagnostics);
             drop(archive);
@@ -322,13 +330,14 @@ fn interpret_path(
 
     if is_package_interpret_input(path) {
         let (config, diagnostics_locale_pack) =
-            match script_package_config_with_diagnostics(path, locale, diagnostics_locale, safe) {
+            match script_package_config(path, locale, diagnostics_locale, safe) {
                 Ok(config) => config,
                 Err(diagnostic) => {
                     eprint_run_diagnostics(
                         std::slice::from_ref(diagnostic.as_ref()),
                         diagnostic_mode,
                         None,
+                        super::eprint_compile_diagnostics,
                     );
                     exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
@@ -346,6 +355,7 @@ fn interpret_path(
                     &diagnostics,
                     diagnostic_mode,
                     diagnostics_locale_pack.as_ref(),
+                    eprint_route_diagnostics,
                 );
                 exit_status::exit_for_run_diagnostics(&diagnostics);
             }
@@ -359,6 +369,7 @@ fn interpret_path(
                         std::slice::from_ref(diagnostic.as_ref()),
                         diagnostic_mode,
                         None,
+                        super::eprint_compile_diagnostics,
                     );
                     exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
                 }
@@ -376,6 +387,7 @@ fn interpret_path(
                         &diagnostics,
                         diagnostic_mode,
                         diagnostics_locale_pack.as_ref(),
+                        super::eprint_compile_diagnostics,
                     );
                     eprint_device_run_note(&diagnostics);
                     exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -398,6 +410,7 @@ fn interpret_path(
                             &diagnostics,
                             diagnostic_mode,
                             diagnostics_locale_pack.as_ref(),
+                            super::eprint_compile_diagnostics,
                         );
                         eprint_device_run_note(&diagnostics);
                         exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -415,6 +428,7 @@ fn interpret_path(
                 &diagnostics,
                 diagnostic_mode,
                 diagnostics_locale_pack.as_ref(),
+                super::eprint_compile_diagnostics,
             );
             eprint_device_run_note(&diagnostics);
             exit_status::exit_for_run_diagnostics(&diagnostics);
@@ -453,13 +467,14 @@ fn interpret_path(
     };
 
     let (config, diagnostics_locale_pack) =
-        match script_package_config_with_diagnostics(path, locale, diagnostics_locale, safe) {
+        match script_package_config(path, locale, diagnostics_locale, safe) {
             Ok(config) => config,
             Err(diagnostic) => {
                 eprint_run_diagnostics(
                     std::slice::from_ref(diagnostic.as_ref()),
                     diagnostic_mode,
                     None,
+                    super::eprint_compile_diagnostics,
                 );
                 exit_status::exit_for_run_diagnostic(diagnostic.as_ref());
             }
@@ -483,6 +498,7 @@ fn interpret_path(
                     &diagnostics,
                     diagnostic_mode,
                     diagnostics_locale_pack.as_ref(),
+                    eprint_route_diagnostics,
                 );
                 exit_status::exit_for_run_diagnostics(&diagnostics);
             }
@@ -543,16 +559,6 @@ fn elapsed_wall_ms(started: Instant) -> u64 {
 /// pack and `effective_package_config` will not replace it with the package's
 /// declared locale.
 fn script_package_config(
-    input: &Path,
-    locale: Option<&str>,
-    diagnostics_locale: Option<&str>,
-    safe: bool,
-) -> Result<radix::module::driver::Config, Box<Diagnostic>> {
-    script_package_config_with_diagnostics(input, locale, diagnostics_locale, safe)
-        .map(|(config, _)| config)
-}
-
-fn script_package_config_with_diagnostics(
     input: &Path,
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
@@ -1033,19 +1039,6 @@ fn ensure_partitions_cpu_route(
     ))
 }
 
-fn eprint_run_diagnostics(
-    diagnostics: &[Diagnostic],
-    mode: radix::services::DiagnosticMode,
-    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
-) {
-    faber_cli::postprocess::print_diagnostics(diagnostics, mode, diagnostics_locale_pack);
-    if let Some(first_error) = diagnostics.iter().find(|diagnostic| diagnostic.is_error())
-        && let (Some(code), Some(issue)) = (first_error.code, first_error.issue())
-    {
-        eprintln!("explain: faber explain {code}.{issue}");
-    }
-}
-
 fn print_run_source_error_with_mode(
     error: &radix::module::mir::RunSourceError,
     mode: radix::services::DiagnosticMode,
@@ -1054,7 +1047,7 @@ fn print_run_source_error_with_mode(
     match error {
         radix::module::mir::RunSourceError::Frontend(diagnostics) => {
             let ordered = radix::services::normalize_locale002_notes(diagnostics.clone());
-            eprint_run_diagnostics(&ordered, mode, diagnostics_locale_pack);
+            faber_cli::postprocess::print_diagnostics(&ordered, mode, diagnostics_locale_pack);
         }
         _ => print_run_source_error(error),
     }
@@ -1102,6 +1095,21 @@ fn eprint_device_run_note(diagnostics: &[Diagnostic]) {
         eprintln!(
             "note: this package declares a device program that executes through the host driver; if it cannot be run here, build the artifact with `faber build` and run the generated entrypoint through the host driver"
         );
+    }
+}
+
+fn eprint_archive_diagnostics(diagnostics: &[Diagnostic]) {
+    for diagnostic in diagnostics {
+        let level = if diagnostic.is_error() {
+            "error"
+        } else {
+            "warning"
+        };
+        if diagnostic.file.is_empty() {
+            eprintln!("{level}: {}", diagnostic.message);
+        } else {
+            eprintln!("{level}: {}: {}", diagnostic.file, diagnostic.message);
+        }
     }
 }
 
@@ -1197,3 +1205,20 @@ mod run_device_tests;
 #[cfg(all(test, feature = "device-runtime", target_os = "macos"))]
 #[path = "run_device_hw_test.rs"]
 mod run_device_hw_tests;
+
+/// Print `diagnostics` in the selected mode; `compact` is the command's
+/// existing compact form, which also carries the message of the package
+/// refusals the expanded renderer prints none for.
+fn eprint_run_diagnostics(
+    diagnostics: &[Diagnostic],
+    mode: radix::services::DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
+    compact: fn(&[Diagnostic]),
+) {
+    faber_cli::postprocess::print_diagnostics_or_compact(
+        diagnostics,
+        mode,
+        diagnostics_locale_pack,
+        compact,
+    );
+}

@@ -225,7 +225,7 @@ pub fn cmd_run_ts(
     let (config, locale_pack) =
         match super::config_with_locale(TS_TARGET, &input, locale, diagnostics_locale) {
             Ok(pair) => pair,
-            Err(diag) => crate::package::build_recipe::report_run_and_exit_mode(
+            Err(diag) => crate::package::build_recipe::report_and_exit_mode(
                 std::slice::from_ref(&*diag),
                 None,
                 diagnostic_mode,
@@ -236,7 +236,7 @@ pub fn cmd_run_ts(
     let scratch = std::env::temp_dir().join("faber-run-ts");
     let layout = match super::cmd::discover_build_layout(&input, &scratch) {
         Ok(layout) => layout,
-        Err(diag) => crate::package::build_recipe::report_run_and_exit_mode(
+        Err(diag) => crate::package::build_recipe::report_and_exit_mode(
             std::slice::from_ref(&*diag),
             locale_pack.as_ref(),
             diagnostic_mode,
@@ -244,7 +244,7 @@ pub fn cmd_run_ts(
     };
     let program = match build_ts_program(&config, &input, &layout) {
         Ok(program) => program,
-        Err(diagnostics) => crate::package::build_recipe::report_run_and_exit_mode(
+        Err(diagnostics) => crate::package::build_recipe::report_and_exit_mode(
             &diagnostics,
             locale_pack.as_ref(),
             diagnostic_mode,
@@ -252,7 +252,7 @@ pub fn cmd_run_ts(
     };
     match run_ts_program(&program, program_args) {
         Ok(status) => std::process::exit(exit_code_of(status)),
-        Err(diag) => crate::package::build_recipe::report_run_and_exit_mode(
+        Err(diag) => crate::package::build_recipe::report_and_exit_mode(
             std::slice::from_ref(&diag),
             locale_pack.as_ref(),
             diagnostic_mode,

@@ -618,20 +618,28 @@ fn safe_package(label: &str, device_table: &str) -> PathBuf {
 #[test]
 fn the_safe_flag_lowers_kernels_to_the_default_tier() {
     let dir = safe_package("safe-flag", "");
-    let unsafe_config = script_package_config(&dir, None, None, false).expect("config");
+    let unsafe_config = script_package_config(&dir, None, None, false)
+        .expect("config")
+        .0;
     assert!(!unsafe_config.deny_kernel_tiers);
-    let safe_config = script_package_config(&dir, None, None, true).expect("config");
+    let safe_config = script_package_config(&dir, None, None, true)
+        .expect("config")
+        .0;
     assert!(safe_config.deny_kernel_tiers);
 }
 
 #[test]
 fn the_manifest_device_safe_key_lowers_kernels_to_the_default_tier() {
     let on = safe_package("safe-manifest-on", "[device]\nsafe = true\n");
-    let config = script_package_config(&on, None, None, false).expect("config");
+    let config = script_package_config(&on, None, None, false)
+        .expect("config")
+        .0;
     assert!(config.deny_kernel_tiers);
 
     let off = safe_package("safe-manifest-off", "[device]\nsafe = false\n");
-    let config = script_package_config(&off, None, None, false).expect("config");
+    let config = script_package_config(&off, None, None, false)
+        .expect("config")
+        .0;
     assert!(!config.deny_kernel_tiers);
 }
 
@@ -639,7 +647,9 @@ fn the_manifest_device_safe_key_lowers_kernels_to_the_default_tier() {
 fn the_safe_flag_can_only_lower_a_tier_never_raise_one() {
     // `safe = false` in the manifest does not undo `--safe`.
     let off = safe_package("safe-flag-over-manifest", "[device]\nsafe = false\n");
-    let config = script_package_config(&off, None, None, true).expect("config");
+    let config = script_package_config(&off, None, None, true)
+        .expect("config")
+        .0;
     assert!(config.deny_kernel_tiers);
 }
 
@@ -677,7 +687,9 @@ fn run_single_file_under(
     arguments: Vec<String>,
 ) -> (Result<ExitCode, RunSourceError>, Vec<String>) {
     let source = std::fs::read_to_string(path).expect("read single-file source");
-    let config = script_package_config(path, None, None, false).expect("single-file config");
+    let config = script_package_config(path, None, None, false)
+        .expect("single-file config")
+        .0;
     let config = match selection.kernel_lowering() {
         radix::module::mir::KernelLowering::Host => config.with_host_kernels(),
         radix::module::mir::KernelLowering::Device => config,

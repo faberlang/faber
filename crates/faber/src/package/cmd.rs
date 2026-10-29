@@ -929,6 +929,7 @@ pub fn cmd_check_package(
                 radix::module::diagnostics::render_expanded_diagnostics(&diagnostics)
             ),
         }
+        crate::postprocess::print_explain_footer(&diagnostics);
     }
 
     for diag in &diagnostics {
@@ -1052,6 +1053,7 @@ fn exit_does_not_lower(
             None => radix::module::diagnostics::render_expanded_diagnostics(diagnostics),
         };
         eprintln!("{rendered}");
+        crate::postprocess::print_explain_footer(diagnostics);
     } else {
         for diag in diagnostics {
             eprintln!("{}", radix::module::diagnostics::render_plain(diag));

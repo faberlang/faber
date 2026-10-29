@@ -47,7 +47,7 @@ pub fn cmd_run_clif_jit(
     let (config, locale_pack) =
         match crate::package::config_with_locale(target, &input_path, locale, diagnostics_locale) {
             Ok(pair) => pair,
-            Err(diagnostic) => crate::package::build_recipe::report_run_and_exit_mode(
+            Err(diagnostic) => crate::package::build_recipe::report_and_exit_mode(
                 std::slice::from_ref(&*diagnostic),
                 None,
                 diagnostic_mode,
@@ -68,7 +68,6 @@ pub fn cmd_run_clif_jit(
     );
     let Some(output) = result.output else {
         eprintln!("compilation failed");
-        crate::package::build_recipe::print_run_explain_footer(&result.diagnostics);
         crate::exit_status::exit_for_compile_failure(&result.diagnostics);
     };
     let Output::ClifJit(image) = output else {

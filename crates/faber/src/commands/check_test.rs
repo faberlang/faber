@@ -302,3 +302,80 @@ fn check_lower_cannot_combine_with_air_or_permissive_or_stdin() {
         .expect("run faber check --lower -");
     assert!(!output.status.success(), "stdin has no package to lower");
 }
+
+/// Two bodyless functions: two errors, one explain footer for the first.
+const TWO_ERRORS_SOURCE: &str =
+    "+++\nlocale = \"en\"\n+++\nfn parse(string s) -> string\nfn other(string s) -> string\n";
+
+fn run_faber_stderr(args: &[&str], path: &std::path::Path) -> String {
+    let binary = super::format_test::faber_binary()
+        .canonicalize()
+        .expect("locate faber binary");
+    let output = Command::new(binary)
+        .args(args)
+        .arg(path)
+        .output()
+        .expect("run faber");
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+/// The footer is generated once per run, for the first error, in the default
+/// form; `--no-diagnostics` has none.
+#[test]
+fn check_default_prints_one_explain_footer_for_the_first_error() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("two.fab");
+    std::fs::write(&file, TWO_ERRORS_SOURCE).expect("write source");
+
+    let default = run_faber_stderr(&["check"], &file);
+    assert!(
+        default.matches("error[").count() >= 2 || default.matches("\nhelp:").count() >= 2,
+        "the fixture must report two errors:\n{default}"
+    );
+    assert_eq!(
+        default.matches("explain: faber explain PARSE012").count(),
+        1,
+        "one footer, for the first error:\n{default}"
+    );
+
+    let compact = run_faber_stderr(&["check", "--no-diagnostics"], &file);
+    assert!(
+        !compact.contains("explain: faber explain"),
+        "--no-diagnostics has no footer:\n{compact}"
+    );
+}
+
+/// `run`, `build` and `format` print the help line by default and omit it under
+/// `--no-diagnostics`.
+#[test]
+fn run_build_and_format_print_help_by_default_and_omit_it_when_disabled() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("bodyless.fab");
+    std::fs::write(
+        &file,
+        "+++\nlocale = \"en\"\n+++\nfn parse(string s) -> string\n",
+    )
+    .expect("write source");
+
+    for command in ["run", "build", "format"] {
+        let default = run_faber_stderr(&[command], &file);
+        assert!(
+            default.contains("\nhelp:"),
+            "`faber {command}` prints the help line by default:\n{default}"
+        );
+        assert_eq!(
+            default.matches("explain: faber explain").count(),
+            1,
+            "`faber {command}` prints one footer:\n{default}"
+        );
+        let compact = run_faber_stderr(&[command, "--no-diagnostics"], &file);
+        assert!(
+            !compact.contains("help:") && !compact.contains("explain: faber explain"),
+            "`faber {command} --no-diagnostics` is compact:\n{compact}"
+        );
+        assert!(
+            compact.contains("PARSE012"),
+            "`faber {command} --no-diagnostics` keeps the code:\n{compact}"
+        );
+    }
+}

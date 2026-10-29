@@ -167,44 +167,31 @@ fn pack_has_row(diag: &Diagnostic, pack: Option<&radix::module::locale::LocalePa
         .is_some_and(|package| package.issues.contains_key(issue))
 }
 
+/// Print the failure of a built-program build or run and terminate. In
+/// expanded mode every diagnostic renders through the shared renderer. In
+/// compact mode a package diagnostic with a reader-pack row renders through
+/// the row; one without has no message template, so its own message is the
+/// report (the tool's output and the failing path are in it). Any other
+/// diagnostic renders as usual.
 pub(crate) fn report_and_exit_mode(
     diagnostics: &[Diagnostic],
     locale_pack: Option<&radix::module::locale::LocalePack>,
     mode: radix::services::DiagnosticMode,
 ) -> ! {
-    if mode == radix::services::DiagnosticMode::Diagnostics {
-        crate::postprocess::print_diagnostics(diagnostics, mode, locale_pack);
-        crate::exit_status::exit_for_diagnostics(diagnostics);
-    }
-    for diag in diagnostics {
-        if diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE) && !pack_has_row(diag, locale_pack) {
-            eprintln!("error: {}", diag.message);
-        } else {
-            crate::postprocess::print_diagnostics(
-                std::slice::from_ref(diag),
-                radix::services::DiagnosticMode::Normal,
-                locale_pack,
-            );
+    crate::postprocess::print_diagnostics_or_compact(diagnostics, mode, locale_pack, |batch| {
+        for diag in batch {
+            if diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE) && !pack_has_row(diag, locale_pack)
+            {
+                eprintln!("error: {}", diag.message);
+            } else {
+                crate::postprocess::print_diagnostics(
+                    std::slice::from_ref(diag),
+                    radix::services::DiagnosticMode::Normal,
+                    locale_pack,
+                );
+            }
         }
-    }
-    crate::exit_status::exit_for_diagnostics(diagnostics);
-}
-
-pub(crate) fn print_run_explain_footer(diagnostics: &[Diagnostic]) {
-    if let Some(first_error) = diagnostics.iter().find(|diagnostic| diagnostic.is_error())
-        && let (Some(code), Some(issue)) = (first_error.code, first_error.issue())
-    {
-        eprintln!("explain: faber explain {code}.{issue}");
-    }
-}
-
-pub(crate) fn report_run_and_exit_mode(
-    diagnostics: &[Diagnostic],
-    locale_pack: Option<&radix::module::locale::LocalePack>,
-    mode: radix::services::DiagnosticMode,
-) -> ! {
-    crate::postprocess::print_diagnostics(diagnostics, mode, locale_pack);
-    print_run_explain_footer(diagnostics);
+    });
     crate::exit_status::exit_for_diagnostics(diagnostics);
 }
 

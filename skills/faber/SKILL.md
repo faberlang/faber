@@ -316,7 +316,7 @@ examples small and canonical unless asked otherwise.
 - Is every spelling I emitted from one pack, only that pack?
 - Did I quote `EBNF.md` and open a real exemplar rather than recall both?
 - Did I verify legality with `faber check` when it matters?
-- If a diagnostic was unclear, did I read its message (`--diagnostics` or
+- If a diagnostic was unclear, did I read its message and help (shown by default; or
   `faber explain`) instead of guessing from the code?
 - If a library/target/host claim: did I inspect that repo's live source?
 - Did I avoid filling gaps with confident invention?

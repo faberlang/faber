@@ -53,7 +53,7 @@ pub fn cmd_format(command: &FormatCommand) {
         }
         let path = Path::new("<stdin>");
         // No package context on stdin: only the flag applies.
-        match format_single_doc_with_mode(path, &source, command.width, command.diagnostic_mode) {
+        match format_single_doc(path, &source, command.width, command.diagnostic_mode) {
             Ok(formatted) => {
                 print!("{formatted}");
                 return;
@@ -108,14 +108,13 @@ pub fn cmd_format(command: &FormatCommand) {
                 continue;
             }
         };
-        let formatted =
-            match format_single_doc_with_mode(path, &source, width, command.diagnostic_mode) {
-                Ok(formatted) => formatted,
-                Err(status) => {
-                    tally.refuse(status);
-                    continue;
-                }
-            };
+        let formatted = match format_single_doc(path, &source, width, command.diagnostic_mode) {
+            Ok(formatted) => formatted,
+            Err(status) => {
+                tally.refuse(status);
+                continue;
+            }
+        };
 
         if command.stdout {
             // Exactly one file here (multi-file `--stdout` rejected above).
@@ -357,21 +356,8 @@ pub(super) fn convert_single_doc(
 /// locale, printing diagnostics and returning the formatted output ready for
 /// write/stdout (frontmatter preserved). `Err(())` means a diagnostic was
 /// already printed.
-pub(super) fn format_single_doc(
-    path: &Path,
-    source: &str,
-    width: Option<NonZeroU32>,
-) -> Result<String, i32> {
-    format_single_doc_with_mode(
-        path,
-        source,
-        width,
-        radix::services::DiagnosticMode::Diagnostics,
-    )
-}
-
 #[cfg(not(feature = "hir-faber"))]
-pub(super) fn format_single_doc_with_mode(
+pub(super) fn format_single_doc(
     _path: &Path,
     _source: &str,
     _width: Option<NonZeroU32>,
@@ -400,7 +386,7 @@ pub(super) fn convert_single_doc(
 /// program is refused, never written. Without a width the output is exactly
 /// the canonical re-emit.
 #[cfg(feature = "hir-faber")]
-pub(super) fn format_single_doc_with_mode(
+pub(super) fn format_single_doc(
     path: &Path,
     source: &str,
     width: Option<NonZeroU32>,
