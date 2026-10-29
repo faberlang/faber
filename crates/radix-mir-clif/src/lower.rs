@@ -4765,7 +4765,9 @@ impl FunctionLower<'_, '_> {
             Literal(String),
             Argument(usize),
         }
-        let template = self.state.input.interner.resolve(template).to_owned();
+        let template = radix_lexer::textus_literal::decode_textus_literal(
+            self.state.input.interner.resolve(template),
+        );
         let mut rendered: Vec<Value> = Vec::with_capacity(args.len());
         for arg in args {
             let (value, rep) = self.scalar_wide(arg)?;
