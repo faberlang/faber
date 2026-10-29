@@ -10,12 +10,3 @@ domain = "types"
 [expect]
 stdout = "stdout.expected"
 check_only = false
-
-[targets.mir]
-outcome = "pass"
-
-[targets.roundtrip]
-outcome = "pass"
-
-[targets.runner]
-outcome = "pass"
