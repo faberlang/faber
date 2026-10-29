@@ -360,6 +360,18 @@ fn lane_grid_geometry_is_generic_1d_over_the_source_shape() {
 }
 
 #[test]
+fn rank1_singleton_lane_domain_dispatches_exactly_one_lane() {
+    let got = geometry_for_call(&lane_grid(1), &[vec![1], vec![1]]).expect("one-lane shape");
+    assert_eq!(
+        got,
+        CallGeometry {
+            grid: [1, 1, 1],
+            block: [1, 1, 1],
+        }
+    );
+}
+
+#[test]
 fn lane_grid_geometry_names_its_failures() {
     let unit = lane_grid(2);
     let ok = vec![7, 5];
