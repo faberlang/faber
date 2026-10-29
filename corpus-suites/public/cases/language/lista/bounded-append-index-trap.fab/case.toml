@@ -8,4 +8,14 @@ domain = "collections"
 
 
 [expect]
-check_only = true
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "bounded collection push at capacity"
+check_only = false
