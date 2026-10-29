@@ -4,7 +4,7 @@
 //! typed integer or float operand beside `d64` still needs `↦`.
 
 use crate::test_support::{
-    assert_accepts_la, assert_analysis_accepts, assert_rejects_with_issue_la,
+    assert_accepts_la, assert_rejects_with_issue_la,
 };
 
 const D: &str = "d64";
@@ -28,13 +28,13 @@ fn decimal_literal_beside_d64_joins() {
 
 #[test]
 fn decimal_literal_in_mut_d64_parameter_matches_local_expectation() {
-    assert_analysis_accepts(
+    assert_accepts_la(
         r#"
-fn local() → void {
-    mut d64 p ← 2.5
+functio local() {
+    varia d64 p ← 2.5
     p ← p + 1.0
 }
-fn increment(mut d64 p) → void {
+functio increment(varia d64 p) {
     p ← p + 1.0
 }
 "#,
