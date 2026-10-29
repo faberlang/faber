@@ -4113,7 +4113,7 @@ help = "name a rounding rule, for example `x ↦ {numerus} via Floor` or `x ↦ 
 
 [diagnostics.SEM016.issues.conversio_via_bits_retired]
 message = "`via Bits` is retired: a bit pattern is held in a bN marker, not selected by a hint"
-help = "write `x ↦ b32` to capture an `f32` bit pattern; reinterpret a `u32` pattern with `u32 ↦ b32 ↦ f32`"
+help = "write `x ↦ b32` to read a float as its bit pattern (b16, b32 or b64 by width) and `b32 ↦ f32` to build one; a pattern held in a number goes through its marker first, as in `u16 ↦ b16 ↦ f16`"
 
 [diagnostics.SEM016.issues.conversio_map_key_not_textus]
 message = "a map key converted to or from value must be text"
