@@ -388,6 +388,40 @@ fn imported_alias_qualified_variant_path_round_trips_in_each_locale() {
 }
 
 #[test]
+fn optional_call_with_variant_path_argument_round_trips() {
+    // Keep the optional-call suffix from optional-call-order while exercising
+    // an authored qualified variant path inside its argument list. The
+    // canonical emit must leave that path resolvable on the re-analysis pass.
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("installed en pack loads");
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_resolved_locale_pack(pack.clone()),
+    );
+    let emit = |input: &str| {
+        let result = reemit_faber(&session, &pack, "optional-variant-path.fab", input);
+        assert!(
+            result.success(),
+            "optional call re-emission failed: {:?}",
+            result
+                .diagnostics
+                .iter()
+                .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+                .collect::<Vec<_>>()
+        );
+        result.output.expect("optional call output").code
+    };
+    let source = "enum Color { red, blue }\ntype Op = (Color) → Color\nfn identity(Color x) → Color { return x }\nmain {\n    mut Op ∪ none f ← identity\n    print f?(Color.red)\n}\n";
+    let first = emit(source);
+    assert!(
+        first.contains("f?(Color.red)"),
+        "variant path in optional call must survive:\n{first}"
+    );
+    assert_eq!(emit(&first), first, "optional call output must be idempotent");
+}
+
+#[test]
 fn canonical_revalidation_rejects_shortened_imported_variant_path() {
     let td = crate::test_support::test_temp_dir("canonical-revalidation-variant-path");
     let home = td.path().join("library-home");

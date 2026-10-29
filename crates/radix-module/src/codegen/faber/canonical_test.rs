@@ -792,6 +792,81 @@ fn emits_canonical_operator_spellings_and_precedence() {
 }
 
 #[test]
+fn optional_chain_receiver_keeps_required_variant_qualifier() {
+    let mut interner = Interner::new();
+    let first_name = interner.intern("First");
+    let second_name = interner.intern("Second");
+    let variant_name = interner.intern("Shared");
+
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let make_enum = |item_id, enum_def, enum_name, variant_def| HirItem {
+        annotations: Vec::new(),
+        id: crate::hir::HirId(item_id),
+        def_id: DefId(enum_def),
+        kind: HirItemKind::Enum(HirEnum {
+            name: enum_name,
+            type_params: Vec::new(),
+            commune_fields: Vec::new(),
+            variants: vec![HirVariant {
+                def_id: DefId(variant_def),
+                name: variant_name,
+                fields: Vec::new(),
+                span: span(),
+            }],
+        }),
+        span: span(),
+    };
+    let optional_call = HirExpression {
+        id: crate::hir::HirId(10),
+        kind: HirExpressionKind::OptionalChain(
+            Box::new(HirExpression {
+                id: crate::hir::HirId(11),
+                kind: HirExpressionKind::Path(DefId(2)),
+                ty: Some(numerus),
+                span: span(),
+            }),
+            HirOptionalChainKind::Call(vec![HirCallArg {
+                name: None,
+                spread: false,
+                marker: None,
+                expr: HirExpression {
+                    id: crate::hir::HirId(12),
+                    kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                    ty: Some(numerus),
+                    span: span(),
+                },
+                span: span(),
+            }]),
+        ),
+        ty: Some(numerus),
+        span: span(),
+    };
+    let program = HirModule {
+        items: vec![make_enum(0, 100, first_name, 2), make_enum(1, 101, second_name, 3)],
+        entry: Some(HirBlock {
+            statements: vec![HirStatement {
+                id: crate::hir::HirId(13),
+                kind: HirStatementKind::Expr(optional_call),
+                span: span(),
+            }],
+            expr: None,
+            span: span(),
+            ..Default::default()
+        }),
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    };
+
+    let code = generate_faber(&program, &types, &interner);
+    assert!(
+        code.contains("First.Shared?(1)"),
+        "optional chain must qualify an ambiguous local variant path:\n{code}"
+    );
+}
+
+#[test]
 fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
     let mut interner = Interner::new();
     let callable = interner.intern("callable");
