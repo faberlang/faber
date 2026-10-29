@@ -11,8 +11,11 @@ null **type** is `none` (la `nihil`). A nullable type is `T ∪ none`; the
 null test is `x is none` and its negation is `x not is none`
 (la `x non est nihil`; the spelling `is not none` is
 `PARSE001 est_non_spelling`). `T ∪ null` and `x is null` are
-`PARSE040 null_value_in_type_position` errors. The en pack still lexes
-the Latin `nihil` as a transitional value-literal alias (la word); write `null`.
+`PARSE040 null_value_in_type_position` errors. `nihil` is not an English
+null-value alias: an unbound bare `nihil` in value position is
+`PARSE030 retired_null_value_spelling`; write `null` (the null type is `none`).
+
+Fences: a `fab` fence is a complete unit that passes `faber check`; a `text` fence is a ✗/✓ pair, a schematic (`…`) or a fragment that needs surrounding declarations.
 
 Reading the claims: a `✗` marked **rejected** is a compile error today (the
 code is named); a plain `✗` compiles and is only non-canonical. A snippet shown
@@ -33,10 +36,10 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | nullable-union | canon-violation | nullability is `T ∪ none`, never an invented suffix |
 | banned-cum | canon-violation | `cum` is a banned keyword |
 | flat-norma-imports | canon-violation | `norma:*` imports are flat; `norma:hal/*` is retired |
-| legacy-annotations | canon-violation | no `@ future` / `@ cursor` in new code |
+| legacy-annotations | non-preferred | no `@ future` / `@ cursor` in new code (they still compile; style, not a gate) |
 | externa-subsidia-library-source | canon-violation | `@ externa` / `@ subsidia` are rejected (SEM018); library source uses native Faber, `ad` templates, or explicit `panic` deferral |
 | legacy-scena-target | canon-violation | new MIR package work uses `fmir-*`, not `scena` |
-| anonymous-object-literal | canon-violation | typed construction or JSON literal; anonymous `{ key = expr }` is rejected |
+| anonymous-object-literal | non-preferred | construction states its destination: `Type { field = expr }`, `_ { … }` or bare `{ field = expr }` for a typed cell; quoted-key `{ "k": v }` is JSON, not a record |
 | empty-collection-type | canon-violation | empty collections carry a declared type with `empty`; the untyped `let x ← empty` is rejected |
 | optional-slot-sponte | non-preferred | omittable slots use the optional marker, not `∪ none` |
 | guard-ergo-redde | non-preferred | single-statement guards use the `then return` consequent (la `ergo redde`); `∴` is the closure joint only |
@@ -50,8 +53,8 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | null-guard-narrowed-use | non-preferred | after an `is none` early-return guard on an immutable binding, plain use — the guard narrows the continuation |
 | structure-over-scalar-fanout | non-preferred | pass the structured value, not a positional scalar fan-out |
 | tensor-glyph-operators | non-preferred | tensor/vector ops through glyph operators (`⊗` `⊙` `⊘` `·`), not method-call spellings |
-| tensor-glyph-transpose | preferred | rank-2 transpose uses postfix `ᵀ`; rank-1 is permanently declined and rank-3+ waits for a batched consumer |
-| tensor-glyph-device-form | preferred | device (`@ kernel`, la `@ nucleum`) bodies spell tensor ops with the same glyphs — `out ← a · b` lowers through the tiled matmul recipe; method-call spellings in device bodies are non-preferred |
+| tensor-glyph-transpose | preferred | matrix transpose uses postfix `ᵀ` (a tensor of rank 3 or more swaps its last two axes); rank-1 is refused |
+| tensor-glyph-device-form | preferred | device (`@ kernel`, la `@ nucleum`) bodies spell tensor ops with the same glyphs — `out ⇇ a · b` lowers through the tiled matmul recipe; method-call spellings in device bodies are non-preferred |
 | tensor-extremum-over-hand-loop | non-preferred | shaped tensor extrema use `reduce via max from` / `reduce via min from` with caller-stated `coalesce`, not a hand-rolled counter loop and sentinel |
 | infix-extrema-over-hand-rolled-max | non-preferred | pairwise or elementwise extrema use `⤒` / `⤓`, not a hand-rolled max/min branch; reductions remain `reduce via max from` / `reduce via min from` |
 | promoted-equality-over-width-blind-eq | non-preferred | compatible numeric widths use lossless `≅` / `≇` — a signed negative never wraps into an unsigned maximum — not a width-blind `==` mental model or strict-tier `≡` |
@@ -68,7 +71,7 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 | file-header-charter | non-preferred | every library file opens with a charter: what, public import, depends on, decisions |
 | failure-posture-selection | non-preferred | absence → `∪ none`; distinct failure identities → typed union `⇥`; one channel per operation |
 | interpolation-slots | non-preferred | slotted strings use `§` interpolation; `+` only without slots |
-| type-holes-no-duplication | non-preferred | never restate the type on both sides of a binding — `_` / `∪` holes when the other side is explicit |
+| type-holes-no-duplication | non-preferred | never restate the type on both sides of a binding — `_` / `∪` holes when the other side is explicit; every declaration still writes its type slot |
 | labeled-tuple-elements | non-preferred | role-bearing tuple slots carry labels (`tuple<gx: f32, gw: f32>`); access by label, not index |
 | named-template-holes | non-preferred | multi-hole templates name their holes (`"§{label} …"(label: value)`); single trivial hole stays `§` |
 | cape-narrowest-scope | non-preferred | catch attaches to the narrowest block that can recover — not one whole-function handler |
@@ -87,7 +90,7 @@ Entry shape: `id` heading, bold one-line claim, one metadata line
 
 canon-violation · Evidence: declarations across `corpus/`; the colon form is rejected (`PARSE001`)
 
-```fab
+```text
 # ✗ rejected (PARSE001): colon annotation
 fn greet(name: string) → string {
     return name
@@ -99,13 +102,19 @@ fn greet(string name) → string {
 }
 ```
 
+```fab
+fn greet(string name) → string {
+    return name
+}
+```
+
 ## nullable-union
 
 **Nullability is a union in type position; suffix `T?` and invented markers are not Faber.**
 
 canon-violation · Evidence: `corpus/si/ergo-redde.fab`; `T?` is rejected (`PARSE012`), `∪ null` is rejected (`PARSE040 null_value_in_type_position`)
 
-```fab
+```text
 # ✗ rejected (PARSE012): invented optional suffix
 fn divide(int a, int b) → int? {
     …
@@ -122,6 +131,13 @@ fn divide(int a, int b) → int ∪ none {
 }
 ```
 
+```fab
+fn divide(int a, int b) → int ∪ none {
+    if b ≡ 0 then return null
+    return a / b
+}
+```
+
 ## banned-cum
 
 **Any use of the `cum` keyword is a violation.**
@@ -134,7 +150,7 @@ canon-violation · Evidence: `cum` is never introduced as a keyword. No pair —
 
 canon-violation · Evidence: live `lib/norma/src/` module layout (`fs`, `text`, `json`, `console`, `process`, `time`, `math`, …); both retired shapes fail with `PKG001 unknown_library_module`
 
-```fab
+```text
 # ✗ rejected (PKG001): retired nested path
 import from "norma:hal/json" json
 
@@ -150,7 +166,7 @@ import from "norma:fs" fs
 
 **Do not add `@ future` / `@ cursor` annotations (la `@ futura`) in new code.**
 
-canon-violation · Evidence: `../../references/idioms.md` General Style avoid-list. Scope: new code; existing legacy uses are migration candidates, not instant findings. The en pack spells the annotation `@ future`; the la spelling `@ futura` in an en file is `PARSE018 wrong_locale_annotation` (locales never mix). Both spellings still compile today, so the rule is style, not a compiler gate.
+canon-violation · Evidence: `../../references/idioms.md` General Style avoid-list. Scope: new code; existing legacy uses are migration candidates, not instant findings. The en pack spells the annotation `@ future`; the la spelling `@ futura` in an en file is `PARSE018 wrong_locale_annotation` (locales never mix). Both spellings still compile today (`corpus/futura/futura.fab` uses `@ future { }`), so the rule is style, not a compiler gate: report a hit as a style migration, never a compile error.
 
 ## externa-subsidia-library-source
 
@@ -166,34 +182,46 @@ canon-violation · Evidence: `faber targets` lists the live target names. Scope:
 
 ## anonymous-object-literal
 
-**Anonymous `{ key = expr }` records are rejected; use typed construction `Type { field = expr }` for computed values, or a JSON literal `{ "key": constant }` for constant data.**
+**Construct with a form whose destination is clear: `Type { field = expr }`, `_ { field = expr }` with an expected type, or bare `{ field = expr }` into a typed cell. A quoted-key `{ "key": constant }` is a JSON literal, a different thing.**
 
-canon-violation · Evidence: `../../references/idioms.md` General Style; `corpus/json/json.fab`; `corpus/genus/genus.fab` ("retired bare object literals — bare `{ }` is now a JSON valor literal"). The bare form fails at parse time (`PARSE001 json_quoted_key`: a bare `{ }` expects quoted keys and `:`).
+non-preferred · Evidence: `grammar/EBNF.md` ("The typed zero `Type {}`" and "The inferred constructor `_ { … }`"); `corpus/genus/inferred-constructor.fab`; `corpus/json/json.fab`. All the forms below check: bare `{ field = expr }` takes the expected class or record type (without one it is an inferred `record<*>`, while `_ { … }` without an expected type is `SEM016 inferred_constructor_no_expected_type`). Do not confuse it with the JSON form, which has quoted keys and colons.
 
 ```fab
-# ✗ rejected (PARSE001): anonymous record with expression values
-let cfg ← { count = 1 + 1 }
+class Config {
+    let int count
+}
 
-# ✓ typed construction for computed values, JSON literal for constant data
-let Config cfg ← Config { count = 1 + 1 }
-let json data ← { "count": 2 }
+main {
+    let Config explicit ← Config { count = 1 + 1 }
+    let Config inferred ← _ { count = 1 + 1 }
+    let Config bare ← { count = 1 + 1 }
+    let json data ← { "count": 2 }
+    print explicit.count
+}
 ```
 
 ## empty-collection-type
 
-**An empty collection carries a declared type with the empty initializer `empty` (la `vacua`); the untyped form `let x ← empty` is rejected (`SEM014`), and `← []` states no element type.**
+**An empty collection carries a declared type with the empty initializer `empty` (la `vacua`); the untyped form `let _ x ← empty` is rejected (`SEM014`), and `← []` states no element type.**
 
-canon-violation · Evidence: `corpus/lista/lista.fab` (a note there says the empty initializer requires a declared collection type); `grammar/EBNF.md` (prefer `empty` for ordinary empty collection values); `let x ← empty` is `SEM014 vacua_requires_declared_type`
+canon-violation · Evidence: `corpus/lista/lista.fab` (a note there says the empty initializer requires a declared collection type); `grammar/EBNF.md` (prefer `empty` for ordinary empty collection values); `let _ x ← empty` is `SEM014 vacua_requires_declared_type` (and `let x ← empty` is `PARSE010 binding_type_slot_required`, since every declaration writes its type slot)
 
-```fab
+```text
 # ✗ rejected (SEM014): empty needs a declared type
-let items ← empty
+let _ items ← empty
 
 # ✗ untyped empty literal — checks, but declares no element type
-let items ← []
+let _ items ← []
 
 # ✓ declared type + empty initializer
 let list<int> items ← empty
+```
+
+```fab
+main {
+    let list<int> items ← empty
+    print items
+}
 ```
 
 ## optional-slot-sponte
@@ -202,7 +230,7 @@ let list<int> items ← empty
 
 non-preferred · Evidence: `corpus/sponte/sponte.fab` (common-mistakes note); verified: `paginate()` against an `int ∪ none page` parameter is `SEM013 wrong_number_of_arguments`, and `Q { name = "x" }` against an `int ∪ none limit` field is `SEM004 missing_required_struct_field`, while both omissions pass with `optional`
 
-```fab
+```text
 # ✗ nullable union modeling an omittable argument
 fn paginate(int ∪ none page) → int {
     …
@@ -214,16 +242,22 @@ fn paginate(int page optional coalesce 1) → int {
 }
 ```
 
+```fab
+fn paginate(int page optional coalesce 1) → int {
+    return page
+}
+```
+
 ## guard-ergo-redde
 
 **Single-statement consequents — especially guard returns — use the compact `then return` consequent (la `ergo redde`; `∴` is rejected in en files, `PARSE026`), not a full block.**
 
 non-preferred · Evidence: `corpus/si/ergo-redde.fab` (the locale surface of the `then return` consequent is the preferred form)
 
-```fab
+```text
 # ✗ full block for a single-statement guard
 fn classify(int x) → string {
-    if x < 0 {
+    if x ≺ 0 {
         return "negative"
     }
     return "positive"
@@ -231,7 +265,7 @@ fn classify(int x) → string {
 
 # ✓ compact consequent
 fn classify(int x) → string {
-    if x < 0 then return "negative"
+    if x ≺ 0 then return "negative"
     return "positive"
 }
 ```
@@ -240,9 +274,9 @@ fn classify(int x) → string {
 
 **When the conversion is the point of the line and the destination is an assignable place with a known type, use `place ↤ value` (optionally `⊥ default`) instead of routing `↦` and storing `←` separately.**
 
-non-preferred · Evidence: `../../references/idioms.md` (Conversion-Directed Assignment); `corpus/assignatio/conversio-assign.fab`; `grammar/EBNF.md` `fixum_decl`, `assignment`, `inline_default` (`inline_default ::= '⊥' unary_expr`), and the Conversion-Directed Assignment prose. `↤` never appears on `const _` or `let` bindings (`PARSE002 conversio_assign_requires_concrete_type`); `⊥` is legal only on `↤` and on a `↦` conversion. Apply `↤` only where its precondition genuinely holds — an assignable place with a known type where the conversion is the point of the line; otherwise explicit `↦` reads clearer.
+non-preferred · Evidence: `../../references/idioms.md` (Conversion-Directed Assignment); `corpus/assignatio/conversio-assign.fab`; `grammar/EBNF.md` `fixum_decl`, `assignment`, `inline_default` (`inline_default ::= '⊥' unary_expr`), and the Conversion-Directed Assignment prose. `↤` needs a concrete destination type: `let int total ↤ "7"` is legal, but an inferred slot (`let _ total ↤ "7"`) cannot supply the conversion target (`PARSE002 conversio_assign_requires_concrete_type`); `⊥` belongs to failable conversions (including the one `↤` performs) and failable calls, and is not a fallback on an ordinary `←` assignment. Apply `↤` only where its precondition genuinely holds — an assignable place with a known type where the conversion is the point of the line; otherwise explicit `↦` reads clearer.
 
-```fab
+```text
 # (in main — see the failable-conversion note in the preamble)
 # ✗ typed declaration, explicit route + store (declaration form — most of the live family)
 let int total ← "7" ↦ int
@@ -259,11 +293,23 @@ count ← "42" ↦ int
 count ↤ "42"
 ```
 
+```fab
+main {
+    let int total ↤ "7"
+    mut int count ← 0
+    count ↤ "42"
+    mut int a ← 0
+    mut int b ← 0
+    a ↤ b ↤ "x" ⊥ 7
+    print total, count, a, b
+}
+```
+
 Recovery is the `⊥` default: `count ↤ "x" ⊥ 0` stores 0 when the conversion fails. The old `⇥ recovery` spelling is rejected (`PARSE030 recovery_uses_exit_arrow`; `⇥` is the function error channel and never takes a value). Outside `main`, an unhandled failable conversion is `SEM011 failable_conversio_requires_handler`, so write `let int total ↤ "7" ⊥ 0` or give the function a `⇥ string` channel.
 
 `↤` binds at the same precedence as `←` and is right-associative: `a ↤ b ↤ "42"` is `a ↤ (b ↤ "42")` (EBNF `assignment`). In a right-associated chain, `⊥ default` attaches to the nearest `↤`, not the outer one (probe: `a ↤ b ↤ "x" ⊥ 7` leaves both `a` and `b` at 7).
 
-```fab
+```text
 mut int a ← 0
 mut int b ← 0
 
@@ -277,7 +323,7 @@ a ↤ b ↤ "x" ⊥ 7
 
 non-preferred · Evidence: `../../references/idioms.md` Formatting Patterns; corpus throughout. Style only — the Allman form below compiles.
 
-```fab
+```text
 # ✗ opening brace on its own line
 fn greet(string name) → string
 {
@@ -296,7 +342,7 @@ fn greet(string name) → string {
 
 non-preferred · Evidence: a leading-underscore function name warns (`WARN030 leading_underscore`) because declarations are private by default and `@ public` is required to export, so the prefix adds nothing (a file's own calls do not care whether a callee is exported); naming regime across `lib/norma/src/text.fab`
 
-```fab
+```text
 # ✗ camelCase function, snake_case type
 fn buildQuadMesh() → quad_mesh { … }
 
@@ -318,7 +364,7 @@ Note: norma's Latin-stem public API names are a documented repo dialect, still s
 
 canon-violation · Evidence: `corpus/importa/auxilium.fab` (only `@ public`/`@ internal` declarations are importable; la `@ publica`/`@ interna`); `corpus/publica/publica.fab`; `corpus/annotation-sugar/` (braced record form is canonical, bare spelling is sugar); verified: reading an unmarked function through an import is `SEM006 import_module_private`
 
-```fab
+```text
 # ✗ exported-by-intent but unmarked — importers cannot see it
 fn face_code_valid(int code) → bool { … }
 
@@ -328,13 +374,20 @@ fn face_code_valid(int code) → bool { … }
 fn face_code_valid(int code) → bool { … }
 ```
 
+```fab
+@ public
+fn face_code_valid(int code) → bool {
+    return code ≥ 0
+}
+```
+
 ## test-colocation-proba
 
 **Tests live in colocated `.proba` files (`src/foo.proba` beside `src/foo.fab`), written as `describe "suite" { test "case" { assert … } }` — not inline test blocks in source.**
 
 non-preferred · Evidence: `lib/norma/src/math.proba`, `lib/norma/src/json.proba`
 
-```fab
+```text
 # ✗ test assertions living in the library source file
 @ public
 fn add(float a, float b) → float {
@@ -358,7 +411,7 @@ describe "math catalog" {
 
 non-preferred · Evidence: the `union ShapeError` + `⇥` + `require … throw variant` shape and `MetricError` (`variant Invalid { message = … }`) in library source. Known weakness: the per-variant `string message` plus a hand-written `message()` mirror states the same fact twice per union; the union/`⇥`/`require throw variant` core is the pattern, the mirror boilerplate is not required. Both forms below check today (the string form is non-canonical, not rejected).
 
-```fab
+```text
 # ✗ untyped string throw as the operation's error surface
 fn numel(list<int> f) → int ⇥ string {
     require f.length() > 0 throw "empty shape"
@@ -385,9 +438,9 @@ Plain `throw "§ …"(args)` strings remain fine inside test helpers and local p
 
 **After an `is none` early-return guard on an immutable binding (parameter or `let`), continue with plain use — the guard narrows the rest of the block. A `!` assertion after the guard is redundant noise.**
 
-non-preferred · Evidence: `crates/radix-semantic/src/passes/typecheck/control.rs` (`join_flow_states` — "diverging edges contribute nothing", the guard's continuation keeps the refinement); `corpus/assertio/nonnulla.fab` (the `!` operator itself). Verified by probe and by `faber run`: `if r is none then return -1` then `return r.a` checks and runs on a `P ∪ none` parameter; the same holds for a `const` local and a call-result bound to a `const`.
+non-preferred · Evidence: `crates/radix-semantic/src/passes/typecheck/control.rs` (`join_flow_states` — "diverging edges contribute nothing", the guard's continuation keeps the refinement); `corpus/assertio/nonnulla.fab` (the `!` operator itself). Verified by probe and by `faber run`: `if r is none then return -1` then `return r.a` checks and runs on a `P ∪ none` parameter; the same holds for a typed `let` local and a call-result bound to a typed `let`.
 
-```fab
+```text
 # ✗ guard, then assert non-null on every use
 fn area(Quad ∪ none quad) → f32 ∪ none {
     if quad is none then return null
@@ -403,7 +456,7 @@ fn area(Quad ∪ none quad) → f32 ∪ none {
 
 The positive form works too, spelled `if quad not is none then return quad.width` (en; la `quad non est nihil`).
 
-Limits (probed): narrowing applies to a visible immutable binding. A field place does not narrow — after `if h.p is none then return null`, `h.p.a` is `SEM004 optional_receiver_requires_chain`; bind the field to a `const` first (see `guard-rebind-over-rebuild`). A `mut` that is never reassigned narrows but draws `WARN013 unnecessary_varia`.
+Limits (probed): narrowing applies to a visible immutable binding. A field place does not narrow — after `if h.p is none then return null`, `h.p.a` is `SEM004 optional_receiver_requires_chain`; bind the field to a typed `let` first (see `guard-rebind-over-rebuild`). A `mut` that is never reassigned narrows but draws `WARN013 unnecessary_varia`.
 
 ## structure-over-scalar-fanout
 
@@ -411,7 +464,7 @@ Limits (probed): narrowing applies to a visible immutable binding. A field place
 
 non-preferred · Evidence: a positional fan-out discards the structure the caller just built; the repaired shape takes four `vector<f32, size 3>` corners and a `Color` instead of 18 positional scalars
 
-```fab
+```text
 # ✗ scalar fan-out — the quad and color just built are flattened away
 return data.colored_quad_mesh_append(positions, colors, indices, quad.a.x, quad.a.y, quad.a.z, quad.b.x, quad.b.y, quad.b.z, quad.c.x, quad.c.y, quad.c.z, quad.d.x, quad.d.y, quad.d.z, color.r, color.g, color.b)
 
@@ -428,50 +481,70 @@ Rule of thumb: once a call's positional arguments exceed roughly five, prefer a 
 non-preferred · Evidence: `corpus/tensor/arithmetic-elementwise.fab`, `glyph-matmul.fab`, `glyph-elementwise.fab`, `glyph-outer.fab`, `glyph-hadamard-divide.fab` (operator surfaces; `⊘` is element-wise divide at the multiplicative tier). The method twins still compile, so this is style, not a gate.
 
 ```fab
-# ✓ canonical operators (probed: vf32 `+`, `-`, `⊙`, and the `⊗` outer product)
-let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
-let vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
-let vf32[2] p ← [1.0, 2.0] ↦ vf32[2]
-let vf32[3] sum ← a + b
-let vf32[3] diff ← a - b
-let vf32[3] squared ← b ⊙ b
-let matrix<f32, [3, 2]> outer ← a ⊗ p
+main {
+    # ✓ canonical operators (probed: vf32 `+`, `-`, `⊙`, and the `⊗` outer product)
+    let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]
+    let vf32[3] b ← [4.0, 5.0, 6.0] ↦ vf32[3]
+    let vf32[2] p ← [1.0, 2.0] ↦ vf32[2]
+    let vf32[3] sum ← a + b
+    let vf32[3] diff ← a - b
+    let vf32[3] squared ← b ⊙ b
+    let matrix<f32, [3, 2]> outer ← a ⊗ p
 
-# ✗ method twins where the operator form is legal
-let vf32[3] method_sum ← a.added(b)
-let vf32[3] method_diff ← a.subtract(b)
+    # ✗ method twins where the operator form is legal (a `let` receiver takes
+    # the value-returning participles `added` / `subtracted`, not the mutating
+    # `add` / `subtract`)
+    let vf32[3] method_sum ← a.added(b)
+    let vf32[3] method_diff ← a.subtracted(b)
+    print sum, diff, squared, outer, method_sum, method_diff
+}
 ```
 
 Scope: numeric/tensor code. When reviewing method-call spellings of operations that have an operator form, flag the operator exemplar as the preferred surface.
 
 ## tensor-glyph-transpose
 
-**A rank-2 tensor transpose uses the postfix `ᵀ` glyph (`[M,N] → [N,M]`), not the non-preferred `transpose()` method twin (la `transpone`); the glyph is sugar over the existing `Transpose` plan.**
+**A matrix transpose uses the postfix `ᵀ` glyph (`[M,N] → [N,M]`; a tensor of known rank 3 or more swaps its last two axes), not the non-preferred `transpose()` method twin (la `transpone`); the glyph is sugar over the existing `Transpose` plan.**
 
 preferred · Evidence: `corpus/tensor/glyph-transpose.fab`, `grammar/EBNF.md` (Postfix tensor transpose); the method twin is `transpose`; the la spelling of it written in an en file is `SEM004 unknown_method`
 
-```fab
-# ✓ rank-2 postfix transpose
+```text
+# ✓ postfix transpose
 let tensor<f32, [3, 2]> output ← inputᵀ
 
 # ✗ method twin when the postfix surface is legal
 let tensor<f32, [3, 2]> output ← input.transpose()
 ```
 
-The rank rule is deliberate: rank-1 is permanently declined because there is
-no row/column distinction; rank-3+ is deferred until a batched-transpose
-consumer owns the contract. The precedence form is `a · bᵀ ∇ [x]` →
+```fab
+main {
+    let tf32[2, 3] input ← tf32[2, 3] {}
+    let tensor<f32, [3, 2]> output ← inputᵀ
+    print output.rank()
+}
+```
+
+The rank rule is deliberate: rank-1 is refused (`SEM011 glyph_transpose_rank1_no_row_column_distinction`) because there is
+no row/column distinction; matrices and tensors of known rank 3 or more transpose (batched tensors keep their leading axes and swap the last two). Execution stays subject to target limits. The precedence form is `a · bᵀ ∇ [x]` →
 `(a · bᵀ) ∇ [x]`; `∇` remains parse-only (a gradient expression is
 `SEM010 gradient_expression_unsupported`).
 
 ## tensor-glyph-device-form
 
-**Device (`@ kernel`) bodies spell tensor operations with the same glyphs as host code — `out ← a · b` lowers through the tiled matmul recipe; method-call spellings in device bodies are non-preferred.**
+**Device (`@ kernel`) bodies spell tensor operations with the same glyphs as host code — `out ⇇ a · b` lowers through the tiled matmul recipe (a kernel `mut` tensor parameter is a device buffer, so the write is the copy-into `⇇`; a whole-tensor `←` there is `SEM057 mut_tensor_param_rebind`); method-call spellings in device bodies are non-preferred.**
 
-preferred · Evidence: `corpus/kernel/` and `corpus/tensor/glyph-*.fab` exemplars. Scope: device-library code; the GPU path as a whole is not a product surface today, so cite exemplars for what a kernel may contain.
+preferred · Evidence: `corpus/kernel/` and `corpus/tensor/glyph-*.fab` exemplars. Scope: device-library code; device execution is target-specific (see `../../references/idioms.md`), so cite exemplars for what a kernel may contain.
 
 ```fab
-# ✓ glyph body (shape of the proof exemplar)
+# ✓ glyph body (`corpus/cuda/matmul-proof.fab`)
+@ kernel
+@ public
+fn multiply(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out) → void {
+    out ⇇ a · b
+}
+```
+
+```fab reject=SEM057
 @ kernel
 @ public
 fn multiply(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out) → void {
@@ -485,13 +558,13 @@ fn multiply(tf32[16, 8] a, tf32[8, 16] b, mut tf32[16, 16] out) → void {
 
 non-preferred · Evidence: `corpus/summa/max-min.fab`; `crates/radix-parser/src/max_min_disambiguation_test.rs`; `grammar/EBNF.md` `reducta_expr`. For a `list`, use `.argmax()` / `.argmin()` or the infix `⤒` / `⤓` (see the next extremum entry). A bounded-prefix row max (a `for range` walk over a valid prefix, commented as deliberate) is not a finding.
 
-```fab
+```text
 # ✗ row-max loop: a sentinel and a second counter walk the flat carrier
 mut f32 maximum ← x.data.get(i * cols) coalesce 0.0
 mut int j ← 0
-while j < end {
+while j ≺ end {
     let f32 value ← x.data.get(i * cols + j) coalesce 0.0
-    if value > maximum {
+    if value ≻ maximum {
         maximum ← value
     }
     j ← j + 1
@@ -517,7 +590,7 @@ transform belongs in the operand (`reduce via max from (row ⊙ scale)`).
 
 non-preferred · Evidence: correct plain assignment is shown at `corpus/typi/sized-numerus.fab` (`let i64 signed ← narrow`).
 
-```fab
+```text
 # ✗ receiver already f32; the cast restates the declaration
 let f32 tolerance ← (0.01 ∷ f32)
 
@@ -527,7 +600,7 @@ let f32 tolerance ← 0.01
 
 (Bindings inside a function or `describe` block; a module-level constant is `const f32 TOLERANCE = 0.01` (`=`, compile-time) — see `module-constant-const`.)
 
-Keep `∷` where the receiver is untyped or no auto-conversion exists (`0x80 ∷ octet`, narrowing into an inferred place) — those ascriptions carry information.
+Keep `∷` where the receiver is untyped or no auto-conversion exists (`0x80 ∷ b8`, narrowing into an inferred place) — those ascriptions carry information.
 
 **Equality is exact-typed (SEM010) — casts in `≡` positions are load-bearing, not redundant.** `f32 ≡ 1.5` is rejected (`equality_exact_types_required`), so `assert x ≡ (10.0 ∷ f32)` on an `f32` receiver is the correct form (verified; the bare form compiles only when widths already match, e.g. the `ratio ≡ 3.5` compare in `corpus/conversio/valor-scalaria.fab`). This entry flags `∷` in binding/argument/default positions with auto-conversion — never inside `≡` comparisons against float literals.
 
@@ -535,17 +608,24 @@ Keep `∷` where the receiver is untyped or no auto-conversion exists (`0x80 ∷
 
 **Data whose size is a compile-time fact uses dimensional types — `vf32[3]`, `tf32[4]`, `matrix<f32, [3, 2]>` — or, for a capacity bound on a list or string, the bounded forms `list<T, size N>` / `string<size N>`; not un-sized collections. Fixed dimensions enable loop unrolling and register representation.**
 
-non-preferred · Evidence: `corpus/tensor/bracket-access.fab` (`mut tf32[4] input ← seed.create(0.0, [4])`), `glyph-elementwise.fab` (`let vf32[3] a ← …`); sizing caveat (`matrix<T, [R,C]>` and `mf32[R,C]` are register types of the semantic and MIR layers; Rust/Go/TS package targets reject them until host representations exist)
+non-preferred · Evidence: `corpus/tensor/bracket-access.fab` (`mut tf32[4] input ← tf32[4] {}`), `glyph-elementwise.fab` (`let vf32[3] a ← …`); sizing caveat (`matrix<T, [R,C]>` and `mf32[R,C]` are register types of the semantic and MIR layers; Rust/Go/TS package targets reject them until host representations exist)
 
-```fab
-# ✗ fixed-length data in an un-sized collection
-mut list<f32> input ← seed.create(0.0, [4])
+```text
+# ✗ fixed-length data represented as an unbounded collection
+mut list<f32> input ← [0.0, 0.0, 0.0, 0.0]
 
-# ✓ dimensional type carries the size fact
-mut tf32[4] input ← seed.create(0.0, [4])
+# ✓ dimensional type carries the shape (the typed zero `Type {}`; the retired `seed.create(…)` is `SEM011 tensor_crea_retired`)
+mut tf32[4] input ← tf32[4] {}
 ```
 
-**Bounded-buffer family — shipped.** `list<T, size N>` (la `lista<T, magnitudo N>`), `string<size N>` and `ascii<size N>` are the capacity-bearing forms (`grammar/EBNF.md` Generic Collections lists the bounded list form as the shipped one). Probed: `mut list<f32, size 2> a ← [1.0, 2.0, 3.0]` is rejected (`SEM010 incompatible_tensor_index`), the type works in parameter position, and `append` on a bounded list is a failable call (`SEM011 failable_call_requires_handler` without a handler). The `string<_>` / `ascii<_>` capacity-hole forms are admitted but not fully shipped (EBNF row). Bounded `map` / `set` are not implied by the family.
+```fab
+main {
+    mut tf32[4] input ← tf32[4] {}
+    print input.length()
+}
+```
+
+**Bounded-buffer family — shipped.** `list<T, size N>` (la `lista<T, magnitudo N>`), `string<size N>` and `ascii<size N>` are the capacity-bearing forms (`grammar/EBNF.md` Generic Collections lists the bounded list form as the shipped one). `list<T, size N>` is a capacity, at most N elements (`size 0…N`), not an exact length; a length range is `size lo‥hi` (half open) or `size lo…hi`, and a fresh literal takes its destination's capacity, so `let list<int, size 0…3> pair ← [1, 2]` is legal (`corpus/lista/ranged-short-literal.fab`, `corpus/genus/sized-list-field-literal.fab`). Probed: `mut list<f32, size 2> a ← [1.0, 2.0, 3.0]` is rejected (`SEM010 incompatible_tensor_index`), the type works in parameter position, and `append` on a bounded list is a failable call (`SEM011 failable_call_requires_handler` without a handler). The `string<_>` / `ascii<_>` capacity-hole forms are admitted but not fully shipped (EBNF row). Bounded `map` / `set` are not implied by the family.
 
 **Hardcoded-width variant spellings in closed host-vocabulary enums are temporary.** A graphics library's `VertexFormat` (`Float32x4`, `Uint32`, …) mirrors WebGPU `GPUVertexFormat` (itself inherited from three.js); the spellings are accepted only because component width is a runtime value generics cannot parameterize — not because they are canonical. The intent is to convert such unions to proper generics once value-parameterized generics land; the library marks them with a TEMPORARY SHAPE note, so do not flag them today, and treat new ones that mirror a host vocabulary the same way.
 
@@ -555,7 +635,7 @@ mut tf32[4] input ← seed.create(0.0, [4])
 
 non-preferred · Evidence: the policy is chosen per module, not per repository (long collection head for general Faber, sugar for numeric/tensor-primary modules; wrapped forms are retired and rejected by the compiler); exemplar `corpus/tensor/index-width.fab` (`let list<u32> origin ← [r, c]`). The policy words keep their `<W>` argument (`trapping<u8>`, `wrapping<u8>`, `saturating<u8>`; la `exactus`, `modulus`, `saturatus`) — those are not retired wrappers.
 
-```fab
+```text
 # ✗ rejected (PARSE040 numeric_wrapper_retired): retired wrapped width
 mut list<int<u8>> out ← empty
 
@@ -567,13 +647,21 @@ mut list<u8> out ← empty
 let tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
 ```
 
+```fab
+main {
+    mut list<u8> out ← empty
+    let tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
+    print out.length(), dense.length()
+}
+```
+
 ## endian-conversion-not-manual-packing
 
 **Byte payloads are `list<b8>` (la `lista<b8>`) with typed endian conversion (`↦ u32 via Be|Le`), never hand-rolled shift-and-append packing. The reverse direction is native too: `x ↦ list<b8, size N> via Le|Be` for one number, `list<f32> ↦ list<b8> via Le|Be` or `tensor<E, shape> ↦ list<b8> via Le|Be` for a whole list or tensor (`corpus/bits/bits-tensor-bytes.fab`), and `out.extend(part)` (la `extende`) joins byte lists (`corpus/lista/methodi-extende-octeti.fab`). The hint is a `via` clause; the type-argument spelling (`↦ ascii<4, Hex>`) is rejected.**
 
 non-preferred · Evidence: `corpus/conversio/octeti-endian.fab` (`|de ad be ef|[0‥4] ↦ u32 via Be`; endian-omitted conversion is rejected, `SEM016 octeti_to_numerus_unspecified`); `grammar/EBNF.md` (The `via` clause: hints are `Hex` `Bin` `Oct` `Be` `Le` `Bits` `Code`; `PARSE030 conversio_hint_type_argument` for the retired form); the manual form (eight `(n ⇒ k) ↦ u8` appends assembling a little-endian u64 by hand) also needs a `⊥` handler outside `main`
 
-```fab
+```text
 # ✗ manual little-endian assembly
 fn header8(int n) → list<u8> {
     mut list<u8> out ← empty
@@ -589,21 +677,37 @@ let text ← 255 ↦ ascii<4, Hex>
 let u32 word ← window[0‥4] ↦ u32 via Le
 let ascii<size 4> hex ← 255 ↦ ascii<size 4> via Hex
 
-# ✓ a whole buffer or weight file at once: literal extents, hint required,
-#   byte length exactly product(shape) x width; never a per-element list round trip
+# ✓ a whole buffer or weight file at once: `via Le|Be` for elements wider than
+#   one byte, byte length exactly product(shape) x width (a run-time extent such
+#   as `tensor<f32, [2, size n]>` is supported; a wrong length is caught on the
+#   error channel); never a per-element list round trip
 let tf32[2, 3] weights ← raw ↦ tf32[2, 3] via Le
+```
+
+```fab
+main {
+    let list<b8> window ← |de ad be ef|
+    let u32 word ← window[0‥4] ↦ u32 via Le
+    let ascii<size 4> hex ← 255 ↦ ascii<size 4> via Hex
+    let tensor<f32, [2]> floats ← [1.0, -2.0] ↦ tensor<f32, [2]>
+    let list<b8> raw ← floats ↦ list<b8> via Le
+    let tensor<f32, [2]> back ← raw ↦ tensor<f32, [2]> via Le
+    print word
+    print hex
+    print back
+}
 ```
 
 ## range-loop-over-open-while
 
-**Index loops over a known span are `for range a‥b let i` (la `itera ab`), not open-ended `while` with a manual counter — range bounds are compile-time facts, so the loop can unroll. A constant stride is spelled `per` (en `step`): `for range a‥b step n let i`.**
+**Index loops over a known span are `for range a‥b let i` (la `itera ab`), not open-ended `while` with a manual counter — the range states the bounds and stride directly (compile-time-known bounds may enable unrolling; ordinary bounds and steps may be run-time values). A constant stride is spelled `per` (en `step`): `for range a‥b step n let i`.**
 
-non-preferred · Evidence: range bounds are compile-time facts, so the loop can unroll; `grammar/EBNF.md` `range_tail` / `itera_stmt`. Probed and run: `for range 0‥values.length() step 3 let i` checks, and `faber run` over seven elements sums indices 0, 3, 6.
+non-preferred · Evidence: the range states bounds and stride directly; a run-time step is checked at loop entry and must be positive (`corpus/itera/range-runtime-step.fab`); `grammar/EBNF.md` `range_tail` / `itera_stmt`. Probed and run: `for range 0‥values.length() step 3 let i` checks, and `faber run` over seven elements sums indices 0, 3, 6.
 
-```fab
+```text
 # ✗ open-ended counter walk over a fixed span
 mut int i ← 0
-while i < values.length() {
+while i ≺ values.length() {
     out ← out + values[i]
     i ← i + 1
 }
@@ -616,6 +720,16 @@ for range 0‥values.length() let i {
 # ✓ constant stride is part of the range, not a hand-advanced counter
 for range 0‥values.length() step 3 let i {
     out ← out + values[i]
+}
+```
+
+```fab
+fn sum_step(list<int> values) → int {
+    mut int out ← 0
+    for range 0‥values.length() step 3 let i {
+        out ← out + values[i]
+    }
+    return out
 }
 ```
 
@@ -642,7 +756,7 @@ Review direction: near-identical functions differing only in an element/field ty
 
 non-preferred · Evidence: repeating the package default in every file is boilerplate; `[locale]` is the canonical manifest section and `[reader]` the legacy alias (`../../references/locales.md`; `crates/faber/src/package/manifest.rs` keeps `[reader]` only as a serde alias).
 
-```fab
+```text
 # ✗ every src file repeating the package default
 +++
 locale = "en"
@@ -662,7 +776,7 @@ A file that genuinely deviates (a Latin-locale exemplar inside an `en` package) 
 
 non-preferred · Evidence: Norma style is one concern per import path; `lib/norma/src/http/headers.fab` and siblings
 
-```fab
+```text
 # ✗ importing the broad facade and qualifying through it
 import from "triga:geometry" geometry
 let attr ← geometry.BufferAttribute { … }
@@ -680,7 +794,7 @@ Aliasing: the alias is an optional trailing `as name` (`import from "triga:graph
 
 non-preferred · Evidence: a header that states what the module is, its import and its dependencies orients a reader; length depends on content; `lib/norma/src/http/headers.fab` opens this way
 
-```fab
+```text
 # ✗ file starts cold
 import from "triga:math" math
 
@@ -701,7 +815,7 @@ When a file encodes a real posture decision, record the decision and its why in 
 
 non-preferred · Evidence: the channel follows the kind of failure, not the repository; undispatched route → an explicit `panic` deferral naming the route
 
-```fab
+```text
 # ✗ absence expressed as failure — not-found is not an error
 fn first(list<int> xs) → int ⇥ LookupError {
     require xs.length() > 0 throw variant LookupError {message = "empty"}
@@ -723,7 +837,7 @@ The inverse is equally a finding: an operation with genuinely distinct failure i
 
 non-preferred · Evidence: `lib/norma/exempla/crypta-sha2/src/main.fab` (`throw "§: byte mismatch at §"(label, i)`)
 
-```fab
+```text
 # ✗ concatenating a slotted message
 return "unknown digest algorithm: " + algorithm
 
@@ -733,16 +847,33 @@ return "unknown digest algorithm: §"(algorithm)
 
 ## type-holes-no-duplication
 
-**A binding states its type on one side only. When the initializer already fixes the type, bind inferred (`let x ← …`, writable `mut _ x ← …`; `let _ x` is `PARSE001 sit_identifier_binding`); when the declaration carries the type, let the right side infer (`let list<f32> xs ← empty`). Never write the same type on both sides.**
+**A binding states its type on one side only. When the initializer already fixes the type, use an explicit inference slot (`let _ x ← …`, writable `mut _ x ← …`); when the declaration carries the type, let the right side infer (`let list<f32> xs ← empty`). An ordinary declaration always writes its type slot: `let x ← …` is `PARSE010 binding_type_slot_required`. Never write the same type on both sides.**
 
-non-preferred · Evidence: `corpus/type-hole-union/type-hole-union.fab` (canonical exemplar: `_` solves one inhabitant, `∪` accumulates members across flows, `list<∪>` learns heterogeneous elements; WARN016/WARN017 police cross-shape solves); `corpus/ego/ego.fab` (`let box ← Box { title = "first" }` — the class-literal hole form); typical offender: `let Quaternion av ← Quaternion {…}`
+non-preferred · Evidence: `corpus/type-hole-union/type-hole-union.fab` (canonical exemplar: `_` solves one inhabitant, `∪` accumulates members across flows, `list<∪>` learns heterogeneous elements; WARN016/WARN017 police cross-shape solves); `corpus/ego/ego.fab` (`let Capsa capsa ← Capsa { titulus = "prima" }`); `corpus/literalia/named-holes.fab` (`let _ named ← …`); typical offender: `let Quaternion av ← Quaternion {…}`
 
-```fab
+```text
 # ✗ type restated on both sides — the constructor already names it
 let Quaternion av ← Quaternion { w = 1.0, x = 0.0, y = 0.0, z = 0.0 }
 
 # ✓ left-inferred: the initializer fixes the type
-let av ← Quaternion { w = 1.0, x = 0.0, y = 0.0, z = 0.0 }
+let _ av ← Quaternion { w = 1.0, x = 0.0, y = 0.0, z = 0.0 }
+```
+
+```fab
+class Quaternion {
+    let f32 w
+    let f32 x
+    let f32 y
+    let f32 z
+}
+
+main {
+    # ✗ type restated on both sides — the constructor already names it:
+    #   let Quaternion av ← Quaternion { … }
+    # ✓ left-inferred: the initializer fixes the type
+    let _ av ← Quaternion { w = 1.0, x = 0.0, y = 0.0, z = 0.0 }
+    print av.w
+}
 ```
 
 The mirror direction is equally binding: when the left side carries the type, the right side stays bare — `let list<f32> xs ← empty`, `mut list<u8> out ← empty` — never `… ← empty` with an untyped place or a duplicated conversion target.
@@ -762,7 +893,7 @@ Scope: bindings whose other side is explicit. Public signatures — parameters, 
 
 non-preferred · Evidence: `corpus/literalia/labeled-elements.fab` (labeled construction, mixed labeled/unlabeled slots, label+hole composition, partial by-label binding with `rest`, identity erasure)
 
-```fab
+```text
 # ✗ role-bearing tuple read by position — the reader must remember the order
 let tuple<f32, f32> grads ← tuple<f32, f32> [1.5, 0.25]
 apply(grads[0], grads[1])
@@ -772,7 +903,7 @@ let tuple<gx: f32, gw: f32> grads ← tuple<gx: f32, gw: f32> [1.5, 0.25]
 apply(grads.gx, grads.gw)
 ```
 
-Live-surface notes from the exemplar: labels compose with holes (`tuple<loss: _, int>`); labels are identity-erased (labeled and unlabeled forms assign across); partial binding uses `let {loss, rest leftover} ← metrics`. Labels are legal only in tuple type-argument position — a label in a non-tuple generic list (`f<gx: T>(x)`, `list<gx: T>`) is a parse error. Combine with `type-holes-no-duplication`: `let pair ← tuple<gx: string, gw: int> ["hello", 42]` — the labeled constructor already names the type.
+Live-surface notes from the exemplar: labels compose with holes (`tuple<loss: _, int>`); labels are identity-erased (labeled and unlabeled forms assign across); partial binding uses `let {loss, rest leftover} ← metrics`. Labels are legal only in tuple type-argument position — a label in a non-tuple generic list (`f<gx: T>(x)`, `list<gx: T>`) is a parse error. Combine with `type-holes-no-duplication`: `let _ pair ← tuple<gx: string, gw: int> ["hello", 42]` — the labeled constructor already names the type.
 
 ## named-template-holes
 
@@ -780,12 +911,24 @@ Live-surface notes from the exemplar: labels compose with holes (`tuple<loss: _,
 
 non-preferred · Evidence: `corpus/literalia/named-holes.fab` (named-only application, mixed named/anonymous with positional actuals, positional actual on a named hole erases identically); `corpus/scriptum/scriptum.fab` (anonymous single-slot form)
 
-```fab
+```text
 # ✗ three anonymous holes — the call site is a guess-the-order exercise
-let row ← "§ | § | §"(name, count, status)
+let _ row ← "§ | § | §"(name, count, status)
 
 # ✓ named holes read at both template and call site
-let row ← "§{name} | §{count} | §{status}"(name: name, count: count, status: status)
+let _ row ← "§{name} | §{count} | §{status}"(name: name, count: count, status: status)
+```
+
+```fab
+main {
+    let string name ← "Ada"
+    let int count ← 3
+    let string status ← "ok"
+    let _ anonymous ← "§ | § | §"(name, count, status)
+    let _ named ← "§{name} | §{count} | §{status}"(name: name, count: count, status: status)
+    print anonymous
+    print named
+}
 ```
 
 Live-surface notes from the exemplar: mixed forms share one positional sequence (`"§{greet} §"("Hello", "World")` fills the named then the anonymous hole in order); labels erase before rendering — output is ordinary text. Reject rows (do not add these to the library): labels on ordinary calls (`f(greet: "x")`), the `=` form (`"§ world"(greet = "x")`), unknown labels.
@@ -796,22 +939,24 @@ Live-surface notes from the exemplar: mixed forms share one positional sequence 
 
 non-preferred · Evidence: EBNF `cape_clause?` attachment points — `do` blocks, every `if`/`elif`/`else` arm, `while`, `for`, `switch` (`grammar/EBNF.md` productions `arm`, `else_arm`, `dum_stmt`, `itera_stmt`, `elige_stmt`, `fac_stmt`; the `cura` resource block is retired and has no attachment point); `corpus/cape/cape.fab`, `corpus/cape/repro.fab` (arm-attached cape emits and rustc-compiles). Both shapes below check today; the whole-body form is a style finding, not a rejection.
 
-```fab
-# ✗ one whole-body handler for three different failures
+```text
+# ✗ one whole-body handler for three different failures; recovery knows nothing
+#   about which step failed (the whole-body shape is the first complete block below)
 fn handle(int x) → string ⇥ string {
     do {
-        if x < 0 then throw "negative input"
+        if x ≺ 0 then throw "negative input"
         step_a(x)
         step_b(x)
     }
     catch e {
-        return "generic failure: §"(e)   # recovery knows nothing about which step failed
+        return "generic failure: §"(e)
     }
+    return "ok"
 }
 
 # ✓ catch attached where recovery happens — per arm, smallest scope
 fn handle(int x) → string {
-    if x < 0 {
+    if x ≺ 0 {
         step_a(x)
     }
     catch e {
@@ -827,6 +972,28 @@ fn handle(int x) → string {
 }
 ```
 
+```fab
+fn step_a(int x) → void ⇥ string {
+    if x ≺ 0 then throw "negative input"
+}
+
+fn step_b(int x) → void ⇥ string {
+    if x ≡ 0 then throw "zero input"
+}
+
+fn handle(int x) → string ⇥ string {
+    do {
+        if x ≺ 0 then throw "negative input"
+        step_a(x)
+        step_b(x)
+    }
+    catch e {
+        return "generic failure: §"(e)
+    }
+    return "ok"
+}
+```
+
 Ordering facts from the grammar: on `do`-`while` (la `fac`-`dum`), `catch` binds before the trailing `while`; an arm-attached `catch` may catch `throw` (la `iace`) without an enclosing `⇥`, and a failable call (`→ T ⇥ E`) propagates to the function's own error channel without any wrapper. Report the whole-body wrapper whenever it collapses genuinely distinct recoveries into one handler.
 
 ## guard-rebind-over-rebuild
@@ -835,7 +1002,7 @@ Ordering facts from the grammar: on `do`-`while` (la `fac`-`dum`), `catch` binds
 
 non-preferred · Evidence: extends `null-guard-narrowed-use` (narrowing is binding-scoped: a field place such as `h.p` does not narrow, a `let` binding does); the green form `let FaceQuad ∪ none quad_result ← …`, `if quad_result is none then return null`, `let FaceQuad quad ← quad_result`. The rebuild shape this entry was written against (`SceneNode {name = result!.name, …}`) no longer appears in the library.
 
-```fab
+```text
 # ✗ guard a field place, then rebuild through `!`
 if self.geometry is none then return null
 let BufferGeometry geom ← BufferGeometry {topology = self.geometry!.topology, vertex_count = self.geometry!.vertex_count, …}
@@ -858,7 +1025,7 @@ Pair with `type-holes-no-duplication`: the binding states its type once, on the 
 
 non-preferred · Evidence: EBNF `unary_expr ::= ('-' | '¬' | 'non') unary_expr` (`grammar/EBNF.md`); `corpus/custodi/custodi.fab` (`return -1`), `corpus/intrinseca/fractus-comparatio.fab` (`let float value ← -3.75`). Both spellings compile; this is style. The original offenders (`0.0 - 89.0`, `0.0 - half_width`) no longer appear in the library; treat any remaining hit as residue.
 
-```fab
+```text
 # ✗ subtraction from zero
 if pitch_degrees ≺ 0.0 - 89.0 then return 0.0 - 89.0
 let f32 half_width ← 0.0 - width * 0.5
@@ -868,7 +1035,17 @@ if pitch_degrees ≺ -89.0 then return -89.0
 let f32 half_width ← -(width * 0.5)
 ```
 
-Live compiler gap (re-probed): a bare negative literal in the compact consequent returning through `T ∪ none` still fails — `if x ≡ 3 then return -1` on `→ int ∪ none` is `SEM011 numeric_operand_required` — while the plain-`int` form passes. Bridge spellings: the block consequent, a typed `let` (`let int negative ← -1; return negative`), or `0 - 1`. Prefer the typed const — it keeps unary minus and states the type once. Zero-subtraction remains non-preferred everywhere else.
+```fab
+main {
+    let f32 width ← 4.0
+    let f32 pitch_degrees ← 100.0
+    if pitch_degrees ≺ -89.0 then print "low"
+    let f32 half_width ← -(width * 0.5)
+    print half_width
+}
+```
+
+Live compiler gap (re-probed): a bare negative literal in the compact consequent returning through `T ∪ none` still fails — `if x ≡ 3 then return -1` on `→ int ∪ none` is `SEM011 numeric_operand_required` — while the plain-`int` form passes. Bridge spellings: the block consequent, a typed `let` (`let int negative ← -1; return negative`), or `0 - 1`. Prefer the typed `let` — it keeps unary minus and states the type once. Zero-subtraction remains non-preferred everywhere else.
 
 ## switch-for-equality-dispatch
 
@@ -876,7 +1053,7 @@ Live compiler gap (re-probed): a bare negative literal in the compact consequent
 
 non-preferred · Evidence: `corpus/elige/` (marked canonical, with a note that it works with text, number, and other comparable types; exemplars are la-locale — render through the reviewed file's locale); en surface from the locale pack (`switch`/`case`/`default`, `locale/en/pack.toml`); re-probed (en `switch`/`case`/`default` on `int`, block and `case 1 then return …` forms, check clean); a live ladder shape is `if code ≡ 1 then return …`. Do not confuse with `match` (`discerne`), which matches closed sets — unions, enums, variants — not numeric widths or lengths.
 
-```fab
+```text
 # ✗ equality ladder over a code discriminant
 if code ≡ 1 then return Color {r = 0.8, g = 0.1, b = 0.1}
 if code ≡ 2 then return Color {r = 1.0, g = 0.4, b = 0.4}
@@ -897,6 +1074,22 @@ switch code {
 }
 ```
 
+```fab
+fn choose(int code) → int ∪ none {
+    switch code {
+        case 1 {
+            return 10
+        }
+        case 2 {
+            return 20
+        }
+        default {
+            return null
+        }
+    }
+}
+```
+
 Guard conditions stay `if` — range checks (`if code ≤ 2`), boolean predicates, and non-literal comparisons are not value dispatch. **Multi-field comparisons are also not dispatch**: a ladder that probes several distinct fields (`if n.x ≡ -1.0 … if n.y ≡ 1.0 …`) has no single discriminant and must stay `if` — converting it to `switch` is a bug, not a fix. Non-exhaustive switches without `default` silently fall through (corpus `switch` common-mistakes note) — cover the values or write the `default`.
 
 ## infix-extrema-over-hand-rolled-max
@@ -905,17 +1098,12 @@ Guard conditions stay `if` — range checks (`if code ≤ 2`), boolean predicate
 
 non-preferred · Evidence: `corpus/summa/minmax-infix.fab` (scalar, list, tensor, and chained clamp); `corpus/summa/max-min.fab` (reduction expressions over shaped inputs); parser precedence in `crates/radix-parser/src/expr.rs`; `grammar/EBNF.md` `additive_expr` (`⤒ ⤓` sit at the `+ -` tier). Probed: `left ⤒ right` and `values ⤒ 4 ⤓ 8` over a `list<int>` check clean.
 
-```fab
-# ✗ hand-rolled pairwise maximum and manual clamp
+```text
+# ✗ hand-rolled pairwise maximum and manual clamp (a `mut` loop binder is a fresh
+#   element slot, so assigning it does not clamp the list)
 mut int high ← left
-if right > high {
+if right ≻ high {
     high ← right
-}
-mut list<int> clamped ← values
-for from clamped mut value {
-    if value > 8 {
-        value ← 8
-    }
 }
 
 # ✓ infix extrema express the operation directly
@@ -924,6 +1112,18 @@ let list<int> clamped ← values ⤒ 4 ⤓ 8
 
 # ✓ whole-tensor reduction keeps its dedicated head and caller identity
 let f32 maximum ← reduce via max from scores coalesce 0.0
+```
+
+```fab
+main {
+    let int left ← 3
+    let int right ← 7
+    let list<int> values ← [1, 5, 12]
+    let int high ← left ⤒ right
+    let list<int> clamped ← values ⤒ 4 ⤓ 8
+    print high
+    print clamped
+}
 ```
 
 Use the glyphs for two-operand scalar, list, or elementwise selection and chained
@@ -937,7 +1137,7 @@ tensor; `coalesce` remains the caller-stated identity for an empty source. A
 
 non-preferred · Evidence: `corpus/operatores/numeric-value-eq.fab`; `crates/radix-semantic/src/passes/typecheck/ops.rs` (numeric promotion join and numeric-only gate); `crates/radix-semantic/src/passes/typecheck/numeric_value_equality_test.rs`; comparisons across number families are exact. Verified: `u16 ≡ i64` is `SEM010 equality_exact_types_required`, `u16 ≅ i64` checks.
 
-```fab
+```text
 # ✗ mainstream width-blind equality is not a Faber operator
 # if left == right { … }
 
@@ -949,6 +1149,16 @@ if port ≡ count {
 # ✓ compatible numeric widths join, then compare exactly
 if port ≅ count {
     print "same value"
+}
+```
+
+```fab
+main {
+    let u8 port ← 42 ∷ u8
+    let int count ← 42
+    if port ≅ count {
+        print "same value"
+    }
 }
 ```
 
@@ -964,7 +1174,7 @@ the `≇` form is true).
 
 non-preferred · Evidence: `grammar/EBNF.md` `cast_expr` / `conversio_expr`; `crates/radix-semantic/src/passes/typecheck/ops.rs` (exact equality); `crates/radix-semantic/src/passes/typecheck/convert_test.rs` (typed list conversion). Verified: the loose and `≅` forms below are rejected, the cast form checks.
 
-```fab
+```text
 # ✗ rejected (SEM010 equality_exact_types_required): list literal's element type left implicit
 assert actual ≡ [1, 2]
 
@@ -973,6 +1183,13 @@ assert actual ≅ [1, 2]
 
 # ✓ bind the comparison literal to the receiver's concrete list type
 assert actual ≡ ([1, 2] ↦ list<int>)
+```
+
+```fab
+main {
+    let list<int> actual ← [1, 2]
+    assert actual ≡ ([1, 2] ↦ list<int>)
+}
 ```
 
 The `↦` cast is load-bearing in the exactness idiom. It states the element
@@ -985,7 +1202,7 @@ collection operator.
 
 non-preferred · Evidence: the equality ladder described below; `crates/radix-semantic/src/passes/typecheck/ops.rs`; `corpus/intrinseca/fractus-approximata.fab`; integer-family `≈` follows one exact relative-1e-9 rule
 
-```fab
+```text
 # ✗ fuzzy glyph for an exact promoted-value check
 assert port ≈ count
 
@@ -1011,7 +1228,7 @@ non-preferred · Evidence: the Faber lexer `IDENTIFIER` rule in `grammar/EBNF.md
 
 scope: library-owned identifier vocabulary only; this does not add grammar, operators or locale-pack spellings, and it sets no naming rule for other libraries.
 
-```fab
+```text
 # ✗ a visually confusable spelling or a Unicode-subscripted quantity
 fn normalize(f32 ο, f32 subscripted_beta) → f32 {
     return ο + subscripted_beta
@@ -1040,11 +1257,11 @@ canonical.
 
 **A function that mixes host policy (`⇥` handling, host-side containers, I/O, `source`, optional-bias branches) with tensor math is two functions: an ordinary wrapper that keeps the policy, and a device region the wrapper calls. The region reuses existing `@ kernel` leaves first; where the wrapper must call a new one, that kernel is `@ public @ kernel` — a private `@ kernel` is a helper only other kernels may call.**
 
-non-preferred · Evidence: the kernel visibility rule (host code calling a private kernel is a check-time error) in `crates/radix-semantic/src/passes/kernel_legality.rs` (`nucleum_private_host_call`, reported as `SEM008`). `⇥`/`throw` is admitted inside a kernel, so a failable function may itself be a kernel when its body is host-free; the split below is for bodies that actually need host policy. Cite the legality pass in findings.
+non-preferred · Evidence: the kernel visibility rule (host code calling a private kernel is a check-time error) in `crates/radix-semantic/src/passes/kernel_legality.rs` (`nucleum_private_host_call`, reported as `SEM008`). A host-free kernel may use the text error channel `⇥ string` and `throw`; another declared error type is refused as `SEM008 nucleum_typed_error_channel` and local handlers are refused, so a `⇥` signature alone neither requires nor permits a kernel; the split below is for bodies that actually need host policy. Cite the legality pass in findings.
 
 scope: device-library conversion of mixed host/math functions. Not session drivers (`decode_step`, `generate`).
 
-```fab
+```text
 # ✗ one function is both host policy and math, so the math never reaches a kernel
 fn dense_block_static<size T, size D, size F>(tensor<f32, [T, D]> x, TypedDenseLayer<D, F> layer, f32 ε) → tensor<f32, [T, D]> ⇥ TransformerError {
     require ε > 0.0 throw variant ShapeMismatch {message = "epsilon"}
@@ -1076,7 +1293,20 @@ fn dense_mlp<size T, size D, size F>(
 }
 ```
 
-The kernel-closure spelling (`(params) kernel ∴ expr`) that an earlier version of this entry taught is retired: it still checks today, but the `kernel` closure modifier is retired — a one-off region is a private `@ kernel` function called from a kernel, a closure inside a kernel needs no modifier, and host code uses `for … thread` (la `itera … filum`). Do not recommend it.
+```fab
+@ kernel
+@ public
+fn scale(f32 x) → f32 {
+    return x * 2.0
+}
+
+fn checked_scale(f32 x) → f32 ⇥ string {
+    require x ≻ 0.0 throw "positive input required"
+    return scale(x)
+}
+```
+
+The kernel-closure spelling (`(params) kernel ∴ expr`) that an earlier version of this entry taught is retired: it still checks today, but closures take no modifier slot at all — a one-off region is a private `@ kernel` function called from a kernel, a closure inside a kernel needs no modifier, and host code uses `for … thread` (la `itera … filum`). Do not recommend it.
 
 Decision tree for a conversion unit:
 
@@ -1092,7 +1322,7 @@ Decision tree for a conversion unit:
 
 non-preferred · Evidence: a same-name getter that only returns a field gives one fact two spellings; field reads in `corpus/genus/genus.fab` (`print p.x`); the repaired shape is `class Metric { mut f32 loss; mut f32 accuracy }` read as `m.loss` (no `fn loss()` twins). File interfaces export struct fields, so `m.loss` typechecks across modules. Member `@ private` **is enforced**: reading a private member from outside the class is `SEM063 member_private_read` — so a getter whose field is private is a legitimate API, not a twin.
 
-```fab
+```text
 # ✗ stored facts duplicated as call-form twins
 @ public
 class Metric {
@@ -1120,9 +1350,19 @@ class Metric {
 print m.loss
 ```
 
+```fab
+class Shape {
+    let list<int> extents
+
+    fn rank() → int {
+        return self.extents.length()
+    }
+}
+```
+
 Keep a method when the body does work — computation, arguments, mutation, or a `⇥` channel:
 
-```fab
+```text
 # ✓ derived / operational surface stays a call
 fn rank() → int {
     return self.shape.length()
@@ -1143,7 +1383,7 @@ Not this entry: builtin collection methods (`list.length()`, `map.get(key)`), co
 
 canon-violation · Evidence: `grammar/EBNF.md` `genus_field_decl` (`let` | `mut` per instance, `const` with `=` for the type-level constant; la `sit` | `varia`, `fixum`); `corpus/genus/genus.fab`; probe: a bare field is `PARSE010 field_modifier_missing`. Union shared fields (`field_decl`) keep the modifier optional.
 
-```fab
+```text
 # ✗ rejected (PARSE010 field_modifier_missing)
 class Person {
     string name
@@ -1151,6 +1391,15 @@ class Person {
 }
 
 # ✓ explicit modifier
+class Person {
+    let string name
+    mut int age = 0
+    mut int limit optional
+    const string HOME = "Rome"
+}
+```
+
+```fab
 class Person {
     let string name
     mut int age = 0
@@ -1167,7 +1416,7 @@ Note the preceding entries' `class` snippets elide fields for brevity; a real cl
 
 canon-violation · Evidence: `static` is retired and `const T x = e` (la `fixum`) is a typed compile-time constant; `grammar/EBNF.md` `fixum_decl` (`'=' const_init`); the "Common wrong guesses" section of `../../SKILL.md`. Probed: `static int X = 3` is `PARSE010 static_decl_retired`; `let f32 TOL ← 0.5` at module level is `SEM062 top_level_binding` (the run-time `const f32 TOL ← 0.5` is `PARSE010 runtime_const_retired`); `const int X = 3` and `const f32 Y = 0.5` check clean. `static`/`generis` is retired in class bodies too (`static_member_retired`; the class-level constant is the member `const T X = e`).
 
-```fab
+```text
 # ✗ rejected (PARSE010 static_decl_retired)
 static int LIMIT = 3
 
@@ -1179,13 +1428,18 @@ const int LIMIT = 3
 const f32 TOLERANCE = 0.5
 ```
 
+```fab
+const int LIMIT = 3
+const f32 TOLERANCE = 0.5
+```
+
 ## true-division-glyph
 
 **`/` and `%` on integers are floor operations; a real-valued quotient is `÷`. Never route an integer `/` into a float slot.**
 
 non-preferred · Evidence: the Division prose in `grammar/EBNF.md` (`a / b` is ⌊a / b⌋, `-7 / 2` is −4, `-7 % 2` is 1; `÷` is real division with no method twin). Verified: `let f64 avg ← a / b` with `int` operands is rejected (`SEM010 integer_quotient_to_float_requires_true_division`); `a ÷ b` checks and yields `f64` for default `int`, `f32` for 8/16-bit operands.
 
-```fab
+```text
 # ✗ rejected (SEM010): integer quotient stored as a float
 let f64 avg ← total / count
 
@@ -1194,6 +1448,18 @@ let f64 avg ← total ÷ count
 
 # ✓ integer floor division stays `/`
 let int pages ← total / page_size
+```
+
+```fab
+main {
+    let int total ← 7
+    let int count ← 2
+    let int page_size ← 3
+    let f64 avg ← total ÷ count
+    let int pages ← total / page_size
+    print avg
+    print pages
+}
 ```
 
 Code ported from C, Java, Rust, or Go changes its results on negative operands: do not carry over truncating division.

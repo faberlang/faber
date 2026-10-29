@@ -33,16 +33,16 @@ postfix `↑` / `↓` as statements (not expressions).
 | `is` / `not is` (la `est` / `non est`) | type test; the right side is always a type. `x is 3` is a parse error, `b is true` is `SEM011 est_value_rhs`. The null test is `x is none` (la `x est nihil`); `x is null` is `PARSE040 null_value_in_type_position`; the null-value comparison is `x ≡ null`. `x is int` works on `int ∪ none`. Negation in en is `not is`, never `is not`. |
 | `≺` / `≻` / `≤` / `≥` | less-than, greater-than, inclusive ordering; ASCII `<` / `>` are legacy comparison aliases, while `<` / `>` also remain generic delimiters. |
 | `∈` / `∉` | membership and its first-class negation; comparison tier; no ASCII spelling. `x ∈ [v1, v2, …]`, `x ∈ set`, and `k ∈ map` (map keys) test collection membership; `x ∈ a‥b` / `x ∈ 0…10` test range containment. Never over text: `"a" ∈ s` is `SEM010 membership_over_text`, use `s.contains("a")` (la `continet`). The old words `within` / `between` (la `intra` / `inter`) are retired as operators (`PARSE001 membership_keyword_retired`, naming `∈`) and remain ordinary identifiers; set intersection (`.intersect(...)`; la `.inter(...)`) is unrelated. Over a range the form checks and emits on Rust, Go, Swift, and TS but fails on the MIR runner (`binary operator without a MIR primitive`). |
-| `∨` / `⊻` / `∧` | bitwise OR, XOR, AND on integers only; booleans use `or` / `and` / `not` (la `aut` / `et` / `non`). |
+| `∨` / `⊻` / `∧` | bitwise OR, XOR, AND on integers and on matching raw-bit widths (`b8`, `b16`, `b32`, `b64`); booleans use `or` / `and` / `not` (la `aut` / `et` / `non`). |
 | `⇐` / `⇒` | left/right shift, unmasked: `x ⇐ n` is `x·2ⁿ`, `x ⇒ n` is `floor(x / 2ⁿ)`; a negative count is `SEM010 shift_count_negative`. |
-| `¬` / `not` | `¬x` is integer complement, `-x - 1` (width-free; integers only, `¬true` is `SEM011`); `not` (la `non`) is boolean not (booleans only); `not is` (la `non est`) is the negated type test. |
+| `¬` / `not` | on integers `¬x` is width-free complement, `-x - 1`; on `b8`/`b16`/`b32`/`b64` it complements within that raw-bit width (`¬true` is `SEM011`); `not` (la `non`) is boolean not (booleans only); `not is` (la `non est`) is the negated type test. |
 | `‥` / `…` / `before` / `until` / `step` | exclusive/inclusive ranges and their word forms (la `ante` / `usque` / `per`); `step` supplies a stride. A descending `5‥0` iterates 5,4,3,2,1. |
 | `coalesce` (la `vel`) | nullable coalesce/default; it is not logical `or` (`1 or 2` is `boolean_operands_required`). Binds tighter than `*`, so `n coalesce 2 * 3` is `6`. A `coalesce` right side may carry a range tail. |
 | `or` / `and` | logical OR / AND (la `aut` / `et`). |
 | `✓` `✗` | the one value conditional: `c ✓ a ✗ b`; nesting is rejected. Replaces the retired `?:` and `yields … else` (la `sic … secus`), which report `PARSE030 conditional_question_colon_removed` / `conditional_sic_removed`. `?` still starts optional access. |
 | `¶` | display-format operator: `value ¶ "spec"` renders to a string (en `string`, la `textus`); same glyph in every locale; binds looser than arithmetic, tighter than comparison; does not chain (`format_chained`); the spec must be a literal. |
 | `⊥` | default/fallback on a failing conversion or failable call: `↦ T ⊥ expr`, `call() ⊥ expr`. After a plain `←` it is `default_requires_failable`. `⇥ E` only ever names an error type; `⇥ 0` is `PARSE030 recovery_uses_exit_arrow`. |
-| `←` / `↤` / `↦` | store, convert-then-store, explicit conversion. `↦` into `wrapping<W>` reduces and into `saturating<W>` clamps (the slot type must match); neither fails. A `↦ via Hint` clause carries a hint (`x ↦ u16 via Le`); the type-argument hint form is gone. A float or `d64` into an integer needs `via Floor|Ceil|HalfEven|Trunc` (bare is `SEM016 float_to_integer_requires_rounding`). In a `↤` chain `⊥` attaches to the nearest `↤`. |
+| `←` / `↤` / `↦` | store, convert-then-store, explicit conversion. For integer widths `↦` into `wrapping<W>` reduces and into `saturating<W>` clamps (the slot type must match); neither fails. A float `saturating<W>` instead keeps IEEE results, infinity and NaN included. A `↦ via Hint` clause carries a hint (`x ↦ u16 via Le`); the type-argument hint form is gone. A float or `d64` into an integer needs `via Floor|Ceil|HalfEven|Trunc` (bare is `SEM016 float_to_integer_requires_rounding`). In a `↤` chain `⊥` attaches to the nearest `↤`. |
 | `⇇` | tensor copy-into, `target ⇇ value`: writes the values of `value` into the existing storage of a writable tensor `target` (a statement, single, no chain; see Copy-Into in `references/grammar.md` for the rules; the old callable-sink form is retired, `SEM012 transfer_sink_retired`). `←` rebinds, `⇇` writes in place. Loosest operator. |
 | `↑` / `↓` | postfix increment/decrement statements on an assignable place (not expressions); on a `let` it is `SEM020`. |
 | `∇` | postfix gradient selection; parses, but `check` rejects it with `SEM010 gradient_expression_unsupported` until the autograd surface lands. |
@@ -70,6 +70,8 @@ Legal device glyphs are documented per admitted consumer. Exemplars:
 `corpus/tensor/glyph-*.fab` and
 `references/idioms.md`.
 
+`t.length()` is the element count, `t.rank()` the number of extents and `t.norm()` the Euclidean norm (vectors have `norm()` too); `rank` and `norm` are spelled that way in every locale. English edge-policy calls are `.edge<clamp>()`, `.edge<wrap>()` and `.edge<reflect>()`; Latin keeps `.limes<…>()`, and `limes` in an English file is wrong (`corpus/tensor/rank-norm.fab`, `corpus/tensor/edge-shift-policies.fab`).
+
 ## Error-conversion seam law
 
 `@ conversion` (en) / `@ conversio` (la) marks one named standalone function,
@@ -83,9 +85,25 @@ general implicit conversion. The in-union `@ conversion` arm form is retracted
 `lib/norma/exempla/error-conversio/`.
 
 ```fab
+union WireError {
+    @ shared
+    string message
+
+    Invalid
+}
+
+union BoundaryError {
+    @ shared
+    string message
+
+    WireFailure {
+        WireError inner
+    }
+}
+
 @ conversion
 fn from_wire_error(WireError err) → BoundaryError {
-    return variant WireFailure {message = err.message, inner = err}
+    return variant WireFailure { message = err.message, inner = err }
 }
 ```
 

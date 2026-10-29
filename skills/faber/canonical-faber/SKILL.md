@@ -96,8 +96,8 @@ finding. The live tree always wins over this library.
    (`binder_fixum_retired`), `int<W>`/`float<W>` wrappers (la
    `numerus<W>`/`fractus<W>`; `PARSE040 numeric_wrapper_retired`), `?:` ternary
    (`PARSE030`), `⇥ value` recovery (`PARSE030 recovery_uses_exit_arrow`), `∴`
-   as a statement joint (`PARSE026`), `T ∪ null` (`PARSE040`), `T?`, anonymous
-   `{ key = expr }`, `@ future` (la `@ futura`), and `norma:hal/*` (`PKG001`). Violations of
+   as a statement joint (`PARSE026`), `T ∪ null` (`PARSE040`), `T?`, and `norma:hal/*` (`PKG001`). `@ future` (la `@ futura`) still
+   compiles: report it as a style migration, never a compile error. Violations of
    the parent skill's hard rules that still compile (banned or invented forms)
    stay in scope.
 3. **Mechanical pass.** Walk every entry in `references/patterns.md` against
@@ -183,7 +183,7 @@ that projection.
 
 **Bad — repeated match wrapper:**
 
-```fab
+```text
 fn message(ShapeError e) → string {
     match e {
         case Incompatible let message { return message }
@@ -196,7 +196,7 @@ return message(error)
 
 **Good — direct shared-field member:**
 
-```fab
+```text
 return error.message
 ```
 
@@ -215,22 +215,11 @@ earlier in-union arm form is removed: a union is pure fields plus variants.
 **Bad — wrapper family (anti-pattern):**
 
 ```fab
-fn inspect_before() → string ⇥ BoundaryError {
-    do {
-        return read_wire()
-    }
-    catch err {
-        throw variant WireFailure {message = err.message, inner = err}
-    }
-}
-```
+union WireError {
+    @ shared
+    string message
 
-**Good — declared conversion function (idiom):**
-
-```fab
-@ conversion
-fn from_wire_error(WireError err) → BoundaryError {
-    return variant WireFailure {message = err.message, inner = err}
+    Invalid
 }
 
 union BoundaryError {
@@ -238,6 +227,46 @@ union BoundaryError {
     string message
 
     WireFailure { WireError inner }
+}
+
+fn read_wire() → string ⇥ WireError {
+    throw variant Invalid { message = "wire rejected" }
+}
+
+fn inspect_before() → string ⇥ BoundaryError {
+    do {
+        return read_wire()
+    }
+    catch err {
+        throw variant WireFailure { message = err.message, inner = err }
+    }
+}
+```
+
+**Good — declared conversion function (idiom):**
+
+```fab
+union WireError {
+    @ shared
+    string message
+
+    Invalid
+}
+
+union BoundaryError {
+    @ shared
+    string message
+
+    WireFailure { WireError inner }
+}
+
+@ conversion
+fn from_wire_error(WireError err) → BoundaryError {
+    return variant WireFailure { message = err.message, inner = err }
+}
+
+fn read_wire() → string ⇥ WireError {
+    throw variant Invalid { message = "wire rejected" }
 }
 
 fn inspect_after() → string ⇥ BoundaryError {
@@ -266,7 +295,7 @@ information, not a style preference.
 
 **Bad — coalesce-fed range bound plus stride indexing over flat data:**
 
-```fab
+```text
 let list<int> f ← x.shape
 let int rows ← f.get(0) coalesce 1
 let int cols ← f.get(1) coalesce 1
@@ -279,9 +308,14 @@ for range 0‥rows let i {
 **Good — direct container walk:**
 
 ```fab
-for from grid at [r, c] let cell {
-    if r ≤ c {
-        print r, c, cell
+main {
+    let vf32[3] a ← [2.0, 3.0, 4.0] ↦ vf32[3]
+    let vf32[3] b ← [5.0, 7.0, 11.0] ↦ vf32[3]
+    let matrix<f32, [3, 3]> grid ← a ⊗ b
+    for from grid at [r, c] let cell {
+        if r ≤ c {
+            print r, c, cell
+        }
     }
 }
 ```
@@ -325,7 +359,7 @@ dropped and `0 - 1` negation was written as `-1`.
 
 **Bad — index variable + `while` + manual increment (`matmul`):**
 
-```fab
+```text
 for range 0‥m let i {
     mut int j ← 0
     while j ≺ n {
@@ -345,7 +379,7 @@ for range 0‥m let i {
 
 **Good — the span is declared, not maintained:**
 
-```fab
+```text
 for range 0‥m let i {
     for range 0‥n let j {
         mut f32 s ← 0.0
@@ -372,7 +406,7 @@ This is the conversion that `range-loop-over-open-while` in
 
 **Bad — compound `while` predicate over two lengths:**
 
-```fab
+```text
 mut int i ← 0
 while i ≺ target_ids.length() and i ≺ candidate_ids.length() {
     if (target_ids.get(i) coalesce -1) ≢ (candidate_ids.get(i) coalesce -1) {
@@ -384,7 +418,7 @@ while i ≺ target_ids.length() and i ≺ candidate_ids.length() {
 
 **Good — compute the bound once, walk one range:**
 
-```fab
+```text
 mut int bound ← target_ids.length()
 if candidate_ids.length() ≺ bound {
     bound ← candidate_ids.length()
@@ -399,35 +433,38 @@ for range 0‥bound let i {
 Write the hoisted
 `bound` binding plus `for range 0‥bound`, not a two-clause `while`.
 
-### 3. Keep-class: `while` stays for open predicates, shrinking searches, and non-+1 strides
+### 3. Keep-class: open predicates, shrinking searches and data-dependent strides
 
-The cleanup deliberately kept these: open predicates, shrinking searches, and
-stride-2 walks stay `while`:
+Keep `while` for genuinely open predicates, shrinking search bounds and
+data-dependent advancement that is not a range step:
 
-```fab
+```text
 # ✓ kept while — shrinking search bound
 while length ≥ MIN_SUFFIX_LENGTH {
     …
     length ← length - 1
 }
-
-# ✓ kept while — column walk with a stride-2 arm
-mut int col ← 0
-while col ≺ d {
-    …
-    col ← col + 2
-}
 ```
 
-Flagging these for `for range` conversion is a false finding. A `while` whose
-bound advances by computed strides or shrinks inside the body has no range
-spelling; a `while` that exists to re-derive a `+1` counter does.
+Flagging that for `for range` conversion is a false finding. A constant
+positive stride has a range spelling, so a counter that only re-derives a
+stride is convert-class: `for range 0‥d step 2 let col`. The step may be a
+run-time value; it is checked at loop entry and must be positive
+(`corpus/itera/range-runtime-step.fab`).
+
+```fab
+main {
+    for range 0‥8 step 2 let col {
+        print col
+    }
+}
+```
 
 ### 4. One-collection walks are `for from xs`, not range-plus-get
 
 **Bad — the range exists only to `get` the same collection:**
 
-```fab
+```text
 for range 0‥checkpoint.layers().length() let i {
     let kv.KVCache layer ← checkpoint.layers().get(i) coalesce kv.default()
     let int layer_remaining ← layer.capacity() - checkpoint.prefix_length()
@@ -438,9 +475,11 @@ for range 0‥checkpoint.layers().length() let i {
 **Good — walk the collection directly; a method call is a legal source:**
 
 ```fab
-for from checkpoint.layers() let layer {
-    let int layer_remaining ← layer.capacity() - checkpoint.prefix_length()
-    …
+main {
+    let list<int> layers ← [1, 2, 3]
+    for from layers let layer {
+        print layer
+    }
 }
 ```
 
@@ -550,7 +589,7 @@ substring appear" is `contains`.
 
 **Bad — the set is rebuilt inside the predicate:**
 
-```fab
+```text
 fn key_value(string k) → bool {
     let set<string> admitted ← [
         "general.architecture",
@@ -563,15 +602,10 @@ fn key_value(string k) → bool {
 **Good — the key universe is a named declaration and membership stays `∈`:**
 
 ```fab
-fn admitted_keys() → set<string> {
-    return [
-        "general.architecture",
-        …37 pinned keys…
-    ] ↦ set<string>
-}
+const list<string> ADMITTED_KEYS = ["general.architecture", "general.name"]
 
 fn key_value(string k) → bool {
-    return k ∈ admitted_keys()
+    return k ∈ ADMITTED_KEYS
 }
 ```
 
@@ -594,7 +628,7 @@ universe is data, never control flow inside the predicate.
 
 **Bad — bare prose comments marking stages:**
 
-```fab
+```text
     # Pre-LN
     let _ ln1 ← x.norm_layer(axis 1, 0.00001, ln1_s, ln1_o)
 
@@ -604,7 +638,7 @@ universe is data, never control flow inside the predicate.
 
 **Good — the banner form, validation stages marked fail-closed:**
 
-```fab
+```text
     # --- pre-LN -----------------------------------------------------------
     let _ ln1 ← x.norm_layer(axis 1, 0.00001, ln1_s, ln1_o)
 
@@ -648,7 +682,7 @@ same way with no body change, and newly written typed leaf functions carry the
 tag from the start. Ordering in every
 case: `@ kernel` first, `@ public` second. A staged-carrier body that walks
 flat lists is *not* a kernel — only glyph bodies were annotated
-(`let kt ← kbᵀ; let scores ← qb · kt`), and `gather_carrier` /
+(`let _ kt ← kbᵀ; let _ scores ← qb · kt`), and `gather_carrier` /
 `transpose_carrier` are deliberately untagged
 (commented "Not @ kernel: no gather glyph or method twin yet").
 
@@ -659,7 +693,7 @@ pinning turns it into a dimensional tensor type.
 
 **Bad — a local, module-private reimplementation of an operation the library already carries (a local `transpose`):**
 
-```fab
+```text
 fn transpose(tensor.NumericBlock t) → tensor.NumericBlock ⇥ DenseError {
     let list<int> f ← t.shape
     …
@@ -674,7 +708,7 @@ fn transpose(tensor.NumericBlock t) → tensor.NumericBlock ⇥ DenseError {
 
 **Good — call the shared carrier, then pin:**
 
-```fab
+```text
 fn transpose(tensor.NumericBlock t) → tensor.NumericBlock ⇥ DenseError {
     return nn.transpose_carrier(t)
 }
@@ -684,7 +718,7 @@ The pin idiom — a staged carrier's flat `data` becomes a
 dimensional tensor inside `do`/`catch conv`, with the typed variant thrown on
 failure (`pin_rank1` / `pin_rank2`):
 
-```fab
+```text
 fn pin_rank1<size N>(tensor.NumericBlock t, string name) → tensor<f32, [N]> ⇥ DenseError {
     do {
         return t.data ↦ tensor<f32, [N]>
@@ -719,22 +753,41 @@ the checkable parts are cited per item. The
 `between` spelling it used is retired (see 6 and 7), as is the module-level
 set spelling (see 9).
 
-### 14. Mixed `⇥` functions split: wrapper vs kernel region
+### 14. Mixed host-policy and kernel-math functions split: wrapper vs kernel region
 
 Section 11 covers a body that is already pure glyphs. This section covers the
-mixed function: admit/policy and tensor math in one `⇥` signature. That
-function cannot be `@ kernel`. Cut it. Full pair and decision tree:
-`kernel-region-split` in `references/patterns.md`.
+mixed function: host-only policy or data (`require`, containers, handlers) and
+tensor math in one body. Cut it. The `⇥` signature alone is not the test: a
+host-free kernel may declare `⇥ string` and `throw`; any other typed error
+channel `⇥ E` is `SEM008 nucleum_typed_error_channel` and local handlers are
+host-only. Inspect the body and the declared error type before recommending a
+split. Full pair and decision tree: `kernel-region-split` in
+`references/patterns.md`.
 
-**Bad — policy and math share the `⇥` function, so the math never becomes a
+**Bad — policy and math share one function, so the math never becomes a
 device region.**
 
-**Good — wrapper keeps `require` / host-side containers / `source` / optional-bias presence;
+**Good — the wrapper keeps `require` / host-side containers / `source` / optional-bias presence;
 math reuses existing `@ kernel` leaves, or a named `@ kernel` leaf (`@ public` when host code calls it; a private kernel
 called from host is `SEM008 nucleum_private_host_call`) when a second caller
-will share it. The kernel-closure modifier is retired (it still checks); do not add new
-uses.**
-An illegal nested call (one a kernel may not contain) becomes an argument to
+will share it:**
+
+```fab
+@ kernel
+@ public
+fn scale(f32 x) → f32 {
+    return x * 2.0
+}
+
+fn checked_scale(f32 x) → f32 ⇥ string {
+    require x ≻ 0.0 throw "positive input required"
+    return scale(x)
+}
+```
+
+The kernel-closure modifier is retired (closures take no modifier slot at
+all; legality comes from the enclosing `@ kernel` function): do not add new
+uses. An illegal nested call (one a kernel may not contain) becomes an argument to
 the region instead of being dragged inside. Session drivers stay ordinary. A
 conversion that does not change the exported launch plan (the set of device
 kernel launches) must not claim a launch-count delta.
@@ -742,6 +795,7 @@ kernel launches) must not claim a launch-count delta.
 This supersedes the earlier "assemblers stay unannotated / no
 in-body call" guidance for fusion parents (functions whose kernels the compiler merges
 into fewer launches): parents that call leaves are the fusion surface;
-composition inlines those calls. Flag a `⇥` function whose body is
-already only kernel/glyph math as convert-class. Flag marking that `⇥`
-function `@ kernel` as a false fix.
+composition inlines those calls. Flag a function whose body is
+already only kernel/glyph math as convert-class, even when it carries a
+`⇥ string` channel. Flag marking a function that holds host-only policy or a
+typed `⇥ E` channel `@ kernel` as a false fix.

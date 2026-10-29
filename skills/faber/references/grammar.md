@@ -116,7 +116,7 @@ main {
 }
 ```
 
-`let name` with no initializer is the inferred deferred form. `let`/`mut T x ↢ future` and
+`let _ name` with no initializer is the inferred deferred form (assign it exactly once before reading it); `let name` without a type slot is `PARSE010 binding_type_slot_required`. `let`/`mut T x ↢ future` and
 `let x ↢ future` are the await-directed initializers (same as `await_const T x ← future`, la `figendum`; `↢` is not an
 expression operator and cannot target an existing place).
 
@@ -200,14 +200,14 @@ Teaching exemplar: `corpus/operatores/numerus-widening.fab`.
 - **Float to integer.** A float or `d64` source needs a rounding choice: `x ↦ int via Floor|Ceil|HalfEven|Trunc`; the bare `x ↦ int` is `SEM016 float_to_integer_requires_rounding`, and `⊥ default` / `⇥` follow the `via` as for any failable conversion (`corpus/conversio/float-to-int-via.fab`). The glyph `⌊x⌉` (nearest) is the short form of `via HalfEven`.
 - **Local constant.** `const T x = e` is a compile-time local (evaluated by the compiler, must fit `T`); a runtime store is `let T x ← e`, and `const T x ← e` is `PARSE010 runtime_const_retired`.
 - **AIR lane.** In an `@ radix lane "air"` function every integer store and operation must be proven to fit by the range rule; otherwise it is a compile error (declare a wider slot or use `↦ T ⊥ default`).
-- **The unbounded integer `inf`** (teaching exemplar `corpus/operatores/inf.fab`, with `inf-conversio.fab`, `inf-json.fab`). The bare marker `inf` is an integer with no bound — opt in by declaring a slot `inf` or converting an operand `↦ inf`; nothing becomes `inf` by default, and a lone literal of any length defaults to `int` (a literal past `u64` needs an `inf` slot or operand, else `SEM010 numerus_literal_out_of_range`). `inf`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>` (la `exactus`/`modulus`/`saturatus`) all name the same type (the wrapped `int<inf>` is retired, `PARSE040`); the marker is ASCII in every locale, with no prefixed sugar (`linf` is an identifier). `inf` is the implicit lossless target of every integer width including `u64` (`let inf x ← u` needs no `↦`) and widens into nothing; `u64 - u64` is still `i64` — opt in with `(a ↦ inf) - b`. On `inf`: `+ - * ⇐ power` never trap, `/` `%` floor, `∧ ∨ ⊻ ¬` use infinite two's complement, a zero divisor or negative shift count/exponent still traps, comparisons against every integer width, `d64` and float are exact, and an `inf` is a valid `map` key. Narrowing back is a checked conversion: `x ↦ u64 ⊥ 9` (a value that does not fit takes the default; without `⊥`/handler it is `failable_conversio_requires_handler`), `↦ wrapping<W>` reduces and `↦ saturating<W>` clamps (never fail); `↦ float` rounds and a magnitude past the float range is `inf`/`-inf`; float → `inf` truncates and fails only on NaN/∞; `d64 ↦ inf` rounds half-even; text parses any number of digits (`"ff" ↦ inf via Hex`); `inf ↦ bytes via Be`/`Le` is minimal two's complement. A store from `inf` into a bounded slot traps (``300 does not fit in `u8` ...``). `inf` is host-only: `SEM008 tensor_element_unbounded` (tensor/vector/matrix/sparsa element), `SEM008 nucleum_host_type` (kernel), `SEM059 air_unbounded_integer` (AIR lane). `∞` is the float infinity, never an `inf` value, and a float ∞ prints as `inf`. Targets: the runner, Rust, TypeScript, Go, Python and sexp carry it; Swift, Haskell, LLVM and Wasm fail closed by name (`inf_target_unsupported`, `llvm_target_inf_unsupported`, `mir_wasm_unsupported`) — check `faber targets` for per-target gaps.
+- **The unbounded integer `inf`** (teaching exemplar `corpus/operatores/inf.fab`, with `inf-conversio.fab`, `inf-json.fab`). The bare marker `inf` is an integer with no bound — opt in by declaring a slot `inf` or converting an operand `↦ inf`; nothing becomes `inf` by default, and a lone literal of any length defaults to `int` (a literal past `u64` needs an `inf` slot or operand, else `SEM010 numerus_literal_out_of_range`). `inf`, `trapping<inf>`, `wrapping<inf>`, `saturating<inf>` (la `exactus`/`modulus`/`saturatus`) all name the same type (the wrapped `int<inf>` is retired, `PARSE040`); the marker is ASCII in every locale, with no prefixed sugar (`linf` is an identifier). `inf` is the implicit lossless target of every integer width including `u64` (`let inf x ← u` needs no `↦`) and widens into nothing; `u64 - u64` is still `i64` — opt in with `(a ↦ inf) - b`. On `inf`: `+ - * ⇐ power` never trap, `/` `%` floor, `∧ ∨ ⊻ ¬` use infinite two's complement, a zero divisor or negative shift count/exponent still traps, comparisons against every integer width, `d64` and float are exact, and an `inf` is a valid `map` key. Narrowing back is a checked conversion: `x ↦ u64 ⊥ 9` (a value that does not fit takes the default; without `⊥`/handler it is `failable_conversio_requires_handler`), `↦ wrapping<W>` reduces and `↦ saturating<W>` clamps (never fail); `↦ float` rounds and a magnitude past the float range is `inf`/`-inf`; a float or `d64` → `inf` needs an explicit rounding hint (`via Floor`, `Ceil`, `HalfEven` or `Trunc`) and a NaN or infinite float fails; text parses any number of digits (`"ff" ↦ inf via Hex`); `inf ↦ list<b8> via Be`/`Le` is minimal two's complement. A store from `inf` into a bounded slot traps (``300 does not fit in `u8` ...``). `inf` is host-only: `SEM008 tensor_element_unbounded` (tensor/vector/matrix/sparsa element), `SEM008 nucleum_host_type` (kernel), `SEM059 air_unbounded_integer` (AIR lane). `∞` is the float infinity, never an `inf` value, and a float ∞ prints as `inf`. Targets: the runner, Rust, TypeScript, Go, Python and sexp carry it; Swift, Haskell, LLVM and Wasm fail closed by name (`inf_target_unsupported`, `llvm_target_inf_unsupported`, `mir_wasm_unsupported`) — check `faber targets` for per-target gaps.
 - **`≈` on integers.** Between integers of any width including `inf`, `≈` is one exact rule, `10⁹·|a − b| ≤ max(|a|, |b|)`, not a float compare (`corpus/operatores/approx-integers.fab`).
 
 ## Bit Reinterpretation and Float Field Reads
 
 - Bit patterns go through the raw-bits markers `b8 b16 b32 b64` (bits are not numbers): `x ↦ b32` reads the pattern of an `f32` (`↦ b64` for `f64`), `u32 ↦ b32 ↦ f32` and `u16 ↦ b16 ↦ f16` reinterpret a pattern as a float; reinterpretation, never value conversion. `via Bits` is retired (`SEM016 conversio_via_bits_retired`, names the `bN` route).
 - **The `via` clause.** A convert hint follows the target: `x ↦ u16 via Le`, `"ff" ↦ i32 via Hex`, `65 ↦ char via Code`; register targets take it too (`v ↦ list<b8, size 16> via Le`). The text/byte hint set is `Hex`, `Bin`, `Oct`, `Be`, `Le`, `Code`, and a float or `d64` to integer takes the rounding hints `Floor`, `Ceil`, `HalfEven`, `Trunc`; it binds tighter than `⊥` and applies per hop (`list<b8>[0‥2] ↦ u16 via Le ↦ b16 ↦ f16 ↦ f32`). On bits lists a `via Le|Be` clause is written exactly when the bit width changes (`list<b8> ↦ list<u16> via Le`; `list<b8> ↦ list<u8>` takes none). `via` is a contextual keyword (an ordinary identifier elsewhere). The retired spellings — a hint as a type argument (`int<u32, Hex>`) or a register tail (`list<b8, size 16><Le>`) — are parse errors (`PARSE030 conversio_hint_type_argument` / `conversio_hint_tail_argument`). `@ kernel lane "x"` is removed (`nucleum_lane_removed`).
-- **Bulk bytes to tensor.** `list<b8> ↦ tensor<E, [d1, …]> via Le` / `via Be` is a faithful reinterpretation of a byte string as a typed tensor: source `list<b8>` or `list<b8, size N>`; literal extents only; `E` is one of `u8 i8 i16 u16 i32 u32 i64 u64 f32 f64`; the hint is REQUIRED for every width (no hint, or `Bits`/`Hex`, is `SEM016 list_b8_to_tensor_unspecified`; another element type is `list_b8_to_tensor_element_unsupported`); row-major, element `i` at bytes `[i·w, (i+1)·w)`; pure bit copy (NaN payloads, `-0.0`, subnormals survive); the byte length must be exactly `product(shape)·w` (a compile error `list_b8_to_tensor_length_mismatch` when statically known, otherwise a recoverable runtime error: handle it with `do { } catch`/`⊥`/`⇥`, and a bare `↦` outside `main` needs a handler). Example: `let tf32[2, 2] m ← raw ↦ tf32[2, 2] via Le`. Decode a whole buffer or weight file at once this way, never element by element through a list. NOT available: the reverse `tensor ↦ list<b8> via Le|Be` (held back), `list<f32> via Le` (still `SEM016 unsupported_conversio`), runtime (non-literal) extents.
+- **Bulk bytes ↔ tensor.** `list<b8> ↦ tensor<E, shape>` reinterprets a whole byte buffer in row-major order, and the inverse `tensor ↦ list<b8>` is shipped and infallible. For elements wider than one byte write `via Le` or `via Be` (no hint, or `Bits`/`Hex`, is `SEM016 list_b8_to_tensor_unspecified`); one-byte `u8`/`i8` elements take none. `E` is one of `u8 i8 i16 u16 i32 u32 i64 u64 f32 f64` (fixed-layout record elements also have supported forms; another element type is `list_b8_to_tensor_element_unsupported`). Shapes may carry supported run-time extents, e.g. `tensor<f32, [2, size n]>`. A pure bit copy (NaN payloads, `-0.0`, subnormals survive); the byte count must equal `product(shape)·w`: a statically known mismatch is `list_b8_to_tensor_length_mismatch`, a dynamic one is a recoverable error (`do { } catch`/`⊥`/`⇥`; a bare `↦` outside `main` needs a handler). Example: `let tf32[2, 2] m ← raw ↦ tf32[2, 2] via Le`. Decode a whole buffer at once this way, never element by element; `list<f32> via Le` is still `SEM016 unsupported_conversio`. Diagnostic names are `list_b8_to_tensor_*` and `tensor_to_list_b8_*` (the old byte-type names have no aliases); check target support before choosing an emitter.
 - finite/NaN detection reads the bit fields through `x ↦ b32 ↦ u32` (exponent all-ones, fraction nonzero separates NaN from ±Inf) — never `x ≢ x`, which is lane-dependent (the MIR runner's float `≢` is NaN-total). Exemplar: `corpus/scalar/finite-nan.fab`.
 
 ## Copy-Into (`⇇`)
@@ -221,16 +221,21 @@ and below ternary, so `output ⇇ (q · kt) ⊙ s` copies the whole product.
 
 ```fab
 fn fill(mut tf32[2, 2] target, tf32[2, 2] source) → void {
-    # a view on the right is fine
     target ⇇ source.transpose()
 }
+
 main {
-    let list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    mut tf32[2, 2] t ← flat ↦ tensor<f32, [2, 2]>
+    let list<f32> flat_source ← [1.0, 2.0, 3.0, 4.0]
+    let list<f32> flat_target ← [10.0, 20.0, 30.0, 40.0]
+    let tf32[2, 2] source ← flat_source ↦ tf32[2, 2]
+    mut tf32[2, 2] target ← flat_target ↦ tf32[2, 2]
     # `←` makes an alias of the same storage
-    let tf32[2, 2] a ← t
-    # writes in place; `a` sees it
-    t ⇇ t + t
+    let tf32[2, 2] alias ← target
+
+    fill(mut target, source)
+    # writes in place; `alias` sees it
+    target ⇇ source + source
+    print alias.flatten()
 }
 ```
 
@@ -248,11 +253,7 @@ The copy-into rules, each a named diagnostic:
 - There is no value use (`copy_into_value_used`).
 - There is no chain (`a ⇇ b ⇇ c` is `PARSE030
   copy_into_chain`).
-- Provisional: a plain `←` of a whole tensor into a `mut` tensor
-  parameter is rejected everywhere, host and kernel alike
-  (`SEM057 mut_tensor_param_rebind`, help names `⇇`), so a `mut` tensor has one
-  write meaning. This rule is regarded as arbitrary and is to be reconsidered once
-  in-place writes are settled; do not treat it as permanent law.
+- A whole-tensor `←` into a host `mut` tensor parameter is an ordinary rebind (`corpus/transfer/copy-into-rebind-host.fab`). Inside a kernel a `mut` tensor parameter is device storage and cannot be rebound whole (`SEM057 mut_tensor_param_rebind`, help names `⇇`); use `⇇` to write its existing storage (`corpus/transfer/copy-into-rebind-reject.fab`).
 - The old callable-sink form `sink ⇇ payload` (a callable on the left) is retired:
   `SEM012 transfer_sink_retired`, scheduled for removal in a future major release.
   Output is `print` (la `nota`), not `⇇`; the `output-transfer-codemod` command is
@@ -282,7 +283,7 @@ union Event {
 }
 ```
 
-Class and variant construction uses `Type { field = expr }`. Bare `{ ... }` is a JSON document, not an anonymous Faber object.
+Class and variant construction uses `Type { field = expr }`. Bare `{ field = value }` takes an expected class or record type (without one it defaults to `record<*>`); the quoted-key `{ "key": constant }` is the JSON-literal form.
 
 **Copy with changes:** `Class { field = value, … } from source` (la `ex`) builds a new value: the braced fields
 override, every other field comes from `source` by value (`from` takes values: an omitted list or object field is
@@ -303,20 +304,26 @@ nothing else. There is no more
 Imports:
 
 ```fab
-import from "hono" Hono
+import from "norma:console" const print
+
+main {
+    print("hello")
+    print "keyword form"
+}
+```
+
+Other import shapes (they need their packages, or a sibling module, to exist):
+
+```text
 import from "norma:console" console
-# binds `text`; no marker means no re-export
-import from "norma:text"
+import from "norma:text"                       # binds `text`; no marker means no re-export
 import { from = "norma:json/solve", as = solve_mod }
-# kernel manifest glob (script mode only), not wildcard import
-import from "faber:*" faber
-import from "lodash" * as _
-# `public` re-exports
-import from "./types" public User
-# Selective imports: one const local per exported member (value or type).
+import from "./types" public User              # `public` re-exports a sibling module
 import from "norma:console" const write_partial as output
 import from "norma:fs" const write_file as out_file, write_bytes as out_bytes
 ```
+
+External packages and sibling modules must resolve. `import from "faber:*"` is script-only and not a package import, and the kernel namespace supplies no host-library modules: use the matching `norma:*` library.
 
 The record form's five field names are reader-pack words like every other keyword: en `from`, `visibility`
 (value `public`), `name`, `as`, `all` (la `ex`, `visibilitas`, `nomen`, `ut`, `omnia`; the other packs follow their
@@ -340,10 +347,11 @@ complete type, and the bindings are never re-exports.
 Primitives:
 
 - `string`, `ascii`, `int`, `float`, `bool`
-- `trapping<W>` (la `exactus<W>`) — the trapping policy spelled out: the same type as the bare marker `W`, and a store traps when the value does not fit (integer widths and `d64`; `trapping<f32>` is `trapping_float_not_implemented`)
+- `trapping<W>` (la `exactus<W>`) — the trapping policy spelled out: the same type as the bare marker `W`, and a store traps when the value does not fit (integer widths and `d64`; float widths too: a trapping float cell rejects non-finite values at stores and conversions)
 - `wrapping<W>` (la `modulus<W>`) — modular word, signed or unsigned; the value reduces mod 2^W at the store, and `↦` into it reduces and cannot fail
 - `saturating<W>` (la `saturatus<W>`) — saturating integer, signed or unsigned; arithmetic is exact and the value clamps to `W` **once, at the store** (never per operation); `↦` into it clamps and cannot fail
 - **Ranged store policy** — `saturating|trapping|wrapping<W, lo‥hi>` (la `saturatus|exactus|modulus<W, lo‥hi>`), integer widths only (teaching exempla `corpus/operatores/ranged-saturating.fab`, `ranged-trapping.fab`, `ranged-wrapping.fab`, `ranged-sugar.fab`). A range is the second argument of the policy word; the width stays explicit and the range refines it. `‥` is half open (`0‥8` holds 0 to 7) and `…` is inclusive (`1…5` holds 1 to 5); both ends are always written, and `∞` / `-∞` write "no bound on this side" (`-∞‥8`, `4‥∞`). The store applies the range once and arithmetic stays exact: saturating clamps into it, trapping traps (message names ``trapping<i32, -2‥3>``), wrapping reduces modulo `hi - lo` offset by `lo` (12 in `wrapping<u8, 3‥9>` is 6). The whole-width range is the existing spelling (`saturating<u8, 0…255>` is `saturating<u8>`, `trapping<u8, 0…255>` is `u8`, `trapping<inf, -∞…∞>` is `inf`: one type). Narrowing a range of the same policy is a store; another policy family still needs `↦` (superseded by ruling 51, operator 2026-10-27, ruled and not yet built: a value of any policy stores into a cell and the cell's policy applies to the exact value; until it is built the compiler still refuses the store, so keep writing `↦`; see `docs/design/numeric-model.md` §8). Refused by name: `u8<0‥8>` (`ranged_policy_word_required`), `0…` (`PARSE040 range_bound_required`), `5‥5` (`ranged_policy_range_empty`), `0‥300` on `u8` (`ranged_policy_range_outside_width`), `-1‥5` on `u8` (`ranged_policy_unsigned_negative_bound`), a float, decimal or `inf` width with a finite range (`ranged_policy_width_unsupported`), and a name or `size` extent as an end (`ranged_policy_bound_not_constant`, not built). Built on the runner and Rust only; other targets decline (`ranged_policy_target_unsupported`) and kernels refuse (`nucleum_ranged_policy_not_built`)
+- **Float policy cells** are distinct types: `saturating<f32>` keeps IEEE results (infinity, NaN) and does not clamp to the largest finite float; `trapping<f32>` checks for non-finite values when stored or converted into the cell, not after each operation. Both are host-only (`corpus/operatores/policy-float.fab`).
 - **List length range** — `list<T, size lo‥hi>` / `list<T, size lo…hi>` (la `lista<T, magnitudo lo‥hi>`; teaching exempla `corpus/lista/ranged-length.fab`, `ranged-length-conversio.fab`, `ranged-length-sink-trap.fab`). The range follows the `size` marker (a bare range bounds a value, as in `trapping<u8, 0…255>`; a bare `list<T, 4>` or `list<T, 1…8>` is retired, `SEM008 list_count_needs_size`; a kernel or AIR lane needs a finite upper size, `size …∞` is `nucleum_unbounded_list_size` / `air_unbounded_list_size`). The range is the second argument of `list`, with the same glyphs as integer ranges (`‥` half open, `…` inclusive, `∞` no upper end, both ends written); it is trapping only, and `list<T>` is `0…∞` while `list<T, size N>` is `0…N` (one type). `append` past the maximum and `remove_first` / `remove_last` below the minimum report on `⇥` (`⇜` past the maximum dies); `list ↦ list<T, size lo‥hi>` checks the length and takes `⊥`; a range with a minimum of one or more is never empty, so `first()` / `last()` return `T`, not `T ∪ none`. Refused by name: a literal or `empty` outside the range (`SEM011 ranged_list_length_out_of_range`), `4‥4` (`ranged_list_range_empty`), a negative end (`ranged_list_bound_negative`), a name as an end (`ranged_list_bound_not_constant`), and a policy word around a list (`ranged_list_policy_word`). Built on the runner and Rust only; other targets decline (`ranged_list_target_unsupported`)
 - `none`, `void`, `never`, `unknown`, `instant`
 - `char` (la `littera`) — one Unicode scalar value (4 bytes, never allocates); element of `string`/`ascii` iteration and `string[i]`/`ascii[i]` indexing
@@ -355,8 +363,10 @@ Collections and buffers:
 
 - `list<T>`, `map<K,V>`, `set<T>`, `queue<T>`, `stack<T>` (la `lista`, `tabula`, `copia`)
 - bounded capacity forms take a `NATURAL` (or `_` to infer, which stays bare) written after `size` (la `magnitudo`): `list<T, size N>`, `queue<T, size N>`, `stack<T, size N>`,
-  `string<size N>`, `ascii<size N>`; the bare `list<T, N>` is `SEM008 list_count_needs_size` and the bare `queue<T, N>`, `stack<T, N>`, `string<N>`, `ascii<N>` are `SEM008 capacity_needs_size`; capacities are compile-time values today (run-time capacities and
-  extents are admitted, not shipped)
+  `string<size N>`, `ascii<size N>`; the bare `list<T, N>` is `SEM008 list_count_needs_size` and the bare `queue<T, N>`, `stack<T, N>`, `string<N>`, `ascii<N>` are `SEM008 capacity_needs_size`; these container capacities are compile-time values today (supported run-time tensor extents are a separate case)
+- **Short literals:** a fresh list literal takes the destination's capacity or length range, so `let list<int, size 0…3> pair ← [1, 2]` is legal and prints `[1, 2]`; an overlong literal is still refused, and the rule covers list-valued fields. Sized and length-ranged list types keep their constraints across export and import (`corpus/lista/ranged-short-literal.fab`, `corpus/genus/sized-list-field-literal.fab`).
+- **List search and join:** `xs.find(pred)` walks left to right, stops at the first match and returns the element or `none` (one optional, never nested; tensor `reduce via first` instead evaluates every predicate). `xs.extend(ys)` appends all of `ys` in order, in place; the receiver must be an unbounded `mut list<T>` (a bounded or length-ranged receiver is `SEM011 extend_requires_plain_list`), the source may be bounded, and `xs.extend(xs)` appends the original elements once (`corpus/lista/find-optional-element.fab`, `methodi-extende.fab`).
+- **Invariant type arguments:** a named `list<u8>` does not become `list<int>`; container, tuple, reference and function type arguments are invariant. Write `↦ list<int>` or build a fresh destination (fresh literals, spreads and lifted results are built by element stores). A generic class method keeps its type parameters rigid, so `T ∪ none` cannot be stored into `T` unhandled. A function or module value may share a pack type word such as `list` or `tensor`; type lookup still finds the builtin.
 - `promise<T>`, `iterator<T>` (la `promissum`, `cursor`)
 - `tensor<T, Figura>`, `sparsa<T, Figura>` — shaped buffers
 - `vector<T, size N>`, `matrix<T, [R, C]>` — register-class, not buffer aliases. The vector long form writes its lane count after `size` (la `magnitudo`), as a list does; a bare `vector<T, 4>` or `vector<T, N>` is `SEM008 vector_width_needs_size` (clean break, no alias). The `vf32[4]` shorthand, `vector<T, [4]>` and the `_` hole are unchanged: the brackets already mark an extent
@@ -377,7 +387,7 @@ Type forms:
 - ownership prefixes on types: `ref T`, `mut T`
 - inferred binding type: `let _ name ← value`, `mut _ name ← value`, `ref _ name ← place`, `const _ NAME = value`; there is no type-omitted declaration (`let name ← value`, `mut name`, `ref name`, `const name` are `PARSE010 binding_type_slot_required`); binders (`for … let x`) take no type slot
 - type holes: `_` infers one inhabitant; standalone `∪` infers a finite union
-- inferred constructor: `_ { x = 1 }` builds the cell's class, `_ [1, "a"]` its tuple or list; a bare `{ x = 1 }` or `[1, "a"]` takes the cell's type (sugar for `_ shape`); with no typed cell it is `SEM016 inferred_constructor_no_expected_type` (`corpus/genus/inferred-constructor*.fab`, `inferred-literals.fab`)
+- inferred constructor: `_ { x = 1 }` builds the cell's class, `_ [1, "a"]` its tuple or list; a bare `{ x = 1 }` or `[1, "a"]` takes the cell's type (sugar for `_ shape`); with no typed cell a bare `{ x = 1 }` defaults to `record<*>`, while `_ { … }` is `SEM016 inferred_constructor_no_expected_type` (`corpus/genus/inferred-constructor*.fab`, `inferred-literals.fab`)
 - labeled tuple forms: `tuple` (la `iuncta`) type arguments, construction, and member access
 - width / shape sugar (type position only, identical to the long form): `lu32` = `list<u32>`, `tf32[2, 3]` =
   `tensor<f32, [2, 3]>`, `sf32` = `sparsa<f32, _>`, `vf32[4]` = `vector<f32, size 4>`, `mf32[4, 4]` =
@@ -451,9 +461,25 @@ union_member ::= annotation* field_decl
 ```
 
 ```fab
+union WireError {
+    @ shared
+    string message
+
+    Invalid
+}
+
+union BoundaryError {
+    @ shared
+    string message
+
+    WireFailure {
+        WireError inner
+    }
+}
+
 @ conversion
 fn from_wire_error(WireError err) → BoundaryError {
-    return variant WireFailure {message = err.message, inner = err}
+    return variant WireFailure { message = err.message, inner = err }
 }
 ```
 
@@ -510,7 +536,7 @@ Prefer posture keywords over the old annotations:
 - `∞` — positive infinity; the named NaN literal is `nan` in every shipped pack except the Latin (`la`) pack, where it is `nonnumerus`. Both are contextual floating-point literals: a surrounding `f32` or `f64` supplies the width, bare `float` remains unsized, and neither form has a width suffix. `-∞` is unary negation of `∞`, not a separate literal. An `int` context rejects either form (fail-closed); neither maps to an integer.
 - `"pattern" ↦ regex` — compiled regex from dynamic text, failable at run time; `regex /pattern/` and `_ /pattern/` — inline regex literal (the locale regex type word or `_`, then a raw slash-delimited body; `\/` is the only escape and a slash inside a character class needs it too, so write `[\/]`; no suffix flags, use the inline `(?i)` form)
 
-Anonymous `{ key = expr }` objects are retired.
+Bare `{ key = expr }` field literals are legal: they use the expected type or default to an inferred record. They are not the colon-keyed JSON-literal form.
 
 **Format (`¶`) and default (`⊥`):** `value ¶ "spec"` renders a value to `string` — the value is the
 value, `¶` says how it is shown (`"§"(price ¶ ".2")`). Same glyph in every locale (no word twin);
@@ -534,13 +560,14 @@ Grounded in `EBNF.md` and probes against the built binary.
 - `x ∷ T` — static ascription (compile-time fact; a numeric narrowing through `∷` is `SEM016
   numeric_ascription_requires_conversion`); `x ↦ T` is the checked runtime conversion. `x ↦ lo‥hi` /
   `x ↦ lo…hi` clamps a number into an interval (`15 ↦ 0‥10` is 9, `15 ↦ 0…10` is 10) and takes no `via`/`⊥`.
-- `?.` `?[` `?(` — optional chaining; `!.` `![` `!(` — non-null assertion (`p?.n`, `p!.n` on `P ∪ none`).
+- `?.` `?[` `?(` — optional chaining; `!.` `![` `!(` — non-null assertion (`p?.n`, `p!.n` on `P ∪ none`). An optional call on an absent receiver skips its argument evaluation; the receiver is captured before the arguments, `mut` arguments work, and an optional result is flattened.
 - Tensor glyph products `· × ⊗ ⊙ ⊘`, postfix `ᵀ` and `∇` are covered in `references/idioms.md`.
 - `trap { … }` (la `capta`) — expression block that reifies the error channel: the trailing expression is the
   success value and the result type is the success type united with every escaping error type
   (`let r ← trap { f() }`); success and error types that coincide are rejected.
 - `reduce via max from t at? (coalesce identity)?` / `reduce via min from t …` (la `reducta via maxima ex t apud? (vel identity)?` / `reducta via minima ex t …`) — extrema over a shaped tensor or matrix, not a `list`.
 - `reduce via first from t at? let x { return pred }` (la `reducta via prima ex t apud? sit x { redde pred }`) — first element of a shaped tensor or matrix whose predicate holds, as `T ∪ none` (none for no match or an empty source; `corpus/summa/reducta-first-en.fab`); the former dedicated first-match form is retired, and a `list` is not a source.
+- Mixing plain (`§`, `§{name}`) and numbered (`§0`) holes is legal but warns `WARN035 mixed_plain_numbered_template_holes`; plain holes count from 0 independently (`"§0 and §"("a")` renders `a and a`), so number every hole.
 - `"§"(a)` renders a template; `format("§!", x)` (la `scriptum`) is its explicit desugaring. `read` / `read line` (la `lege` / `lege lineam`) are builtin read expressions (a user binding of the same spelling wins).
 - `#` comments start a line (`LEX007 inline_hash_after_code` after code); `//` and `/* */` are not comments.
 - Commas are required between items and forbidden after the last (`PARSE001 item_list_trailing_comma`); declaration
@@ -549,13 +576,14 @@ Grounded in `EBNF.md` and probes against the built binary.
   prints qualified (`N.Sig { x = 2 }`), a `list` as `[1, 2]`. A statement-initial `print(x)` is a call
   of an identifier `print`, not output.
 - `axis` is a marker word beside `mut`/`own`/`copy`: `t.sum(axis 1)` and `t.mean(axis 0)` reduce a rank-2 tensor over a literal axis; `t.mean()` is sum / count, so an empty source is NaN (`corpus/tensor/axis-builtins.fab`, `corpus/summa/mean-sugar.fab`).
-- Collection reads: `xs[i]` out of range dies, `xs.get(i)` gives `none`, `xs.at(i)` reports on the error channel (`do { } catch err { }`, la `fac { } cape err { }`, or `⊥ default`); text indexes by Unicode character; an out-of-range range index dies (`corpus/lista/reads-three-ways.fab`).
+- Collection reads: `xs[i]` out of range dies, `xs.get(i)` gives `none`, `xs.at(i)` reports an unproven bounds failure on the error channel (a statically proven access needs no handler; `do { } catch err { }`, la `fac { } cape err { }`, or `⊥ default`); integer guards, loop bounds and lengths prove accesses, and a mutation invalidates the proof; text indexes by Unicode character; an out-of-range range index dies (`corpus/lista/reads-three-ways.fab`).
 - Value-side markers: `mut b ← copy a` duplicates, `mut b ← own a` takes over, an unmarked `b ← c` shares; read-only is deep, so a `let` (or `ref`, or unmarked-parameter) container or class into a `mut` cell is `SEM065 const_shared_into_var`; `ref`/`mut` may hold `T ∪ none` for a reference type, never a scalar (`corpus/mutabilitas/ref-optional-cursor.fab`) (`corpus/mutabilitas/copy-bind-deep.fab`, `const-share-into-var-reject.fab`). A method that changes the shape of the collection a loop walks is `SEM011 loop_collection_shape_change`; a bracket store that grows a map in its own loop traps `map changed size during iteration`.
 - Retired: `sum from …`, `max from …`, and `min from …` (la `summa ex …`, `maxima ex …`, and `minima ex …`) report `PARSE010`; use `reduce via <op> from …` (la `reducta via <op> ex …`).
 - `do device { … } catch e { … }` (la `fac machina`) is a checked device region: kernel launches, entry-known loops and guards, and no host effect, host call, allocation, direct lane loop, nested region or crossing `return`/`break` (named `SEM008` rows); `do all device` is `PARSE020`. V0 lowers it exactly as `do all` (`corpus/kernel/region.fab`, `region-reject.fab`, `docs/design/device-region.md`).
-- Admitted but **not** accepted by the parser today: `for … thread` (la `itera … filum`),
-  superscript powers (`x²`), run-time capacities/extents, `trapping`/`saturating` float
-  cells. See "Admitted, Not Shipped" in `grammar/EBNF.md`.
+- `for … at […] thread lane let value { … }` (la `itera … filum`) is shipped lane-loop syntax, and host `trapping<f32>` / `saturating<f32>` cells are shipped. Superscript powers (`x²`) and general run-time container capacities remain unshipped (supported run-time tensor extents are a separate case, e.g. `tensor<f32, [2, size n]>`). See "Admitted, Not Shipped" in `grammar/EBNF.md`.
+- **Return placement:** a newline ends a bare `return`; its value must begin on the same line. `return thread` ends only the current lane (no value, also from a nested ordinary loop); plain `return` cannot leave a lane; outside a lane, with a value, or inside a nested closure or reduction body it is a named `SEM010`. Placement is check-only in 1.17: execution refuses it as `return_thread_lowering_pending`.
+- **Ordered prefix scan:** `scan via op [total inclusive|exclusive] from source [at […]] [per key] [order asc|desc] thread lane let value { … }` (square-bracketed clauses optional; default inclusive, row-major; operators `sum product max min all any count`, exclusive extrema refused by name; lowers to the runner, Metal and CUDA). The shape is the grammar's `scan_expr`; there is no `corpus/scan` exemplar.
+- `do all { … } catch e { … }` defers kernel fault delivery to the block exit; `do device { … } catch e { … }` also checks device-region legality and runs as `do all` in 1.17. `faber check --device cpu|metal|cuda` reports placement and synchronisation advice (`INFO001`) without running.
 
 ## Capability Calls
 
@@ -596,6 +624,7 @@ Common annotations include:
 - contracts/data: `@ annotation { target = fn }` (la `@ annotatio`), application `@ Contract { field = value }`, `@ json`, `@ json { name = "wire" }`
 - testing: `test "name" skip "why" | only | tag "x" | timeout N | bench | repeat N | flaky N | todo "why" | expect_failure { … }` are `test`/`describe` modifiers, not annotations (la `proba "name" omitte "why" | solum | tag "x" | temporis N | metior | repete N | fragilis N | futurum "why" | erratur { … }`, `probandum`); `expect_failure` expects the body to escape through `⇥`
 - compute: `@ kernel` on device kernels, with an optional tier word: `@ kernel` (default tier: IEEE-correct float math, every unproven index check kept), `@ kernel relaxed` (adds approximate `/` and `sqrt`, fast transcendentals, flush-to-zero, float reassociation) and `@ kernel unsafe` (includes `relaxed` and drops the index checks the compiler cannot prove; an out-of-range access is undefined behaviour); la `@ nucleum`, `@ nucleum laxus`, `@ nucleum intutus` (provisional). One ordered choice, never both words (`PARSE018 duplicate_nucleum_tier`); an unknown word is `unknown_nucleum_tier`, a tier on a `fragment` is `nucleum_tier_on_fragment`, on anything but a kernel function `nucleum_tier_non_kernel`; the braced form carries `fragment` only. `faber run --safe`, `faber build --safe` and `safe = true` under `[device]` in `faber.toml` run every kernel at the default tier (they only lower a tier; no environment variable). Exemplars `corpus/kernel/tier.fab`, `tier-la.fab`; ruling `docs/factory/faber-language-decisions/kernel-math-tiers-ruling-2026-10-28.md`
+- kernel contracts in 1.17: the tiers state permissions, not that every backend implements each one: Metal selects precise or fast math from the tier; CUDA does not yet select math by tier, so `--safe` is no precise-math guarantee there, and `unsafe` does not yet remove unproven index checks. Explicit source checks stay and integer and decimal results stay exact. **Kernel numeric widths:** `i64`, `u64`, `wrapping<u64>`, `saturating<u64>` and `d64` are legal kernel values (`nucleum_wide_integer` and `nucleum_d64` are retired); Metal carries wide integer lanes and decimals (stores round half-even to eight fractional digits; overflow and division by zero are device faults); unsupported operations or devices refuse by name; `f64` stays forbidden. A host-free kernel may declare `⇥ string`; another error type is `SEM008 nucleum_typed_error_channel`.
 - availability: `@ unstable [TARGET] ["reason"]` (la `@ nondum`) marks a declaration planned but unavailable; with no `TARGET` it is unavailable on every target. A top-level `fn` or a `class` method marked this way may omit its block (`nondum_functio_decl`, `nondum_method_decl`); a signature-only `fn` or method without it is `PARSE012 function_body_absent`. The function or method may be declared and exported, but any use (call, call through an imported namespace or name, or taken as a value; for a method, a call through an instance, `self`, or an imported class) is `SEM017 nondum_function_for_target` (interface methods: `nondum_method_for_target`). Corpus: `corpus/meta/nondum-function.fab`, `nondum-method.fab`, `nondum.fab`
 
 Do not add `@ externa` or `@ subsidia` to current Norma/Triga/Gradus/Tela source.
@@ -621,9 +650,9 @@ corresponding idiom entry for:
 
 Tensor glyph operators and `sum` thread reductions are already covered
 in `references/idioms.md`; do not restate their grammar here. The admitted
-transpose suffix is `ᵀ` (U+1D40), rank-2 only in v1, and the settled precedence
+transpose suffix is `ᵀ` (U+1D40) on a matrix or a tensor of known rank 3 or more (batched: leading axes kept, last two swapped), and the settled precedence
 form is `a · bᵀ ∇ [x]` → `(a · bᵀ) ∇ [x]`. Rank-1 has no row/column distinction
-and is permanently declined; rank-3+ waits for a batched-transpose consumer.
+and is refused (`glyph_transpose_rank1_no_row_column_distinction`).
 
 
 ## Validation Discipline
@@ -637,3 +666,13 @@ When asked whether syntax is valid:
 5. Probe small: write a `.fab` under the scratchpad (a file with no `locale` frontmatter reads as en), then
    `faber check f.fab` (message and help text; `check --no-diagnostics` prints only the code and issue),
    `faber explain <CODE>` for a diagnostic, and `faber run f.fab`. `faber parse` / `faber lex` print the AST/tokens.
+
+**1.17 command boundaries**
+
+- `check`, `build`, `run`, `test`, `emit`, `format` and `convert` show diagnostic message and help by default; `--no-diagnostics` gives the compact form and the old `--diagnostics` is removed. JSON output is unchanged.
+- `faber run --target go|ts|llvm-host` builds the package and runs it, forwarding arguments, standard streams and the program's status (Go needs its toolchain; TypeScript needs `tsc` and Node; LLVM host needs LLVM tools, and release binaries carry the runtime archive). `--target clif-jit` compiles and runs in memory with the Cranelift language limits; `build` and `emit` refuse it.
+- `faber run --device cpu --threads N` uses CPU workers (`[device] threads` is the default; `--threads` needs the CPU device); `--device reference` is sequential; `--partitions N` requests CPU, Metal or CUDA partitions. `faber check --device cpu|metal|cuda` checks the device image and prints informational `INFO001` advice without running it.
+- Package kernel tests take `--device cpu --threads N` or `--device reference`, never Metal or CUDA; the environment selector is `--only-in` (`--solum-in` is retired).
+- `faber format --width N` opts into wrapping (`[format] width = N` is the package default; the flag wins; unwrapped otherwise).
+- Tool failure statuses: `64` bad arguments, `65` source errors, `66` missing input, `69` unavailable compiled support, `70` internal failure, `73` unwritable output, `78` bad configuration; failed tests and formatting drift return `1` and a program's own status passes through, so do not assume every trap exits `1` or Rust's `101`.
+- `fmir-bin` is removed; `fmir` and `fmir-text` are image outputs, not inputs to `faber run`. A relative `--library-home` resolves against the working directory.
