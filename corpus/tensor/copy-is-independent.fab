@@ -1,0 +1,22 @@
++++
+term = "tensor copy independence"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "tensor"
+canonical = false
+summary = "A copied tensor gets independent storage, so writing through the copy leaves the source unchanged."
+related = ["tensor", "copy", "bracket-access"]
+locale = "en"
++++
+
+# tensor copy independence — `copy` duplicates backing storage.
+#
+# EXPECTED stdout:
+#   [1.0, 2.0]
+
+main {
+    mut tf32[2] original ← [1.0, 2.0] ↦ tf32[2]
+    mut tf32[2] copied ← copy original
+    copied[0] ← 9.0
+    print original
+}
