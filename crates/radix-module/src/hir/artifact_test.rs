@@ -906,6 +906,30 @@ fn alias_chain_round_trips() {
 }
 
 #[test]
+fn optional_function_alias_round_trips() {
+    // The optional-call exemplar spells callable aliases beneath an optional
+    // union (`Op ∪ none`). Finalized HIR canonicalizes the callable signature,
+    // so the FHIR presentation must preserve and validate the alias witness
+    // rather than wrapping it in a synthetic semantic function form.
+    use crate::codegen::Target;
+    use crate::driver::{Config, Session, analyze_source};
+    use crate::hir::serialize::from_analyzed;
+
+    let source = include_str!("../../../../corpus/optionalis/optional-call-flatten.fab");
+    let session = Session::new(
+        Config::default()
+            .with_latin_locale()
+            .with_dev_locale_root()
+            .with_target(Target::HirRust),
+    );
+    let original = analyze_source(&session, "optional-call-flatten.fab", source, AnalyzeRequest::default())
+        .expect("optional function alias fixture analyzes");
+    let artifact = from_analyzed(&original, "optional-call-flatten", "optional-call-flatten.fab");
+    let bytes = postcard::to_allocvec(&artifact).expect("serialize optional function alias artifact");
+    load_fhir(&bytes).expect("optional function alias artifact must load");
+}
+
+#[test]
 fn genus_union_alias_survives_the_fhir_round_trip() {
     // `type Figura = Circulus ∪ Quadratum` is a transparent alias whose
     // annotation finalizes to a union of genus types at the HIR site. The
