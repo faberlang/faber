@@ -5593,43 +5593,43 @@ help = "keep the term pure: write only locals the body declares, and call only h
 
 [diagnostics.SEM010.issues.await_bind_requires_async_context]
 message = "await binding outside an async context"
-help = "use the await binding only inside an async function"
+help = "Put `{figendum}` or `{variandum}` in a `{fiet}` or `{fient}` function, or a `{incipiet}` entry point"
 
 [diagnostics.SEM010.issues.await_bind_requires_promissum]
 message = "await binding source is not a promise"
-help = "bind an awaitable promise value"
+help = "Use `{figendum}` or `{variandum}` with a promise value"
 
 [diagnostics.SEM010.issues.await_failable_alternate_type_mismatch]
 message = "failable await alternate has the wrong type"
-help = "make the alternate value match the awaited success type"
+help = "Make the failure type match the active error channel"
 
 [diagnostics.SEM010.issues.await_failable_requires_alternate_exit]
 message = "failable await needs an alternate exit"
-help = "provide an alternate value or exit for the failure case"
+help = "Handle the failure with `{cape}`, or let it propagate through a matching error channel"
 
 [diagnostics.SEM010.issues.cede_requires_generator]
 message = "cede is only valid in a generator"
-help = "use cede inside a generator function"
+help = "Use `{cede}` only in a `{fiunt}` or `{fient}` function"
 
 [diagnostics.SEM010.issues.cede_requires_promissum]
 message = "cede operand is not a promise"
-help = "cede an awaitable promise value"
+help = "Yield the value itself with `{cede}`; use `{reddet}` or `{tacebit}` to await a promise"
 
 [diagnostics.SEM010.issues.reddet_requires_async_function]
 message = "reddet requires an async function"
-help = "use reddet only inside an async function"
+help = "Use `{reddet}` in a `{fiet}` function to await a promise and return its value"
 
 [diagnostics.SEM010.issues.tacebit_requires_async_context]
 message = "tacebit requires an async context"
-help = "use tacebit only inside an async function"
+help = "Use `{tacebit}` in a `{fiet}` or `{fient}` function, or a `{incipiet}` entry point"
 
 [diagnostics.SEM010.issues.intervallum_value_step_unsupported]
 message = "value step is not supported for this range"
-help = "use a supported range step form"
+help = "Use `{per}` with a positive integer literal for a stored range; keep a run-time step in a range loop or bracket window"
 
 [diagnostics.SEM010.issues.itera_lockstep_at_coordinate_cardinality]
 message = "lockstep coordinate binder count does not match the sources"
-help = "bind one coordinate per lockstep source"
+help = "Use at most one shared coordinate with `{apud}` in a lockstep walk"
 
 [diagnostics.SEM010.issues.itera_lockstep_length_mismatch]
 message = "lockstep sources have different lengths"
@@ -5645,11 +5645,11 @@ help = "use list sources in a lockstep iteration"
 
 [diagnostics.SEM010.issues.itera_range_extent_binder_shadowing]
 message = "range extent binder shadows another binding"
-help = "rename the extent binder"
+help = "Rename the loop binder so it does not share a name with a binding used in a range bound"
 
 [diagnostics.SEM010.issues.itera_range_mixed_source]
 message = "range iteration mixes range and non-range sources"
-help = "use only range sources or only iterable sources"
+help = "Use only ranges after `{ab}`, or use `{ex}` for list sources"
 
 [diagnostics.SEM010.issues.itera_range_source_binder_arity_mismatch]
 message = "range binder count does not match the source count"
@@ -5657,27 +5657,27 @@ help = "bind one name per range source"
 
 [diagnostics.SEM010.issues.reducta_body_forbids_cape]
 message = "reduction body may not contain cape"
-help = "remove the cape from the reduction body"
+help = "Remove `{cape}` from the reduction body"
 
 [diagnostics.SEM010.issues.reducta_body_forbids_cede]
 message = "reduction body may not contain cede"
-help = "remove the cede from the reduction body"
+help = "Remove `{cede}`; a reduction body must compute a value for each element"
 
 [diagnostics.SEM010.issues.reducta_body_forbids_iace]
 message = "reduction body may not contain iace"
-help = "remove the iace from the reduction body"
+help = "Remove `{iace}`; a reduction body must compute a value for each element"
 
 [diagnostics.SEM010.issues.reducta_body_forbids_rumpe]
 message = "reduction body may not contain rumpe"
-help = "remove the rumpe from the reduction body"
+help = "Remove `{rumpe}` from the reduction body"
 
 [diagnostics.SEM010.issues.reducta_body_requires_single_redde]
 message = "reduction body must be a single redde"
-help = "write the reduction body as one redde expression"
+help = "Return exactly one value with `{redde}`; you may compute it with local statements first"
 
 [diagnostics.SEM010.issues.reducta_filum_requires_nucleum_kernel]
 message = "filum reduction requires a nucleum kernel"
-help = "use the filum reduction only inside a nucleum kernel"
+help = "Use `{filum}` reductions only inside a `{nucleum}` kernel"
 
 [diagnostics.SEM010.issues.reducta_first_requires_body]
 message = "a first reduction needs a body: the body is the predicate"
@@ -5685,15 +5685,15 @@ help = "write `{reducta} {via} {prima} {ex} source` followed by a binder and a b
 
 [diagnostics.SEM010.issues.reducta_requires_shaped_iterable]
 message = "reduction source is not a shaped iterable"
-help = "reduce a shaped iterable such as a list or tensor"
+help = "Use a tensor or matrix as the reduction source; lists are not supported"
 
 [diagnostics.SEM010.issues.reducta_tail_not_aligned]
 message = "reduction tail is not aligned"
-help = "use an extent aligned to the reduction width"
+help = "For `{filum}` reductions, make the total element count a multiple of 32"
 
 [diagnostics.SEM010.issues.reducta_term_type_non_scalar]
 message = "reduction term type is not scalar"
-help = "use a scalar term type for the reduction"
+help = "Use a numeric scalar as each reduction term"
 
 [diagnostics.SEM010.issues.scan_exclusive_extremum_unsupported]
 message = "exclusive scan does not support max or min"
@@ -5709,7 +5709,7 @@ help = "group by integer keys"
 
 [diagnostics.SEM010.issues.scan_group_keys_not_literal]
 message = "scan group keys are not a literal key list"
-help = "write the group as a literal list of keys"
+help = "Use one key expression or a literal list of key expressions; do not pass a list variable"
 
 [diagnostics.SEM010.issues.scan_operator_unsupported]
 message = "scan does not support argmax or argmin"
@@ -5721,30 +5721,35 @@ help = "scan a tensor or matrix"
 
 [diagnostics.SEM010.issues.scan_term_type_non_scalar]
 message = "scan term type is not scalar"
-help = "use a scalar term type for the scan"
+help = "Make the scan body return a numeric scalar"
 
 [diagnostics.SEM010.issues.scan_term_type_not_bool]
 message = "scan term type is not bool"
-help = "use a bivalens term for all, any, and count"
+help = "Return `{bivalens}` from the body for all, any, and count"
 
 [diagnostics.SEM010.issues.scan_thread_requires_nucleum_kernel]
 message = "thread scan requires a nucleum kernel"
-help = "use the thread scan only inside a nucleum kernel"
+help = "Use `{filum}` scans only inside a `{nucleum}` kernel"
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "expected '>' after type arguments"
+help = "Add the closing `>` after the type arguments"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "expected '(' before function type parameters"
+help = "Begin the function type with `(` before its parameter types"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "expected ')' after function type parameters"
+help = "Close the parameter list with `)` before the `→` return arrow"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "expected '→' before the function return type"
+help = "Write `→` between the parameter list and the return type"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "expected '<' after the numeric wrapper name"
+help = "Use a bare width type such as `i32` or `f32`; numeric types no longer take `<...>`"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "expected ':' after the tuple element label"
