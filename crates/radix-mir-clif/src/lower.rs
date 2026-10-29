@@ -1751,11 +1751,6 @@ impl FunctionLower<'_, '_> {
         }
         let (value, have) = self.scalar(operand)?;
         let value = self.coerce(value, have, rep)?;
-        let value = if rep == Rep::Float {
-            self.round_float_to_type(value, element)
-        } else {
-            value
-        };
         Ok((value, rep))
     }
 
@@ -1824,12 +1819,6 @@ impl FunctionLower<'_, '_> {
             (self.builder.use_var(variable), rep)
         } else {
             self.read_projected(&container)?
-        };
-        let target_ty = self.place_type(place)?;
-        let value = if rep == Rep::Float {
-            self.round_float_to_type(value, target_ty)
-        } else {
-            value
         };
         let tag = self
             .builder
@@ -3799,20 +3788,6 @@ impl FunctionLower<'_, '_> {
         self.finish_collection(destination, result)
     }
 
-    /// Round an f32 value through its storage precision while retaining the
-    /// f64 carrier used by the CLIF backend.
-    fn round_float_to_type(&mut self, value: Value, ty: MirType) -> Value {
-        if matches!(
-            resolve(self.state.input.types, ty.semantic_id()),
-            Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
-        ) {
-            let narrow = self.builder.ins().fdemote(types::F32, value);
-            self.builder.ins().fpromote(types::F64, narrow)
-        } else {
-            value
-        }
-    }
-
     /// 1 when `place` holds a float narrower than `f64`, else 0.
     fn float_narrow_place(&self, place: &MirPlace) -> i64 {
         let Ok(ty) = self.place_type(place) else {
@@ -4693,11 +4668,6 @@ impl FunctionLower<'_, '_> {
             return Err(Decline::new("result representation mismatch"));
         }
         if let Some(value) = value {
-            let value = if rep == Rep::Float {
-                self.round_float_to_type(value, self.place_type(destination)?)
-            } else {
-                value
-            };
             self.builder.def_var(variable, value);
         }
         Ok(())
@@ -5595,8 +5565,8 @@ impl FunctionLower<'_, '_> {
         {
             return Ok((Some(computed), rep));
         }
-        let result = match &value.kind {
-            MirValueKind::Operand(operand) => self.operand(operand)?,
+        match &value.kind {
+            MirValueKind::Operand(operand) => self.operand(operand),
             MirValueKind::Unary { op, operand } => {
                 let cap = wide::cap_int(self.state.input.types, value.ty);
                 if *op == MirUnOp::Neg && rep_of(self.state.input.types, value.ty)? == Rep::Dec {
@@ -5614,28 +5584,20 @@ impl FunctionLower<'_, '_> {
                     return Ok((Some(negated), Rep::Inf));
                 }
                 let (computed, rep) = self.unary(*op, operand, cap)?;
-                (Some(computed), rep)
+                Ok((Some(computed), rep))
             }
             MirValueKind::Option(op) => {
                 let (computed, rep) = self.option_op(op, value.ty)?;
-                (Some(computed), rep)
+                Ok((Some(computed), rep))
             }
             MirValueKind::Binary { op, lhs, rhs } => {
                 let result = rep_of(self.state.input.types, value.ty)?;
                 let cap = wide::cap_int(self.state.input.types, value.ty);
                 let (computed, rep) = self.binary(*op, lhs, rhs, result, cap)?;
-                (Some(computed), rep)
+                Ok((Some(computed), rep))
             }
-            MirValueKind::Closure(closure) => (Some(self.closure_value(closure)?), Rep::Func),
-            MirValueKind::TensorExtent { .. } => return Err(Decline::new("value kind")),
-        };
-        if let (Some(computed), Rep::Float) = result {
-            Ok((
-                Some(self.round_float_to_type(computed, value.ty)),
-                Rep::Float,
-            ))
-        } else {
-            Ok(result)
+            MirValueKind::Closure(closure) => Ok((Some(self.closure_value(closure)?), Rep::Func)),
+            MirValueKind::TensorExtent { .. } => Err(Decline::new("value kind")),
         }
     }
 

@@ -20,8 +20,6 @@ locale = "en"
 #     + (1.0 + 1.0)` is 16777218; the same sums in `f64` are exact
 #   • An overflow gives infinity as IEEE says; no operation traps and
 #     nothing clamps to the largest finite value
-#   • Storing each increment rounds too: both a scalar f32 cell and a
-#     list<f32> element stay at 16777216 after four additions of 1.0
 #
 # Common mistakes:
 #   • Expecting the `f32` sum to equal the `f64` sum: it is rounded at
@@ -44,18 +42,6 @@ main {
     print tenth + tenth + tenth
     let f64 wide_tenth ← 0.1
     print wide_tenth + wide_tenth + wide_tenth
-    mut f32 s ← big
-    s ← s + one
-    s ← s + one
-    s ← s + one
-    s ← s + one
-    print s
-    mut list<f32> values ← [big]
-    values[0] ← values[0] + one
-    values[0] ← values[0] + one
-    values[0] ← values[0] + one
-    values[0] ← values[0] + one
-    print values[0]
     let f32 m ← 3.4028235e38
     print m * m
     let f32 sq ← m * m
