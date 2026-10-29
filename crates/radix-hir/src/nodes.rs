@@ -38,6 +38,17 @@ use radix_types::{
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+// An optional wire value is still a required field: explicit `None` is not
+// equivalent to a missing contract fact. `deserialize_with` prevents serde's
+// implicit missing-field default for Option without changing either wire shape.
+fn required_option<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer)
+}
+
 /// Stable identity for a named semantic definition.
 ///
 /// Most `DefId` values come from name resolution; lowering also allocates
@@ -1128,7 +1139,7 @@ pub struct HirLocal {
     /// after the await, the value is checked against the slot under its
     /// policy (trap, `wrapping` reduce, `saturating` clamp). `None` when the
     /// result is assignable to the slot.
-    #[serde(default)]
+    #[serde(deserialize_with = "required_option")]
     pub await_store: Option<HirStoreSite>,
 
     /// Source declared this binding with the `size` (la `magnitudo`) form.
@@ -1630,7 +1641,7 @@ pub enum HirExpressionKind {
         /// applies: a built-in `ordo` row (D9.4) or a registered
         /// `@ conversio` function (D9.3). `None` means the backend's own
         /// scalar/structural conversion rules decide the lowering.
-        #[serde(default)]
+        #[serde(deserialize_with = "required_option")]
         route: Option<HirConversioRoute>,
 
         /// `Some` marks an **implicit store node** inserted by typecheck where
@@ -1639,7 +1650,7 @@ pub enum HirExpressionKind {
         /// decides the outcome: a trapping slot traps (never routed to `⇥`
         /// or `cape`), a `wrapping` slot reduces, a `saturating` slot clamps.
         /// Authored `↦` sites carry `None` and stay recoverable.
-        #[serde(default)]
+        #[serde(deserialize_with = "required_option")]
         implicit: Option<HirStoreSite>,
     },
 
