@@ -9,8 +9,29 @@ syntax = "list<int, size 0…3> ∪ none"
 related = ["list<T, size lo…hi>", "format"]
 locale = "en"
 +++
+# =============================================================================
+# optional ranged list type formatting — the length range survives `∪ none`.
+# =============================================================================
+#
+# What this teaches:
+#   • `list<int, size 0…3> ∪ none` is an optional list whose length is limited
+#     to 0 through 3; `faber format` writes the same range back, not a single
+#     size.
+#   • A caller passes a list within the range, or `null`.
+#
+# Common mistakes:
+#   • Expecting the formatter to drop the range under `∪ none`: it keeps the
+#     authored bounds.
+#
+# See also: lista
+# =============================================================================
+
 fn show(list<int, size 0…3> ∪ none xs) → void {
     print xs
 }
 
-main {}
+main {
+    let list<int, size 0…3> pair ← [1, 2, 3]
+    show(pair)
+    show(null)
+}

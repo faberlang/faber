@@ -138,13 +138,11 @@ fn optional_union_preserves_authored_ranged_lista_form() {
         .find(|form| matches!(fixture.result.types.get(form.ty), Type::Option(_)))
         .expect("nullable list parameter form");
     let child = single_type_child(form);
+    // `0…3` is the bounded list of capacity 3 semantically; only the authored
+    // form remembers that the author wrote a range.
     assert!(matches!(
         fixture.result.types.get(child.ty),
-        Type::RangedArray {
-            min: 0,
-            max: Some(3),
-            ..
-        }
+        Type::BoundedArray { .. }
     ));
     assert!(
         child.args.iter().any(|arg| matches!(arg, HirTypeFormArg::Range(range)
