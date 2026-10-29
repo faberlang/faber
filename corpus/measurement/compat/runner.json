@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 489,
-    "analyzable": 561
+    "capable": 495,
+    "analyzable": 567
   },
   "terms": [
     {
@@ -366,8 +366,8 @@
     {
       "term": "genus",
       "rule": "keyword",
-      "capable": 23,
-      "analyzable": 23
+      "capable": 25,
+      "analyzable": 25
     },
     {
       "term": "guillemet",
@@ -498,8 +498,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 17,
-      "analyzable": 21
+      "capable": 21,
+      "analyzable": 25
     },
     {
       "term": "manifest",
