@@ -318,9 +318,9 @@ impl<'a> LaneIndexProof<'a> {
     }
 
     /// The proof state of a whole-grid reduction's term or group-key helper.
-    /// The helper has no lane and no grid guard, so only a literal or
-    /// sequential-counter coordinate is proven; every other tensor index is
-    /// unproven and needs the kernel's device bounds compare.
+    /// The helper has no lane and no grid guard. Checker-carried ProvenIndex
+    /// reads remain proven; without that carrier, only a literal or sequential
+    /// counter proves a coordinate. Other reads need the kernel's bounds compare.
     #[must_use]
     pub fn for_helper(function: &'a MirFunction, validation: &'a MirValidationContext<'a>) -> Self {
         let mut proof = Self {

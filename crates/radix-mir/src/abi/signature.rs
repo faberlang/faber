@@ -356,14 +356,11 @@ pub(crate) fn grid_reduce_node(
         })
 }
 
-/// The kernel tensor parameters a whole-grid reduction captures into a
-/// function-form term or group-key helper, in operand order (term first, then
-/// each key), each once. An index inside a helper body is never proven by the
-/// lane (the helper has no grid guard), so each such tensor owns one index
-/// fault slot and one element-count resource; the slots follow the grouped-key
-/// axis slots in the fault record. The helper bodies are separate
-/// functions the signature cannot see, so the set is the captures, not the
-/// indexes the bodies actually make.
+/// Kernel tensor parameters with unproven reads in whole-grid reduction
+/// helpers, in operand order (term first, then each key), each once. Each owns
+/// an index fault slot and element-count resource, after the grouped-key slots.
+/// Validated MIR supplies per-helper index summaries; without a visible helper
+/// body, conservatively reserve every tensor capture.
 #[must_use]
 pub fn grid_reduce_helper_tensors(
     function: &MirFunction,
@@ -411,7 +408,18 @@ pub fn grid_reduce_helper_tensors(
     let aliases = ParameterAliases::new(function);
     let mut tensors = Vec::new();
     for (start, count) in runs {
-        for operand in args.iter().skip(start).take(count) {
+        let indexed = match args.get(start + count) {
+            Some(MirOperand::Constant(crate::MirConstant::Function(id))) => {
+                validation.grid_reduce_helper_indexes.get(id)
+            }
+            _ => None,
+        };
+        for (capture, operand) in args.iter().skip(start).take(count).enumerate() {
+            if let Some(indexed) = indexed
+                && !indexed.iter().any(|position| *position as usize == capture)
+            {
+                continue;
+            }
             let MirOperand::Place(place) = operand else {
                 continue;
             };
@@ -1187,7 +1195,7 @@ pub(crate) fn append_matmul_runtime_extent_resources(
 /// grouped-key validity slot per output axis, then one slot per constant throw
 /// (see [`super::throw_sites`]), then ONE `d64` slot when the body does decimal
 /// arithmetic (see [`super::d64_fault_site`]). A whole-grid reduction adds, after its
-/// grouped-key slots, one slot per tensor captured into a term or key helper
+/// grouped-key slots, one slot per tensor with an unproven read in a term or key helper
 /// (see [`grid_reduce_helper_tensors`]). A kernel whose every
 /// tensor index is proven and that has no vector index or throw is untouched.
 fn append_fault_resources(
