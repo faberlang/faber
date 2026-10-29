@@ -57,6 +57,20 @@ incipit {
 }
 
 #[test]
+fn explicit_generic_call_binds_ranged_lista_argument() {
+    accepts(
+        r#"functio count<T>(lista<T, magnitudo 1…∞> xs) → numerus {
+    redde xs.longitudo()
+}
+
+incipit {
+    sit lista<numerus, magnitudo 1…∞> xs ← [7]
+    nota count<numerus>(xs)
+}"#,
+    );
+}
+
+#[test]
 fn explicit_generic_call_rejects_argument_mismatch() {
     rejects_with_issue(
         r#"functio id<T>(T x) → T {

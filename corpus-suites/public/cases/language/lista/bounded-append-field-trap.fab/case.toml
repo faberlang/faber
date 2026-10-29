@@ -1,0 +1,21 @@
+version = 1
+id = "corpus/lista/bounded-append-field-trap.fab"
+group = "language"
+input_root = "corpus"
+input = "lista/bounded-append-field-trap.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
+
+[targets.runner.expect]
+exit = 70
+stdout = "stdout.expected"
+stderr_contains = "bounded collection push at capacity"
+check_only = false

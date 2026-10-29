@@ -46,6 +46,16 @@ incipit {
 }
 "#;
 
+const OPTIONAL_RANGED_LIST_SOURCE: &str = r#"+++
+locale = "en"
++++
+fn show(list<int, size 0…3> ∪ none xs) → void {
+    print xs
+}
+
+main {}
+"#;
+
 fn temp_fixture(name: &str, source: &str) -> PathBuf {
     let path = std::env::temp_dir().join(name);
     fs::write(&path, source).expect("write typed-zero fixture");
@@ -81,6 +91,18 @@ fn assert_zero_forms(output: &str, size: &str) {
     assert!(
         !output.contains("vacua") && !output.contains("crea"),
         "the synthesized constructor call must not leak into source:\n{output}"
+    );
+}
+
+#[test]
+fn format_optional_ranged_list_keeps_authored_bounds_and_is_idempotent() {
+    let output = format_idempotent(
+        "faber-optional-ranged-list-en.fab",
+        OPTIONAL_RANGED_LIST_SOURCE,
+    );
+    assert!(
+        output.contains("list<int, size 0…3> ∪ none"),
+        "format must retain the list range beneath the optional union:\n{output}"
     );
 }
 

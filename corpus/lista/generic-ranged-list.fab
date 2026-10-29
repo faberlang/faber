@@ -1,0 +1,19 @@
++++
+term = "generic list with a length range"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "sized_range_argument", "range_argument", "range_glyph", "range_bound", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "A generic element parameter accepts a list whose length is described by a range."
+syntax = "fn count<T>(list<T, size 1…∞> xs)"
+related = ["list<T, size lo…hi>", "generic function"]
+locale = "en"
++++
+fn count<T>(list<T, size 1…∞> xs) → int {
+    return xs.length()
+}
+
+main {
+    let list<int, size 1…∞> xs ← [7]
+    print count<int>(xs)
+}
