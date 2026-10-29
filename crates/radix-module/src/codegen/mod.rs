@@ -637,6 +637,22 @@ fn register_cross_file_defids(
             r#gen.register_named_def(export.def_id, canonical);
         }
     }
+    // A `ns.f(..)` call to an imported failable function: the importing
+    // module's own function facts do not cover the callee, so its `⇥` channel
+    // is read from the file interface.
+    for item in &hir.items {
+        let crate::hir::HirItemKind::Import(import) = &item.kind else {
+            continue;
+        };
+        for import_item in &import.items {
+            let binding = import_item.alias.unwrap_or(import_item.name);
+            for (member, sig) in resolver.namespace_file_function_exports(binding) {
+                if sig.err.is_some() {
+                    r#gen.register_external_failable_fn(import_item.def_id, member);
+                }
+            }
+        }
+    }
 }
 
 /// Map compiler-owned GPU builtin `DefId`s to their TypeScript spellings.

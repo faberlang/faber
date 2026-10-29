@@ -1,0 +1,14 @@
+3
+3
+3
+["B", "B", "B"]
+["A", "A", "A"]
+["other", "other", "other"]
+["one", "two", "three", "many"]
+["inner-one", "inner-two", "none"]
+["A", "A", "A"]
+["case-one", "case-two", "case-other"]
+["block", "block"]
+A
+B
+none

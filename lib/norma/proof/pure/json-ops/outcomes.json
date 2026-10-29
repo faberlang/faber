@@ -15,8 +15,8 @@
     "ts": {
       "outcome": "known-fail",
       "phase": "build",
-      "diagnostic_contains": "ts_trap_expression_unsupported",
-      "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
+      "diagnostic_contains": "Cannot find name 'json_codec'",
+      "reason": "The program builds past code generation, but `tsc` rejects the emitted package: the `json_codec` module namespace is not bound in main.ts and norma-json-lexer.ts assigns a number where a boolean is declared."
     },
     "llvm": {
       "outcome": "known-fail",

@@ -18,12 +18,6 @@
       "diagnostic_contains": "Sigma0_32 redeclared",
       "reason": "Two imports of one Norma module each emit its constants into the entry file, so the Go build reports a redeclared identifier; deduplicating imported constants per package is an open emitter unit."
     },
-    "ts": {
-      "outcome": "known-fail",
-      "phase": "build",
-      "diagnostic_contains": "ts_trap_expression_unsupported",
-      "reason": "A Norma module this program imports uses a `capta` trap expression, which the TypeScript backend cannot emit yet, so code generation stops with ts_trap_expression_unsupported."
-    },
     "llvm": {
       "outcome": "known-fail",
       "phase": "build",
