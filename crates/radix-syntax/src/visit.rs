@@ -235,6 +235,11 @@ pub fn walk_stmt<V: Visitor>(visitor: &mut V, stmt: &Stmt) {
                 visitor.visit_expr(value);
             }
         }
+        StmtKind::ReddeFilum(ret) => {
+            if let Some(value) = &ret.value {
+                visitor.visit_expr(value);
+            }
+        }
         StmtKind::Proba(test) => visitor.visit_block(&test.body),
         StmtKind::Iace(throw) => visitor.visit_expr(&throw.value),
         StmtKind::Mori(panic) => visitor.visit_expr(&panic.value),

@@ -325,7 +325,7 @@ extract_field ::= IDENTIFIER ('كـ' IDENTIFIER)?
 # [157] ceteri_field
 ceteri_field ::= 'باقي' IDENTIFIER
 # [158] redde_stmt
-redde_stmt ::= 'أعد' expression?
+redde_stmt ::= 'أعد' ('خيط' expression? | expression?)
 # [159] reddet_stmt
 reddet_stmt ::= 'أعد_منتظرا' expression
 # [160] tacebit_stmt
@@ -2285,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `كرر من...ليكن`/`كرر من...متغير` = for-of (values)
 - `كرر عن...ليكن`/`كرر عن...متغير` = for-in (keys)
 - `كرر نطاق range ليكن/متغير i` = range iteration (e.g. `كرر نطاق 0‥10 كل 2 ليكن i { اعرض i }`; `كل` belongs to the range expression)
+- In an `كرر ... خيط` lane body, `أعد خيط` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `أعد` stays forbidden there; `أعد خيط` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `تابع` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `كل`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

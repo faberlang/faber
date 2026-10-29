@@ -325,7 +325,7 @@ extract_field ::= IDENTIFIER ('ในชื่อ' IDENTIFIER)?
 # [157] ceteri_field
 ceteri_field ::= 'ที่เหลือ' IDENTIFIER
 # [158] redde_stmt
-redde_stmt ::= 'คืน' expression?
+redde_stmt ::= 'คืน' ('เส้นใย' expression? | expression?)
 # [159] reddet_stmt
 reddet_stmt ::= 'รอคืน' expression
 # [160] tacebit_stmt
@@ -2285,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `วน ออก...กำหนด`/`วน ออก...แปร` = for-of (values)
 - `วน จาก...กำหนด`/`วน จาก...แปร` = for-in (keys)
 - `วน ช่วง range กำหนด/แปร i` = range iteration (e.g. `วน ช่วง 0‥10 ต่อ 2 กำหนด i { บันทึก i }`; `ต่อ` belongs to the range expression)
+- In an `วน ... เส้นใย` lane body, `คืน เส้นใย` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `คืน` stays forbidden there; `คืน เส้นใย` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `ไปต่อ` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `ต่อ`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

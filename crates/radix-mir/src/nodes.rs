@@ -536,6 +536,8 @@ pub struct MirTerminator {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MirTerminatorKind {
     Return(Option<MirOperand>),
+    /// End the current thread lane, not the containing function.
+    ReturnThread,
     ReturnError(MirOperand),
     TryCall {
         destination: Option<MirPlace>,
@@ -651,6 +653,7 @@ impl MirTerminatorKind {
     pub fn kind_name(&self) -> &'static str {
         match self {
             Self::Return(_) => "return",
+            Self::ReturnThread => "return_thread",
             Self::ReturnError(_) => "return_error",
             Self::TryCall { .. } => "try_call",
             Self::Goto(_) => "goto",

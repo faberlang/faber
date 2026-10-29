@@ -325,7 +325,7 @@ extract_field ::= IDENTIFIER ('như' IDENTIFIER)?
 # [157] ceteri_field
 ceteri_field ::= 'còn_lại' IDENTIFIER
 # [158] redde_stmt
-redde_stmt ::= 'trả' expression?
+redde_stmt ::= 'trả' ('sợi' expression? | expression?)
 # [159] reddet_stmt
 reddet_stmt ::= 'đợi_trả' expression
 # [160] tacebit_stmt
@@ -2285,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `lặp từ...đặt`/`lặp từ...biến` = for-of (values)
 - `lặp ra...đặt`/`lặp ra...biến` = for-in (keys)
 - `lặp khoảng range đặt/biến i` = range iteration (e.g. `lặp khoảng 0‥10 qua 2 đặt i { ghi_chú i }`; `qua` belongs to the range expression)
+- In an `lặp ... sợi` lane body, `trả sợi` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `trả` stays forbidden there; `trả sợi` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `tiếp` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `qua`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

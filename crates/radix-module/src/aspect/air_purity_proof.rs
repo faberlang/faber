@@ -227,6 +227,7 @@ fn walk_block(block: &crate::hir::HirBlock, walk: &mut Walk) {
             HirStatementKind::Local(local) => walk.record_local(local),
             HirStatementKind::Redde(Some(expr)) => walk.record_value(walk_expr(expr)),
             HirStatementKind::Redde(None)
+            | HirStatementKind::ReddeFilum(_)
             | HirStatementKind::Rumpe
             | HirStatementKind::Perge
             | HirStatementKind::Tacet

@@ -145,6 +145,7 @@ fn kind_name(kind: &StmtKind) -> &'static str {
         StmtKind::Custodi(_) => "custodi",
         StmtKind::Fac(_) => "fac",
         StmtKind::Redde(_) => "redde",
+        StmtKind::ReddeFilum(_) => "redde_filum",
         StmtKind::Rumpe(_) => "rumpe",
         StmtKind::Perge(_) => "perge",
         StmtKind::Iace(_) => "iace",

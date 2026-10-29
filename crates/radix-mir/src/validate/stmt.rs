@@ -231,6 +231,9 @@ impl Validator<'_, '_> {
             MirTerminatorKind::TryCall { .. } => {
                 self.validate_try_call(scope, previous, terminator);
             }
+            MirTerminatorKind::ReturnThread => {
+                self.error(terminator.span, "return_thread lowering pending");
+            }
             MirTerminatorKind::Goto(_) | MirTerminatorKind::Unreachable => {}
             MirTerminatorKind::Branch { condition, .. } => {
                 if let Some(condition_ty) = self.validate_operand(scope, condition, terminator.span)

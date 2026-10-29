@@ -137,6 +137,10 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
         StmtKind::Custodi(custodi_stmt) => lowerer.lower_custodi(custodi_stmt),
         StmtKind::Fac(fac_stmt) => lowerer.lower_fac(fac_stmt),
         StmtKind::Redde(ret) => lowerer.lower_redde(ret),
+        StmtKind::ReddeFilum(ret) => {
+            let value = ret.value.as_deref().map(|value| lowerer.lower_expr(value));
+            HirStatementKind::ReddeFilum(value)
+        }
         StmtKind::Rumpe(_) => HirStatementKind::Rumpe,
         StmtKind::Perge(_) => HirStatementKind::Perge,
         StmtKind::Iace(iace_stmt) => lowerer.lower_iace(iace_stmt),

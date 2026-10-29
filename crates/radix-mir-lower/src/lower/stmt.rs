@@ -108,6 +108,12 @@ impl HirVisitor for FunctionBuilder<'_> {
                 self.emit_device_exits_to(0, stmt.span);
                 self.terminate_current(MirTerminatorKind::Return(None), stmt.span);
             }
+            HirStatementKind::ReddeFilum(_) => self.errors.push(MirError {
+                message: "return thread lowering is pending".to_owned(),
+                issue: "return_thread_lowering_pending".to_owned(),
+                span: stmt.span,
+                definition_span: None,
+            }),
             HirStatementKind::Rumpe => self.lower_rumpe(stmt.span),
             HirStatementKind::Perge => self.lower_perge(stmt.span),
             HirStatementKind::Tacet => {}

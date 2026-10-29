@@ -671,6 +671,11 @@ impl<'a> BorrowChecker<'a> {
                     self.check_expr(expr);
                 }
             }
+            HirStatementKind::ReddeFilum(value) => {
+                if let Some(expr) = value {
+                    self.check_expr(expr);
+                }
+            }
             HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
             HirStatementKind::IncDec(inc_dec) => self.check_lvalue(&inc_dec.target),
             HirStatementKind::Custodi(custodi) => {

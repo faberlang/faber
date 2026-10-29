@@ -1095,6 +1095,9 @@ pub enum HirStatementKind {
     /// Function return with optional value.
     Redde(Option<HirExpression>),
 
+    /// End the current lane iteration, without returning from the function.
+    ReddeFilum(Option<HirExpression>),
+
     /// Loop break.
     Rumpe,
 

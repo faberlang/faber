@@ -228,9 +228,17 @@ fn locale_pack_completeness_nominal_ascription_row_in_every_pack() {
 #[test]
 fn locale_pack_completeness_thread_body_exit_rows_in_every_pack() {
     for locale in ["la", "en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
-        for issue in ["break_in_thread_body", "return_in_thread_body"] {
-            assert_issue_template(&owned_pack(locale), "SEM010", issue);
+        let pack = owned_pack(locale);
+        for issue in [
+            "break_in_thread_body",
+            "return_in_thread_body",
+            "return_thread_outside_lane",
+            "return_thread_with_value",
+            "return_thread_in_nested_body",
+        ] {
+            assert_issue_template(&pack, "SEM010", issue);
         }
+        assert_issue_template(&pack, "PKG001", "return_thread_lowering_pending");
     }
 }
 

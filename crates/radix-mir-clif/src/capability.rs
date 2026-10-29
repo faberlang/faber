@@ -899,6 +899,7 @@ impl MirVisitor for ClifCapability<'_> {
             | MirTerminatorKind::Branch { .. }
             | MirTerminatorKind::Switch { .. }
             | MirTerminatorKind::Unreachable => {}
+            MirTerminatorKind::ReturnThread => self.record(Gap::Subset("return_thread".to_owned())),
         }
         radix_mir::visit::walk_terminator(self, terminator);
     }

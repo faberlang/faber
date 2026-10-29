@@ -3906,8 +3906,20 @@ help = "`{rumpe}` 不能停止 `{filum}` 迴圈：各通道相互獨立執行。
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` 不能離開 `{filum}` 迴圈"
-help = "`{redde}` 不能離開 `{filum}` 迴圈：各通道相互獨立執行。要從各通道得到一個值，請用 `{reducta}`；要在某個界限處停止，請先算出該界限，再迴圈到該界限。"
+help = "`{redde} {filum}` 可從任何深度結束目前通道；`{perge}` 僅在通道頂層執行此操作。"
 
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` 僅在通道迴圈主體內有效"
+help = "僅在 `{filum}` 迴圈主體內使用 `{redde} {filum}`"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` 不接受值"
+help = "移除該值；各通道透過自己的儲存傳遞結果"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "巢狀主體中的 `{redde} {filum}` 無法結束外層通道"
+help = "請在通道主體本身使用，不要在巢狀閉包或歸約主體中使用"
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "歸約體只能呼叫裝置內建函式、片段與私有核心輔助函式：{reason}"
 help = "把呼叫移出歸約，或呼叫私有核心輔助函式"
@@ -4254,3 +4266,8 @@ message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"
+
+
+[diagnostics.PKG001.issues.return_thread_lowering_pending]
+message = "`{redde} {filum}` 的 MIR 降低尚未實作"
+help = "通道返回降低完成前，請使用等效的明確控制流程形式"

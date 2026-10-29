@@ -1394,7 +1394,7 @@ extract_fields := extract_field (',' extract_field)* (',' ceteri_field)? | ceter
 extract_field  := IDENTIFIER ('ut' IDENTIFIER)?
 ceteri_field     := 'ceteri' IDENTIFIER
 
-redde_stmt   := 'redde' expression?
+redde_stmt   := 'redde' ('filum' expression? | expression?)
 reddet_stmt := 'reddet' expression
 tacebit_stmt := 'tacebit' expression
 cede_stmt    := 'cede' expression

@@ -167,6 +167,32 @@ functio k(in tensor<f32, [2, 2]> out, de tensor<f32, [2]> rows, de tensor<f32, [
 }
 
 #[test]
+fn thread_return_outside_a_lane_is_refused_by_issue_code() {
+    refused(
+        "functio f() → vacuum { redde filum }",
+        "return_thread_outside_lane",
+    );
+}
+
+#[test]
+fn thread_return_with_a_value_is_refused_by_issue_code() {
+    refused(&lane("redde filum 1"), "return_thread_with_value");
+}
+
+#[test]
+fn thread_return_in_a_nested_closure_body_is_refused_by_issue_code() {
+    refused(
+        &lane("sit (f32) → vacuum f ← f32 x { redde filum }"),
+        "return_thread_in_nested_body",
+    );
+}
+
+#[test]
+fn thread_return_at_any_depth_of_its_lane_is_accepted_semantically() {
+    accepted(&lane("varia i32 n ← 0\n dum n ≺ 4 { redde filum }"));
+}
+
+#[test]
 fn return_inside_a_reduction_term_body_returns_the_term_value() {
     accepted(
         r"@ nucleum

@@ -423,7 +423,7 @@ impl<'a> LintContext<'a> {
         match &stmt.kind {
             HirStatementKind::Local(local) => self.check_local(local, stmt.span),
             HirStatementKind::Expr(expr) => self.check_expr(expr, in_loop),
-            HirStatementKind::Redde(value) => {
+            HirStatementKind::Redde(value) | HirStatementKind::ReddeFilum(value) => {
                 if let Some(expr) = value {
                     self.check_expr(expr, in_loop);
                 }

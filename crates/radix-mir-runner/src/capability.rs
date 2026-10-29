@@ -238,6 +238,14 @@ fn classify_terminator(
         MirTerminatorKind::Goto(_) => {}
         MirTerminatorKind::Branch { condition, .. } => classify_operand(condition, gaps, seen),
         MirTerminatorKind::Switch { value, .. } => classify_operand(value, gaps, seen),
+        MirTerminatorKind::ReturnThread => push_gap(
+            gaps,
+            seen,
+            CapabilityGap::UnsupportedMirShape {
+                shape: "return_thread terminator".to_owned(),
+                slug: SLUG_UNSUPPORTED,
+            },
+        ),
         MirTerminatorKind::Unreachable => push_gap(
             gaps,
             seen,

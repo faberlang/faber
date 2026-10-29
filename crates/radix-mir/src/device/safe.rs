@@ -1284,7 +1284,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             return;
         }
         match &terminator.kind {
-            MirTerminatorKind::Return(_) => crate::visit::walk_terminator(self, terminator),
+            MirTerminatorKind::Return(_) | MirTerminatorKind::ReturnThread => {
+                crate::visit::walk_terminator(self, terminator);
+            }
             // C4-2e: a structurizable lane-form kernel's acyclic Goto/Branch
             // edges are expressed by its region tree.
             //

@@ -360,7 +360,7 @@ impl Builder {
                 fragment.normal = vec![statement_node];
                 Ok(fragment)
             }
-            HirStatementKind::Redde(value) => {
+            HirStatementKind::Redde(value) | HirStatementKind::ReddeFilum(value) => {
                 let mut fragment = if let Some(value) = value {
                     self.build_expression(value, loop_context)?
                 } else {

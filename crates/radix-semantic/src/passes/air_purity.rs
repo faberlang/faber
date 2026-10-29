@@ -178,7 +178,7 @@ impl AirPurityChecker<'_> {
                 }
                 self.check_expr(expr);
             }
-            HirStatementKind::Rumpe | HirStatementKind::Perge => {
+            HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::ReddeFilum(_) => {
                 self.reject(stmt.span, "loop_control");
             }
             HirStatementKind::Tacet => self.reject(stmt.span, "tacet"),

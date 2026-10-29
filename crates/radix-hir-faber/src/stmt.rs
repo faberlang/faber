@@ -663,6 +663,16 @@ impl super::FaberCodegen<'_> {
                 }
                 writer.newline();
             }
+            HirStatementKind::ReddeFilum(value) => {
+                writer.write(surface.contextual_keyword("redde"));
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("filum"));
+                if let Some(expr) = value {
+                    writer.write(" ");
+                    self.write_expr(expr, names, surface, writer);
+                }
+                writer.newline();
+            }
             HirStatementKind::Rumpe => {
                 writer.writeln(surface.contextual_keyword("rumpe"));
             }

@@ -142,6 +142,8 @@ pub enum StmtKind {
     Fac(FacStmt),
     /// `redde` return.
     Redde(ReddeStmt),
+    /// `redde filum` / `return thread`: end the current lane iteration.
+    ReddeFilum(ReddeFilumStmt),
     /// `rumpe` break.
     Rumpe(RumpeStmt),
     /// `perge` continue.
@@ -958,6 +960,13 @@ pub struct FacStmt {
 
 #[derive(Debug)]
 pub struct ReddeStmt {
+    pub value: Option<Box<Expr>>,
+}
+
+/// `redde filum` / `return thread` — end the current thread lane.
+#[derive(Debug)]
+pub struct ReddeFilumStmt {
+    /// Parsed so the semantic pass can diagnose the forbidden value explicitly.
     pub value: Option<Box<Expr>>,
 }
 

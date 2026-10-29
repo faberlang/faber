@@ -68,6 +68,10 @@ mod frame_names_test;
 #[path = "ad_annotation_roundtrip_test.rs"]
 mod ad_annotation_roundtrip_test;
 
+#[cfg(test)]
+#[path = "return_thread_roundtrip_test.rs"]
+mod return_thread_roundtrip_test;
+
 use crate::lexer::TokenKind;
 use crate::locale;
 use radix_hir_faber::KeywordSurface as LeafKeywordSurface;

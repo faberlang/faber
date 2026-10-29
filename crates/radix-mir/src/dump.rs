@@ -160,6 +160,7 @@ fn terminator_kind(kind: &MirTerminatorKind) -> String {
     match kind {
         MirTerminatorKind::Return(Some(value)) => format!("return {}", operand(value)),
         MirTerminatorKind::Return(None) => "return".to_owned(),
+        MirTerminatorKind::ReturnThread => "return_thread".to_owned(),
         MirTerminatorKind::ReturnError(value) => format!("return_error {}", operand(value)),
         MirTerminatorKind::TryCall {
             destination,

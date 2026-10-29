@@ -3866,8 +3866,20 @@ help = "`{rumpe}` không thể dừng vòng lặp `{filum}`: các làn chạy đ
 
 [diagnostics.SEM010.issues.return_in_thread_body]
 message = "`{redde}` không thể rời vòng lặp `{filum}`"
-help = "`{redde}` không thể rời vòng lặp `{filum}`: các làn chạy độc lập. Để lấy một giá trị từ các làn, dùng `{reducta}`; để dừng ở một ngưỡng, hãy tính ngưỡng trước rồi lặp đến ngưỡng đó."
+help = "`{redde} {filum}` kết thúc làn này từ mọi độ sâu, còn `{perge}` làm vậy ở cấp cao nhất của làn."
 
+
+[diagnostics.SEM010.issues.return_thread_outside_lane]
+message = "`{redde} {filum}` chỉ hợp lệ bên trong thân vòng lặp làn luồng"
+help = "chỉ dùng `{redde} {filum}` bên trong thân vòng lặp `{filum}`"
+
+[diagnostics.SEM010.issues.return_thread_with_value]
+message = "`{redde} {filum}` không nhận giá trị"
+help = "bỏ giá trị; các làn gửi kết quả qua kho lưu trữ của chúng"
+
+[diagnostics.SEM010.issues.return_thread_in_nested_body]
+message = "`{redde} {filum}` trong thân lồng nhau không thể kết thúc làn bên ngoài"
+help = "dùng trong chính thân làn, không dùng trong closure hoặc thân reduction lồng nhau"
 [diagnostics.SEM010.issues.reducta_body_context]
 message = "thân phép rút gọn chỉ được gọi hàm nội tại của thiết bị, đoạn mã và hàm trợ giúp nhân riêng: {reason}"
 help = "chuyển lời gọi ra ngoài phép rút gọn, hoặc gọi hàm trợ giúp nhân riêng"
@@ -4258,3 +4270,8 @@ message = "kernel `{kernel}` chạy tuần tự trên thiết bị {device}"
 
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: {kind} của nó trên {partitions} phân vùng có thể tránh được: {avoidable} ({reason})"
+
+
+[diagnostics.PKG001.issues.return_thread_lowering_pending]
+message = "chưa triển khai hạ `{redde} {filum}` xuống MIR"
+help = "dùng dạng luồng điều khiển tường minh tương đương cho đến khi hỗ trợ kết thúc làn"

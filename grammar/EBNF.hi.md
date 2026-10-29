@@ -325,7 +325,7 @@ extract_field ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
 # [157] ceteri_field
 ceteri_field ::= 'बाकी' IDENTIFIER
 # [158] redde_stmt
-redde_stmt ::= 'लौटाओ' expression?
+redde_stmt ::= 'लौटाओ' ('धागा' expression? | expression?)
 # [159] reddet_stmt
 reddet_stmt ::= 'रुको_लौटाओ' expression
 # [160] tacebit_stmt
@@ -2285,6 +2285,7 @@ prefer sugar. Choose per module or file.
 - `दोहराओ सेवन...बैठा`/`दोहराओ सेवन...चर` = for-of (values)
 - `दोहराओ से...बैठा`/`दोहराओ से...चर` = for-in (keys)
 - `दोहराओ सीमा range बैठा/चर i` = range iteration (e.g. `दोहराओ सीमा 0‥10 प्रति 2 बैठा i { दिखाओ i }`; `प्रति` belongs to the range expression)
+- In an `दोहराओ ... धागा` lane body, `लौटाओ धागा` (en `return thread`) ends only the current lane from any depth, including inside nested ordinary loops. Lanes are independent, so plain `लौटाओ` stays forbidden there; `लौटाओ धागा` is forbidden outside a lane and inside a nested closure or reduction body. It takes no value: lanes publish results through their stores. `जारी` (en `continue`) also ends the current lane when used at that lane's top level.
 
 **Range step and direction (`range_tail`, `प्रति`).** The bounds alone pick the
 direction of a range: `a‥b` and `a…b` count up when `a <= b` and count down

@@ -1844,6 +1844,7 @@ fn terminator_writes_whole_temp(terminator: &MirTerminatorKind, temp: MirTempId)
                     .is_some_and(|place| is_whole_temp_place(place, temp))
         }
         MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::ReturnError(_)
         | MirTerminatorKind::Goto(_)
         | MirTerminatorKind::Branch { .. }

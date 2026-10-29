@@ -555,6 +555,11 @@ fn resolve_stmt(
                 resolve_expr(resolver, interner, value, errors);
             }
         }
+        StmtKind::ReddeFilum(stmt) => {
+            if let Some(value) = &stmt.value {
+                resolve_expr(resolver, interner, value, errors);
+            }
+        }
         StmtKind::Rumpe(stmt) => {
             if !resolver.in_breakable() {
                 errors.push(

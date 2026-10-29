@@ -6314,6 +6314,9 @@ impl FunctionLower<'_, '_> {
                 self.builder.ins().return_(&results);
                 Ok(())
             }
+            MirTerminatorKind::ReturnThread => {
+                Err(Decline::new("return_thread lowering is pending"))
+            }
             MirTerminatorKind::ReturnError(operand) => {
                 let Some(error_rep) = self.error_rep else {
                     return Err(Decline::new("error return outside a failable function"));

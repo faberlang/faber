@@ -213,6 +213,7 @@ fn stmt_terminates(
     match &stmt.kind {
         // `redde` is the only statement that satisfies the normal channel.
         HirStatementKind::Redde(_) => true,
+        HirStatementKind::ReddeFilum(_) => false,
         // Control-flow expressions embedded as statements may terminate; other
         // expression statements (calls, assignments, projections) fall through.
         HirStatementKind::Expr(expr) => expr_terminates(expr, types, enum_variants),
@@ -331,7 +332,10 @@ fn contains_rumpe_block(block: &HirBlock) -> bool {
 fn contains_rumpe_stmt(stmt: &HirStatement) -> bool {
     match &stmt.kind {
         HirStatementKind::Rumpe => true,
-        HirStatementKind::Perge | HirStatementKind::Tacet | HirStatementKind::Redde(_) => false,
+        HirStatementKind::Perge
+        | HirStatementKind::Tacet
+        | HirStatementKind::Redde(_)
+        | HirStatementKind::ReddeFilum(_) => false,
         HirStatementKind::Expr(expr) => contains_rumpe_expr(expr),
         HirStatementKind::Local(local) => local.init.as_ref().is_some_and(contains_rumpe_expr),
         HirStatementKind::IncDec(inc) => contains_rumpe_expr(&inc.target),

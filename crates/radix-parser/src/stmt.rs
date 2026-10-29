@@ -606,16 +606,36 @@ impl Parser {
 
     // TRANSFER STATEMENTS
 
-    /// Parse `redde`.
+    /// Parse `redde` or `redde filum`.
     ///
     /// GRAMMAR:
     ///   redde-stmt := `redde` [`expr`]
+    ///   redde-filum-stmt := `redde` `filum` [`expr`]
     ///
-    /// The value must start on the `redde` line. A newline ends a bare
-    /// `redde`, so `si n ≡ 0 ergo redde` never swallows the next statement as
-    /// its return value.
+    /// The value must start on the statement's line. A newline ends a bare
+    /// return (or a bare thread return), so a following statement cannot be
+    /// swallowed as its payload.
     pub(super) fn parse_redde_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Redde)?;
+
+        if !self.raw_newline_before_next_word()
+            && matches!(
+                self.peek().kind,
+                TokenKind::Ident(sym) if self.keyword_claim_key(sym) == Some("filum")
+            )
+        {
+            self.advance();
+            let value = if !self.is_at_end()
+                && !self.check(&TokenKind::RBrace)
+                && !self.check(&TokenKind::Semicolon)
+                && !self.raw_newline_before_next_word()
+            {
+                Some(Box::new(self.parse_expression()?))
+            } else {
+                None
+            };
+            return Ok(StmtKind::ReddeFilum(ReddeFilumStmt { value }));
+        }
 
         let value = if !self.is_at_end()
             && !self.check(&TokenKind::RBrace)

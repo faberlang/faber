@@ -2299,6 +2299,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         self.recycle_frame(frame);
                     }
                 }
+                MirTerminatorKind::ReturnThread => {
+                    self.fail(RunnerError::unsupported(
+                        terminator.span,
+                        "return_thread terminator is not executable before lane lowering",
+                    ));
+                }
                 MirTerminatorKind::ReturnError(operand) => {
                     let value = match self.eval_operand(operand, terminator.span) {
                         Ok(value) => value,
@@ -4575,6 +4581,7 @@ fn reachable_block_ids(function: &MirFunction) -> FxHashSet<MirBlockId> {
 fn terminator_successors(kind: &MirTerminatorKind) -> Vec<MirBlockId> {
     match kind {
         MirTerminatorKind::Return(_)
+        | MirTerminatorKind::ReturnThread
         | MirTerminatorKind::ReturnError(_)
         | MirTerminatorKind::Unreachable => Vec::new(),
         MirTerminatorKind::Goto(target) => vec![*target],
