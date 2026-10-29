@@ -853,11 +853,11 @@ help = "use true, false, null, a string, a number, an object, or an array"
 
 [diagnostics.PARSE002.issues.expected_json_value]
 message = "expected JSON value"
-help = "provide a JSON value"
+help = "use true, false, null, a string, a number, an object, or an array"
 
 [diagnostics.PARSE002.issues.json_integer_underflow]
 message = "JSON integer literal underflows int"
-help = "use an int value within range"
+help = "write the value as a float or a string"
 
 [diagnostics.PARSE002.issues.expected_json_number_after_minus]
 message = "expected number after '-' in JSON"
@@ -869,7 +869,7 @@ help = "write a concrete type for the binding, e.g. 'let int x ↤ value'"
 
 [diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
 message = "'↤' is not supported on awaited bindings"
-help = "keep '←' for 'figendum'/'variandum' awaited bindings"
+help = "keep '←' for '{figendum}'/'{variandum}' awaited bindings"
 
 [diagnostics.PARSE002.issues.allocator_surface_removed]
 message = "'{keyword}' was removed; allocation is not a language surface"
@@ -881,7 +881,7 @@ help = "inheritance was removed; use a contract (`implements`) or composition"
 
 [diagnostics.PARSE002.issues.nexum_removed]
 message = "'nexum' was removed; change notification is a library pattern over '{ad}'"
-help = "delete 'nexum' and declare an ordinary field: '<type> <name>'"
+help = "remove `nexum`; declare `{sit} T name` for a read-only field or `{varia} T name` for a writable field"
 
 [diagnostics.PARSE002.issues.construction_spread_removed]
 message = "'{sparge}' is not valid in a construction literal"
@@ -897,7 +897,7 @@ help = "check declaration keywords and required parts"
 
 [diagnostics.PARSE010.issues.declaration_not_top_level]
 message = "declarations are top-level; {functio} and type declarations cannot appear inside a block"
-help = "use a closure, or a top-level function for recursion"
+help = "move the declaration to the top level; use a closure for local behavior or a top-level function for recursion"
 
 [diagnostics.PARSE010.issues.sum_type_function]
 message = "sum types are data only; a {functio} cannot be declared inside an {ordo} or {discretio}"
@@ -909,7 +909,7 @@ help = "write top-level functions that use {discerne} on the value, or use a {ge
 
 [diagnostics.PARSE010.issues.schema_inheritance]
 message = "a schema cannot attach sub, implet, or an interface"
-help = "keep schemas as plain relational headings"
+help = "remove that clause; schemas define columns only"
 
 [diagnostics.PARSE010.issues.schema_method]
 message = "a schema cannot declare a method"
@@ -925,7 +925,7 @@ help = "write `{sit} T {name} ← …` (or `{sit} _ {name} ← …` to infer the
 
 [diagnostics.PARSE010.issues.binding_type_slot_required]
 message = "a `{keyword}` declaration writes its type slot; `{name}` has none"
-help = "write `{keyword} T {name} ← …`, or `{keyword} _ {name} ← …` to infer the type"
+help = "add a type before `{name}` (`_` infers it); use `{sit}` or `{varia}` with `←`, or `{fixum}` with `=` for a constant"
 
 [diagnostics.PARSE010.issues.binder_fixum_retired]
 message = "a `{keyword}` binder was retired"
@@ -973,11 +973,11 @@ help = "write `{varia} T name ← value` for a mutable binding, or `{fixum} T na
 
 [diagnostics.PARSE010.issues.compile_time_requires_name]
 message = "a compile-time constant binds one name; `=` cannot initialize a destructuring pattern"
-help = "write `{fixum} T name = value`, or destructure with `←`"
+help = "write `{fixum} T name = value` for one constant; destructure with `{sit}` or `{varia}` and `←`"
 
 [diagnostics.PARSE010.issues.field_modifier_repeated]
 message = "a field takes exactly one of {sit}, {varia} or {fixum}"
-help = "keep one modifier; a {fixum} member is already read-only"
+help = "keep one modifier: `{sit}` or `{varia}` for an instance field, `{fixum}` with `= value` for a type constant"
 
 [diagnostics.PARSE010.issues.field_modifier_missing]
 message = "a {genus} field must declare {sit}, {varia} or {fixum}"
@@ -985,7 +985,7 @@ help = "write `{varia} T name` to keep today's meaning (or {sit} when never reas
 
 [diagnostics.PARSE010.issues.module_declaration_misplaced]
 message = "a {regio} declaration must be the first declaration of the file, before any {importa}"
-help = "move `{regio} {name}` to the top of the file, directly after the frontmatter"
+help = "make `{regio} {name}` the first declaration, after the frontmatter if present"
 
 [diagnostics.PARSE010.issues.module_declaration_duplicate]
 message = "a file declares {regio} at most once"
@@ -997,7 +997,7 @@ help = "choose one of the active locale's reduction operators after `{reducta} {
 
 [diagnostics.PARSE010.issues.size_requires_const]
 message = "a `{size_param}` declaration is always a constant; a bare `{size_param}` cannot start a declaration"
-help = "write `{suggestion}`"
+help = "write `{fixum} {size_param} name ← value` for a run-time size or `{fixum} {size_param} name = literal` for a static size"
 
 [diagnostics.PARSE010.issues.size_is_write_once]
 message = "a `{size_param}` declaration is write-once; {varia} cannot declare one"
