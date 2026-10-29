@@ -29,8 +29,10 @@ use crate::locale::LocalePack;
 use handroll::FxHashMap;
 use radix_types::KernelLowering;
 use std::cell::RefCell;
+use std::fmt;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Policy for promoting warning diagnostics to errors at the compilation boundary.
 ///
@@ -63,6 +65,41 @@ impl WarnPolicy {
     }
 }
 
+/// Product-supplied resolver for a frontmatter `locale` id, installed on
+/// [`Config`] by the tool that owns a pack set (faber embeds the reader
+/// packs in its binary).
+///
+/// [`resolve_frontmatter_locale_pack`](super::resolve_frontmatter_locale_pack)
+/// consults it only when the configured language-pack root cannot serve the
+/// id (no root, or no pack under it), so dev checkouts and planted test roots
+/// keep filesystem resolution and an installed binary still reads `+++
+/// locale = "\u{2026}" +++` sources with no checkout beside it.
+#[derive(Clone)]
+pub struct LocalePackLoader(LocalePackLoadFn);
+
+/// The load function [`LocalePackLoader`] wraps.
+type LocalePackLoadFn = Arc<dyn Fn(&str) -> Result<LocalePack, String> + Send + Sync>;
+
+impl LocalePackLoader {
+    /// Wrap a load function; `Err` carries the display detail for the
+    /// `LOCALE003` `load_failed` diagnostic.
+    #[must_use]
+    pub fn new(load: impl Fn(&str) -> Result<LocalePack, String> + Send + Sync + 'static) -> Self {
+        Self(Arc::new(load))
+    }
+
+    /// Load the pack for `locale_id`.
+    pub(crate) fn load(&self, locale_id: &str) -> Result<LocalePack, String> {
+        (self.0)(locale_id)
+    }
+}
+
+impl fmt::Debug for LocalePackLoader {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LocalePackLoader").finish_non_exhaustive()
+    }
+}
+
 /// User-facing compilation policy consumed by the driver.
 ///
 /// The builder methods keep call sites readable while preserving a single
@@ -78,6 +115,11 @@ pub struct Config {
 
     /// Optional language-pack root (`radix/locale`) for frontmatter locale load.
     pub locale_root: Option<PathBuf>,
+
+    /// Optional product-supplied resolver for frontmatter locale ids (faber's
+    /// embedded reader packs). Consulted when [`Config::locale_root`] cannot
+    /// serve the id; `None` keeps filesystem-only resolution.
+    pub locale_pack_loader: Option<LocalePackLoader>,
 
     /// Optional library-home override (provider repos such as `norma/`).
     ///
@@ -176,6 +218,7 @@ impl Default for Config {
             // language-pack root, so the default config discovers the workspace
             // `locale/` tree when one is present (no-op for installed builds).
             locale_root: discover_dev_locale_root(),
+            locale_pack_loader: None,
             library_home: None,
             warn_policy: WarnPolicy::default(),
             locale_pack: None,
@@ -225,6 +268,15 @@ impl Config {
     #[must_use]
     pub fn with_locale_root(mut self, path: PathBuf) -> Self {
         self.locale_root = Some(path);
+        self
+    }
+
+    /// Install the product-supplied frontmatter locale resolver (faber's
+    /// embedded reader packs), consulted when the language-pack root cannot
+    /// serve the locale id.
+    #[must_use]
+    pub fn with_locale_pack_loader(mut self, loader: LocalePackLoader) -> Self {
+        self.locale_pack_loader = Some(loader);
         self
     }
 
