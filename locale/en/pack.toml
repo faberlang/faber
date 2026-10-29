@@ -2601,15 +2601,15 @@ help = "Use `{ex}` for list or set values, or `{de}` for map keys."
 
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
-help = "convert the tensor to a list first, or use a library routine that ranks tensor scores"
+help = "iterate over the tensor with `{itera} {ex}`, append each value to a list, then sort the list"
 
 [diagnostics.SEM010.issues.ledger_operation_not_implemented]
 message = "a ledger value cannot be used yet: {tabulae} types are accepted in declarations, and no operation on a ledger value is implemented"
-help = "declare the type only; use a map ({tabula}) until the ledger operations land"
+help = "use a map ({tabula}) for the operation if insertion order does not matter"
 
 [diagnostics.SEM010.issues.ledger_type_unsupported_on_target]
 message = "the ledger type is not supported on this target yet"
-help = "use the MIR runner or the Faber source emitter, or a map ({tabula}), until this target carries a ledger"
+help = "use the MIR runner or Faber source emitter for ledgers; use a map ({tabula}) only when insertion order is not needed"
 
 [diagnostics.SEM010.issues.ranged_policy_target_unsupported]
 message = "the ranged store policy is not supported on this target yet"
@@ -2625,11 +2625,11 @@ help = "use rust or the MIR runner, or drop the {route} call"
 
 [diagnostics.SEM010.issues.sort_source_unordered]
 message = "the elements have no natural order to sort by"
-help = "give the sort a body that returns an orderable key, such as a number, text or bool"
+help = "end the sort body with `{redde}` and an orderable key, such as a number, text or bool"
 
 [diagnostics.SEM010.issues.sort_key_unordered]
 message = "the sort key has no natural order"
-help = "return a number, text or bool from the sort body; a key is never a comparison"
+help = "`{redde}` a number, text or bool from the sort body; a key is never a comparison"
 
 [diagnostics.SEM010.issues.sort_source_not_collection]
 message = "a sort expression needs a list, a set or a map as its source"
@@ -2637,11 +2637,11 @@ help = "sort a list or a set with `from`, or a map with `from` (values) or `ref`
 
 [diagnostics.SEM010.issues.sort_body_requires_redde]
 message = "a sort body must return its key"
-help = "end the sort body with `return <key>`"
+help = "end the sort body with `{redde} <key>`"
 
 [diagnostics.SEM010.issues.argument_type_mismatch]
 message = "argument type mismatch"
-help = "make the expression type match the expected type"
+help = "pass a value of the parameter's type, or convert it with `↦` when that conversion is supported"
 
 [diagnostics.SEM010.issues.mut_argument_type_mismatch]
 message = "argument type differs from the mutable parameter type"
@@ -2649,43 +2649,43 @@ help = "a store through a mutable parameter lands in the caller's cell, so pass 
 
 [diagnostics.SEM010.issues.callee_not_callable]
 message = "callee is not callable"
-help = "make the expression type match the expected type"
+help = "call a function, closure, or callable value"
 
 [diagnostics.SEM010.issues.figura_not_index_param]
 message = "name does not refer to an index parameter"
-help = "make the expression type match the expected type"
+help = "use a declared `{magnitudo}` parameter for a shape dimension, or mark a local or parameter as a run-time extent with `{magnitudo}`"
 
 [diagnostics.SEM010.issues.assignment_type_mismatch]
 message = "assignment type mismatch"
-help = "make the expression type match the expected type"
+help = "convert the value explicitly with `↦` if supported, or change the destination type"
 
 [diagnostics.SEM010.issues.assert_condition_type_mismatch]
 message = "assert condition must be boolean"
-help = "make the expression type match the expected type"
+help = "make the condition boolean, for example by comparing values with `≡`"
 
 [diagnostics.SEM010.issues.constant_annotation_mismatch]
 message = "constant value does not match annotation"
-help = "make the expression type match the expected type"
+help = "make the value match the declared type, or change the type annotation"
 
 [diagnostics.SEM010.issues.closure_parameter_type_mismatch]
 message = "closure parameter type mismatch"
-help = "make the expression type match the expected type"
+help = "make the closure's declared parameter types match the expected function type"
 
 [diagnostics.SEM010.issues.closure_return_type_mismatch]
 message = "closure return type mismatch"
-help = "make the expression type match the expected type"
+help = "make the closure body produce the expected result type, or change its explicit return type"
 
 [diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
 message = "coalesce fallback type mismatch"
-help = "make the expression type match the expected type"
+help = "make the fallback match the nullable value's inner type"
 
 [diagnostics.SEM010.issues.tensor_coalesce_element_nullable_required]
 message = "{vel} on a tensor needs elements that may be nihil"
-help = "use a tensor whose element type is T ∪ nihil, or drop the {vel}"
+help = "use a tensor whose element type is `T ∪ {nihil}`, or drop the {vel}"
 
 [diagnostics.SEM010.issues.common_type_mismatch]
 message = "incompatible types"
-help = "make the expression type match the expected type"
+help = "give both values a shared type, converting one explicitly with `↦` where appropriate"
 
 [diagnostics.SEM010.issues.tensor_edge_policy_marker_not_runtime_value]
 message = "tensor edge-policy markers are type arguments, not runtime values"
@@ -2693,19 +2693,19 @@ help = "use clamp, reflect, or wrap only as the type argument to {limes}"
 
 [diagnostics.SEM010.issues.array_element_type_mismatch]
 message = "array element type mismatch"
-help = "make the expression type match the expected type"
+help = "make each array element match the target element type, converting values explicitly when supported"
 
 [diagnostics.SEM010.issues.array_spread_element_type_mismatch]
 message = "array spread element type mismatch"
-help = "make the expression type match the expected type"
+help = "spread a list whose element type matches the target element type"
 
 [diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
 message = "propagating conversio failure channel mismatch"
-help = "make the expression type match the expected type"
+help = "use an enclosing `⇥` type that accepts the failure, or give the conversion a `⊥` fallback"
 
 [diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
 message = "conversio recovery type mismatch"
-help = "make the expression type match the expected type"
+help = "make the `⊥` fallback a value of the conversion target type"
 
 [diagnostics.SEM010.issues.conversio_assign_inference_hole_destination]
 message = "conversion-directed assignment '↤' requires a resolved destination type"
@@ -2713,23 +2713,23 @@ help = "write a concrete type for the destination, e.g. 'let int x ↤ value'"
 
 [diagnostics.SEM010.issues.cursor_iteration_requires_ex]
 message = "cursor iteration supports {itera} {ex} only"
-help = "make the expression type match the expected type"
+help = "use `{itera} {ex}` to iterate cursor items; cursors have no `{de}` key iteration"
 
 [diagnostics.SEM010.issues.expression_type_mismatch]
 message = "expression type mismatch"
-help = "make the expression type match the expected type"
+help = "provide a value of the required type, or convert it with `↦` when supported"
 
 [diagnostics.SEM010.issues.import_conversion_required]
 message = "a foreign value of unknown type ({found}) cannot be stored in a cell of {expected}"
-help = "force the trust transfer with a conversion: `value ↦ {expected}`"
+help = "convert the imported value explicitly before storing it: `value ↦ {expected}`"
 
 [diagnostics.SEM010.issues.equality_exact_types_required]
 message = "equality requires identical types; use `≅` to compare numeric values across types, or `↦` to convert one side explicitly before comparing (ascii ↦ int for the scalar value, or compare against an ascii literal like 'a')"
-help = "make the expression type match the expected type"
+help = "make the types identical before `≡` or `≢`; use `≅` for numeric values across types, or convert one side with `↦`"
 
 [diagnostics.SEM010.issues.field_initializer_type_mismatch]
 message = "field initializer type mismatch"
-help = "make the expression type match the expected type"
+help = "make the initializer match the field's declared type, converting it explicitly when supported"
 
 [diagnostics.SEM010.issues.construction_source_type_mismatch]
 message = "the '{ex}' source must be the genus being constructed"
@@ -2737,27 +2737,27 @@ help = "copy from a value of the same genus type"
 
 [diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
 message = "failable call error type does not match enclosing ⇥"
-help = "make the expression type match the expected type"
+help = "make the enclosing function's `⇥` type accept this error, or handle the call locally with `{fac} … {cape}`"
 
 [diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
 message = "handled failable call error type mismatch"
-help = "make the expression type match the expected type"
+help = "handle calls with different error types separately, or make their error types match"
 
 [diagnostics.SEM010.issues.field_default_type_mismatch]
 message = "field default type mismatch"
-help = "make the expression type match the expected type"
+help = "make the default value match the field's declared type"
 
 [diagnostics.SEM010.issues.iace_requires_alternate_exit]
 message = "iace requires an enclosing function with a '⇥' alternate-exit type"
-help = "make the expression type match the expected type"
+help = "declare an error type after `⇥` on the enclosing function, or enclose `{iace}` in `{fac} … {cape}`"
 
 [diagnostics.SEM010.issues.iace_value_type_mismatch]
 message = "alternate exit value type mismatch"
-help = "make the expression type match the expected type"
+help = "make the `{iace}` value match the active error type, or handle throws with different types in separate `{fac} … {cape}` blocks"
 
 [diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
 message = "ignored expression result must resolve"
-help = "make the expression type match the expected type"
+help = "give the expression enough type context to resolve, or remove the unused expression"
 
 [diagnostics.SEM010.issues.implet_contract_arity]
 message = "contract {contract} takes {expected} type argument(s), found {found}"
