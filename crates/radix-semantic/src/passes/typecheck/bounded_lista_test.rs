@@ -300,9 +300,28 @@ fn bounded_lista_hole_without_literal_witness_still_reports_sem014() {
 
 #[test]
 fn bounded_lista_parameter_widening_stays_explicit() {
+    // A list value of capacity 2 does not implicitly widen to capacity 3.
     assert_rejects_with_issue_la(
         r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
+incipit {
+    sit lista<numerus, magnitudo 2> pair ← [1, 2]
+    consume(pair)
+}",
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn bounded_lista_literal_argument_takes_the_parameter_cell() {
+    // A literal is built for its destination cell, as `[]` is: a short literal
+    // against a capacity-3 parameter fits it, a longer one is refused by name.
+    assert_accepts_la(
+        r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
 incipit { consume([1, 2]) }",
+    );
+    assert_rejects_with_issue_la(
+        r"functio consume(lista<numerus, magnitudo 3> xs) → vacuum { nota xs }
+incipit { consume([1, 2, 3, 4]) }",
         "argument_type_mismatch",
     );
 }
