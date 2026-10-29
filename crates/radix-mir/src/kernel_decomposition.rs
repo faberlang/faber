@@ -448,7 +448,7 @@ pub fn decompose_kernel_function_with_limit(
         // result copied in through a stage local — is a statement the
         // contract-shaped surface cannot bind: it names the recipe result
         // local as the output and leaves the parameter unwritten.
-        let plain = build_subchain_function(
+        let initial_subchain = build_subchain_function(
             function,
             indices,
             &[],
@@ -461,9 +461,9 @@ pub fn decompose_kernel_function_with_limit(
             is_last
                 && crate::read_analysis::terminator_return_local(&block.terminator.kind)
                     != Some(output)
-                && !crate::device_program_plans::recipe_result_is_param(&plain, output)
+                && !crate::device_program_plans::recipe_result_is_param(&initial_subchain, output)
         });
-        let mut synthetic = plain;
+        let mut synthetic = initial_subchain;
         if subchain_output_param.is_some() {
             synthetic = build_subchain_function(
                 function,
