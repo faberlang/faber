@@ -235,7 +235,7 @@ type_head ::= IDENTIFIER | 'โมดูลัส'
 # [112] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
 # [113] type_argument
-type_argument ::= labeled_type_argument | range_argument | sized_range_argument | type_annotation | NATURAL | '[' figura_list? ']'
+type_argument ::= labeled_type_argument | range_argument | sized_range_argument | spelled_lift | type_annotation | NATURAL | '[' figura_list? ']'
 # [114] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
 # [115] range_argument
