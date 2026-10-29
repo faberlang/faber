@@ -11,7 +11,7 @@ locale = "en"
 # Ref genus parameters preserve checked indexing on list fields.
 
 class Shelf {
-    list<int> values
+    let list<int> values
 }
 
 fn second(ref Shelf shelf, int i) → int {
