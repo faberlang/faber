@@ -1272,7 +1272,7 @@ fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: 
                 );
             }
             DiagnosticMode::Normal => {
-                eprintln!("{}", radix::module::diagnostics::render_plain(row))
+                eprintln!("{}", radix::module::diagnostics::render_plain(row));
             }
         }
     }
