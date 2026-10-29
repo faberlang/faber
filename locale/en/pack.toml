@@ -4953,7 +4953,7 @@ help = "write into the tensor that owns the storage, not into a view of it"
 
 [diagnostics.SEM057.issues.copy_into_target_not_storage]
 message = "the left side of '⇇' must name tensor storage"
-help = "write the target as a local, a mut parameter, or a field of one"
+help = "use a local tensor, a mutable tensor parameter, or a tensor field on a mutable local as the target"
 
 [diagnostics.SEM057.issues.copy_into_alias]
 message = "the right side of '⇇' reads the storage the left side writes"
@@ -4969,7 +4969,7 @@ help = "assign the binding before reading it, or declare the slot `sponte`"
 
 [diagnostics.SEM058.issues.possibly_uninitialized]
 message = "use of possibly uninitialized binding"
-help = "assign the binding before reading it, or declare the slot `sponte`"
+help = "initialize the binding before reading it, or ensure every branch assigns it before the read"
 
 [diagnostics.SEM059]
 message = "AIR purity violation"
@@ -4993,51 +4993,51 @@ help = "declare a wider slot, or convert with `↦` and a `⊥` default"
 
 [diagnostics.SEM059.issues.async_function]
 message = "@ radix lane \"{lane}\" rejects this function body: async functions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "put async work in a host wrapper and pass its result to a synchronous AIR function"
 
 [diagnostics.SEM059.issues.assignment_mutation]
 message = "@ radix lane \"{lane}\" rejects this function body: assignment is mutation outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "compute new values with immutable bindings instead of assigning back to existing storage"
 
 [diagnostics.SEM059.issues.breakable_block]
 message = "@ radix lane \"{lane}\" rejects this function body: breakable blocks are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a {si} or {discerne} expression to choose the result instead of leaving a breakable block early"
 
 [diagnostics.SEM059.issues.cede]
 message = "@ radix lane \"{lane}\" rejects this function body: `cede` is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "keep async and stream operations outside AIR; pass their completed value into the AIR function"
 
 [diagnostics.SEM059.issues.cli_mounted_function]
 message = "@ radix lane \"{lane}\" rejects this function body: CLI-mounted functions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "keep CLI parsing in a wrapper and pass its parsed values to a separate AIR function"
 
 [diagnostics.SEM059.issues.closure]
 message = "@ radix lane \"{lane}\" rejects this function body: closures are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a named AIR-lane function for a supported callback; keep other closures outside the AIR function"
 
 [diagnostics.SEM059.issues.defaulted_parameter]
 message = "@ radix lane \"{lane}\" rejects this function body: defaulted parameters are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "remove the parameter default and supply the argument at each call site"
 
 [diagnostics.SEM059.issues.deferred_local_init]
 message = "@ radix lane \"{lane}\" rejects this function body: deferred local initialization is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "initialize each local when you declare it; compute branch-specific values with expressions"
 
 [diagnostics.SEM059.issues.diagnostic_output]
 message = "@ radix lane \"{lane}\" rejects this function body: diagnostic output is a host effect outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "return diagnostic data to the caller and print it outside the AIR function"
 
 [diagnostics.SEM059.issues.dum_loop]
 message = "@ radix lane \"{lane}\" rejects this function body: `dum` loops are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a finite {itera} {ab} loop the AIR unroller can expand, or move this while loop outside AIR"
 
 [diagnostics.SEM059.issues.expression_ad]
 message = "@ radix lane \"{lane}\" rejects this function body: expression-form ad is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "make the external call outside AIR and pass its result into the AIR function"
 
 [diagnostics.SEM059.issues.expression_statement]
 message = "@ radix lane \"{lane}\" rejects this function body: expression statements are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "bind the result with {sit}, return it with {redde}, or remove the unused expression"
 
 [diagnostics.SEM059.issues.reducta_first_unbounded_source]
 message = "@ radix lane \"{lane}\" rejects this function body: the source of a first-match reduction has no statically known extent, which the v1 AIR subset requires"
@@ -5045,79 +5045,79 @@ help = "use a source with a static shape (a fully shaped tensor or matrix) as th
 
 [diagnostics.SEM059.issues.generator_function]
 message = "@ radix lane \"{lane}\" rejects this function body: generator functions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "collect generated values outside AIR, then pass bounded data into the AIR function"
 
 [diagnostics.SEM059.issues.gradient_expression_unsupported]
 message = "@ radix lane \"{lane}\" rejects this function body: postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A"
-help = "gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/selector rules land with tensor-glyphs 2B"
+help = "postfix `∇` is not implemented yet; remove it and use supported forward tensor operations for now"
 
 [diagnostics.SEM059.issues.iace]
 message = "@ radix lane \"{lane}\" rejects this function body: `iace` is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "handle the throw locally with a {fac}/{cape} handler, or return a failure value instead"
 
 [diagnostics.SEM059.issues.inc_dec_mutation]
 message = "@ radix lane \"{lane}\" rejects this function body: increment/decrement mutation is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "compute the next value with an immutable binding instead of incrementing or decrementing in place"
 
 [diagnostics.SEM059.issues.input_read]
 message = "@ radix lane \"{lane}\" rejects this function body: input reads are host effects outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "read input in the caller and pass the value as an AIR-function argument"
 
 [diagnostics.SEM059.issues.itera_loop]
 message = "@ radix lane \"{lane}\" rejects this function body: `itera` loops are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a single {itera} {ab} loop with a concrete bound and an unrollable body; move unsupported iteration outside AIR"
 
 [diagnostics.SEM059.issues.kernel_device_function]
 message = "@ radix lane \"{lane}\" rejects this function body: kernel/device functions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "for a differentiable device function, add `@ radix backward \"name\"` alongside the AIR lane; otherwise remove its AIR lane"
 
 [diagnostics.SEM059.issues.loop]
 message = "@ radix lane \"{lane}\" rejects this function body: loops are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a finite {itera} {ab} loop the AIR unroller can expand, or move this loop outside AIR"
 
 [diagnostics.SEM059.issues.loop_control]
 message = "@ radix lane \"{lane}\" rejects this function body: loop control is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "replace early loop exits with a {si} expression that chooses a value, or move the control flow outside AIR"
 
 [diagnostics.SEM059.issues.method_call]
 message = "@ radix lane \"{lane}\" rejects this function body: method call `{method}` is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "replace the unsupported method with a tensor arithmetic intrinsic allowed in AIR, or make the call outside AIR"
 
 [diagnostics.SEM059.issues.missing_body]
 message = "@ radix lane \"{lane}\" rejects this function body: AIR-lane functions must have a body"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "add a body; AIR-lane function declarations cannot be signature-only"
 
 [diagnostics.SEM059.issues.mori]
 message = "@ radix lane \"{lane}\" rejects this function body: `mori` is outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "return a status or failure value instead of panicking, and let the host caller report it"
 
 [diagnostics.SEM059.issues.mutable_varia]
 message = "@ radix lane \"{lane}\" rejects this function body: `mut` bindings are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use an immutable {sit} binding with an initializer and compute later values as new bindings"
 
 [diagnostics.SEM059.issues.named_call_arg]
 message = "@ radix lane \"{lane}\" rejects this function body: named call arguments are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "pass arguments positionally in the order declared by the function"
 
 [diagnostics.SEM059.issues.non_air_call]
 message = "@ radix lane \"{lane}\" rejects this function body: calls from AIR-lane functions must target another AIR-lane function"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "move a pure callee into the AIR lane and keep it within the accepted subset, or make this call outside AIR"
 
 [diagnostics.SEM059.issues.optional_null_chain]
 message = "@ radix lane \"{lane}\" rejects this function body: optional/null assertion chains are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "resolve the optional value before calling the AIR function, and pass a non-optional value"
 
 [diagnostics.SEM059.issues.reducta_expression_unsupported]
 message = "@ radix lane \"{lane}\" rejects this function body: reduction expressions are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a first-match reduction only with a statically shaped source; perform other reductions outside AIR"
 
 [diagnostics.SEM059.issues.recoverable_handler]
 message = "@ radix lane \"{lane}\" rejects this function body: recoverable handlers are outside the v1 AIR subset"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "use a local {fac}/{cape} handler whose recovery arm produces the handled region's value type"
 
 [diagnostics.SEM059.issues.recovery_type_mismatch]
 message = "@ radix lane \"{lane}\" rejects this function body: a recovery arm's exit value type differs from the handled region's normal-exit type, which the v1 AIR subset requires"
-help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+help = "make every normal exit in the recovery arm produce the same type as the handled region"
 
 [diagnostics.SEM059.issues.reference_place_op]
 message = "@ radix lane \"{lane}\" rejects this function body: reference/place operations are outside the v1 AIR subset"
