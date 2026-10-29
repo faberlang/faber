@@ -559,6 +559,22 @@ incipit {
     );
 }
 
+// --- A ranged list keeps its range while the element parameter is bound ---
+
+#[test]
+fn generic_element_param_binds_a_ranged_list_argument() {
+    accepts(
+        r"functio numera<T>(lista<T, magnitudo 1…∞> xs) → numerus {
+    redde xs.longitudo()
+}
+
+incipit {
+    sit lista<numerus, magnitudo 1…∞> xs ← [7]
+    nota numera<numerus>(xs)
+}",
+    );
+}
+
 // --- Size parameters of a generic class instantiate at the receiver ---
 
 #[test]
