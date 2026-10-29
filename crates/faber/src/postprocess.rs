@@ -108,6 +108,8 @@ pub(crate) fn render_normal(
 }
 
 /// Print diagnostics using Faber-owned presentation.
+///
+/// In expanded mode the batch is followed by the run's explain footer.
 pub fn print_diagnostics(
     diagnostics: &[radix::module::diagnostics::Diagnostic],
     mode: DiagnosticMode,
@@ -137,6 +139,80 @@ pub fn print_diagnostics(
             "{}",
             radix::module::diagnostics::render_expanded_diagnostics(diagnostics)
         ),
+    }
+    print_explain_footer(diagnostics);
+}
+
+/// Whether `diag` is a package refusal (`PKG001` with an issue) that has no
+/// reader-pack row. The shared expanded renderer prints no message for it, so
+/// its own message is the report.
+pub(crate) fn package_refusal_without_row(
+    diag: &radix::module::diagnostics::Diagnostic,
+    pack: Option<&radix::module::locale::LocalePack>,
+) -> bool {
+    let Some(issue) = diag.issue() else {
+        return false;
+    };
+    diag.code == Some(crate::PACKAGE_DIAGNOSTIC_CODE)
+        && !pack.is_some_and(|pack| {
+            pack.diagnostics
+                .get(crate::PACKAGE_DIAGNOSTIC_CODE)
+                .is_some_and(|package| package.issues.contains_key(issue))
+        })
+}
+
+/// Print diagnostics for a command whose compact form already carries the
+/// message of every diagnostic (`compact`). In expanded mode the shared
+/// renderer prints what it can; the package refusals it prints no message for
+/// go through `compact` instead, so the message is never lost.
+pub fn print_diagnostics_or_compact(
+    diagnostics: &[radix::module::diagnostics::Diagnostic],
+    mode: DiagnosticMode,
+    diagnostics_locale_pack: Option<&radix::module::locale::LocalePack>,
+    compact: impl Fn(&[radix::module::diagnostics::Diagnostic]),
+) {
+    if mode != DiagnosticMode::Diagnostics {
+        compact(diagnostics);
+        return;
+    }
+    let (message_only, expanded): (Vec<_>, Vec<_>) = diagnostics
+        .iter()
+        .cloned()
+        .partition(|diag| package_refusal_without_row(diag, diagnostics_locale_pack));
+    print_diagnostics(&expanded, mode, diagnostics_locale_pack);
+    compact(&message_only);
+}
+
+/// Set once the run has printed its explain footer.
+static EXPLAIN_FOOTER_PRINTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// The `faber explain` query for the first error in `diagnostics`: its
+/// `CODE.issue`, or its `CODE` when the issue has no row of its own. `None`
+/// when `faber explain` has nothing to say about it.
+fn explain_footer_query(diagnostics: &[radix::module::diagnostics::Diagnostic]) -> Option<String> {
+    let first_error = diagnostics.iter().find(|diag| diag.is_error())?;
+    let code = first_error.code?;
+    let issue_query = first_error.issue().map(|issue| format!("{code}.{issue}"));
+    [issue_query, Some(code.to_owned())]
+        .into_iter()
+        .flatten()
+        .find(|query| {
+            matches!(
+                crate::diagnostic_explain::lookup_embedded_diagnostic(query, None),
+                Ok(Some(_))
+            )
+        })
+}
+
+/// Print `explain: faber explain <CODE>.<issue>` for the first error, once per
+/// run. A batch with no explainable error leaves the footer for a later batch.
+pub(crate) fn print_explain_footer(diagnostics: &[radix::module::diagnostics::Diagnostic]) {
+    let Some(query) = explain_footer_query(diagnostics) else {
+        return;
+    };
+    if !EXPLAIN_FOOTER_PRINTED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        eprintln!("explain: faber explain {query}");
     }
 }
 

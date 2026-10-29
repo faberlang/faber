@@ -150,29 +150,28 @@ reds. From the repo root: `cargo build -p faber` then `target/debug/faber ...`, 
 
 ### Reading a diagnostic
 
-Default output is **code-first by design**: a coded diagnostic prints as
-`error[SEM010:initializer_annotation_mismatch]: file:line` plus the source
-line — no message, no help. The prose exists in the reader packs, and you have
-to ask for it:
+Default `faber check` prints expanded phase-aware diagnostics, including the
+rendered message and help. Use `--no-diagnostics` for the former compact code
+and source-line form:
 
 ```bash
-faber check --diagnostics <path>                      # message + help + phase/span, inline
+faber check <path>                                  # message + help + phase/span
+faber check --no-diagnostics <path>                 # compact code + source line
 faber explain SEM010                                  # catalog entry by code
 faber explain SEM010.initializer_annotation_mismatch  # catalog entry by code.issue
-faber check --diagnostics --diagnostics-locale la <path>   # message language
+faber check --diagnostics-locale la <path>           # message language
 ```
 
-- `--diagnostics` is the verbose developer mode, and it is the only check mode
-  that consults `--diagnostics-locale`; default output ignores that flag, so
-  setting it alone changes nothing.
-- Embedded diagnostic locales: `ar`, `en`, `hi`, `la`, `th-TH`, `vi`,
-  `zh-Hans`, `zh-Hant`, default `en`. `--diagnostics-locale` takes a locale
-  *name*, not a pack path.
+`--diagnostics-locale` applies to the default rendered diagnostics too.
+Embedded diagnostic locales: `ar`, `en`, `hi`, `la`, `th-TH`, `vi`,
+`zh-Hans`, `zh-Hant`, default `en`. The flag takes a locale *name*, not a
+pack path. Build, run, test, emit, format, and convert also show message/help
+by default; each accepts `--no-diagnostics` for compact output.
+
 - `faber verify` prints the expanded record without message or help (it passes
   no pack); do not read its silence as a missing template.
-- Never infer a fix from the bare code. If the meaning is not obvious from the
-  code and source line, run `--diagnostics` or `faber explain` and read the
-  message and help before editing source.
+- Never infer a fix from the bare code. Read the default message and help, or
+  use `faber explain`, before editing source.
 
 ## Locale First
 
@@ -317,7 +316,7 @@ examples small and canonical unless asked otherwise.
 - Is every spelling I emitted from one pack, only that pack?
 - Did I quote `EBNF.md` and open a real exemplar rather than recall both?
 - Did I verify legality with `faber check` when it matters?
-- If a diagnostic was unclear, did I read its message (`--diagnostics` or
+- If a diagnostic was unclear, did I read its message and help (shown by default; or
   `faber explain`) instead of guessing from the code?
 - If a library/target/host claim: did I inspect that repo's live source?
 - Did I avoid filling gaps with confident invention?

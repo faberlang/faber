@@ -558,9 +558,8 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // asserted via code/args in the same tests.
         || rel == "crates/radix-semantic/tests/pack_placeholder_completeness.rs"
         || rel == "crates/radix-module/src/driver/frontmatter_locale_test.rs"
-        // Renderer contract (CLI output mode): pins the terse plain-mode
-        // line (code header, no message prose) against the `--diagnostics`
-        // expanded rendering of the same diagnostic.
+        // Renderer contract (CLI output mode): pins both default expanded
+        // diagnostics and the `--no-diagnostics` compact rendering.
         || rel == "crates/faber/src/commands/check_test.rs"
         // Renderer contract: `faber explain` / reference-pack resolution pins
         // the template and help text it returns.

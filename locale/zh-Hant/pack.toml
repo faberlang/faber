@@ -3918,177 +3918,234 @@ help = "保持項為純：只寫入歸約體宣告的區域變數，只呼叫不
 
 [diagnostics.PARSE001.issues.type_arguments_end]
 message = "型別實參後需要 '>'"
+help = "在型別實參後加上結尾的 `>`。"
 
 [diagnostics.PARSE001.issues.function_type_start]
 message = "函式型別的形參前需要 '('"
+help = "在函式型別的參數型別前加上 `(`。"
 
 [diagnostics.PARSE001.issues.function_type_parameters_end]
 message = "函式型別的形參後需要 ')'"
+help = "在 `→` 回傳箭頭前以 `)` 關閉參數清單。"
 
 [diagnostics.PARSE001.issues.function_type_return_arrow]
 message = "函式回傳型別前需要 '→'"
+help = "在參數清單和回傳型別之間寫上 `→`。"
 
 [diagnostics.PARSE001.issues.numeric_wrapper_start]
 message = "數值包裝型別名稱後需要 '<'"
+help = "使用裸寬度型別，例如 `i32` 或 `f32`；數值型別不再使用 `<...>`。"
 
 [diagnostics.PARSE001.issues.tuple_type_label_separator]
 message = "元組元素標籤後需要 ':'"
+help = "以 `:` 分隔元組型別標籤和型別，例如 `tuple<name: string>`。"
 
 [diagnostics.PARSE001.issues.ratio_type_label_separator]
 message = "ratio 元素標籤後需要 ':'"
+help = "以 `:` 分隔記錄欄位標籤和型別，例如 `record<name: string>`。"
 
 [diagnostics.PARSE001.issues.shape_dimensions_end]
 message = "形狀維度後需要 ']'"
+help = "以 `]` 關閉形狀維度，例如 `tf32[2, 3]`。"
 
 [diagnostics.PARSE001.issues.shape_parenthesis_end]
 message = "括號內的形狀後需要 ')'"
+help = "以 `)` 關閉括號內的大小運算式，例如 `{magnitudo} (n + 1)`。"
 
 [diagnostics.PARSE001.issues.awaited_binding_assignment]
 message = "等定／等變綁定後需要 '←'"
+help = "在 `{figendum}` 或 `{variandum}` 綁定後，使用 `←` 接上 future 運算式。"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_start]
 message = "陣列綁定模式需要以 '[' 開始"
+help = "以 `[` 開始陣列綁定，例如 `{sit} [first, second] ← values`。"
 
 [diagnostics.PARSE001.issues.array_binding_pattern_end]
 message = "陣列綁定模式需要以 ']' 結束"
+help = "以 `]` 關閉陣列綁定，例如 `{sit} [first, second] ← values`。"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_start]
 message = "物件綁定模式需要以大括號開始"
+help = "以 `{{` 開始物件綁定，例如 `{sit} {{ name } ← value`。"
 
 [diagnostics.PARSE001.issues.object_binding_pattern_end]
 message = "物件綁定模式需要以 '}' 結束"
+help = "以 `}` 關閉物件綁定，例如 `{sit} {{ name } ← value`。"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_start]
 message = "函式宣告參數前需要 '('"
+help = "在函式名稱後以括號書寫參數：`{functio} greet(string name)`。"
 
 [diagnostics.PARSE001.issues.function_declaration_parameters_end]
 message = "函式宣告參數後需要 ')'"
+help = "在最後一個參數後關閉參數清單，例如 `{functio} greet(string name)`。"
 
 [diagnostics.PARSE001.issues.class_body_end]
 message = "類別本體後需要 '}'"
+help = "在成員後關閉類別，例如 `{genus} Name {{ {sit} int value }`。"
 
 [diagnostics.PARSE001.issues.interface_body_start]
 message = "介面主體需要以大括號開始"
+help = "以 `{{` 開始介面主體，例如 `{implendum} Name {{ {functio} method() }`。"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_start]
 message = "介面 method 參數前需要 '('"
+help = "以括號書寫介面方法參數：`{functio} method(string name)`。"
 
 [diagnostics.PARSE001.issues.interface_method_parameters_end]
 message = "介面 method 參數後需要 ')'"
+help = "在最後一個參數後關閉方法參數清單：`{functio} method(string name)`。"
 
 [diagnostics.PARSE001.issues.interface_body_end]
 message = "介面主體後需要 '}'"
+help = "在方法簽章後關閉介面，例如 `{implendum} Name {{ {functio} method() }`。"
 
 [diagnostics.PARSE001.issues.type_alias_value_separator]
 message = "型別別名值前需要 '='"
+help = "使用 `=` 書寫型別別名，例如 `{typus} Name = string`。"
 
 [diagnostics.PARSE001.issues.schema_body_start]
 message = "schema 主體需要以大括號開始"
+help = "以 `{{` 開始 schema 主體，例如 `{schema} Name {{ {columna} int id }`。"
 
 [diagnostics.PARSE001.issues.schema_body_end]
 message = "schema 主體後需要 '}'"
+help = "在欄位後關閉 schema，例如 `{schema} Name {{ {columna} int id }`。"
 
 [diagnostics.PARSE001.issues.enum_body_start]
 message = "enum 主體需要以大括號開始"
+help = "以 `{{` 開始列舉主體，例如 `{ordo} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.enum_body_end]
 message = "enum 主體後需要 '}'"
+help = "在成員後關閉列舉，例如 `{ordo} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.union_body_start]
 message = "union 主體需要以大括號開始"
+help = "以 `{{` 開始 union 主體，例如 `{discretio} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.union_variant_fields_end]
 message = "union variant 欄位後需要 '}'"
+help = "在欄位後關閉變體承載內容，例如 `Circle {{ int radius }`。"
 
 [diagnostics.PARSE001.issues.union_body_end]
 message = "union 主體後需要 '}'"
+help = "在變體後關閉 union，例如 `{discretio} Name {{ First, Second }`。"
 
 [diagnostics.PARSE001.issues.import_record_start]
 message = "匯入記錄需要以大括號開始"
+help = "以 `{{` 開始匯入記錄，例如 `{importa} {{ {ex} = \"norma:console\" }`。"
 
 [diagnostics.PARSE001.issues.import_field_value_separator]
 message = "匯入欄位名稱後需要 '='"
+help = "以 `=` 分隔匯入欄位和值，例如 `{ex} = \"norma:console\"`。"
 
 [diagnostics.PARSE001.issues.import_record_end]
 message = "匯入記錄欄位後需要 '}'"
+help = "在欄位後關閉匯入記錄，例如 `{importa} {{ {ex} = \"norma:console\" }`。"
 
 [diagnostics.PARSE001.issues.probandum_body_start]
 message = "probandum 主體需要以大括號開始"
+help = "以 `{{` 開始測試套件主體，例如 `{probandum} \"suite\" {{`。"
 
 [diagnostics.PARSE001.issues.probandum_body_end]
 message = "probandum 主體後需要 '}'"
+help = "在測試和設定掛鉤後以 `}` 關閉測試套件。"
 
 [diagnostics.PARSE001.issues.annotation_fields_start]
 message = "註解欄位需要以大括號開始"
+help = "欄位請使用大括號註解，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.annotation_field_value_separator]
 message = "註解欄位名稱後需要 '='"
+help = "以 `=` 分隔註解欄位和值，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.annotation_fields_end]
 message = "註解欄位後需要 '}'"
+help = "在欄位後關閉大括號註解，例如 `@{cli} {{ name = \"runner\" }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_start]
 message = "nucleum 註解欄位需要以大括號開始"
+help = "使用大括號核心選項，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_field_value_separator]
 message = "nucleum 註解欄位名稱後需要 '='"
+help = "以 `=` 分隔核心選項和值，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.nucleum_annotation_fields_end]
 message = "nucleum 註解欄位後需要 '}'"
+help = "在欄位後關閉大括號核心選項，例如 `@{nucleum} {{ {fragment} = {verum} }`。"
 
 [diagnostics.PARSE001.issues.block_start]
 message = "區塊需要以大括號開始"
+help = "在標頭後開始區塊，例如 `{si} ready {{ {tacet} }`。"
 
 [diagnostics.PARSE001.issues.block_end]
 message = "區塊需要以 '}' 結束"
+help = "在陳述式後以 `}` 關閉區塊。"
 
 [diagnostics.PARSE001.issues.generic_parameters_end]
 message = "泛型參數後需要 '>'"
+help = "以 `>` 關閉泛型參數清單，例如 `{functio} identity<T>(T value)`。"
 
 [diagnostics.PARSE001.issues.contract_type_arguments_end]
 message = "contract 型別實參後需要 '>'"
+help = "以 `>` 關閉合約的型別實參，例如 `Contract<Type>`。"
 
 [diagnostics.PARSE001.issues.apud_coordinates_start]
 message = "'apud' 後需要 '['"
+help = "在 `{apud}` 後以方括號列出迭代座標，例如 `{itera} {ex} values {apud} [i] {sit} value`。"
 
 [diagnostics.PARSE001.issues.apud_coordinates_end]
 message = "'apud' 座標後需要 ']'"
+help = "在座標名稱後以 `]` 關閉座標清單。"
 
 [diagnostics.PARSE001.issues.expected_keyword]
 message = "需要 '{keyword}'"
 
 [diagnostics.PARSE001.issues.reducta_source]
 message = "reduction 運算子之後需要 reduction 來源"
+help = "在歸約運算子後寫上 `{ex} source`。"
 
 [diagnostics.PARSE001.issues.lege_lineam]
 message = "需要 '{lege}' 或 '{lineam}'"
+help = "使用 `{lege}` 讀取所有輸入，或使用 `{lineam}` 讀取一行。"
 
 [diagnostics.PARSE001.issues.elige_body_start]
 message = "elige 主體需要以大括號開始"
+help = "寫成 `{elige} value {{ ... }`，並在其中放入 `{casu}` 案例。"
 
 [diagnostics.PARSE001.issues.elige_body_end]
 message = "elige 分支後需要 '}'"
+help = "在 `{casu}` 案例和選用的 `{ceterum}` 分支後關閉 `{elige}` 主體。"
 
 [diagnostics.PARSE001.issues.discerne_body_start]
 message = "discerne 主體需要以大括號開始"
+help = "寫成 `{discerne} value {{ ... }`，並在其中放入 `{casu}` 模式分支。"
 
 [diagnostics.PARSE001.issues.discerne_body_end]
 message = "discerne 分支後需要 '}'"
+help = "在 `{casu}` 分支和選用的 `{ceterum}` 分支後關閉 `{discerne}` 主體。"
 
 [diagnostics.PARSE001.issues.custodi_body_start]
 message = "custodi 主體需要以大括號開始"
+help = "以 `{custodi} {{` 開始主體，並加入一個或多個 `{si}` 子句。"
 
 [diagnostics.PARSE001.issues.custodi_body_end]
 message = "custodi 子句後需要 '}'"
+help = "在 `{si}` 子句後關閉 `{custodi}` 主體。"
 
 [diagnostics.PARSE001.issues.conditional_else_marker]
 message = "條件值後需要 '✗'"
+help = "在 then 值和 else 值之間放置 `✗`。"
 
 [diagnostics.PARSE001.issues.call_arguments_end]
 message = "呼叫引數後需要 ')'"
+help = "以 `)` 關閉呼叫的引數清單。"
 
 [diagnostics.PARSE001.issues.index_end]
 message = "索引運算式後需要 ']'"
+help = "以 `]` 關閉索引運算式。"
 
 [diagnostics.PARSE001.issues.index_coordinate_comma]
 message = "索引括號只接受一個運算式；分開的座標不是按軸的槽位"
@@ -4096,102 +4153,135 @@ help = "把座標寫成帶括號的清單，例如 m[[r, c]]"
 
 [diagnostics.PARSE001.issues.gradient_selectors_end]
 message = "gradient 選擇器後需要 ']'"
+help = "在括號選擇器清單的項目後以 `]` 關閉。"
 
 [diagnostics.PARSE001.issues.optional_index_end]
 message = "可選索引運算式後需要 ']'"
+help = "以 `value?[index]` 的形式完成可選索引。"
 
 [diagnostics.PARSE001.issues.optional_call_arguments_end]
 message = "可選呼叫引數後需要 ')'"
+help = "以 `value?(arguments)` 的形式完成可選呼叫。"
 
 [diagnostics.PARSE001.issues.non_null_index_end]
 message = "非空索引運算式後需要 ']'"
+help = "以 `value![index]` 的形式完成非空索引。"
 
 [diagnostics.PARSE001.issues.non_null_call_arguments_end]
 message = "非空呼叫引數後需要 ')'"
+help = "以 `value!(arguments)` 的形式完成非空呼叫。"
 
 [diagnostics.PARSE001.issues.typed_constructor_fields_end]
 message = "建構子欄位後需要 '}'"
+help = "在最後一個欄位後以 `}` 關閉建構子欄位。"
 
 [diagnostics.PARSE001.issues.inferred_constructor_elements_end]
 message = "推斷建構子元素後需要 ']'"
+help = "以 `]` 關閉推斷建構子的元素清單。"
 
 [diagnostics.PARSE001.issues.array_literal_end]
 message = "陣列元素後需要 ']'"
+help = "在元素後以 `]` 關閉清單字面值。"
 
 [diagnostics.PARSE001.issues.parenthesized_expression_end]
 message = "括號內的運算式後需要 ')'"
+help = "以 `)` 關閉括號內的運算式。"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_start]
 message = "'ratio' 後需要 '<'"
+help = "在 `record` 後書寫帶標籤的型別實參，例如 `record<label: Type>`。"
 
 [diagnostics.PARSE001.issues.ratio_type_arguments_end]
 message = "ratio 型別實參後需要 '>'"
+help = "在欄位前以 `>` 關閉記錄型別實參。"
 
 [diagnostics.PARSE001.issues.ratio_fields_start]
 message = "ratio 型別實參後需要大括號"
+help = "在記錄型別實參後，以 `{{` 開始欄位。"
 
 [diagnostics.PARSE001.issues.ratio_fields_end]
 message = "ratio 欄位後需要 '}'"
+help = "在最後一個欄位後以 `}` 關閉記錄欄位。"
 
 [diagnostics.PARSE001.issues.type_constructor_fields_end]
 message = "具型別建構子欄位後需要 '}'"
+help = "在最後一個欄位後以 `}` 關閉具型別建構子的欄位。"
 
 [diagnostics.PARSE001.issues.finge_fields_end]
 message = "finge 欄位後需要 '}'"
+help = "在最後一個欄位後以 `}` 關閉變體欄位。"
 
 [diagnostics.PARSE001.issues.iuncta_type_arguments_start]
 message = "'iuncta' 後需要 '<'"
+help = "在 `{iuncta}` 後書寫元組型別實參，例如 `{iuncta}<T, U>`。"
 
 [diagnostics.PARSE001.issues.iuncta_elements_start]
 message = "iuncta 型別實參後需要 '['"
+help = "型別實參後，以方括號書寫元組值清單。"
 
 [diagnostics.PARSE001.issues.iuncta_elements_end]
 message = "iuncta 元素後需要 ']'"
+help = "在元素後以 `]` 關閉元組值清單。"
 
 [diagnostics.PARSE001.issues.closure_parameters_end]
 message = "閉包參數後需要 ')'"
+help = "在選用的簽名和 `∴` 前以 `)` 關閉參數清單。"
 
 [diagnostics.PARSE001.issues.closure_body_marker]
 message = "閉包簽名後需要 '∴'"
+help = "閉包簽名後寫上 `∴`，接著提供運算式或 `{fac}` 區塊。"
 
 [diagnostics.PARSE001.issues.ad_opener_end]
 message = "ad 開啟括號後需要 ')'"
+help = "在值後以 `)` 關閉選用的開啟運算式。"
 
 [diagnostics.PARSE001.issues.argument_label_separator]
 message = "引數標籤後需要 ':'"
+help = "在範本呼叫中，於引數標籤和值之間加上 `:`。"
 
 [diagnostics.PARSE001.issues.computed_key_end]
 message = "計算鍵值後需要 ']'"
+help = "在寫入 `= value` 前以 `]` 關閉計算欄位鍵。"
 
 [diagnostics.PARSE001.issues.json_key_separator]
 message = "JSON 索引鍵後需要 ':'"
+help = "在每個帶引號的 JSON 索引鍵和值之間放置 `:`。"
 
 [diagnostics.PARSE001.issues.json_object_end]
 message = "JSON 物件後需要 '}'"
+help = "在成員後以 `}` 關閉 JSON 物件。"
 
 [diagnostics.PARSE001.issues.json_array_end]
 message = "JSON 陣列後需要 ']'"
+help = "在值後以 `]` 關閉 JSON 陣列。"
 
 [diagnostics.PARSE001.issues.inferred_field_constructor_end]
 message = "推斷建構子欄位後需要 '}'"
+help = "以 `}` 關閉推斷建構子。"
 
 [diagnostics.PARSE001.issues.call_type_arguments_end]
 message = "呼叫型別實參後需要 '>'"
+help = "在呼叫的左括號前以 '>' 關閉型別實參清單。"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_start]
 message = "建構子型別實參前需要 '<'"
+help = "在建構子的型別實參前加上 '<'。"
 
 [diagnostics.PARSE001.issues.constructor_type_arguments_end]
 message = "建構子型別實參後需要 '>'"
+help = "以 '>' 關閉建構子的型別實參清單。"
 
 [diagnostics.PARSE001.issues.scriptum_start]
 message = "'scriptum' 後需要 '('"
+help = "以 '(' 開始 `{scriptum}` 呼叫。"
 
 [diagnostics.PARSE001.issues.scriptum_end]
 message = "scriptum 引數後需要 ')'"
+help = "在引數後以 ')' 關閉 `{scriptum}` 呼叫。"
 
 # Package-layer rows. The PKG001 base row only holds issue rows: the renderer
 # shows a PKG001 diagnostic from the pack only when its own issue row exists.
+
 [diagnostics.PKG001]
 message = "套件建置失敗"
 
@@ -4252,5 +4342,26 @@ help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacu
 [diagnostics.INFO001]
 message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
 
+[diagnostics.INFO001.issues.single_lane]
+message = "內核 `{kernel}` 在單一車道上執行"
+help = "若每個通道都應處理一個項目，請使用 `@ {nucleum}` 函式搭配 `{itera}` 迴圈和 `{filum}` 子句。"
+
+[diagnostics.INFO001.issues.not_split]
+message = "內核 `{kernel}` 只在 {partitions} 個分區中的一個上執行：{reason}"
+help = "檢查原因：分割需要線性通道網格、通道範圍，以及限制在各通道範圍內的寫入。"
+
+[diagnostics.INFO001.issues.split_depends_on_shapes]
+message = "內核 `{kernel}`：能否拆分到 {partitions} 個分區取決於執行時形狀"
+help = "選擇執行期形狀，讓通道網格與其寫入具有相符範圍，以便可預測地分割。"
+
+[diagnostics.INFO001.issues.whole_call]
+message = "內核 `{kernel}` 作為一次循序呼叫在一個 CPU 工作執行緒上執行"
+help = "若要獨立處理每個項目，請使用 `@ {nucleum}` 函式搭配 `{itera}` 迴圈和 `{filum}` 子句。"
+
+[diagnostics.INFO001.issues.not_placed]
+message = "內核 `{kernel}` 未放置到 {device} 裝置上：{reason}"
+help = "檢查原因，並使用所選裝置支援的核心形式。"
+
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"
+help = "依照稽核原因找出相依性。讓分區讀寫留在各通道本地，並盡可能使用相符的緩衝區配置。"

@@ -233,7 +233,10 @@ impl FunctionLower<'_, '_> {
                     // The floor remainder, as the scalar operator.
                     return Ok((self.float_floor_rem(a, b)?, Rep::Float));
                 }
-                self.float_binary(op, a, b)
+                // The operands arrive from typed list cells and the result
+                // rounds at `lift_store`'s element cell, so the per-cell
+                // width needs no operand rounding here.
+                self.float_binary(op, a, b, false)
             }
             _ => Err(Decline::new("list lift operand representations")),
         }

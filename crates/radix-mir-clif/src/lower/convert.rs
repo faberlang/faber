@@ -915,7 +915,12 @@ impl FunctionLower<'_, '_> {
                 (self.builder.ins().fcvt_from_sint(types::F64, wide), None)
             }
             (Num::Bool, Num::Int(_)) => (self.builder.ins().uextend(types::I64, value), None),
-            (Num::Float(_), Num::Float(_)) | (Num::Nil, Num::Dyn) => (value, None),
+            (Num::Float(_), Num::Float(width)) => {
+                // A float target narrower than `f64` rounds at the slot
+                // through `f32` (the runner's `round_float_at_slot`).
+                (self.round_float_width(value, width), None)
+            }
+            (Num::Nil, Num::Dyn) => (value, None),
             (Num::Float(_), Num::Int(to)) => self.float_to_int(conversion, to, value),
             (Num::Text, Num::Int(to)) => self.text_to_int(conversion, to, value)?,
             (Num::Int(_) | Num::Float(_) | Num::Bool | Num::Text | Num::Char, Num::Dyn) => {
@@ -946,7 +951,12 @@ impl FunctionLower<'_, '_> {
             (Num::Text, Num::Char) => self.convert_text_char(value)?,
             (Num::Int(_), Num::Char) => self.convert_int_char(conversion, value)?,
             (Num::Char, Num::Int(_)) => self.convert_char_int(conversion, value)?,
-            (Num::Text, Num::Float(_)) => self.convert_text_float(value)?,
+            (Num::Text, Num::Float(width)) => {
+                let (parsed, failure) = self.convert_text_float(value)?;
+                // Text parses in `f64` and narrows at the slot: the double
+                // rounding is accepted for text sources, as in the runner.
+                (self.round_float_width(parsed, width), failure)
+            }
             (Num::Int(_), Num::Bool) => {
                 let zero = self.builder.ins().iconst(types::I64, 0);
                 (self.builder.ins().icmp(IntCC::NotEqual, value, zero), None)

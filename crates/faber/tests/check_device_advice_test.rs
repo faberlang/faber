@@ -3,7 +3,8 @@
 //! static (the device image is built, nothing runs), so no GPU is needed.
 //!
 //! Identity assertions target the rendered label (`INFO001:<issue>`) and the
-//! back-quoted kernel and entry names, never prose.
+//! back-quoted kernel and entry names, never prose. The rows are read from the
+//! compact form (`--no-diagnostics`), one line per advice row.
 #![cfg(all(feature = "runner", feature = "device-runtime"))]
 
 use std::path::{Path, PathBuf};
@@ -18,6 +19,7 @@ fn acceptance(name: &str) -> PathBuf {
 fn faber_check(args: &[&str], package: &Path) -> (String, Option<i32>) {
     let output = Command::new(env!("CARGO_BIN_EXE_faber"))
         .arg("check")
+        .arg("--no-diagnostics")
         .arg(package)
         .args(args)
         .stdin(Stdio::null())

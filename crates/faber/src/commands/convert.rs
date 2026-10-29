@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 /// Arguments for `faber convert`.
 #[derive(Debug, Clone)]
 pub struct ConvertCommand {
+    pub diagnostic_mode: radix::services::DiagnosticMode,
     pub paths: Vec<PathBuf>,
     pub to: String,
     pub from: Option<String>,
@@ -36,7 +37,13 @@ pub fn cmd_convert(command: &ConvertCommand) {
             exit_status::exit_no_input();
         }
         let path = Path::new("<stdin>");
-        match convert_single_doc(path, &command.to, command.from.as_deref(), &source) {
+        match convert_single_doc(
+            path,
+            &command.to,
+            command.from.as_deref(),
+            &source,
+            command.diagnostic_mode,
+        ) {
             Ok(converted) => {
                 print!("{converted}");
                 return;
@@ -82,14 +89,19 @@ pub fn cmd_convert(command: &ConvertCommand) {
             }
         };
 
-        let converted =
-            match convert_single_doc(path, &command.to, command.from.as_deref(), &source) {
-                Ok(converted) => converted,
-                Err(status) => {
-                    tally.refuse(status);
-                    continue;
-                }
-            };
+        let converted = match convert_single_doc(
+            path,
+            &command.to,
+            command.from.as_deref(),
+            &source,
+            command.diagnostic_mode,
+        ) {
+            Ok(converted) => converted,
+            Err(status) => {
+                tally.refuse(status);
+                continue;
+            }
+        };
 
         if command.stdout {
             print!("{converted}");
@@ -163,10 +175,11 @@ fn convert_single_doc(
     to: &str,
     from: Option<&str>,
     source: &str,
+    diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     #[cfg(not(feature = "hir-faber"))]
     {
-        drop((path, to, from, source));
+        drop((path, to, from, source, diagnostic_mode));
         eprintln!(
             "error: reader-locale conversion requires a faber build with feature `hir-faber`"
         );
@@ -174,7 +187,7 @@ fn convert_single_doc(
     }
     #[cfg(feature = "hir-faber")]
     {
-        super::format::convert_single_doc(path, to, from, source)
+        super::format::convert_single_doc(path, to, from, source, diagnostic_mode)
     }
 }
 

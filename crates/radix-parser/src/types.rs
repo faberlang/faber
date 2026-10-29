@@ -962,7 +962,7 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   range-argument := range-bound ('‥' | '…') range-bound
-    ///   range-bound    := ['-'] NATURAL | ['-'] '∞' | ['size'] IDENTIFIER
+    ///   range-bound    := [`-`] NATURAL | [`-`] `∞` | [`size`] IDENTIFIER
     ///
     /// Both ends are always written: `0…` alone is refused by name, and `∞` /
     /// `-∞` write "no bound on this side".

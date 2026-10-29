@@ -7,9 +7,9 @@ use std::path::PathBuf;
 /// Parsed `faber emit` command payload after clap normalization.
 #[derive(Args, Debug)]
 pub struct EmitArgs {
-    /// Print expanded phase-aware diagnostics instead of normal emit diagnostics
+    /// Use compact diagnostics instead of the default message and help
     #[arg(long)]
-    pub diagnostics: bool,
+    pub no_diagnostics: bool,
 
     /// Code locale used to select a package-local locale pack.
     #[arg(long = "locale", value_name = "LOCALE")]

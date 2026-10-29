@@ -4922,6 +4922,3 @@ struct CollectionConversioShape {
     key: Option<TypeId>,
     value: Option<TypeId>,
 }
-
-// Lane-gated: compiles through the full driver to the Rust target; a
-// core-only build excludes the module.

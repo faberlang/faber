@@ -49,14 +49,10 @@ entry = "main.fab"
     );
 }
 
-/// A bodyless function in an `en` file (need, items 3 and 4).
-///
-/// Plain mode is terse by design for every coded diagnostic: code, location
-/// and source line, with no prose (the prose lives in the reader pack and
-/// shows under `--diagnostics`). The `--diagnostics` text names the `en`
-/// keyword `fn`, never the Latin `functio`.
+/// A bodyless function in an `en` file: expanded check output is the default,
+/// and `--no-diagnostics` preserves the compact form.
 #[test]
-fn check_bodyless_function_in_en_file_plain_is_terse_and_diagnostics_prints_en_keyword() {
+fn check_default_prints_help_and_no_diagnostics_keeps_the_compact_form() {
     let root = tempfile::tempdir().expect("create check fixture root");
     let file = root.path().join("bodyless.fab");
     std::fs::write(
@@ -69,33 +65,41 @@ fn check_bodyless_function_in_en_file_plain_is_terse_and_diagnostics_prints_en_k
         .expect("locate faber binary");
 
     let plain = Command::new(&binary)
-        .args(["check"])
+        .args(["check", "--no-diagnostics"])
         .arg(&file)
         .output()
         .expect("run faber check");
     let plain = String::from_utf8_lossy(&plain.stderr);
     assert!(
         plain.contains("error[PARSE012]"),
-        "plain mode keeps the code header:\n{plain}"
+        "--no-diagnostics keeps the code header:\n{plain}"
     );
     assert!(
         !plain.contains("expected function body"),
-        "plain mode is terse by design: no message prose:\n{plain}"
+        "--no-diagnostics omits message prose:\n{plain}"
+    );
+    assert!(
+        !plain.contains("help:"),
+        "compact output omits help:\n{plain}"
     );
 
     let expanded = Command::new(&binary)
-        .args(["check", "--diagnostics"])
+        .args(["check"])
         .arg(&file)
         .output()
-        .expect("run faber check --diagnostics");
+        .expect("run faber check");
     let expanded = String::from_utf8_lossy(&expanded.stderr);
     assert!(
         expanded.contains("expected function body for 'fn' declaration"),
-        "--diagnostics names the en keyword:\n{expanded}"
+        "default diagnostics names the en keyword:\n{expanded}"
+    );
+    assert!(
+        expanded.contains("\nhelp:"),
+        "default diagnostics shows the help text:\n{expanded}"
     );
     assert!(
         !expanded.contains("'functio'"),
-        "an en diagnostic must not print the Latin keyword:\n{expanded}"
+        "the default diagnostic must not print the Latin keyword:\n{expanded}"
     );
 }
 
@@ -207,17 +211,17 @@ fn check_lower_accepts_the_optional_parameter_exemplar() {
     );
 }
 
-/// `--diagnostics` renders the lowering failure with its named issue too.
+/// Default expanded diagnostics render the lowering failure with its named issue too.
 #[test]
 fn check_lower_diagnostics_mode_keeps_the_named_issue() {
     let root = tempfile::tempdir().expect("create fixture root");
     let file = root.path().join("located.fab");
     std::fs::write(&file, CHECKS_BUT_DOES_NOT_LOWER_SOURCE).expect("write source");
-    let (ok, stderr) = run_check(&["--lower", "--diagnostics"], &file);
+    let (ok, stderr) = run_check(&["--lower"], &file);
     assert!(!ok, "{stderr}");
     assert!(
         stderr.contains("package_mir_cli_surface_unsupported"),
-        "--diagnostics keeps the named issue:\n{stderr}"
+        "default diagnostics keeps the named issue:\n{stderr}"
     );
 }
 
@@ -297,4 +301,81 @@ fn check_lower_cannot_combine_with_air_or_permissive_or_stdin() {
         .output()
         .expect("run faber check --lower -");
     assert!(!output.status.success(), "stdin has no package to lower");
+}
+
+/// Two bodyless functions: two errors, one explain footer for the first.
+const TWO_ERRORS_SOURCE: &str =
+    "+++\nlocale = \"en\"\n+++\nfn parse(string s) -> string\nfn other(string s) -> string\n";
+
+fn run_faber_stderr(args: &[&str], path: &std::path::Path) -> String {
+    let binary = super::format_test::faber_binary()
+        .canonicalize()
+        .expect("locate faber binary");
+    let output = Command::new(binary)
+        .args(args)
+        .arg(path)
+        .output()
+        .expect("run faber");
+    String::from_utf8_lossy(&output.stderr).into_owned()
+}
+
+/// The footer is generated once per run, for the first error, in the default
+/// form; `--no-diagnostics` has none.
+#[test]
+fn check_default_prints_one_explain_footer_for_the_first_error() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("two.fab");
+    std::fs::write(&file, TWO_ERRORS_SOURCE).expect("write source");
+
+    let default = run_faber_stderr(&["check"], &file);
+    assert!(
+        default.matches("error[").count() >= 2 || default.matches("\nhelp:").count() >= 2,
+        "the fixture must report two errors:\n{default}"
+    );
+    assert_eq!(
+        default.matches("explain: faber explain PARSE012").count(),
+        1,
+        "one footer, for the first error:\n{default}"
+    );
+
+    let compact = run_faber_stderr(&["check", "--no-diagnostics"], &file);
+    assert!(
+        !compact.contains("explain: faber explain"),
+        "--no-diagnostics has no footer:\n{compact}"
+    );
+}
+
+/// `run`, `build` and `format` print the help line by default and omit it under
+/// `--no-diagnostics`.
+#[test]
+fn run_build_and_format_print_help_by_default_and_omit_it_when_disabled() {
+    let root = tempfile::tempdir().expect("create fixture root");
+    let file = root.path().join("bodyless.fab");
+    std::fs::write(
+        &file,
+        "+++\nlocale = \"en\"\n+++\nfn parse(string s) -> string\n",
+    )
+    .expect("write source");
+
+    for command in ["run", "build", "format"] {
+        let default = run_faber_stderr(&[command], &file);
+        assert!(
+            default.contains("\nhelp:"),
+            "`faber {command}` prints the help line by default:\n{default}"
+        );
+        assert_eq!(
+            default.matches("explain: faber explain").count(),
+            1,
+            "`faber {command}` prints one footer:\n{default}"
+        );
+        let compact = run_faber_stderr(&[command, "--no-diagnostics"], &file);
+        assert!(
+            !compact.contains("help:") && !compact.contains("explain: faber explain"),
+            "`faber {command} --no-diagnostics` is compact:\n{compact}"
+        );
+        assert!(
+            compact.contains("PARSE012"),
+            "`faber {command} --no-diagnostics` keeps the code:\n{compact}"
+        );
+    }
 }

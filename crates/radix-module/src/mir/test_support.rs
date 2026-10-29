@@ -103,6 +103,23 @@ pub fn compile_metal_text_output(source: &str) -> Result<MetalTextOutput, String
     compile_target_typed_output(Target::MirMetal, "metal.fab", source)
 }
 
+/// Compile Metal text with the kernel safe switch enabled.
+#[cfg(feature = "mir-metal")]
+pub fn compile_metal_text_output_with_safe_kernels(source: &str) -> Result<MetalTextOutput, String> {
+    let session = crate::driver::Session::new(
+        crate::driver::Config::default()
+            .with_target(Target::MirMetal)
+            .with_dev_locale_root()
+            .with_latin_locale()
+            .with_safe_kernels(),
+    );
+    let result = compile(&session, "metal.fab", source, ModuleCompileRequest::default());
+    match MetalTextOutput::from_output(result.output) {
+        Some(output) => Ok(output),
+        None => Err(diagnostic_facts_message(&result.diagnostics)),
+    }
+}
+
 /// Compile source to Metal text.
 ///
 /// # Errors
