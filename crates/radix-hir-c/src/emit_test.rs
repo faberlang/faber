@@ -296,6 +296,15 @@ fn functions_get_prototypes_and_prefixed_names() {
     }
 }
 
+#[test]
+fn a_callable_entry_exit_returns_its_value_as_the_process_status() {
+    let code = emitted(
+        "fn status() → int {\n    return 3\n}\nmain exit status() {\n    print \"done\"\n}",
+    );
+    assert!(code.contains("    return (int)(f_status());\n"), "{code}");
+    assert!(!code.contains("(void)f_status();"), "{code}");
+}
+
 /// C leaves argument and operand order unspecified; Faber is left to right,
 /// so operands that share an evaluation with a call are bound in order.
 #[test]
