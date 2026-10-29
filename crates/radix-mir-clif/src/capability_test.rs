@@ -858,3 +858,105 @@ fn sermo_text_materialization_is_still_declined() {
         "a text materialization has no CLIF symbol yet: {gaps:?}"
     );
 }
+
+#[test]
+fn mut_union_parameter_names_the_box_writeback_gap_through_aliases() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let text = types.primitive(Primitive::Textus);
+    let union = types.intern(Type::Union(vec![numerus, text]));
+    let alias = types.intern(Type::Alias(radix_hir::DefId(51), union));
+    for ty in [union, alias] {
+        let mut parameter = param(0, MirType::semantic(ty));
+        assert!(!crate::capability::is_mut_union(&types, &parameter));
+        parameter.mode = MirParamMode::MutRef;
+        let program = single_function(FunctionShape {
+            params: vec![parameter],
+            locals: Vec::new(),
+            temps: Vec::new(),
+            statements: Vec::new(),
+            terminator: MirTerminatorKind::Return(None),
+            return_ty: self::ty(&types, Primitive::Vacuum),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        });
+        let verdict = classify_with_types(&program, &types);
+        assert_eq!(verdict.gaps()[0].shape(), "mutable union parameter");
+    }
+}
+
+#[test]
+fn b64_to_u64_is_a_compile_time_gap_even_for_a_small_pattern() {
+    let mut types = TypeTable::new();
+    let bits = MirType::semantic(types.intern(Type::Bits(radix_types::BitsWidth::B64)));
+    let unsigned = MirType::semantic(types.intern(Type::SizedNumeric(
+        Primitive::Numerus,
+        radix_types::NumericWidth::U64,
+    )));
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        statements: vec![runtime_call(
+            explicit_conversion(bits, unsigned),
+            vec![MirOperand::Constant(MirConstant::UInt(1))],
+            unsigned,
+        )],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    let verdict = classify_with_types(&program, &types);
+    assert_eq!(verdict.gaps()[0].shape(), "b64 to u64 conversion");
+}
+
+#[test]
+fn i64_edge_guard_is_limited_to_cyclic_inclusive_shapes() {
+    let types = TypeTable::new();
+    let shape = |bound, op, terminator| {
+        single_function(FunctionShape {
+            params: Vec::new(),
+            locals: Vec::new(),
+            temps: Vec::new(),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::temp(MirTempId(0)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Binary {
+                            op,
+                            lhs: MirOperand::Constant(MirConstant::Int(0)),
+                            rhs: MirOperand::Constant(MirConstant::Int(bound)),
+                        },
+                        ty: ty(&types, Primitive::Bivalens),
+                        span: sample_span(),
+                    },
+                },
+                span: sample_span(),
+            }],
+            terminator,
+            return_ty: ty(&types, Primitive::Vacuum),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+        })
+    };
+    let cycle = MirTerminatorKind::Goto(MirBlockId(0));
+    for (program, expected) in [
+        (shape(i64::MAX, MirBinOp::LtEq, cycle.clone()), true),
+        (shape(10, MirBinOp::LtEq, cycle.clone()), false),
+        (shape(i64::MAX, MirBinOp::Lt, cycle), false),
+        (
+            shape(i64::MAX, MirBinOp::LtEq, MirTerminatorKind::Return(None)),
+            false,
+        ),
+    ] {
+        assert_eq!(
+            crate::capability::has_i64_edge_loop(&program.functions[0]),
+            expected
+        );
+    }
+}

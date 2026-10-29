@@ -1,3 +1,5 @@
+//! Execution-oracle selection and bounded corpus subprocess judging.
+
 use super::{
     Case, ChildError, Expected, Outcome, TargetExpectation, collect_drains, run_bounded, run_case,
     runner_lower_args, runner_run_args,
@@ -38,13 +40,22 @@ fn case(args: &[&str]) -> Case {
 fn runner_target_pins_the_reference_route() {
     assert_eq!(
         runner_run_args(&case(&[])),
-        ["run", "/d/main.fab", "--device", "reference"]
+        [
+            "run",
+            "/d/main.fab",
+            "--target",
+            "runner",
+            "--device",
+            "reference"
+        ]
     );
     assert_eq!(
         runner_run_args(&case(&["a", "b"])),
         [
             "run",
             "/d/main.fab",
+            "--target",
+            "runner",
             "--device",
             "reference",
             "--",
@@ -259,4 +270,94 @@ fn only_a_check_only_case_with_no_entry_takes_the_lower_standard() {
     let row = run_case(&library_case(true, Outcome::Pass, None), &other);
     assert_eq!(status(&row), "fail");
     assert_eq!(lower_calls(other_dir.path()), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn jit_refusals_are_compile_time_only_and_do_not_mask_traps_or_crashes() {
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::{ExitStatus, Output};
+    let output = |code, stderr: &str| Output {
+        status: ExitStatus::from_raw(code << 8),
+        stdout: Vec::new(),
+        stderr: stderr.as_bytes().to_vec(),
+    };
+    assert!(super::is_jit_refusal(&output(
+        65,
+        "CODEGEN001 clif target declines: mutable union parameter"
+    )));
+    assert!(super::is_jit_refusal(&output(
+        65,
+        "CODEGEN001 unsupported MIR lowering: path that does not resolve to a local value"
+    )));
+    for stderr in [
+        "error: numerus overflow",
+        "SEM001 unresolved_name",
+        "TARGETLANE001:lane_requires_mir_backed_target",
+        "error: this faber build has no Cranelift target",
+    ] {
+        assert!(!super::is_jit_refusal(&output(65, stderr)), "{stderr}");
+    }
+    assert!(super::is_jit_refusal(&output(
+        65,
+        "PKG001 clif target declines: mutable union parameter"
+    )));
+    assert!(!super::is_jit_refusal(&output(
+        70,
+        "CODEGEN001 clif target declines: runtime text"
+    )));
+    let mut crash = output(65, "CODEGEN001 clif target declines: not a compile failure");
+    crash.status = ExitStatus::from_raw(11);
+    assert!(!super::is_jit_refusal(&crash));
+    let mut printed = output(65, "CODEGEN001 clif target declines: program text");
+    printed.stdout = b"program already ran".to_vec();
+    assert!(!super::is_jit_refusal(&printed));
+}
+
+#[test]
+fn jit_inherits_runner_pins_but_honours_its_own_override() {
+    use std::collections::BTreeMap;
+    let dir = tempfile::tempdir().expect("scratch");
+    let path = dir.path().join("case.toml");
+    let text = "version = 1\ninput = 'main.fab'\n[expect]\ncheck_only = true\n[targets.runner]\noutcome = 'known-fail'\nphase = 'run'\ndiagnostic_contains = 'TARGETLANE001:lane_requires_mir_backed_target'\n[targets.clif]\noutcome = 'known-fail'\nphase = 'run'\ndiagnostic_contains = 'not the JIT oracle'\n";
+    let parse = |text: &str| {
+        super::parse_case(
+            text,
+            &path,
+            dir.path(),
+            "clif-jit",
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+        )
+        .expect("case")
+    };
+    let inherited = parse(text);
+    assert_eq!(
+        inherited.target.diagnostic_contains.as_deref(),
+        Some("TARGETLANE001:lane_requires_mir_backed_target")
+    );
+    let overridden = parse(&format!("{text}\n[targets.clif-jit]\noutcome = 'pass'\n"));
+    assert!(matches!(overridden.target.outcome, Outcome::Pass));
+}
+
+#[cfg(unix)]
+#[test]
+fn jit_rows_separate_named_refusals_and_check_explicit_compile_pins() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().expect("scratch");
+    let faber = dir.path().join("faber");
+    fs::write(
+        &faber,
+        "#!/bin/sh\necho 'CODEGEN001 clif target declines: mutable union parameter' >&2\nexit 65\n",
+    )
+    .expect("fake compiler");
+    fs::set_permissions(&faber, fs::Permissions::from_mode(0o755)).expect("executable");
+    let mut fixture = library_case(true, Outcome::Pass, None);
+    let row = super::run_jit_case(&fixture, &faber);
+    assert_eq!(row["status"], "refused");
+    assert_eq!(row["target"], "clif-jit");
+    assert_eq!(row["phase"], "emit");
+    fixture.target.phase = Some("emit".to_owned());
+    fixture.target.diagnostic_contains = Some("another shape".to_owned());
+    assert_eq!(super::run_jit_case(&fixture, &faber)["status"], "fail");
 }

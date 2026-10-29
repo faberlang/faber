@@ -73,6 +73,9 @@ pub struct StructMeta {
     /// Parameters that admit none although declared with a plain type (the
     /// `optional` modifier): function, position and the optional type.
     pub optional_params: FxHashMap<(MirFunctionId, usize), MirType>,
+    /// In-process call routes: the native conversation runtime cannot dispatch
+    /// these MIR handlers or propagate their alternate exits yet.
+    pub handler_routes: FxHashSet<String>,
     /// Captured-closure environments by id.
     pub environments: FxHashMap<MirClosureEnvironmentId, MirClosureEnvironment>,
 }
@@ -469,6 +472,19 @@ impl ModuleState<'_> {
             signature.params.push(AbiParam::new(types::I64));
         }
         for (index, param) in function.params.iter().enumerate() {
+            if crate::capability::is_mut_union(self.input.types, param) {
+                return Err(Decline::new("mutable union parameter"));
+            }
+            // The metadata detects a plain parameter some call passes none to.
+            // Its default and none-tolerant reads are not represented here.
+            if self
+                .input
+                .structs
+                .optional_params
+                .contains_key(&(function.id, index))
+            {
+                return Err(Decline::new("optional parameter omission"));
+            }
             if !matches!(
                 param.mode,
                 MirParamMode::Owned | MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move
@@ -714,6 +730,9 @@ struct FunctionLower<'f, 'a> {
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
+    if crate::capability::has_i64_edge_loop(function) {
+        return Err(Decline::new("inclusive loop with i64-max operand"));
+    }
     let signature = state.signature_for(function)?;
     let func_id = *state
         .functions
@@ -4554,6 +4573,9 @@ impl FunctionLower<'_, '_> {
         let text = radix_lexer::textus_literal::decode_textus_literal(
             self.state.input.interner.resolve(*symbol),
         );
+        if self.state.input.structs.handler_routes.contains(&text) {
+            return Err(Decline::new("call handler conversation"));
+        }
         let data = self.state.string_data(text.as_bytes())?;
         let global = self
             .state
@@ -4941,6 +4963,15 @@ impl FunctionLower<'_, '_> {
         conversion: &MirConversion,
         argument: &MirOperand,
     ) -> Lowered<()> {
+        if matches!(
+            resolve(self.state.input.types, conversion.source_ty.semantic_id()),
+            Type::Bits(BitsWidth::B64)
+        ) && matches!(
+            resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
+        ) {
+            return Err(Decline::new("b64 to u64 conversion"));
+        }
         let (value, rep) = self.scalar(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
         if rep == Rep::Set && slot_rep == Rep::List {

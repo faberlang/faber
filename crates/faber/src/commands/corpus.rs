@@ -477,7 +477,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             return;
         }
     }
-    if args.target != "runner" {
+    if !matches!(args.target.as_str(), "runner" | "clif-jit") {
         external::execute(
             &suite.cases,
             &input,
@@ -497,6 +497,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
     let mut rejected = 0;
     let mut expected_failures = 0;
     let mut not_applicable = 0;
+    let mut refused = 0;
     let mut failed = 0;
     // WHY: each case is an independent `faber run` child, so the suite is bound by
     // the sum of its children rather than by this process. The launcher takes a
@@ -522,7 +523,12 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
                     let Some(case) = cases.get(index) else {
                         break;
                     };
-                    out.push((index, run_case(case, faber)));
+                    let row = if args.target == "clif-jit" {
+                        run_jit_case(case, faber)
+                    } else {
+                        run_case(case, faber)
+                    };
+                    out.push((index, row));
                 }
                 out
             }));
@@ -541,17 +547,18 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             Some("rejected") => rejected += 1,
             Some("expected-fail") => expected_failures += 1,
             Some("not-applicable") => not_applicable += 1,
+            Some("refused") => refused += 1,
             _ => failed += 1,
         }
         println!("{result}");
     }
-    let status = summary_status(passed + rejected, expected_failures, failed);
+    let status = summary_status(passed + rejected + refused, expected_failures, failed);
     // WHY: harnesses and unit proofs grep leg logs for `failed: <n>`; the
     // compact JSON summary cannot carry that literal. stdout is a JSON-lines
     // stream that parsers consume line by line, so the human summary goes to
     // stderr and stdout stays pure JSON.
     eprintln!(
-        "corpus {} summary: {} case(s): {passed} passed, {rejected} rejected, {expected_failures} expected-fail, {not_applicable} not-applicable, failed: {failed} [{status}]",
+        "corpus {} summary: {} case(s): {passed} passed, {rejected} rejected, {expected_failures} expected-fail, {not_applicable} not-applicable, {refused} refused, failed: {failed} [{status}]",
         args.target,
         suite.cases.len()
     );
@@ -566,6 +573,7 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
             "rejected": rejected,
             "expected_failures": expected_failures,
             "not_applicable": not_applicable,
+            "refused": refused,
             "failed": failed,
             "status": status,
             "timing_ms": {"discover": discover_ms, "total": ms(started)}
@@ -920,14 +928,25 @@ fn parse_case(
     } else {
         manifest_dir.to_path_buf()
     };
-    let expectation = manifest.targets.remove(target).or_else(|| {
-        manifest
-            .group
-            .as_deref()
-            .and_then(|group| expectations.get(group))
-            .and_then(|group| group.get(target))
-            .cloned()
-    });
+    // JIT is judged against the runner, not the linked CLIF lane's known
+    // failures. Only an explicit JIT pin may override that oracle.
+    let oracle = if target == "clif-jit" {
+        "runner"
+    } else {
+        target
+    };
+    let expectation = manifest
+        .targets
+        .remove(target)
+        .or_else(|| manifest.targets.remove(oracle))
+        .or_else(|| {
+            manifest
+                .group
+                .as_deref()
+                .and_then(|group| expectations.get(group))
+                .and_then(|group| group.get(oracle))
+                .cloned()
+        });
     let Some(mut expectation) = expectation else {
         return Err(format!(
             "{id}: target {target} has no expectation from the case or group"
@@ -1172,6 +1191,8 @@ fn runner_run_args(case: &Case) -> Vec<String> {
     let mut args = vec![
         "run".to_owned(),
         case.input.display().to_string(),
+        "--target".to_owned(),
+        "runner".to_owned(),
         "--device".to_owned(),
         "reference".to_owned(),
     ];
@@ -1183,6 +1204,27 @@ fn runner_run_args(case: &Case) -> Vec<String> {
 }
 
 fn run_case(case: &Case, faber: &Path) -> Value {
+    run_engine_case(case, faber, false)
+}
+
+fn run_jit_case(case: &Case, faber: &Path) -> Value {
+    let mut row = run_engine_case(case, faber, true);
+    row["target"] = json!("clif-jit");
+    row
+}
+
+/// A compile-time lowering refusal is safe for the default engine to fall back
+/// from. A runtime trap, signal, semantic rejection or missing engine is not.
+fn is_jit_refusal(output: &Output) -> bool {
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    output.status.code() == Some(exit_status::DATA_ERROR)
+        && output.stdout.is_empty()
+        && (stderr.contains("CODEGEN001") || stderr.contains("PKG001"))
+        && (stderr.contains("clif target declines:")
+            || stderr.contains("unsupported MIR lowering:"))
+}
+
+fn run_engine_case(case: &Case, faber: &Path, jit: bool) -> Value {
     let started = Instant::now();
     let Some(outcome) = case.target.outcome.judged() else {
         return json!({
@@ -1223,7 +1265,20 @@ fn run_case(case: &Case, faber: &Path) -> Value {
         }
     };
     let read_ms = ms(reading);
-    let run_args = runner_run_args(case);
+    let mut run_args = runner_run_args(case);
+    if jit {
+        // Keep --device reference on the oracle only: JIT has no device route.
+        run_args = vec![
+            "run".to_owned(),
+            case.input.display().to_string(),
+            "--target".to_owned(),
+            "clif-jit".to_owned(),
+        ];
+        if !case.args.is_empty() {
+            run_args.push("--".to_owned());
+            run_args.extend(case.args.iter().cloned());
+        }
+    }
     let mut argv = vec![faber.display().to_string()];
     argv.extend(run_args.iter().cloned());
     let mut command = Command::new(faber);
@@ -1242,7 +1297,26 @@ fn run_case(case: &Case, faber: &Path) -> Value {
     // A library-shaped case has no entry function, so the runner has nothing to
     // start from. Its standard is the runner's equivalent of "it builds": the
     // program checks and lowers to valid MIR, judged from `check --lower`.
-    let library = if is_library_shaped(case, &output) {
+    if jit && !case.target.rejects && is_jit_refusal(&output) {
+        if case.target.phase.as_deref() == Some("emit")
+            && let Some(fragment) = &case.target.diagnostic_contains
+            && !String::from_utf8_lossy(&output.stderr).contains(fragment)
+        {
+            return case_error(
+                case,
+                "compile-time refusal shape changed".to_owned(),
+                started,
+            );
+        }
+        return json!({
+            "schema": 1, "type": "case", "case": case.id, "target": "clif-jit",
+            "status": "refused", "phase": "emit",
+            "reason": String::from_utf8_lossy(&output.stderr),
+            "command": {"argv": argv, "cwd": case.dir}, "exit": output.status.code(),
+            "timing_ms": {"read": read_ms, "run": run_ms, "compare": ms(comparing), "total": ms(started)}
+        });
+    }
+    let library = if !jit && is_library_shaped(case, &output) {
         let lower_args = runner_lower_args(case);
         let mut lower = Command::new(faber);
         lower.args(&lower_args).current_dir(&case.dir);

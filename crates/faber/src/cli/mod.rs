@@ -727,9 +727,12 @@ pub struct ReplArgs {
     pub args: Vec<String>,
 }
 
-/// Compiled targets `faber run --target` builds and then runs.
+/// Execution engines and compiled targets accepted by `faber run --target`.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 pub enum RunTarget {
+    /// Interpret through the MIR runner explicitly.
+    #[value(name = "runner")]
+    Runner,
     /// Build the package as a Node project and run it with `node`.
     #[value(name = "ts")]
     Ts,
@@ -749,8 +752,9 @@ pub enum RunTarget {
 ///
 /// Without `--target`, `run` is interpreted execution: a single `.fab` file,
 /// package directory, `faber.toml`, or archive is routed through the runner —
-/// never compiled. With `--target`, `run` builds the package for that target
-/// and runs the result with the arguments after `--`, standard streams and
+/// never compiled. `--target runner` selects that same oracle explicitly. Other
+/// targets compile the package and run the result with the arguments after `--`,
+/// standard streams and
 /// exit code passed straight through. Device packages keep a host-driver
 /// execution route.
 #[derive(clap::Args, Debug)]
@@ -766,7 +770,7 @@ pub struct RunArgs {
     #[command(flatten)]
     pub library: LibraryHomeArgs,
 
-    /// Build the package for a compiled target, then run the built program.
+    /// Select the runner or a compiled execution target.
     #[arg(long = "target", short = 't', value_enum, value_name = "TARGET")]
     pub target: Option<RunTarget>,
 

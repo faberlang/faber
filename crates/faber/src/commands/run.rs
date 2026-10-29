@@ -106,7 +106,7 @@ pub(super) fn cmd_run(args: RunArgs) {
             );
             exit_status::exit_usage();
         }
-        None => {}
+        None | Some(crate::cli::RunTarget::Runner) => {}
     }
 
     if let Some(seed) = args.shuffle_seed {
