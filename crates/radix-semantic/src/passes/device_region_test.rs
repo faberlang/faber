@@ -219,10 +219,11 @@ fn a_host_function_call_in_a_region_is_refused() {
 }
 
 #[test]
-fn a_wide_integer_capture_is_refused() {
-    assert_region_rejects(
+fn a_wide_integer_capture_is_admitted() {
+    // Ruling 2026-10-28: 64-bit integers are kernel values. The capture is a
+    // per-target capability fact in the requirement report, not a check error.
+    assert_region_accepts(
         "    let int steps ← 5\n    do device {\n        for range 0‥steps let k {\n            bump(z, mut t, k ↦ i32)\n        }\n    }",
-        "nucleum_wide_integer",
     );
 }
 

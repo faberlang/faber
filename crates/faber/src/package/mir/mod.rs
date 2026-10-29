@@ -107,6 +107,19 @@ fn device_section_builder(
         .with_file(diagnostic_path.display().to_string())
         .with_arg("issue", "package_device_steps_not_repeating")]);
     }
+    // The Metal artifact is always part of the section, so a kernel Metal's
+    // requirement row refuses stops the build by name before any emission.
+    let refused = super::device::metal_refused_kernels(lowered);
+    if let Some((_, reason)) = refused
+        .iter()
+        .find(|(id, _)| program.kernels.iter().any(|kernel| kernel.function == *id))
+    {
+        return Err(vec![mir_issue_diag(
+            diagnostic_path,
+            super::device::TARGET_REQUIREMENTS_ISSUE,
+            reason.clone(),
+        )]);
+    }
     let device_inputs = resolve_device_inputs(prepared, lowered, &program, diagnostic_path)?;
     let selection = prepared.device_selection.unwrap_or(DeviceSelection::Auto);
     let cuda_libdevice =

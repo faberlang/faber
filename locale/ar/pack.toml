@@ -1582,10 +1582,6 @@ help = "أصلح تركيب AST للتخفيض"
 message = "width marker لا يقبل parameters"
 help = "أصلح تركيب AST للتخفيض"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 غير مدعوم في نواة nucleum"
-help = "استخدم نوع قيمة نواة مدعوما"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "امتداد العدد الصحيح للنواة {extent} غير مثبت ليتسع في المدى المحمول"
 help = "قيّد الامتداد بقيم ضمن مدى الأعداد الصحيحة المحمول"
@@ -1617,10 +1613,6 @@ help = "خصص الـ tensor قبل المنطقة واستخدمه داخلها
 [diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
 message = "'{construct}' في منطقة '{fac} {machina}' يقرأ قيمة حُسبت على الجهاز؛ التحكم بالحلقات على الجهاز لم يُبنَ بعد"
 help = "اجعل الشروط والحدود والوسائط العددية من قيم معروفة قبل المنطقة، واقرأ نتائج الجهاز بعدها"
-
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "عرض العدد الصحيح {width} يتجاوز عرض نواة nucleum المدعوم"
-help = "استخدم عرض عدد صحيح لا يتجاوز 32 بت"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "امتداد القيمة الوسيطة للنواة {extent} يتجاوز مدى الأعداد الصحيحة المحمول"

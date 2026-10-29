@@ -1622,10 +1622,6 @@ help = "修正用於降階的 AST 結構"
 message = "width marker 不能接受參數"
 help = "修正用於降階的 AST 結構"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 不受 nucleum 核心支援"
-help = "請使用受支援的核心值型別"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "核心整數範圍 {extent} 尚未證明落在可攜式整數範圍內"
 help = "將範圍限制為可攜式整數範圍內的值"
@@ -1657,10 +1653,6 @@ help = "在區域之前配置 tensor，再於區域內使用"
 [diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
 message = "'{fac} {machina}' 區域中的 '{construct}' 讀取了裝置上計算的值；裝置端迴圈控制尚未實作"
 help = "條件、邊界和純量引數只用區域之前已知的值，並在區域之後讀取裝置結果"
-
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "整數寬度 {width} 超出 nucleum 核心支援的寬度"
-help = "請使用不超過 32 位元的整數寬度"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "核心中間範圍 {extent} 超出可攜式整數範圍"

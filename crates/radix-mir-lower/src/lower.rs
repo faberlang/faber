@@ -783,7 +783,7 @@ pub fn lower_analyzed_unit(
         }
         let functions = std::mem::take(&mut lowerer.functions);
         let closure_environments = std::mem::take(&mut lowerer.closure_environments);
-        let device_function_metadata = std::mem::take(&mut lowerer.device_function_metadata);
+        let mut device_function_metadata = std::mem::take(&mut lowerer.device_function_metadata);
         let lowering_interner = interner.clone();
         drop(lowerer);
         let mut program = MirProgram { functions };
@@ -806,6 +806,7 @@ pub fn lower_analyzed_unit(
                 &generic_templates,
             )?;
         }
+        attach_backend_refusals(unit, &program, &mut device_function_metadata);
         // The display tokens the file holding the unit prints through: its
         // own locale pack's words.
         let display_tokens = unit.display_tokens.clone();
@@ -830,6 +831,53 @@ pub fn lower_analyzed_unit(
         })
     } else {
         Err(lowering_errors)
+    }
+}
+
+/// Carry the per-target kernel requirement rows to the emit boundary: a
+/// kernel function (and every source-less closure it owns) whose row refuses a
+/// portable device backend records that backend in its metadata, so a package
+/// route that never sees the semantic report still refuses by name before it
+/// emits. A function with no row (a generic instance, an imported shape) stays
+/// unmarked here; its own unit's lowering marks it.
+fn attach_backend_refusals(
+    unit: AnalyzedModuleApplicationView<'_>,
+    program: &MirProgram,
+    metadata: &mut MirDeviceFunctionMetadataMap,
+) {
+    use radix_mir::device::{MirDeviceBackend, MirRefusedBackends};
+    use radix_target::Target;
+
+    if unit.kernel_requirements.kernels.is_empty() {
+        return;
+    }
+    let source_of: FxHashMap<MirFunctionId, DefId> = program
+        .functions
+        .iter()
+        .filter_map(|function| Some((function.id, function.source?)))
+        .collect();
+    for row in metadata.values_mut() {
+        let Some(requirement) = source_of
+            .get(&row.identity.parent)
+            .and_then(|def_id| unit.kernel_requirements.kernel(*def_id))
+        else {
+            continue;
+        };
+        let mut refused = MirRefusedBackends::default();
+        for report in requirement
+            .target_reports
+            .iter()
+            .filter(|report| !report.admitted)
+        {
+            let backend = match report.target {
+                Target::MirAmd => MirDeviceBackend::Amd,
+                Target::MirMetal => MirDeviceBackend::Metal,
+                Target::MirWgsl => MirDeviceBackend::Wgsl,
+                _ => continue,
+            };
+            refused = refused.with(backend);
+        }
+        row.refused_backends = refused;
     }
 }
 
@@ -1971,6 +2019,7 @@ impl<'a> MirLowerer<'a> {
                     },
                     origin: MirFunctionOrigin::Source,
                     lane_domain_local,
+                    refused_backends: radix_mir::device::MirRefusedBackends::default(),
                 },
             );
         }

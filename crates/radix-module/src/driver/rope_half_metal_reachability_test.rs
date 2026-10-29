@@ -14,16 +14,17 @@
 //!   a `mut` output) because the return-buffer ABI is elementwise-only and
 //!   the rank-3 angle table has a different element count than the rotated
 //!   row.
-//! - Refusal half: a run-time `pos` cannot reach the device plan at all. The
-//!   intrinsic's position parameter is the native `numerus` width (`i64`),
-//!   which the kernel surface bans, so check stage refuses the body with
-//!   `nucleum_wide_integer` before MIR lowering or plan resolution.
+//! - Refusal half: a run-time `pos` cannot reach the device plan. The
+//!   intrinsic's position parameter is the native `numerus` width (`i64`).
+//!   Until the operator ruling of 2026-10-28 that was a check-stage refusal
+//!   (`nucleum_wide_integer`); 64-bit integers are now kernel values, so the
+//!   body checks and the Metal emitter refuses by name at plan resolution.
 //!
 //! The research need predicted the refusal at the device plan
-//! (`rope_plan_facts` / `const_non_negative`). The observed first seam is the
-//! check-stage wide-integer rule; this file pins what the compiler actually
-//! does. The return-buffer spelling from that need is pinned as its own
-//! refusal so the next attempt does not rediscover the ABI seam.
+//! (`rope_plan_facts` / `const_non_negative`). This file pins what the
+//! compiler actually does. The return-buffer spelling from that need is
+//! pinned as its own refusal so the next attempt does not rediscover the ABI
+//! seam.
 
 use super::compile;
 use crate::Output;
@@ -56,15 +57,15 @@ fn ropam(tensor<f32, [4]> x, tensor<f32, [1, 2, 3]> table) → tensor<f32, [4]> 
 }
 "#;
 
-/// The same return-buffer fn with the rotation position supplied at run time.
+/// The indexed-view fn with the rotation position supplied at run time.
 const ROPE_HALF_RUNTIME_POS: &str = r#"+++
 locale = "en"
 +++
 
 @ kernel
 @ public
-fn ropam(tensor<f32, [4]> x, u32 pos, tensor<f32, [1, 2, 3]> table) → tensor<f32, [4]> {
-    return x.rope_half<size 4>(pos, table)
+fn ropam(tensor<f32, [4]> x, u32 pos, tensor<f32, [1, 2, 3]> table, mut tensor<f32, [4]> out, u32 i) → void {
+    out ⇇ x.rope_half<size 4>(pos, table)
 }
 "#;
 
@@ -158,11 +159,12 @@ fn rope_half_metal_return_buffer_spelling_fails_at_the_abi() {
     assert_eq!(error.phase, DiagnosticPhase::Codegen, "the refusal is at codegen");
 }
 
-/// S05 family-1 seam: a run-time position is refused at check stage, not at
-/// the device plan. The intrinsic's position parameter is the native `numerus`
-/// width, which the kernel surface bans as a wide integer.
+/// S05 family-1 seam: a run-time position is refused at the Metal emit seam
+/// by name. The intrinsic's position parameter is the native `numerus` width,
+/// a kernel value since the 2026-10-28 ruling, so check stage no longer
+/// refuses it.
 #[test]
-fn rope_half_metal_runtime_pos_fails_at_check() {
+fn rope_half_metal_runtime_pos_fails_at_the_emit_seam() {
     let session = metal_session();
     let result = compile(
         &session,
@@ -174,13 +176,8 @@ fn rope_half_metal_runtime_pos_fails_at_check() {
     let error = first_error(&result);
     assert_eq!(
         arg_value(error, "issue"),
-        Some("nucleum_wide_integer"),
-        "a run-time position hits the wide-integer kernel rule: {error:?}"
+        Some("mir_metal_text_unsupported"),
+        "the refusal must be the Metal emit seam: {error:?}"
     );
-    assert_eq!(
-        arg_value(error, "width"),
-        Some("i64"),
-        "the intrinsic's position is the native numerus width: {error:?}"
-    );
-    assert_eq!(error.phase, DiagnosticPhase::Analysis, "the refusal is at check");
+    assert_eq!(error.phase, DiagnosticPhase::Codegen, "the refusal is at codegen");
 }

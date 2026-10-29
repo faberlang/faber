@@ -1151,7 +1151,8 @@ pub(crate) fn append_matmul_runtime_extent_resources(
 /// fault site, LAST. Sites are tensor index forms (loads before stores), then
 /// distinct run-time vector index operands in first-use MIR order, then one
 /// grouped-key validity slot per output axis, then one slot per constant throw
-/// (see [`super::throw_sites`]). A whole-grid reduction adds, after its
+/// (see [`super::throw_sites`]), then ONE `d64` slot when the body does decimal
+/// arithmetic (see [`super::d64_fault_site`]). A whole-grid reduction adds, after its
 /// grouped-key slots, one slot per tensor captured into a term or key helper
 /// (see [`grid_reduce_helper_tensors`]). A kernel whose every
 /// tensor index is proven and that has no vector index or throw is untouched.
@@ -1170,10 +1171,12 @@ fn append_fault_resources(
             .and_then(|(scan, _)| scan.group.as_ref())
             .map_or(0, |group| group.axes.len());
     let helper_tensors = grid_reduce_helper_tensors(function, validation);
+    let d64 = usize::from(super::d64_fault_site(function, validation));
     if forms.is_empty()
         && vector_forms.is_empty()
         && group_axes == 0
         && throws == 0
+        && d64 == 0
         && helper_tensors.is_empty()
     {
         return Ok(());
@@ -1218,7 +1221,7 @@ fn append_fault_resources(
         next_binding += 1;
     }
     let sites = u32::try_from(
-        forms.len() + vector_forms.len() + helper_tensors.len() + group_axes + throws,
+        forms.len() + vector_forms.len() + helper_tensors.len() + group_axes + throws + d64,
     )
     .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?;
     signature.extra_inputs.push(MirKernelResource {

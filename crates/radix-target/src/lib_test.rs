@@ -169,6 +169,20 @@ fn device_targets_are_the_three_device_backends() {
     }
 }
 
+/// Wide (64-bit integer, `d64`) kernel values are a Metal capability; WGSL and
+/// AMD refuse them by name until their emitters emulate 64-bit lanes.
+#[test]
+fn wide_kernel_values_are_metal_only() {
+    for target in Target::ALL {
+        let expected = matches!(target, Target::MirMetal);
+        assert_eq!(
+            target.supports_wide_kernel_values(),
+            expected,
+            "supports_wide_kernel_values for {target}"
+        );
+    }
+}
+
 /// Wrapping kernel integers are a Metal and WGSL capability; AMD is not a
 /// wrapping backend even though it is a device target.
 #[test]

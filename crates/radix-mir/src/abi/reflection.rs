@@ -80,7 +80,8 @@ impl MirKernelReflection {
                 .and_then(|(filum, _)| filum.group.as_ref())
                 .map_or(0, |group| group.keys.len());
         let throws = super::throw_sites(function, &validation.types).unwrap_or_default();
-        if indexes + throws.len() != self.fault_sites.len() {
+        let d64 = usize::from(super::d64_fault_site(function, validation));
+        if indexes + throws.len() + d64 != self.fault_sites.len() {
             return;
         }
         for (site, throw) in self.fault_sites[indexes..].iter_mut().zip(&throws) {
@@ -91,6 +92,11 @@ impl MirKernelReflection {
                 .map_or_else(String::new, |interner| {
                     interner.resolve(throw.text).to_owned()
                 });
+        }
+        if d64 == 1
+            && let Some(site) = self.fault_sites.last_mut()
+        {
+            super::D64_FAULT_TEXT.clone_into(&mut site.text);
         }
     }
 

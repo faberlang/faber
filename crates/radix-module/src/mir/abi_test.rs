@@ -1907,11 +1907,24 @@ fn kernel_reflection_rejects_atomic_resources_explicitly() {
 }
 
 #[test]
+fn kernel_abi_admits_64_bit_integer_device_view_elements() {
+    // Kernel-wide types ruling 2026-10-28: i64 and u64 are kernel values.
+    for width in [NumericWidth::I64, NumericWidth::U64] {
+        let mut types = TypeTable::new();
+        let tensor_ty = rank1_tensor_type(&mut types, Primitive::Numerus, width);
+        let index_ty = u32_type(&mut types);
+        let return_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+        let validation = validation_with_device_tensor_layouts(&types);
+        let function = indexed_kernel_function(tensor_ty, index_ty, return_ty);
+        MirKernelSignature::storage_buffer_kernel(&function, &validation)
+            .expect("64-bit integer device view elements are admitted");
+    }
+}
+
+#[test]
 fn kernel_abi_rejects_unsupported_scalar_device_view_elements() {
     for (primitive, width, expected) in [
         (Primitive::Numerus, NumericWidth::I16, "i16"),
-        (Primitive::Numerus, NumericWidth::I64, "i64"),
-        (Primitive::Numerus, NumericWidth::U64, "u64"),
         (Primitive::Fractus, NumericWidth::F64, "f64"),
     ] {
         let mut types = TypeTable::new();

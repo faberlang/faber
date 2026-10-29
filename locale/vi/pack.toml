@@ -1582,10 +1582,6 @@ help = "sửa cấu trúc AST để hạ cấp"
 message = "dấu độ rộng không thể nhận tham số"
 help = "sửa cấu trúc AST để hạ cấp"
 
-[diagnostics.SEM008.issues.nucleum_d64]
-message = "d64 không được hỗ trợ trong kernel nucleum"
-help = "dùng một kiểu giá trị kernel được hỗ trợ"
-
 [diagnostics.SEM008.issues.nucleum_extent_unproven]
 message = "phạm vi số nguyên của kernel {extent} chưa được chứng minh là vừa với phạm vi di động"
 help = "ràng buộc phạm vi vào các giá trị trong phạm vi số nguyên di động"
@@ -1617,10 +1613,6 @@ help = "cấp phát tensor trước vùng rồi dùng bên trong"
 [diagnostics.SEM008.issues.nucleum_region_device_read_not_built]
 message = "'{construct}' trong vùng '{fac} {machina}' đọc giá trị tính trên thiết bị; điều khiển vòng lặp trên thiết bị chưa được xây dựng"
 help = "giữ điều kiện, cận và đối số vô hướng ở các giá trị biết trước vùng, và đọc kết quả thiết bị sau vùng"
-
-[diagnostics.SEM008.issues.nucleum_wide_integer]
-message = "độ rộng số nguyên {width} vượt quá độ rộng kernel nucleum được hỗ trợ"
-help = "dùng độ rộng số nguyên không quá 32 bit"
 
 [diagnostics.SEM008.issues.nucleum_wide_intermediate]
 message = "phạm vi trung gian của kernel {extent} vượt quá phạm vi số nguyên di động"

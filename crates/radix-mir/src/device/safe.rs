@@ -448,6 +448,20 @@ impl<'a> DeviceSafeClassifier<'a> {
             )
     }
 
+    /// The implicit store of a `d64` value into a `d64` cell (kernel-wide
+    /// types ruling 2026-10-28): the rounding, range check and fault the lane
+    /// emitters lower.
+    fn is_d64_store_conversion(&self, call: &MirRuntimeCall) -> bool {
+        let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
+            return false;
+        };
+        conversion.recovery.is_none()
+            && conversion.params.is_empty()
+            && call.args.len() == 1
+            && crate::is_d64_type(conversion.source_ty, self.types)
+            && crate::is_d64_type(conversion.target_ty, self.types)
+    }
+
     fn is_plain_scalar_conversion(&self, call: &MirRuntimeCall) -> bool {
         let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
             return false;
@@ -572,8 +586,9 @@ impl<'a> DeviceSafeClassifier<'a> {
                 )
                 | MirLayoutKind::Void
                 | MirLayoutKind::Never => {}
-                MirLayoutKind::Scalar(MirScalarLayout::I64)
-                    if self.in_lane_form_function || self.in_single_lane_function => {}
+                MirLayoutKind::Scalar(
+                    MirScalarLayout::I64 | MirScalarLayout::U64 | MirScalarLayout::D64,
+                ) if self.in_lane_form_function || self.in_single_lane_function => {}
                 // gpu-reset Q02: a narrow field read in place. A lane-form
                 // kernel that reads a record-element view (or a genus
                 // parameter) loads an `f16`, `i8` or `u8` field at its own
@@ -669,6 +684,9 @@ impl<'a> DeviceSafeClassifier<'a> {
                     | MirScalarLayout::F32
                     | MirScalarLayout::I32
                     | MirScalarLayout::U32
+                    | MirScalarLayout::I64
+                    | MirScalarLayout::U64
+                    | MirScalarLayout::D64
                     | MirScalarLayout::U8
             ) {
                 self.record_layout(format!("kernel device view element {}", element.spelling()));
@@ -1232,7 +1250,8 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             // pair fails closed in its own emit gate.
             MirStatementKind::RuntimeCall { call, .. }
                 if (self.in_lane_form_function || self.in_single_lane_function)
-                    && self.is_plain_scalar_conversion(call) =>
+                    && (self.is_plain_scalar_conversion(call)
+                        || self.is_d64_store_conversion(call)) =>
             {
                 crate::visit::walk_stmt(self, stmt);
             }

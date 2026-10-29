@@ -36,6 +36,12 @@ pub enum MirScalarLayout {
     /// emitter fails closed on it (ruling 46) and every device gate rejects
     /// it (ruling 39); only the MIR runner carries a value of this layout.
     Magnus,
+    /// `d64`: an `i64` mantissa at scale 10^-8 (decimal-widths; kernel-wide
+    /// types ruling 2026-10-28). Eight bytes, eight-byte aligned, like `i64`,
+    /// but never an integer: arithmetic on it is decimal arithmetic. Appended
+    /// so the serde index of every earlier variant is unchanged. A consumer
+    /// that does not carry decimals must refuse it by name.
+    D64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -507,6 +513,7 @@ impl MirScalarLayout {
             Self::F32 => "f32",
             Self::F64 => "f64",
             Self::Magnus => "magnus",
+            Self::D64 => "d64",
         }
     }
 
@@ -517,7 +524,7 @@ impl MirScalarLayout {
             Self::I8 | Self::U8 => 8,
             Self::I16 | Self::U16 | Self::F16 | Self::Bf16 => 16,
             Self::I32 | Self::U32 | Self::F32 => 32,
-            Self::I64 | Self::U64 | Self::F64 => 64,
+            Self::I64 | Self::U64 | Self::F64 | Self::D64 => 64,
             Self::I128 => 128,
             // Unsized heap carrier: no fixed width. Reported as 0 so a device
             // consumer can never mistake it for a sized element; every
@@ -564,7 +571,13 @@ impl MirScalarLayout {
             Self::I64 | Self::U64 => Some(64),
             Self::I128 => Some(128),
             // `Magnus` is an integer of no fixed width: not a sized integer.
-            Self::Bool | Self::F16 | Self::Bf16 | Self::F32 | Self::F64 | Self::Magnus => None,
+            Self::Bool
+            | Self::F16
+            | Self::Bf16
+            | Self::F32
+            | Self::F64
+            | Self::Magnus
+            | Self::D64 => None,
         }
     }
 
@@ -1055,9 +1068,6 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         (Primitive::Numerus, NumericWidth::I16) => MirScalarLayout::I16,
         (Primitive::Numerus, NumericWidth::I32) => MirScalarLayout::I32,
         (Primitive::Numerus, NumericWidth::I64) => MirScalarLayout::I64,
-        // d64 is the signed i64 carrier at scale 10^8. Arithmetic semantics
-        // are handled by the host emitter; its physical stored layout is i64.
-        (Primitive::Numerus, NumericWidth::D64) => MirScalarLayout::I64,
         (Primitive::Numerus, NumericWidth::U8) => MirScalarLayout::U8,
         (Primitive::Numerus, NumericWidth::U16) => MirScalarLayout::U16,
         (Primitive::Numerus, NumericWidth::U32) => MirScalarLayout::U32,
@@ -1069,6 +1079,9 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         // Ruling 46: `inf` is a heap-resident bignum (`Magnus`), an opaque
         // scalar layout no native or device emitter may read as an integer.
         (Primitive::Numerus, NumericWidth::Inf) => MirScalarLayout::Magnus,
+        // Kernel-wide types ruling 2026-10-28: a `d64` cell is an `i64`
+        // mantissa at scale 10^-8.
+        (Primitive::Numerus, NumericWidth::D64) => MirScalarLayout::D64,
         (prim, width) => {
             let family = match prim {
                 Primitive::Numerus => "numerus",
