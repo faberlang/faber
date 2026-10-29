@@ -2445,11 +2445,11 @@ help = "keep integer intermediates within 64 bits and decimal intermediates with
 
 [diagnostics.SEM008.issues.size_shape_dimension_unsupported]
 message = "a shape after `size` in a call's type arguments admits natural-number dimensions only"
-help = "write each dimension as a natural number, as in `size [2, 3]`; pass a symbolic or run-time dimension through a `size` name instead"
+help = "Use natural numbers in `{magnitudo} [2, 3]`. For symbolic or run-time dimensions, pass each separately with `{magnitudo}` to a function that declares matching size parameters."
 
 [diagnostics.SEM008.issues.size_shape_outside_call_args]
 message = "a bracketed shape after `size` is only admitted in a call's type arguments"
-help = "write the shape directly, as in `tensor<f32, [2, 3]>`, or use `size [2, 3]` in a call such as `construct<f32, size [2, 3]>(data)`"
+help = "Write the shape directly, as in `tensor<f32, [2, 3]>`, or pass it to a shape-taking call, as in `tensor.construct<f32, {magnitudo} [2, 3]>(data)`."
 
 [diagnostics.SEM009]
 message = "CLI validation error"
@@ -2457,139 +2457,139 @@ help = "fix the CLI annotation contract before emitting runnable CLI code"
 
 [diagnostics.SEM009.issues.alias_collides_with_path]
 message = "command alias '{alias}' collides with a command path"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Choose an alias that is not the name of any command path."
 
 [diagnostics.SEM009.issues.cli_on_non_incipit]
 message = "@ cli may only annotate an {incipit} entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Put `@ cli` on a `{incipit}` entry point, not on a function."
 
 [diagnostics.SEM009.issues.command_global_surface]
 message = "'{ubique}' options and operands must be declared on the @ cli entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Move `{ubique}` options and operands from the command to the root `@ cli` `{incipit}` declaration."
 
 [diagnostics.SEM009.issues.command_params_unsupported]
 message = "Phase 04 CLI commands must receive parsed values through 'argumenta <ident>', not ordinary parameters"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Remove ordinary parameters from the command function; bind parsed values with `{argumenta} args` instead."
 
 [diagnostics.SEM009.issues.duplicate_binding]
 message = "duplicate CLI binding '{binding}' in {label} CLI surface"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Give every option and operand on this CLI surface a distinct binding name."
 
 [diagnostics.SEM009.issues.duplicate_cli_entry]
 message = "only one @ cli entry point is allowed"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Keep `@ cli` on only one `{incipit}` entry point."
 
 [diagnostics.SEM009.issues.duplicate_command_alias]
 message = "duplicate command alias '{alias}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Give each command a different alias."
 
 [diagnostics.SEM009.issues.duplicate_command_path]
 message = "duplicate command path '{path}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Give each `@ {imperium}` command a distinct path."
 
 [diagnostics.SEM009.issues.duplicate_long_flag]
 message = "duplicate long flag '{long}' in {label} CLI surface"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Choose a long flag not used by another option on this CLI surface."
 
 [diagnostics.SEM009.issues.duplicate_rest_operand]
 message = "only one {ceteri} operand is allowed"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use at most one `{ceteri}` operand on each CLI surface."
 
 [diagnostics.SEM009.issues.duplicate_short_flag]
 message = "duplicate short flag '{short}' in {label} CLI surface"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Choose a short flag not used by another option on this CLI surface."
 
 [diagnostics.SEM009.issues.global_operand_placement]
 message = "'{ubique}' operands must be declared on the @ cli entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Declare `{ubique}` operands on the root `@ cli` `{incipit}`, not on command functions."
 
 [diagnostics.SEM009.issues.global_option_placement]
 message = "'{ubique}' options must be declared on the @ cli entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Declare `{ubique}` options on the root `@ cli` `{incipit}`, not on command functions."
 
 [diagnostics.SEM009.issues.imperium_on_non_func]
 message = "@ {imperium} may only annotate a {functio} declaration"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Put `@ {imperium}` directly on a `{functio}` declaration."
 
 [diagnostics.SEM009.issues.invalid_command_alias]
 message = "invalid command alias '{alias}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use a nonempty, single-segment alias without `/`."
 
 [diagnostics.SEM009.issues.invalid_command_path]
 message = "invalid command path '{path}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use a nonempty path with no leading, trailing, or repeated `/`."
 
 [diagnostics.SEM009.issues.invalid_long_flag]
 message = "invalid long flag '{long}' for option '{binding}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use a nonempty long flag with no leading hyphen or whitespace."
 
 [diagnostics.SEM009.issues.invalid_short_flag]
 message = "invalid short flag '{short}' for option '{binding}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use exactly one character for the short flag, without a leading hyphen."
 
 [diagnostics.SEM009.issues.list_element_not_named]
 message = "CLI list types must use a named element type"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use a named element type, such as `{lista}<{textus}>` or `{lista}<{numerus}>`."
 
 [diagnostics.SEM009.issues.local_operand_global_collision]
 message = "{label} operand '{binding}' collides with a global CLI binding"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Rename this local operand or the global binding so their names differ."
 
 [diagnostics.SEM009.issues.local_option_global_collision]
 message = "{label} option '{binding}' collides with a global CLI binding"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Rename this local option or the global binding so their names differ."
 
 [diagnostics.SEM009.issues.missing_entry_argument]
 message = "@ cli programs must use an explicit '{incipit} argumenta <ident>' entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Declare the root as `{incipit} {argumenta} args { ... }` so parsed arguments have a binding."
 
 [diagnostics.SEM009.issues.malformed_annotation]
 message = "{annotation} field `{field}` must be {expected}"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Set `{field}` on `{annotation}` to the required form shown above."
 
 [diagnostics.SEM009.issues.missing_option_flag]
 message = "{label} option '{binding}' needs brevis or longum"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Add a `{brevis}` or `{longum}` flag to the option annotation."
 
 [diagnostics.SEM009.issues.mounted_module_root_cli]
 message = "mounted CLI command modules must not declare their own @ cli entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Remove `@ cli` from the mounted module; keep the CLI entry point in the root program."
 
 [diagnostics.SEM009.issues.nested_module_mount]
 message = "@ imperia module mounts may only be declared on the root CLI entry point"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Declare `{imperia}` mounts only on the root `@ cli` `{incipit}`, not inside a mounted module."
 
 [diagnostics.SEM009.issues.operand_after_rest]
 message = "operand '{binding}' appears after {ceteri} operand"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Move this operand before the `{ceteri}` operand; a rest operand must come last."
 
 [diagnostics.SEM009.issues.orphan_cli_surface]
 message = "@ optio and @ operandus must annotate @ cli {incipit} or @ {imperium} {functio}"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Attach `@ {optio}` or `@ {operandus}` to the root `@ cli` `{incipit}` or a `@ {imperium}` function."
 
 [diagnostics.SEM009.issues.rest_not_final]
 message = "{ceteri} operand must be the final operand"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Move the `{ceteri}` operand to the end of the operand list."
 
 [diagnostics.SEM009.issues.subcommand_local_surface]
 message = "subcommand CLI programs may only declare top-level options or operands with '{ubique}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Move root-local options and operands onto command declarations, or mark shared ones `{ubique}` on the root."
 
 [diagnostics.SEM009.issues.subcommand_root_body]
 message = "subcommand CLI programs must use an empty root {incipit} body in Phase 04"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Leave the root `{incipit}` body empty; put command behavior in `@ {imperium}` functions."
 
 [diagnostics.SEM009.issues.unsupported_list_element_type]
 message = "unsupported CLI list element type '{type}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use `{lista}` with `{textus}`, `{numerus}`, or `b8` elements for a CLI list."
 
 [diagnostics.SEM009.issues.unsupported_type]
 message = "unsupported CLI type '{type}'"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use `{textus}`, `{numerus}`, `{fractus}`, `{bivalens}`, `{ignotum}`, or a supported `{lista}` type."
 
 [diagnostics.SEM009.issues.unsupported_type_shape]
 message = "unsupported CLI type shape"
-help = "fix the CLI annotation contract before emitting runnable CLI code"
+help = "Use a plain named CLI type or a supported `{lista}` type, not a union, access marker, or nested type."
 
 [diagnostics.SEM010]
 message = "type mismatch"
@@ -2597,7 +2597,7 @@ help = "make the expression type match the expected type"
 
 [diagnostics.SEM010.issues.sort_ref_requires_map]
 message = "`ref` sorts the keys of a map, so the source must be a map"
-help = "use `from` to sort the values of a list or a set, or sort a map with `ref`"
+help = "Use `{ex}` for list or set values, or `{de}` for map keys."
 
 [diagnostics.SEM010.issues.sort_tensor_unsupported]
 message = "a tensor cannot be the source of a sort expression"
