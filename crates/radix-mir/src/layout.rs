@@ -1055,6 +1055,9 @@ fn sized_numeric_layout(prim: Primitive, width: NumericWidth) -> LayoutResolutio
         (Primitive::Numerus, NumericWidth::I16) => MirScalarLayout::I16,
         (Primitive::Numerus, NumericWidth::I32) => MirScalarLayout::I32,
         (Primitive::Numerus, NumericWidth::I64) => MirScalarLayout::I64,
+        // d64 is the signed i64 carrier at scale 10^8. Arithmetic semantics
+        // are handled by the host emitter; its physical stored layout is i64.
+        (Primitive::Numerus, NumericWidth::D64) => MirScalarLayout::I64,
         (Primitive::Numerus, NumericWidth::U8) => MirScalarLayout::U8,
         (Primitive::Numerus, NumericWidth::U16) => MirScalarLayout::U16,
         (Primitive::Numerus, NumericWidth::U32) => MirScalarLayout::U32,
@@ -1108,13 +1111,9 @@ fn int_layout(width: NumericWidth) -> LayoutResolution {
         | NumericWidth::BF16
         | NumericWidth::F32
         | NumericWidth::F64
-        // decimal-widths D1: decimals have no integer layout arm until D4/D5.
         | NumericWidth::D64 => {
             return LayoutResolution::MissingFact(
-                format!(
-                    "modulus<{}> has no named layout arm",
-                    width.faber_marker()
-                ),
+                format!("modulus<{}> has no named layout arm", width.faber_marker()),
                 vec![
                     ("reason", "no_named_layout_arm".to_owned()),
                     ("family", "modulus".to_owned()),
