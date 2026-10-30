@@ -897,7 +897,10 @@ fn tensor_type_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Optio
                     _ => Some(Sym::Dim(dim.0)),
                 })
                 .collect(),
-            _ => None,
+            // A rank-1 dynamic extent (a generic helper formal that kept its
+            // size parameter after specialization) is one opaque dimension:
+            // an unproven read of it faults, like any other dynamic bound.
+            _ => Some(vec![Sym::Dim(shape.0)]),
         },
         Type::Alias(_, target) => tensor_type_dims(MirType::semantic(*target), validation),
         _ => None,
