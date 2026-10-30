@@ -190,17 +190,6 @@ impl HirCfg {
 }
 
 /// Build a deterministic HIR CFG for functions, the optional module entry,
-/// and every closure or lane body nested inside them.
-///
-/// Malformed HIR (a loop transfer outside a loop) returns [`CfgError`] rather
-/// than being approximated.  This keeps the semantic region consumer fail
-/// closed: its caller may reject loudly instead of silently keeping the old
-/// block-scope approximation.
-///
-/// # Errors
-/// Returns `CfgError` when a control-flow shape is unsupported.
-
-/// Build a deterministic HIR CFG for functions, the optional module entry,
 /// every closure or lane body nested inside them, and module constants.
 ///
 /// Malformed HIR (a loop transfer outside a loop) returns [`CfgError`] rather
@@ -1184,11 +1173,10 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
             }
         }
         K::Widen { operand, .. } => children.push(operand),
-        K::Ad { opener, .. } => {
-            if let Some(opener) = opener {
-                children.push(opener);
-            }
-        }
+        K::Ad {
+            opener: Some(opener),
+            ..
+        } => children.push(opener),
         K::Ref(_, object) | K::Deref(object) => children.push(object),
         K::TypeCheck { expr, .. } => children.push(expr),
         K::CopyInto { target, value }
