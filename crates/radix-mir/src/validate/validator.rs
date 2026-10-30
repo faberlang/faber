@@ -85,6 +85,7 @@ fn detached_fields_are_send(context: MirValidationContext<'static>, program: Mir
         layouts,
         interner,
         functions,
+        grid_reduce_helper_indexes,
         method_defs,
         external_function_identities,
         package_product,
@@ -111,6 +112,7 @@ fn detached_fields_are_send(context: MirValidationContext<'static>, program: Mir
     assert_send(&layouts);
     assert_send(&interner);
     assert_send(&functions);
+    assert_send(&grid_reduce_helper_indexes);
     assert_send(&method_defs);
     assert_send(&external_function_identities);
     assert_send(&package_product);
@@ -249,7 +251,64 @@ impl<'a> ValidatedMir<'a> {
 
     /// Assemble the proof token from a program that has just passed
     /// validation and the context that proved it.
-    fn from_validated(program: MirProgram, context: MirValidationContext<'a>) -> Self {
+    fn from_validated(program: MirProgram, mut context: MirValidationContext<'a>) -> Self {
+        // Rebuild, rather than carry stale summaries through patches, linking
+        // or specialization. This is derived metadata, not a serialized proof.
+        context.grid_reduce_helper_indexes.clear();
+        let helpers: FxHashSet<_> = program
+            .functions
+            .iter()
+            .flat_map(|function| &function.blocks)
+            .flat_map(|block| &block.statements)
+            .filter_map(|statement| match &statement.kind {
+                crate::MirStatementKind::RuntimeCall { call, .. }
+                    if matches!(&call.intrinsic, crate::MirIntrinsic::FilumReduce(op)
+                        if op.form == crate::MirFilumForm::Grid) =>
+                {
+                    Some(call)
+                }
+                _ => None,
+            })
+            .flat_map(|call| &call.args)
+            .filter_map(|arg| match arg {
+                crate::MirOperand::Constant(crate::MirConstant::Function(id)) => Some(*id),
+                _ => None,
+            })
+            .collect();
+        for helper in program
+            .functions
+            .iter()
+            .filter(|function| helpers.contains(&function.id))
+        {
+            // An uncomposed call can index any capture; keep the conservative
+            // fallback until its body is visible in this helper.
+            if helper.blocks.iter().any(|block| {
+                block
+                    .statements
+                    .iter()
+                    .any(|statement| matches!(statement.kind, crate::MirStatementKind::Call { .. }))
+                    || matches!(
+                        block.terminator.kind,
+                        crate::MirTerminatorKind::TryCall { .. }
+                    )
+            }) {
+                continue;
+            }
+            let indexes = crate::LaneIndexProof::for_helper(helper, &context)
+                .unproven()
+                .iter()
+                .filter_map(|form| {
+                    helper
+                        .params
+                        .iter()
+                        .position(|param| param.local == form.tensor)
+                        .and_then(|position| u32::try_from(position).ok())
+                })
+                .collect();
+            context
+                .grid_reduce_helper_indexes
+                .insert(helper.id, indexes);
+        }
         let function_index = program.function_index();
         Self {
             program,

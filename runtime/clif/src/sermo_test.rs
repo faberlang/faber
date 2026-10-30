@@ -12,7 +12,13 @@ use super::{
 use faber_leaf::LeafErrorKind;
 
 fn open(route: &str) -> i64 {
-    unsafe { __faber_clif_v1_sermo_open(route.as_ptr(), i64::try_from(route.len()).unwrap()) }
+    unsafe {
+        __faber_clif_v1_sermo_open(
+            crate::test_arena_ptr(),
+            route.as_ptr(),
+            i64::try_from(route.len()).unwrap(),
+        )
+    }
 }
 
 /// The bytes one fault-field export reports for `handle`.
@@ -21,11 +27,11 @@ fn open(route: &str) -> i64 {
 ///
 /// The export must write its byte count through the pointer it is given.
 unsafe fn raw_field(
-    export: unsafe extern "C" fn(i64, *mut i64) -> *const u8,
+    export: unsafe extern "C" fn(*const crate::Arena, i64, *mut i64) -> *const u8,
     handle: i64,
 ) -> Vec<u8> {
     let mut length = -1_i64;
-    let bytes = unsafe { export(handle, &raw mut length) };
+    let bytes = unsafe { export(crate::test_arena_ptr(), handle, &raw mut length) };
     assert!(!bytes.is_null(), "a raw fault field is never null");
     let length = usize::try_from(length).expect("the export writes a byte count");
     unsafe { std::slice::from_raw_parts(bytes, length) }.to_vec()
@@ -50,12 +56,12 @@ fn set_opener_i64_reopens_the_conversation() {
     const ROUTE: &str = "tempus:dormiet";
 
     // An unknown handle is a no-op, not a panic.
-    __faber_clif_v1_sermo_set_opener_nil(0);
-    __faber_clif_v1_sermo_set_opener_i64(i64::MAX, 1);
+    __faber_clif_v1_sermo_set_opener_nil(crate::test_arena_ptr(), 0);
+    __faber_clif_v1_sermo_set_opener_i64(crate::test_arena_ptr(), i64::MAX, 1);
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    __faber_clif_v1_sermo_set_opener_i64(handle, 0);
+    __faber_clif_v1_sermo_set_opener_i64(crate::test_arena_ptr(), handle, 0);
 
     let mut table = CONVERSATIONS
         .lock()
@@ -74,8 +80,8 @@ fn valor_opener_reopens_a_numerus_conversation() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    let boxed = crate::__faber_clif_v1_opt_some(crate::TAG_INT, 7);
-    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, boxed) };
+    let boxed = crate::__faber_clif_v1_opt_some(crate::test_arena_ptr(), crate::TAG_INT, 7);
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(crate::test_arena_ptr(), handle, boxed) };
 
     let mut table = CONVERSATIONS
         .lock()
@@ -90,7 +96,9 @@ fn a_null_valor_opener_is_nihil() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, std::ptr::null()) };
+    unsafe {
+        __faber_clif_v1_sermo_set_opener_valor(crate::test_arena_ptr(), handle, std::ptr::null())
+    };
 
     let mut table = CONVERSATIONS
         .lock()
@@ -105,8 +113,8 @@ fn an_unsupported_tag_reopens_on_nihil() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    let boxed = crate::__faber_clif_v1_opt_some(crate::TAG_FLOAT, 0);
-    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, boxed) };
+    let boxed = crate::__faber_clif_v1_opt_some(crate::test_arena_ptr(), crate::TAG_FLOAT, 0);
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(crate::test_arena_ptr(), handle, boxed) };
 
     let mut table = CONVERSATIONS
         .lock()
@@ -121,7 +129,7 @@ fn set_opener_nil_reopens_the_conversation() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    __faber_clif_v1_sermo_set_opener_nil(handle);
+    __faber_clif_v1_sermo_set_opener_nil(crate::test_arena_ptr(), handle);
 
     let mut table = CONVERSATIONS
         .lock()
@@ -140,15 +148,21 @@ fn monotonic_materializes_through_the_exports() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    let nanos = __faber_clif_v1_sermo_materialize_i64(handle, 0);
+    let nanos = __faber_clif_v1_sermo_materialize_i64(crate::test_arena_ptr(), handle, 0);
     assert!(nanos > 0, "{ROUTE} materialized {nanos}");
-    assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
+    assert_eq!(
+        __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
+        0
+    );
 }
 
 #[test]
 fn invalid_handle_materializes_the_fallback() {
-    assert_eq!(__faber_clif_v1_sermo_materialize_i64(0, 7), 7);
-    assert_eq!(__faber_clif_v1_sermo_failed(0), 1);
+    assert_eq!(
+        __faber_clif_v1_sermo_materialize_i64(crate::test_arena_ptr(), 0, 7),
+        7
+    );
+    assert_eq!(__faber_clif_v1_sermo_failed(crate::test_arena_ptr(), 0), 1);
 }
 
 #[test]
@@ -158,9 +172,15 @@ fn wrong_reply_shape_faults_and_crosses_kind_and_path_raw() {
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
     // The route replies `nihil`, so asking for a number faults.
-    __faber_clif_v1_sermo_set_opener_i64(handle, 0);
-    assert_eq!(__faber_clif_v1_sermo_materialize_i64(handle, 7), 7);
-    assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
+    __faber_clif_v1_sermo_set_opener_i64(crate::test_arena_ptr(), handle, 0);
+    assert_eq!(
+        __faber_clif_v1_sermo_materialize_i64(crate::test_arena_ptr(), handle, 7),
+        7
+    );
+    assert_eq!(
+        __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
+        1
+    );
 
     assert_eq!(
         unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) },
@@ -178,9 +198,12 @@ fn no_fault_reports_an_empty_kind_and_path() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    let nanos = __faber_clif_v1_sermo_materialize_i64(handle, 0);
+    let nanos = __faber_clif_v1_sermo_materialize_i64(crate::test_arena_ptr(), handle, 0);
     assert!(nanos > 0, "{ROUTE} materialized {nanos}");
-    assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
+    assert_eq!(
+        __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
+        0
+    );
 
     assert!(unsafe { raw_field(__faber_clif_v1_sermo_fault_kind, handle) }.is_empty());
     assert!(unsafe { raw_field(__faber_clif_v1_sermo_fault_path, handle) }.is_empty());
@@ -206,9 +229,12 @@ fn drain_serves_a_unit_route_and_clears_the_fault() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    __faber_clif_v1_sermo_set_opener_i64(handle, 0);
-    __faber_clif_v1_sermo_drain(handle);
-    assert_eq!(__faber_clif_v1_sermo_failed(handle), 0);
+    __faber_clif_v1_sermo_set_opener_i64(crate::test_arena_ptr(), handle, 0);
+    __faber_clif_v1_sermo_drain(crate::test_arena_ptr(), handle);
+    assert_eq!(
+        __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
+        0
+    );
 }
 
 fn assert_fault_exports_match_leaf(handle: i64, error: &faber_leaf::LeafError) {
@@ -235,9 +261,12 @@ fn drain_preserves_the_shared_empty_path_fault_facts() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    __faber_clif_v1_sermo_set_opener_i64(handle, -1);
-    __faber_clif_v1_sermo_drain(handle);
-    assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
+    __faber_clif_v1_sermo_set_opener_i64(crate::test_arena_ptr(), handle, -1);
+    __faber_clif_v1_sermo_drain(crate::test_arena_ptr(), handle);
+    assert_eq!(
+        __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
+        1
+    );
     assert_fault_exports_match_leaf(handle, &leaf_error);
 }
 
@@ -275,12 +304,16 @@ fn c_fault_exports_preserve_the_shared_nonempty_path_facts() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
-    let text = crate::text_new(PATH.as_bytes());
+    let text = crate::text_new(crate::test_arena_ptr(), PATH.as_bytes());
     let text_bits = i64::try_from(text as usize).expect("text pointer fits ABI payload");
-    let boxed = crate::__faber_clif_v1_opt_some(crate::TAG_TEXT, text_bits);
-    unsafe { __faber_clif_v1_sermo_set_opener_valor(handle, boxed) };
-    __faber_clif_v1_sermo_drain(handle);
-    assert_eq!(__faber_clif_v1_sermo_failed(handle), 1);
+    let boxed =
+        crate::__faber_clif_v1_opt_some(crate::test_arena_ptr(), crate::TAG_TEXT, text_bits);
+    unsafe { __faber_clif_v1_sermo_set_opener_valor(crate::test_arena_ptr(), handle, boxed) };
+    __faber_clif_v1_sermo_drain(crate::test_arena_ptr(), handle);
+    assert_eq!(
+        __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
+        1
+    );
     assert_fault_exports_match_leaf(handle, &leaf_error);
 }
 
