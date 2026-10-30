@@ -4,6 +4,7 @@ use std::ffi::OsStr;
 use std::fs;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct TempDir {
@@ -12,13 +13,30 @@ pub struct TempDir {
 
 impl TempDir {
     pub fn new(prefix: &str, label: &str) -> Self {
+        // Uniqueness needs more than the wall clock: worker threads creating
+        // directories in the same nanosecond would collide (create_dir_all is
+        // idempotent), share one tree, and one drop would delete the other's
+        // case mid-run. The pid separates processes; the counter separates
+        // same-nanosecond creations inside this one.
+        static CREATION_COUNTER: AtomicU64 = AtomicU64::new(0);
         let nonce = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("clock")
             .as_nanos();
-        let path = std::env::temp_dir().join(format!("{prefix}-{label}-{nonce}"));
-        fs::create_dir_all(&path).expect("create temp dir");
-        Self { path }
+        let ordinal = CREATION_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "{prefix}-{label}-{}-{nonce}-{ordinal}",
+            std::process::id()
+        ));
+        match fs::create_dir(&path) {
+            Ok(()) => Self { path },
+            Err(_) if path.is_dir() => {
+                // A same-name directory already exists: uniqueness failed,
+                // so fail loudly rather than share the tree.
+                panic!("temp dir name collision: {}", path.display());
+            }
+            Err(error) => panic!("create temp dir {}: {error}", path.display()),
+        }
     }
 }
 

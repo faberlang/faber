@@ -71,9 +71,17 @@ fn requirement_tiers(fixture: &AnalyzedFixture) -> Vec<(String, KernelTier)> {
     rows
 }
 
-fn assert_head_matches_annotation_form(annotation_form: &str, head_form: &str, analyze: fn(&str) -> AnalyzedFixture) {
+fn assert_head_matches_annotation_form(
+    annotation_form: &str,
+    head_form: &str,
+    analyze: fn(&str) -> AnalyzedFixture,
+) {
     let annotation = analyze(annotation_form);
-    assert!(annotation.is_ok(), "annotation form: {:?}", annotation.diagnostics);
+    assert!(
+        annotation.is_ok(),
+        "annotation form: {:?}",
+        annotation.diagnostics
+    );
     let head = analyze(head_form);
     assert!(head.is_ok(), "head form: {:?}", head.diagnostics);
     assert_eq!(
@@ -158,5 +166,5 @@ fn a_head_form_kernel_keeps_the_runner_refusal() {
     let fixture = analyze_la("nucleum k(f32 x) → f32 { redde x }\n");
     assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
     let rows = kernel_fact_rows(&fixture);
-    assert_eq!(rows[0].1, true, "the head form marks is_kernel");
+    assert!(rows[0].1, "the head form marks is_kernel");
 }

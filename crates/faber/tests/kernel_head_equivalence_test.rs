@@ -27,11 +27,28 @@ const FAMILY_WORDS: [&str; 2] = ["kernel", "nucleum"];
 const MODE_WORDS: [&str; 5] = ["relaxed", "unsafe", "laxus", "intutus", "fragment"];
 const FN_HEAD_WORDS: [&str; 2] = ["fn", "functio"];
 const MODIFIER_WORDS: [&str; 12] = [
-    "errata", "errors", "exitus", "exit", "immutata", "readonly", "iacit", "throws", "optiones",
-    "options", "argumenta", "args",
+    "errata",
+    "errors",
+    "exitus",
+    "exit",
+    "immutata",
+    "readonly",
+    "iacit",
+    "throws",
+    "optiones",
+    "options",
+    "argumenta",
+    "args",
 ];
 const MODIFIERS_WITH_ARGUMENT: [&str; 8] = [
-    "errata", "errors", "exitus", "exit", "optiones", "options", "argumenta", "args",
+    "errata",
+    "errors",
+    "exitus",
+    "exit",
+    "optiones",
+    "options",
+    "argumenta",
+    "args",
 ];
 
 #[path = "support/temp.rs"]
@@ -70,7 +87,11 @@ enum Rewrite {
 fn marker_on_line(trimmed: &str) -> Option<Result<(String, Option<String>), ()>> {
     let rest = trimmed.strip_prefix('@')?.trim_start();
     let family = FAMILY_WORDS.iter().find(|word| {
-        rest.starts_with(*word) && !rest[(*word).len()..].chars().next().is_some_and(is_word_char)
+        rest.starts_with(*word)
+            && !rest[(*word).len()..]
+                .chars()
+                .next()
+                .is_some_and(is_word_char)
     })?;
     let tail = rest[family.len()..].trim_start();
     if tail.is_empty() {
@@ -97,7 +118,9 @@ fn marker_on_line(trimmed: &str) -> Option<Result<(String, Option<String>), ()>>
         }
         return Some(Ok(((*family).to_owned(), mode)));
     }
-    let word_len = tail.find(|ch: char| !is_word_char(ch)).unwrap_or(tail.len());
+    let word_len = tail
+        .find(|ch: char| !is_word_char(ch))
+        .unwrap_or(tail.len());
     let word = &tail[..word_len];
     let after = tail[word_len..].trim_start();
     if !after.is_empty() && !after.starts_with('#') {
@@ -124,7 +147,11 @@ fn head_line_of(lines: &[&str], marker_line: usize) -> Option<usize> {
     }
     let head = lines[k].trim_start();
     let is_head = FN_HEAD_WORDS.iter().any(|word| {
-        head.starts_with(word) && !head[(*word).len()..].chars().next().is_some_and(is_word_char)
+        head.starts_with(word)
+            && !head[(*word).len()..]
+                .chars()
+                .next()
+                .is_some_and(is_word_char)
     });
     is_head.then_some(k)
 }
@@ -226,21 +253,27 @@ fn rewrite_kernel_annotations(source: &str) -> Rewrite {
 fn mode_insert_offset(source: &str, lines: &[&str], head: usize) -> Option<usize> {
     let head_line_text = lines[head];
     let indent = head_line_text.len() - head_line_text.trim_start().len();
-    let mut offset = lines[..head].iter().map(|line| line.len() + 1).sum::<usize>() + indent;
+    let mut offset = lines[..head]
+        .iter()
+        .map(|line| line.len() + 1)
+        .sum::<usize>()
+        + indent;
     let mut rest = &source[offset..];
     let head_len = FN_HEAD_WORDS
         .iter()
         .find_map(|word| rest.starts_with(word).then(|| word.len()))?;
     rest = &rest[head_len..];
     offset += head_len;
-    let mut skip_ws = |rest: &mut &str, offset: &mut usize| {
+    let skip_ws = |rest: &mut &str, offset: &mut usize| {
         let skipped = rest.len() - rest.trim_start().len();
         *rest = &rest[skipped..];
         *offset += skipped;
     };
     skip_ws(&mut rest, &mut offset);
     // The declaration name.
-    let name_len = rest.find(|ch: char| !is_word_char(ch)).unwrap_or(rest.len());
+    let name_len = rest
+        .find(|ch: char| !is_word_char(ch))
+        .unwrap_or(rest.len());
     rest = &rest[name_len..];
     offset += name_len;
     skip_ws(&mut rest, &mut offset);
@@ -265,7 +298,9 @@ fn mode_insert_offset(source: &str, lines: &[&str], head: usize) -> Option<usize
         if trimmed.is_empty() {
             break;
         }
-        let word_len = trimmed.find(|ch: char| !is_word_char(ch)).unwrap_or(trimmed.len());
+        let word_len = trimmed
+            .find(|ch: char| !is_word_char(ch))
+            .unwrap_or(trimmed.len());
         let word = &trimmed[..word_len];
         if !MODIFIER_WORDS.contains(&word) {
             break;
@@ -314,7 +349,10 @@ fn collect_fab_files(root: &Path, out: &mut Vec<PathBuf>) {
         .collect();
     entries.sort();
     for path in entries {
-        let name = path.file_name().and_then(|name| name.to_str()).unwrap_or("");
+        let name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("");
         if path.is_dir() {
             if name == ".git" || name == "node_modules" || name == "target" {
                 continue;
@@ -454,7 +492,8 @@ fn package_equivalence(root: &Path, sources: &[(PathBuf, String, String)]) -> Re
 
     for (relative, _, rewritten) in sources {
         let target = copy_root.join(relative);
-        fs::write(&target, rewritten).map_err(|err| format!("{label}: rewrite {}: {err}", relative.display()))?;
+        fs::write(&target, rewritten)
+            .map_err(|err| format!("{label}: rewrite {}: {err}", relative.display()))?;
     }
 
     let (second_status, second_ids) = check_identity(&copy_root);
@@ -485,13 +524,15 @@ where
         .unwrap_or(4);
     std::thread::scope(|scope| {
         for _ in 0..workers {
-            scope.spawn(|| loop {
-                let next = queue.lock().expect("task queue").pop();
-                let Some(task) = next else {
-                    break;
-                };
-                if let Err(message) = run(&task) {
-                    failures.lock().expect("failure list").push(message);
+            scope.spawn(|| {
+                loop {
+                    let next = queue.lock().expect("task queue").pop();
+                    let Some(task) = next else {
+                        break;
+                    };
+                    if let Err(message) = run(&task) {
+                        failures.lock().expect("failure list").push(message);
+                    }
                 }
             });
         }
@@ -506,8 +547,15 @@ where
 }
 
 enum Case {
-    SingleFile { label: String, original: String, rewritten: String },
-    Package { root: PathBuf, sources: Vec<(PathBuf, String, String)> },
+    SingleFile {
+        label: String,
+        original: String,
+        rewritten: String,
+    },
+    Package {
+        root: PathBuf,
+        sources: Vec<(PathBuf, String, String)>,
+    },
 }
 
 #[test]

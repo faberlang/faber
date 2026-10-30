@@ -82,7 +82,7 @@ impl Parser {
     /// `Parser::is_recovery_boundary` so malformed input can resume at the new
     /// construct instead of skipping it.
     pub(super) fn parse_stmt(&mut self) -> Result<Stmt, ParseError> {
-        let leading_trivia = self.parse_leading_trivia();
+        let mut leading_trivia = self.parse_leading_trivia();
         let start = self.current_span();
         let id = self.next_id();
         // The kernel declaration head synthesizes its nucleum annotation
@@ -131,7 +131,14 @@ impl Parser {
                 // declaration name follows, so an ordinary `kernel(…)` call
                 // or identifier use stays expression material.
                 Some(TokenKind::Nucleum) if self.at_kernel_decl_head() => {
-                    let (func, head) = self.parse_kernel_decl()?;
+                    // A bare claim (no authored annotations above) folds the
+                    // synthetic boundary newline; under a stack the authored
+                    // annotation line's own terminator already rides the run.
+                    let bare = !std::mem::take(&mut self.head_under_authored_annotations);
+                    let (func, head, head_newline) = self.parse_kernel_decl(bare)?;
+                    if let Some(newline) = head_newline {
+                        leading_trivia.push(newline);
+                    }
                     head_annotation = Some(head);
                     StmtKind::Func(func)
                 }
@@ -208,12 +215,14 @@ impl Parser {
 
     fn parse_annotated_stmt(&mut self, leading_trivia: Vec<Trivia>) -> Result<Stmt, ParseError> {
         let annotations = self.parse_annotations()?;
-        self.nondum_function_pending =
-            (self.check_keyword_ident(TokenKind::Functio) || self.at_kernel_decl_head())
-                && annotations
-                    .iter()
-                    .any(|annotation| self.is_nondum_annotation(annotation));
+        self.nondum_function_pending = (self.check_keyword_ident(TokenKind::Functio)
+            || self.at_kernel_decl_head())
+            && annotations
+                .iter()
+                .any(|annotation| self.is_nondum_annotation(annotation));
+        self.head_under_authored_annotations = true;
         let parsed = self.parse_stmt();
+        self.head_under_authored_annotations = false;
         self.nondum_function_pending = false;
         let mut stmt = parsed?;
         if !matches!(stmt.kind, StmtKind::Func(_)) {
@@ -1032,7 +1041,21 @@ impl Parser {
     /// to the same function declaration the `@ nucleum` annotation form
     /// marks: the parsed mode synthesizes the nucleum annotation, and the
     /// caller attaches it where the authored marker would ride.
-    fn parse_kernel_decl(&mut self) -> Result<(FuncDecl, Annotation), ParseError> {
+    ///
+    /// A bare head (`bare_head`, no authored annotations above it) also
+    /// returns the synthetic boundary newline the annotation path folds into
+    /// its statement trivia (the annotation line's own terminator, attached
+    /// ahead of the declaration): the canonical emitter re-emits every kernel
+    /// as the annotation form and strips exactly one trailing terminator from
+    /// the item's trivia run, so a bare head must carry the same shape or an
+    /// authored blank line before the declaration would be swallowed by that
+    /// strip. A head under an authored annotation stack, and a genus method
+    /// head, return none — in those positions the annotation form records no
+    /// extra terminator either.
+    fn parse_kernel_decl(
+        &mut self,
+        bare_head: bool,
+    ) -> Result<(FuncDecl, Annotation, Option<Trivia>), ParseError> {
         let nondum_declared = std::mem::take(&mut self.nondum_function_pending);
         let head_span = self.current_span();
         self.expect_keyword_ident(TokenKind::Nucleum)?;
@@ -1051,7 +1074,8 @@ impl Parser {
             }),
             span,
         };
-        Ok((decl, annotation))
+        let head_newline = bare_head.then_some(Trivia::Newline(Newline { span: head_span }));
+        Ok((decl, annotation, head_newline))
     }
 
     /// Parse the declaration body shared by both heads (`functio` and the
@@ -1126,7 +1150,7 @@ impl Parser {
     }
 
     /// GRAMMAR (operator ruling 2026-10-30):
-    ///   kernel_mode := `laxus` | `intutus` | `fragment`
+    ///   `kernel_mode` := `laxus` | `intutus` | `fragment`
     ///
     /// One optional mode word in the kernel head's signature slot, after the
     /// modifier run. Mirrors the annotation form's refusal set so both heads
@@ -1137,8 +1161,8 @@ impl Parser {
         let start = self.current_span();
         let is_fragment = self.eat_keyword_ident(TokenKind::Fragment);
         let tier = self.parse_kernel_mode_tier(is_fragment)?;
-        let mode_span = (is_fragment || tier != KernelTier::Default)
-            .then(|| start.merge(self.previous_span()));
+        let mode_span =
+            (is_fragment || tier != KernelTier::Default).then(|| start.merge(self.previous_span()));
         Ok(ParsedKernelMode {
             is_fragment,
             tier,
@@ -1158,18 +1182,18 @@ impl Parser {
     fn parse_kernel_mode_tier(&mut self, fragment: bool) -> Result<KernelTier, ParseError> {
         let mut tier = KernelTier::Default;
         let mut written = false;
-        loop {
-            let TokenKind::Ident(symbol) = self.peek().kind else {
-                break;
-            };
+        while let TokenKind::Ident(symbol) = self.peek().kind {
             let next = match self.current_keyword_ident() {
                 Some(TokenKind::Laxus) => KernelTier::Relaxed,
                 Some(TokenKind::Intutus) => KernelTier::Unsafe,
                 Some(TokenKind::Fragment) if written => {
                     return Err(self.invalid_annotation_error("nucleum_tier_on_fragment"));
                 }
-                Some(TokenKind::Fragment) => break,
-                Some(TokenKind::Fiet | TokenKind::Fiunt | TokenKind::Fient) => break,
+                Some(
+                    TokenKind::Fragment | TokenKind::Fiet | TokenKind::Fiunt | TokenKind::Fient,
+                ) => {
+                    break;
+                }
                 _ => {
                     return Err(self
                         .invalid_annotation_error("unknown_nucleum_tier")
@@ -1665,11 +1689,13 @@ impl Parser {
             ClassMemberKind::Method(func)
         } else if self.at_kernel_decl_head() {
             // A kernel method head: same rule as a `functio` method, with the
-            // head's marker folded into the member's annotation stack.
+            // head's marker folded into the member's annotation stack. The
+            // member boundary records no annotation-line terminator for the
+            // annotation form either, so the head claims no synthetic one.
             self.nondum_function_pending = annotations
                 .iter()
                 .any(|annotation| self.is_nondum_annotation(annotation));
-            let (func, head) = self.parse_kernel_decl()?;
+            let (func, head, _) = self.parse_kernel_decl(false)?;
             annotations = self.merge_kernel_head_annotation(annotations, head);
             ClassMemberKind::Method(func)
         } else {

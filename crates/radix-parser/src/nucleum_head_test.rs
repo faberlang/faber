@@ -5,9 +5,9 @@
 //!
 //! Identity assertions target the structured `issue`, never rendered prose.
 
-use crate::test_support::{assert_parse_error_issue_la, parse_ok, parse_ok_la};
+use crate::test_support::{assert_parse_error_issue_la, parse_ok_la};
 use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
-use radix_syntax::{AnnotationKind, ClassMemberKind, KernelTier, StmtKind, Stmt};
+use radix_syntax::{AnnotationKind, ClassMemberKind, KernelTier, Stmt, StmtKind};
 
 /// English surface for the head spellings: the registered keyword rows the
 /// installed `en` pack declares for the kernel family.
@@ -74,8 +74,14 @@ fn kernel_head_parses_as_function_with_synthesized_marker() {
         panic!("a kernel head declares a function");
     };
     assert_eq!(program.statements[0].annotations.len(), 1);
-    assert_eq!(nucleum_annotation(&program.statements[0]), (false, KernelTier::Default));
-    assert!(func.body.is_some(), "the head form takes a block like functio");
+    assert_eq!(
+        nucleum_annotation(&program.statements[0]),
+        (false, KernelTier::Default)
+    );
+    assert!(
+        func.body.is_some(),
+        "the head form takes a block like functio"
+    );
 }
 
 #[test]
@@ -199,9 +205,7 @@ fn kernel_head_claims_only_a_declaration_name_shape() {
 
 #[test]
 fn kernel_head_parses_as_a_genus_method_marker() {
-    let result = parse_ok_la(
-        "genus C {\n    nucleum m(f32 x) → f32 { redde x }\n}\n",
-    );
+    let result = parse_ok_la("genus C {\n    nucleum m(f32 x) → f32 { redde x }\n}\n");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Class(class) = &program.statements[0].kind else {
         panic!("expected a genus declaration");
@@ -211,7 +215,10 @@ fn kernel_head_parses_as_a_genus_method_marker() {
     };
     assert!(matches!(member.kind, ClassMemberKind::Method(_)));
     assert_eq!(member.annotations.len(), 1);
-    assert!(matches!(member.annotations[0].kind, AnnotationKind::Nucleum(_)));
+    assert!(matches!(
+        member.annotations[0].kind,
+        AnnotationKind::Nucleum(_)
+    ));
 }
 
 #[test]

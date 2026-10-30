@@ -578,9 +578,14 @@ impl Lowerer<'_> {
             });
         }
         // Authored brace shape: `@ nucleum { … }` keeps braces; the sugar
-        // markers (`@ kernel`, `@ kernel fragment`) stay bare.
+        // markers (`@ kernel`, `@ kernel laxus`) stay bare. A fragment rides
+        // a field, and the canonical emitter writes fields as one braced
+        // record — the only fragment round trip — so every fragment-bearing
+        // nucleum (sugar, braced record, or the declaration head's mode
+        // word) lowers to the braced record.
+        let braced = nucleum.braced || nucleum.is_fragment;
         let mut annotation = HirAnnotation::with_fields(family, fields, span);
-        annotation.brace_authored = nucleum.braced;
+        annotation.brace_authored = braced;
         annotation
     }
 

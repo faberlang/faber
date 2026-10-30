@@ -360,14 +360,10 @@ const NUCLEUM_HEAD: &[KeywordOwner] = &[
     KeywordOwner::AnnotationName,
     KeywordOwner::DeclarationIntroducer,
 ];
-const ANNOTATION_MODIFIER_OR_KERNEL_MODE: &[KeywordOwner] = &[
-    KeywordOwner::AnnotationModifier,
-    KeywordOwner::KernelMode,
-];
-const ANNOTATION_NAME_OR_KERNEL_MODE: &[KeywordOwner] = &[
-    KeywordOwner::AnnotationName,
-    KeywordOwner::KernelMode,
-];
+const ANNOTATION_MODIFIER_OR_KERNEL_MODE: &[KeywordOwner] =
+    &[KeywordOwner::AnnotationModifier, KeywordOwner::KernelMode];
+const ANNOTATION_NAME_OR_KERNEL_MODE: &[KeywordOwner] =
+    &[KeywordOwner::AnnotationName, KeywordOwner::KernelMode];
 const ANNOTATION_NAME: &[KeywordOwner] = &[KeywordOwner::AnnotationName];
 const TYPE_PARAMETER: &[KeywordOwner] = &[KeywordOwner::TypeParameter];
 const REST_PATTERN: &[KeywordOwner] =
