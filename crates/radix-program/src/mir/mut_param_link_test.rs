@@ -2,8 +2,8 @@
 //! site: the semantic signature carried in the validation context spells the
 //! access intent as a `Ref` wrapper, MIR carries it in `MirParamMode`, so the
 //! argument is the payload place. A `trap` around a checked tensor read whose
-//! literal index the checker proved in range has no `textus` member, so the
-//! read lowers bare and assigns nothing into the trap destination.
+//! literal index the checker proved in range has no error member; the tagged
+//! result must therefore select `returned` with the body's `void` payload.
 
 use super::*;
 
@@ -36,7 +36,10 @@ const TRAP_MAIN: &str = r"main {
         let tensor<f32, [2, 2]> y ← [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [2, 2]>
         print y.get([0, 1]) coalesce (0.0 ∷ f32)
     }
-    print trapped is void
+    match trapped {
+        case returned let value { print value is void }
+        case thrown let error { print false }
+    }
 }
 ";
 
