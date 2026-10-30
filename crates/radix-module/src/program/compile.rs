@@ -2037,7 +2037,7 @@ fn func_export_from_stmt(
     let mut params = Vec::new();
     for param in &decl.params {
         params.push(InterfaceParam {
-            ty: interface_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
+            ty: interface_parameter_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
             mode: semantic_param_mode(param.mode),
             optional: param.sponte || param.default.is_some(),
             sponte: param.sponte,
@@ -2122,7 +2122,13 @@ fn class_export_from_stmt(
             let mut params = Vec::new();
             for param in &method.params {
                 params.push(InterfaceParam {
-                    ty: interface_type_from_type_expr(&param.ty, interner, &type_param_names, nominal_kinds, ctx)?,
+                    ty: interface_parameter_type_from_type_expr(
+                        &param.ty,
+                        interner,
+                        &type_param_names,
+                        nominal_kinds,
+                        ctx,
+                    )?,
                     mode: semantic_param_mode(param.mode),
                     optional: param.sponte || param.default.is_some(),
                     sponte: param.sponte,
@@ -2523,6 +2529,21 @@ fn generic_arg_bare_name(arg: &radix_syntax::GenericArgExpr) -> Option<radix_syn
     }
 }
 
+fn interface_parameter_type_from_type_expr(
+    ty: &TypeExpr,
+    interner: &crate::lexer::Interner,
+    type_params: &BTreeSet<&str>,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<InterfaceTypeSnapshot> {
+    let snapshot = interface_type_from_type_expr(ty, interner, type_params, nominal_kinds, ctx)?;
+    let Some(mode) = ty.mode else {
+        return Some(snapshot);
+    };
+    let mutability = crate::semantic::access_marker_from_type_mode(mode).mutability();
+    Some(InterfaceTypeSnapshot::Ref(mutability, Box::new(snapshot)))
+}
+
 fn interface_type_from_type_expr(
     ty: &TypeExpr,
     interner: &crate::lexer::Interner,
@@ -2631,7 +2652,7 @@ fn interface_type_from_type_expr(
             let mut params = Vec::new();
             for param in &func.params {
                 params.push(InterfaceParam {
-                    ty: interface_type_from_type_expr(param, interner, &no_params, nominal_kinds, ctx)?,
+                    ty: interface_parameter_type_from_type_expr(param, interner, &no_params, nominal_kinds, ctx)?,
                     mode: SemanticParamMode::Owned,
                     optional: false,
                     sponte: false,
@@ -2906,7 +2927,7 @@ fn interface_method_from_ast(
     let mut params = Vec::new();
     for param in &method.params {
         params.push(InterfaceParam {
-            ty: interface_type_from_type_expr(&param.ty, interner, type_param_names, nominal_kinds, ctx)?,
+            ty: interface_parameter_type_from_type_expr(&param.ty, interner, type_param_names, nominal_kinds, ctx)?,
             mode: semantic_param_mode(param.mode),
             optional: param.sponte || param.default.is_some(),
             sponte: param.sponte,
