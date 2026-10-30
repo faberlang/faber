@@ -1987,9 +1987,13 @@ impl<'a> BorrowChecker<'a> {
         })
     }
 
+    /// Whether an unmarked bind of `ty` names the source's storage. A
+    /// register-class `vector`/`matrix` does not: `b ← a` copies (operator
+    /// ruling 7b25889f R1), so a later lane write through the binding never
+    /// reaches the source.
     fn is_aliasing_type(&self, ty: TypeId) -> bool {
         let (_, inner) = self.types.peel_access_marker(ty);
-        if self.types.is_aliasing_container_through_option(inner) {
+        if self.types.binds_by_sharing_through_option(inner) {
             return true;
         }
         match self.types.get(inner) {

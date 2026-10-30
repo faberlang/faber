@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/vector/copy-on-assign.fab"
+group = "language"
+input_root = "corpus"
+input = "vector/copy-on-assign.fab"
+category = "vector"
+domain = "tensors"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
