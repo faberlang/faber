@@ -80,12 +80,24 @@ fn access_marker_on_a_text_pointer() {
     );
 }
 
+/// Optional element reads need the LG2 nullable-query implementation.
 #[test]
-fn list_of_genus() {
+fn optional_index_of_a_genus_list_is_refused() {
     assert_eq!(
         rejected(
-            "class P {\n    mut int x = 0\n}\nmain {\n    let list<P> ps ← [{ x = 1 }]\n    print ps.length()\n}"
+            "class P {\n    mut int x = 0\n}\nmain {\n    let list<P> ps ← [{ x = 1 }]\n    let P ∪ none first ← ps?[0]\n    print first\n}"
         ),
-        "list of genus"
+        "optional index on a list of genus"
+    );
+}
+
+/// R7 list copy is still refused until the list family clones each genus.
+#[test]
+fn copying_a_list_of_genus_is_refused() {
+    assert_eq!(
+        rejected(
+            "class P {\n    mut int x = 0\n}\nmain {\n    let list<P> ps ← [{ x = 1 }]\n    let list<P> duplicate ← copy ps\n    print duplicate.length()\n}"
+        ),
+        "copy of a list of genus"
     );
 }

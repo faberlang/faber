@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+class Point {
+    mut int x = 0
+}
+
+main {
+    let list<Point> points ← [{ x = 1 }]
+    let Point ∪ none first ← points?[0]
+    print first
+}

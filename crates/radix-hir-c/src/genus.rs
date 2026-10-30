@@ -13,7 +13,7 @@ use crate::error::unsupported;
 use crate::expr::{Operand, Value};
 use crate::helpers::{Helper, ListOp};
 use crate::names::Namer;
-use crate::ty::{Inner, Ty, classify, returns};
+use crate::ty::{Elem, Inner, Ty, classify, returns};
 use handroll::FxHashSet;
 use radix_codegen_shared::CodegenError;
 use radix_hir::{DefId, HirExpression, HirStruct};
@@ -79,13 +79,60 @@ pub(crate) struct Field {
 }
 
 impl Emitter<'_> {
+    /// The element's C spelling, using the program's collected genus names.
+    pub(crate) fn elem_c_type(&self, elem: Elem) -> Result<String, CodegenError> {
+        Ok(match elem {
+            Elem::Int => "int64_t".to_owned(),
+            Elem::Text => "faber_text".to_owned(),
+            Elem::Bool => "bool".to_owned(),
+            Elem::Float => "double".to_owned(),
+            Elem::Float32 => "float".to_owned(),
+            Elem::Modular(width) => width.c_type().to_owned(),
+            Elem::Bits(width) => crate::ty::int_width_of_bits(width).c_type().to_owned(),
+            Elem::Genus(def_id) => {
+                let genus = self
+                    .genera
+                    .get(&def_id)
+                    .ok_or_else(|| unsupported("genus list element outside the program"))?;
+                format!("faber_elem_{}", genus.c_name)
+            }
+        })
+    }
+
+    /// The family suffix, including the collected C name for a genus.
+    pub(crate) fn elem_suffix(&self, elem: Elem) -> Result<String, CodegenError> {
+        Ok(match elem {
+            Elem::Int => "i64".to_owned(),
+            Elem::Text => "text".to_owned(),
+            Elem::Bool => "bool".to_owned(),
+            Elem::Float => "f64".to_owned(),
+            Elem::Float32 => "f32".to_owned(),
+            Elem::Modular(width) => width.marker().to_owned(),
+            Elem::Bits(width) => width.faber_marker().to_owned(),
+            Elem::Genus(def_id) => self
+                .genera
+                .get(&def_id)
+                .map(|genus| genus.c_name.clone())
+                .ok_or_else(|| unsupported("genus list element outside the program"))?,
+        })
+    }
+
+    /// The pointer type of a family whose spelling may depend on a genus.
+    pub(crate) fn elem_list_c_pointer(&self, elem: Elem) -> Result<String, CodegenError> {
+        Ok(format!("faber_list_{} *", self.elem_suffix(elem)?))
+    }
+
     /// The C spelling of a class.
     pub(crate) fn c_type(&self, ty: Ty) -> Result<String, CodegenError> {
-        // An optional genus is the genus's pointer, `NULL` for none.
-        let ty = match ty {
-            Ty::Opt(crate::ty::Inner::Genus(def_id)) => Ty::Genus(def_id),
-            other => other,
-        };
+        if let Ty::List(elem) | Ty::Set(elem) = ty {
+            return self.elem_list_c_pointer(elem);
+        }
+        if let Ty::Opt(inner) = ty {
+            if let Some(scalar) = inner.scalar_struct() {
+                return Ok(scalar.to_owned());
+            }
+            return self.c_type(inner.ty());
+        }
         if let Ty::Func(id) = ty {
             return self.func_c_type(id);
         }
@@ -204,6 +251,12 @@ impl Emitter<'_> {
             } else {
                 declared
             };
+            if matches!(
+                ty,
+                Ty::List(Elem::Genus(_)) | Ty::Opt(Inner::List(Elem::Genus(_)))
+            ) {
+                self.need_class(ty);
+            }
             fields.push(Field {
                 c_name: members.claim(&format!("m_{field_name}")),
                 name: field_name,
@@ -239,11 +292,23 @@ impl Emitter<'_> {
     }
 
     /// The forward `typedef`s and the struct bodies of every genus.
-    pub(crate) fn genus_declarations(&self, order: &[DefId]) -> Result<String, CodegenError> {
+    pub(crate) fn genus_declarations(&mut self, order: &[DefId]) -> Result<String, CodegenError> {
         let mut out = String::new();
         for def_id in order {
             if let Some(genus) = self.genera.get(def_id) {
                 writeln!(out, "typedef struct {0} {0};", genus.c_name).ok();
+            }
+        }
+        for def_id in order {
+            if self.genus_list_elements.contains(def_id)
+                && let Some(genus) = self.genera.get(def_id)
+            {
+                self.support.need(crate::helpers::Helper::List(
+                    Elem::Genus(*def_id),
+                    ListOp::Struct,
+                ));
+                writeln!(out, "typedef {0} *faber_elem_{0};", genus.c_name).ok();
+                writeln!(out, "FABER_LIST_FAMILY({0}, faber_elem_{0})", genus.c_name).ok();
             }
         }
         if !out.is_empty() {
@@ -681,8 +746,14 @@ impl Emitter<'_> {
     fn copy_field(&mut self, read: &str, ty: Ty) -> Result<String, CodegenError> {
         Ok(match ty {
             Ty::List(elem) => {
+                if matches!(elem, Elem::Genus(_)) {
+                    return Err(unsupported("copy of a list of genus field"));
+                }
                 self.support.need(Helper::List(elem, ListOp::Of));
-                format!("faber_list_{}_copy(faber_a, {read})", elem.suffix())
+                format!(
+                    "faber_list_{}_copy(faber_a, {read})",
+                    self.elem_suffix(elem)?
+                )
             }
             Ty::Genus(inner) => self.genus_copy_call(inner, read)?,
             Ty::Opt(inner) => match inner {
@@ -696,10 +767,13 @@ impl Emitter<'_> {
                 | Inner::Modular(_)
                 | Inner::Bits(_) => read.to_owned(),
                 Inner::List(elem) => {
+                    if matches!(elem, Elem::Genus(_)) {
+                        return Err(unsupported("copy of an optional list of genus field"));
+                    }
                     self.support.need(Helper::List(elem, ListOp::Of));
                     format!(
                         "({read} == NULL ? NULL : faber_list_{}_copy(faber_a, {read}))",
-                        elem.suffix()
+                        self.elem_suffix(elem)?
                     )
                 }
                 Inner::Genus(id) => {
