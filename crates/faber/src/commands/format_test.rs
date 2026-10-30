@@ -1682,6 +1682,8 @@ fn format_cli_formats_valid_imported_mut_call() {
             mode.join(" ")
         );
         assert!(
+            // ALLOW_DIAGNOSTIC_RENDER_TEXT: tool output rendered diagnostic contract
+            // (`faber format` has no structured diagnostics; this pins the code:issue).
             !stderr.contains("SEM057"),
             "format {} must not report a call-marker refusal:\n{stderr}",
             mode.join(" ")
@@ -1760,6 +1762,8 @@ fn format_cli_still_refuses_read_only_imported_argument() {
             mode.join(" ")
         );
         assert!(
+            // ALLOW_DIAGNOSTIC_RENDER_TEXT: tool output rendered diagnostic contract
+            // (`faber format` has no structured diagnostics; this pins the code:issue).
             stderr.contains("SEM057:call_marker_on_read_only"),
             "format {} must name the call-marker refusal:\n{stderr}",
             mode.join(" ")
