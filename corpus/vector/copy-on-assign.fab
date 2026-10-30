@@ -1,7 +1,7 @@
 +++
 term = "vector"
 kind = "exemplum"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "varia_decl", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "assignment", "place", "member_suffix", "nota_stmt", "expression", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "assignment", "place", "member_suffix", "nota_stmt", "expression", "literal"]
 category = "vector"
 canonical = false
 summary = "A vector is a silent value: `b ← a` copies, so a lane write through b never reaches a."
