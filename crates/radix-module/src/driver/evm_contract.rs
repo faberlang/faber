@@ -15,21 +15,40 @@ pub fn require_contract_execution_target(
     analysis: &AnalyzedModule,
     target: Target,
 ) -> Result<(), Box<crate::Diagnostic>> {
-    reject_wrong_target(analysis, target).map_err(|error| {
-        let mut diagnostic = crate::Diagnostic::codegen_error(&error.message)
-            .with_code("PKG001")
-            .with_args(error.args);
-        if let Some(span) = error.span {
-            diagnostic = diagnostic.with_span(span);
-        }
-        Box::new(diagnostic)
-    })
+    reject_wrong_target(analysis, target).map_err(mismatch_diagnostic)
+}
+
+/// Enforce the absence of a contract environment at an artifact builder that
+/// cannot honor any contract target: the package Wasm, LLVM and Rust graph
+/// builders sit below target dispatch and own no target choice of their own,
+/// so a selected contract is always a mismatch. `consumer` is the builder's
+/// target spelling, carried by the diagnostic.
+///
+/// # Errors
+/// Returns `PKG001.contract_target_mismatch` when the annotated class
+/// requires a contract environment.
+pub fn forbid_contract_environment(analysis: &AnalyzedModule, consumer: &str) -> Result<(), Box<crate::Diagnostic>> {
+    reject_contract_environment(analysis, consumer).map_err(mismatch_diagnostic)
+}
+
+fn mismatch_diagnostic(error: SpannedCodegenError) -> Box<crate::Diagnostic> {
+    let mut diagnostic = crate::Diagnostic::codegen_error(&error.message)
+        .with_code("PKG001")
+        .with_args(error.args);
+    if let Some(span) = error.span {
+        diagnostic = diagnostic.with_span(span);
+    }
+    Box::new(diagnostic)
 }
 
 pub(super) fn reject_wrong_target(analysis: &AnalyzedModule, target: Target) -> Result<(), SpannedCodegenError> {
     if target == Target::MirEvm || target == Target::HirFaber || target == Target::HirFhir {
         return Ok(());
     }
+    reject_contract_environment(analysis, target.as_str())
+}
+
+fn reject_contract_environment(analysis: &AnalyzedModule, consumer: &str) -> Result<(), SpannedCodegenError> {
     let Some(item) = radix_semantic::evm_contract::selected(&analysis.hir, &analysis.interner) else {
         return Ok(());
     };
@@ -38,7 +57,7 @@ pub(super) fn reject_wrong_target(analysis: &AnalyzedModule, target: Target) -> 
         args: vec![
             DiagnosticArg::new("issue", "contract_target_mismatch"),
             DiagnosticArg::new("required", "evm"),
-            DiagnosticArg::new("target", target.as_str()),
+            DiagnosticArg::new("target", consumer),
         ],
         span: Some(item.span),
     })

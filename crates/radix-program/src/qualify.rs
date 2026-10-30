@@ -41,6 +41,34 @@ pub(crate) fn require_contract_execution_targets(
     }
 }
 
+/// Refuse annotated contract environments at an artifact builder that cannot
+/// honor any contract target: the package Wasm, LLVM and Rust graph builders
+/// sit below target dispatch and own no target choice of their own, so they
+/// never spell a concrete build target here. `consumer` is the builder's
+/// target spelling, carried by the diagnostics.
+///
+/// # Errors
+/// Returns a named mismatch for every unit requiring a contract environment.
+pub(crate) fn forbid_contract_environments(
+    program: &AnalyzedProgram,
+    consumer: &str,
+) -> Result<(), Vec<Diagnostic>> {
+    let diagnostics: Vec<_> = program
+        .nodes
+        .values()
+        .filter_map(|node| {
+            radix_module::driver::forbid_contract_environment(&node.analysis, consumer)
+                .err()
+                .map(|diagnostic| (*diagnostic).with_file(node.path.display().to_string()))
+        })
+        .collect();
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
 /// Qualify every unit of a package in the neutral form for the build
 /// target in `config`.
 ///

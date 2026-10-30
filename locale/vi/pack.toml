@@ -4362,6 +4362,18 @@ help = "'⇇' hiện sao chép các giá trị ở vế phải vào vùng lưu t
 message = "hợp đồng sinking phải khai báo chính xác `sink(T) → vacuum ⇥ E` và `flush() → vacuum ⇥ E` với một tham số kiểu"
 help = "khai báo `{implendum} Sink<T>` với `{functio} sink(T res) → vacuum ⇥ E` và `{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "chú thích hợp đồng của trình biên dịch không hợp lệ: {reason}"
+help = 'viết `@ contract { target = "evm" }` trên một kiểu'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "dạng hợp đồng EVM thử nghiệm không được hỗ trợ: {reason}"
+help = "dùng một kiểu không có trường, với phương thức vô hướng và mục công khai tường minh"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "hợp đồng cần đích `{required}`, nhưng đích đã chọn là `{target}`"
+help = "chọn đích thực thi mà hợp đồng yêu cầu; định dạng nguồn và tuần tự hóa HIR giữ lại chú thích"
+
 [diagnostics.INFO001]
 message = "kernel `{kernel}` chạy tuần tự trên thiết bị {device}"
 
@@ -4392,3 +4404,7 @@ help = "Theo lý do kiểm tra để tìm phần phụ thuộc. Giữ các lư�
 [diagnostics.SEM008.issues.region_facts_not_built]
 message = "dữ liệu vùng mượn chưa được dựng cho '{construct}'; bộ kiểm tra mượn đóng cửa thay vì xấp xỉ"
 help = "dạng này cần suy luận vùng cho các quyết định mượn của nó; hãy báo cáo để bộ máy vùng phủ nó"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "bản thử nghiệm EVM từ chối {shape} ({reason})"
+help = "Chỉ dùng tập con vô hướng evm_entry đã giới hạn; đích thử nghiệm này không có bề mặt gói hay thực thi."
