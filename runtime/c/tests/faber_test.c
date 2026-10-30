@@ -13,7 +13,7 @@ FABER_TEXT_LITERAL(faber_LBANG, "!", 1, 1);
 FABER_TEXT_LITERAL(faber_LQE, "q\"\\\n\t\r\x1b" "e", 8, 8);
 
 typedef int *faber_test_genus_pointer;
-FABER_LIST_FAMILY(test_genus_pointer, faber_test_genus_pointer)
+FABER_LIST_FAMILY(test_genus_pointer, faber_test_genus_pointer, NULL)
 
 static int failures;
 

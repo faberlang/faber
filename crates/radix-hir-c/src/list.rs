@@ -397,11 +397,7 @@ impl Emitter<'_> {
             _ if name == "ordina" && args.is_empty() => {
                 self.support.need(Helper::List(elem, ListOp::At));
                 Ok(Operand::new(
-                    format!(
-                        "faber_list_{}_sort({})",
-                        self.elem_suffix(elem)?,
-                        list.text
-                    ),
+                    format!("faber_list_{}_sort({})", self.elem_suffix(elem)?, list.text),
                     Value::Void,
                 )
                 .with_effect(true))
