@@ -932,9 +932,11 @@ pub(crate) fn generated_at() -> String {
 // Inverse of the proleptic Gregorian day-number calculation, with 1970-01-01
 // as day zero.  Keeping this local avoids adding a timestamp dependency for a
 // diagnostic metadata field.
-fn civil_date(days_since_unix_epoch: i64) -> (i64, i64, i64) {
+pub(super) fn civil_date(days_since_unix_epoch: i64) -> (i64, i64, i64) {
     let z = days_since_unix_epoch + 719_468;
-    let era = (if z >= 0 { z } else { z - 146_096 }).div_euclid(146_097);
+    // Euclidean division already floors negative values; the correction for
+    // truncating division would shift dates before the epoch by an extra era.
+    let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;
     let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096).div_euclid(365);
     let year = yoe + era * 400;
