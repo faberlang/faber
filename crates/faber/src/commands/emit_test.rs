@@ -68,6 +68,7 @@ fn single_file_result(command: &EmitCommand, pack: Option<&LocalePack>) -> radix
         pack,
         command.output_mode,
         command.module_name.as_deref(),
+        None,
     )
 }
 
@@ -329,4 +330,89 @@ fn merge_library_target_bindings_on_no_roots_is_empty() {
     assert!(bindings.functions.is_empty(), "no roots bind no functions");
     assert!(bindings.types.is_empty(), "no roots bind no types");
     assert!(diagnostics.is_empty(), "no roots load no diagnostics");
+}
+
+// ── single-file emit honours a declared frontmatter locale on an install ──
+//
+// The emit lane's compile entries used to mint their config without any pack
+// source for the frontmatter locale: an installed binary (no workspace
+// `locale/` tree) failed to resolve `+++ locale = "…" +++` and read the
+// source as English. The lane now hands the compile its locale base — the
+// embedded reader packs — and these tests model the install by clearing the
+// discovered root from that exact base.
+
+/// The emit lane's locale base with no discoverable workspace root: the
+/// installed-binary condition, where only the embedded packs remain.
+fn installed_locale_base() -> radix::driver::Config {
+    let mut base = emit::emit_locale_base();
+    base.locale_root = None;
+    base
+}
+
+const LA_IDENTITY: &str = "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio identitas(bivalens valor) → bivalens {\n    redde valor\n}\n";
+
+const LA_HADAMARD: &str = "+++\nlocale = \"la\"\n+++\n\n@ nucleum\n@ publica\nfunctio hadamard(tf32[256] sinistra, tf32[256] dextera) → tf32[256] {\n    redde sinistra ⊙ dextera\n}\n";
+
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn emit_single_file_honours_frontmatter_locale_without_pack_root() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let entry = fixture(dir.path(), "main.fab", LA_IDENTITY);
+    let command = emit_command(&entry, Target::MirLlvm);
+    let pack = code_pack(&command);
+
+    let result = radix::services::compile_cli_input_with_locale_pack(
+        &command.input,
+        command.package,
+        command.target,
+        pack.as_ref(),
+        command.output_mode,
+        command.module_name.as_deref(),
+        Some(&installed_locale_base()),
+    );
+
+    assert!(
+        result.success(),
+        "the installed binary must read the declared Latin locale, diagnostics: {:?}",
+        result.diagnostics
+    );
+    let code = radix::services::output_code(result.output.expect("llvm-text output"));
+    assert!(
+        code.contains("identitas"),
+        "the emitted IR must name the Latin function:\n{code}"
+    );
+}
+
+#[cfg(feature = "mir-wgsl")]
+#[test]
+fn emit_wgsl_route_honours_frontmatter_locale_without_pack_root() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let entry = fixture(dir.path(), "main.fab", LA_HADAMARD);
+    let command = emit_command(&entry, Target::MirWgsl);
+    let pack = code_pack(&command);
+    let resolve = |_roots: &std::collections::BTreeSet<std::path::PathBuf>| {
+        radix::driver::TargetBindings::default()
+    };
+
+    let result = radix::services::compile_cli_input_with_library_bindings(
+        &command.input,
+        command.package,
+        command.target,
+        pack.as_ref(),
+        command.output_mode,
+        command.module_name.as_deref(),
+        &resolve,
+        Some(&installed_locale_base()),
+    );
+
+    assert!(
+        result.success(),
+        "the WGSL route must read the declared Latin locale, diagnostics: {:?}",
+        result.diagnostics
+    );
+    let code = radix::services::output_code(result.output.expect("wgsl-text output"));
+    assert!(
+        code.contains("hadamard"),
+        "the emitted WGSL must name the Latin kernel:\n{code}"
+    );
 }

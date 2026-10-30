@@ -19,7 +19,20 @@ pub struct VerifySourceResult {
 
 #[must_use]
 pub fn verify_source(name: &str, source: &str, checker_config: Option<LeanAspectCheckerConfig>) -> VerifySourceResult {
-    let session = Session::new(Config::default().with_dev_locale_root());
+    verify_source_with_config(name, source, checker_config, &Config::default().with_dev_locale_root())
+}
+
+/// [`verify_source`] under a caller-owned locale policy: the session's config
+/// carries the language-pack root and product loader a declared frontmatter
+/// locale resolves through (faber installs its embedded reader packs here).
+#[must_use]
+pub fn verify_source_with_config(
+    name: &str,
+    source: &str,
+    checker_config: Option<LeanAspectCheckerConfig>,
+    locale_config: &Config,
+) -> VerifySourceResult {
+    let session = Session::new(locale_config.clone());
     let analysis = match crate::program::analyze_prepared_program_name(&session, name, source) {
         Ok(analysis) => analysis,
         Err(diagnostics) => return VerifySourceResult { coverage: None, diagnostics, success: false },

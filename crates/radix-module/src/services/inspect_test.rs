@@ -94,3 +94,80 @@ fn hir_inspection_resolves_imported_library_types() {
     assert!(payload["errors"].as_array().expect("errors").is_empty());
     assert!(payload["items"].as_u64().expect("items") > 0);
 }
+
+// ── single-file inspection resolves frontmatter locales through the config ──
+//
+// The lex/parse/hir/cli-ir lanes used to resolve a declared `+++ locale ──`
+// through a default config's discovered workspace root only:
+// an installed binary with no `locale/` tree silently inspected the source in
+// another surface. The `_with_config` entries take the caller's root/loader.
+
+fn loader_only_config() -> crate::driver::Config {
+    let en =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en")).expect("en pack");
+    let la =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la")).expect("la pack");
+    let mut config = crate::driver::Config::default();
+    config.locale_root = None;
+    config.with_locale_pack_loader(crate::driver::LocalePackLoader::new(move |locale_id| match locale_id {
+        "en" => Ok(en.clone()),
+        "la" => Ok(la.clone()),
+        other => Err(format!("no pack for locale '{other}'")),
+    }))
+}
+
+const LA_SOURCE: &str = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio salve() { }\n";
+
+#[test]
+fn lex_inspection_resolves_frontmatter_locale_through_config_loader() {
+    let result = super::lex_inspection_for_source_with_config("la.fab", LA_SOURCE, &loader_only_config());
+    assert!(result.success, "errors: {:?}", result.errors);
+    let payload = json(&result.text);
+    // The Latin keyword claims its slot under the loader-resolved pack.
+    assert!(
+        payload["tokens"]
+            .as_array()
+            .expect("tokens")
+            .iter()
+            .any(|token| token["keyword"] == "functio"),
+        "the Latin `functio` must lex as a keyword: {}",
+        result.text
+    );
+}
+
+#[test]
+fn parse_inspection_resolves_frontmatter_locale_through_config_loader() {
+    let result = super::parse_inspection_for_source_with_config("la.fab", LA_SOURCE, &loader_only_config());
+    assert!(result.success, "errors: {:?}", result.errors);
+    let payload = json(&result.text);
+    assert_eq!(payload["statements"], 1);
+    assert_eq!(payload["ast"][0]["kind"], "Func");
+}
+
+#[test]
+fn hir_inspection_resolves_frontmatter_locale_through_config_loader() {
+    let source = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio bis(numerus i) → numerus {\n    redde i * 2\n}\n";
+    let result = super::hir_inspection_for_source_with_config("la.fab", source, &loader_only_config());
+    assert!(result.success, "errors: {:?}", result.errors);
+    let payload = json(&result.text);
+    assert_eq!(payload["items"], 1);
+}
+
+#[test]
+fn cli_ir_inspection_resolves_frontmatter_locale_through_config_loader() {
+    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n    nota \"salve\"\n}\n";
+    let result = super::cli_ir_inspection_for_source_with_config("la.fab", source, &loader_only_config());
+    assert!(result.success, "errors: {:?}", result.errors);
+}
+
+#[test]
+fn lex_inspection_fails_closed_on_unresolvable_frontmatter_locale() {
+    let source = "+++\nlocale = \"zh-Hant\"\n+++\nfunctio salve() { }\n";
+    let result = super::lex_inspection_for_source_with_config("la.fab", source, &loader_only_config());
+    assert!(!result.success, "an unloadable declared locale must not inspect");
+    assert!(
+        result.errors.iter().any(|error| error.contains("zh-Hant")),
+        "the failure must name the declared locale: {:?}",
+        result.errors
+    );
+}

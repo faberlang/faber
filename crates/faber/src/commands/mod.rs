@@ -42,6 +42,9 @@ pub(crate) mod format_test;
 pub mod host;
 pub(crate) mod init;
 #[cfg(test)]
+#[path = "locale_lanes_test.rs"]
+mod locale_lanes_test;
+#[cfg(test)]
 #[path = "mir_dump_test.rs"]
 mod mir_dump_test;
 mod model;
@@ -583,12 +586,20 @@ fn read_source(args: &[String]) -> (String, String) {
 
 fn cmd_inspect_lex(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix::services::lex_inspection_for_source(&name, &source));
+    print_inspection(radix::services::lex_inspection_for_source_with_config(
+        &name,
+        &source,
+        &single_file_locale_config(input),
+    ));
 }
 
 fn cmd_inspect_parse(input: &[String]) {
     let (name, source) = read_source(input);
-    print_inspection(radix::services::parse_inspection_for_source(&name, &source));
+    print_inspection(radix::services::parse_inspection_for_source_with_config(
+        &name,
+        &source,
+        &single_file_locale_config(input),
+    ));
 }
 
 fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
@@ -597,7 +608,11 @@ fn cmd_inspect_hir(input: &[String], load: Option<std::path::PathBuf>) {
         exit_status::exit_usage();
     }
     let (name, source) = read_source(input);
-    print_inspection(radix::services::hir_inspection_for_source(&name, &source));
+    print_inspection(radix::services::hir_inspection_for_source_with_config(
+        &name,
+        &source,
+        &single_file_locale_config(input),
+    ));
 }
 
 #[cfg(feature = "runner")]
@@ -616,10 +631,30 @@ fn cmd_inspect_mir(input: &[String]) {
 }
 
 /// Reader-locale config for `faber mir`, the same selection `check`, `build`
-/// and `run` make: the owning manifest's locale, else the product default
-/// `en`; a file's own frontmatter `locale` still wins during analysis.
+/// and `run` make ([`single_file_locale_config`]): the owning manifest's
+/// locale, else the product default `en`; a file's own frontmatter `locale`
+/// still wins during analysis.
 #[cfg(feature = "runner")]
 fn mir_dump_config(input: &[String]) -> radix::module::Config {
+    single_file_locale_config(input)
+}
+
+fn cmd_inspect_cli_ir(input: &[String]) {
+    let (name, source) = read_source(input);
+    print_inspection(radix::services::cli_ir_inspection_for_source_with_config(
+        &name,
+        &source,
+        &single_file_locale_config(input),
+    ));
+}
+
+/// Reader-locale config for the single-file read lanes (`check`, `lex`,
+/// `parse`, `hir`, `cli-ir`, `verify`): the owning manifest's locale, else
+/// the product default `en`, plus the embedded reader packs as the
+/// frontmatter-locale loader — a file's own `+++ locale = "…" +++` still
+/// wins during analysis, and an installed binary resolves it with no
+/// workspace `locale/` tree beside it.
+fn single_file_locale_config(input: &[String]) -> radix::module::Config {
     let target = radix::module::Config::default().target;
     let result = if input.is_empty() || input[0] == "-" {
         package::default_config_with_locale(target)
@@ -637,13 +672,6 @@ fn mir_dump_config(input: &[String]) -> radix::module::Config {
     }
 }
 
-fn cmd_inspect_cli_ir(input: &[String]) {
-    let (name, source) = read_source(input);
-    print_inspection(radix::services::cli_ir_inspection_for_source(
-        &name, &source,
-    ));
-}
-
 fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
     if command.package {
         // Cross-reference: must stay verbatim with
@@ -652,8 +680,15 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
         exit_status::exit_usage();
     }
     let (name, source) = read_source(&command.input);
-    let mut result =
-        radix::services::check_diagnostics_for_source(&name, &source, command.permissive);
+    let locale_config = single_file_locale_config(&command.input);
+    let mut result = radix::services::check_diagnostics_for_source_with_config(
+        &name,
+        &source,
+        command.permissive,
+        None,
+        None,
+        &locale_config,
+    );
     let warn_policy = radix::module::driver::WarnPolicy {
         deny_all_warnings: command.deny_warnings,
         deny_codes: command.deny_codes.clone(),
@@ -684,7 +719,12 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
 
 fn cmd_verify_file(command: VerifyCommand) {
     let (name, source) = read_source(&command.input);
-    let result = radix::services::verify_source(&name, &source, None);
+    let result = radix::services::verify_source_with_config(
+        &name,
+        &source,
+        None,
+        &single_file_locale_config(&command.input),
+    );
     if !result.diagnostics.is_empty() {
         eprint!(
             "{}",
