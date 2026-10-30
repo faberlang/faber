@@ -683,7 +683,7 @@ impl Emitter<'_> {
             out,
             &format!(
                 "faber_list_{} *const {source} = {};",
-                elem.suffix(),
+                self.elem_suffix(elem)?,
                 list.text
             ),
         );
@@ -770,7 +770,7 @@ impl Emitter<'_> {
         self.need_class(class);
         self.support.need(Helper::List(k, ListOp::New));
         self.support.need(Helper::List(v, ListOp::New));
-        let suffix = Self::map_suffix(k, v);
+        let suffix = self.map_suffix(k, v)?;
         self.line(out, "{");
         self.depth += 1;
         self.line(
@@ -886,7 +886,10 @@ impl Emitter<'_> {
             self.temps += 1;
             self.line(
                 out,
-                &format!("faber_list_{} *const {name} = {text};", elem.suffix()),
+                &format!(
+                    "faber_list_{} *const {name} = {text};",
+                    self.elem_suffix(*elem)?
+                ),
             );
             names.push(name);
         }
@@ -1188,7 +1191,7 @@ impl Emitter<'_> {
         for arg in args {
             operands.push(self.expr(arg)?);
         }
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let tokens = self.names.display_tokens();
         let (yes, no) = (
             self.text_literal(&tokens.true_)?,

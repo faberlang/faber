@@ -48,19 +48,6 @@ impl IntWidth {
         }
     }
 
-    /// The C type of a `list<wrapping<W>>` (`faber_list_<marker> *`).
-    pub(crate) fn list_c_pointer(self) -> &'static str {
-        match self {
-            IntWidth::I8 => "faber_list_i8 *",
-            IntWidth::I16 => "faber_list_i16 *",
-            IntWidth::I32 => "faber_list_i32 *",
-            IntWidth::U8 => "faber_list_u8 *",
-            IntWidth::U16 => "faber_list_u16 *",
-            IntWidth::U32 => "faber_list_u32 *",
-            IntWidth::U64 => "faber_list_u64 *",
-        }
-    }
-
     pub(crate) fn range(self) -> (i128, i128) {
         match self {
             IntWidth::I8 => (i128::from(i8::MIN), i128::from(i8::MAX)),
@@ -216,7 +203,7 @@ pub(crate) enum Ty {
 }
 
 /// The element kinds a list carries in this subset.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Elem {
     Int,
     Text,
@@ -230,53 +217,42 @@ pub(crate) enum Elem {
     Modular(IntWidth),
     /// Raw bits use a distinct `bN` family, separate from same-width words.
     Bits(BitsWidth),
+    /// A concrete genus is stored as a pointer to its existing arena object.
+    Genus(DefId),
+}
+
+impl PartialOrd for Elem {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Elem {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        use std::cmp::Ordering;
+        let tag = |elem: &Self| match elem {
+            Self::Int => 0,
+            Self::Text => 1,
+            Self::Bool => 2,
+            Self::Float => 3,
+            Self::Float32 => 4,
+            Self::Modular(_) => 5,
+            Self::Bits(_) => 6,
+            Self::Genus(_) => 7,
+        };
+        match tag(self).cmp(&tag(other)) {
+            Ordering::Equal => match (self, other) {
+                (Self::Modular(left), Self::Modular(right)) => left.cmp(right),
+                (Self::Bits(left), Self::Bits(right)) => left.cmp(right),
+                (Self::Genus(left), Self::Genus(right)) => left.0.cmp(&right.0),
+                _ => Ordering::Equal,
+            },
+            ordering => ordering,
+        }
+    }
 }
 
 impl Elem {
-    /// The suffix of the list family's C names (`faber_list_i64_push`).
-    pub(crate) fn suffix(self) -> &'static str {
-        match self {
-            Elem::Int => "i64",
-            Elem::Text => "text",
-            Elem::Bool => "bool",
-            Elem::Float => "f64",
-            Elem::Float32 => "f32",
-            Elem::Modular(width) => width.marker(),
-            Elem::Bits(width) => width.faber_marker(),
-        }
-    }
-
-    /// The element's C type inside the list family.
-    pub(crate) fn c_type(self) -> &'static str {
-        match self {
-            Elem::Int => "int64_t",
-            Elem::Text => "faber_text",
-            Elem::Bool => "bool",
-            Elem::Float => "double",
-            Elem::Float32 => "float",
-            Elem::Modular(width) => width.c_type(),
-            Elem::Bits(width) => int_width_of_bits(width).c_type(),
-        }
-    }
-
-    /// The pointer type of this element's list family (`faber_list_u8 *`).
-    pub(crate) fn list_c_pointer(self) -> &'static str {
-        match self {
-            Elem::Int => "faber_list_i64 *",
-            Elem::Text => "faber_list_text *",
-            Elem::Bool => "faber_list_bool *",
-            Elem::Float => "faber_list_f64 *",
-            Elem::Float32 => "faber_list_f32 *",
-            Elem::Modular(width) => width.list_c_pointer(),
-            Elem::Bits(width) => match width {
-                BitsWidth::B8 => "faber_list_b8 *",
-                BitsWidth::B16 => "faber_list_b16 *",
-                BitsWidth::B32 => "faber_list_b32 *",
-                BitsWidth::B64 => "faber_list_b64 *",
-            },
-        }
-    }
-
     /// The scalar class an element reads as.
     pub(crate) fn ty(self) -> Ty {
         match self {
@@ -287,6 +263,7 @@ impl Elem {
             Elem::Float32 => Ty::Float32,
             Elem::Modular(width) => Ty::Modular(width),
             Elem::Bits(width) => Ty::Bits(width),
+            Elem::Genus(def_id) => Ty::Genus(def_id),
         }
     }
 }
@@ -302,7 +279,9 @@ impl Ty {
             Ty::Sized(width) | Ty::Modular(width) | Ty::Saturating(width) => Some(width.c_type()),
             // Raw bits live in the unsigned C cell of their own width.
             Ty::Bits(width) => Some(int_width_of_bits(width).c_type()),
-            Ty::Opt(Inner::Genus(_)) | Ty::Genus(_) | Ty::Func(_) => None,
+            Ty::Opt(Inner::Genus(_)) | Ty::Genus(_) | Ty::Func(_) | Ty::List(_) | Ty::Set(_) => {
+                None
+            }
             Ty::Opt(inner) => inner
                 .scalar_struct()
                 .or_else(|| inner.ty().builtin_c_type()),
@@ -311,7 +290,6 @@ impl Ty {
             Ty::Float => Some("double"),
             Ty::Float32 => Some("float"),
             Ty::Decimal => Some("faber_dec"),
-            Ty::List(elem) | Ty::Set(elem) => Some(elem.list_c_pointer()),
             Ty::Map(k, v) => match (k, v) {
                 (Elem::Int, Elem::Int) => Some("faber_map_i64_i64 *"),
                 (Elem::Int, Elem::Text) => Some("faber_map_i64_text *"),
@@ -452,7 +430,7 @@ pub(crate) fn classify(types: &TypeTable, ty: TypeId) -> Result<Ty, CodegenError
                 Ty::Float => Ok(Ty::List(Elem::Float)),
                 Ty::Float32 => Ok(Ty::List(Elem::Float32)),
                 Ty::List(_) => Err(unsupported("nested list type")),
-                Ty::Genus(_) => Err(unsupported("list of genus")),
+                Ty::Genus(def_id) => Ok(Ty::List(Elem::Genus(def_id))),
                 Ty::Decimal => Err(unsupported("list of decimals")),
                 Ty::Modular(width) => Ok(Ty::List(Elem::Modular(width))),
                 Ty::Bits(width) => Ok(Ty::List(Elem::Bits(width))),
