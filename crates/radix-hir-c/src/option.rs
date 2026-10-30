@@ -176,7 +176,7 @@ impl Emitter<'_> {
             if !matches!(position.value, Value::Int | Value::Exact) {
                 return Err(unsupported("list index that is not an integer"));
             }
-            return Ok(self.list_at_operands(base, position, elem)?);
+            return self.list_at_operands(base, position, elem);
         }
         Err(unsupported(
             "non-null assertion followed by an index on this class",

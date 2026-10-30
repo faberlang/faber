@@ -1008,10 +1008,7 @@ impl Emitter<'_> {
                 Ok(c_type) => format!("{c_type} "),
                 Err(error) => return Err(error),
             },
-            Value::Genus(def_id) => match self.c_type(Ty::Genus(def_id)) {
-                Ok(c_type) => c_type,
-                Err(error) => return Err(error),
-            },
+            Value::Genus(def_id) => self.c_type(Ty::Genus(def_id))?,
             // A bare `void` has no value to bind, and a function value never
             // carries an effect, so neither is given a temporary.
             Value::Void | Value::Func(_) => return Ok(String::new()),
@@ -1559,9 +1556,7 @@ impl Emitter<'_> {
         }
         let wide = ty.is_some_and(|t| matches!(classify(self.types, t), Ok(Ty::Modular(_))));
         match op {
-            HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => {
-                return self.concat(l, r);
-            }
+            HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => self.concat(l, r),
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
                 self.arithmetic(op, l, r, wide)
             }
