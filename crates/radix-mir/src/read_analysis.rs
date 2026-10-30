@@ -336,7 +336,7 @@ fn push_place_index_locals(place: &MirPlace, out: &mut Vec<MirLocalId>) {
     for projection in &place.projections {
         match projection {
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                push_operand_locals(operand, out)
+                push_operand_locals(operand, out);
             }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
@@ -375,7 +375,7 @@ fn push_place_index_slots(place: &MirPlace, out: &mut Vec<MirPlaceBase>) {
     for projection in &place.projections {
         match projection {
             MirProjection::Index(operand) | MirProjection::ProvenIndex(operand) => {
-                push_operand_slots(operand, out)
+                push_operand_slots(operand, out);
             }
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }

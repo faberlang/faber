@@ -2082,10 +2082,10 @@ fn lane_kernel_call_context(
     program: &crate::MirProgram,
     interner: &Interner,
 ) -> String {
-    let kernel_name = function
-        .name
-        .map(|name| interner.resolve(name).to_owned())
-        .unwrap_or_else(|| format!("function {}", function.id.0));
+    let kernel_name = function.name.map_or_else(
+        || format!("function {}", function.id.0),
+        |name| interner.resolve(name).to_owned(),
+    );
     let targets_kernel = |callee: &MirCallee| match callee {
         MirCallee::Function(id)
         | MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => *id == function.id,
@@ -2095,10 +2095,10 @@ fn lane_kernel_call_context(
     };
     let mut call_sites = Vec::new();
     for caller in &program.functions {
-        let caller_name = caller
-            .name
-            .map(|name| interner.resolve(name).to_owned())
-            .unwrap_or_else(|| format!("function {}", caller.id.0));
+        let caller_name = caller.name.map_or_else(
+            || format!("function {}", caller.id.0),
+            |name| interner.resolve(name).to_owned(),
+        );
         for block in &caller.blocks {
             for statement in &block.statements {
                 let MirStatementKind::Call { callee, .. } = &statement.kind else {

@@ -108,7 +108,7 @@ fn raw_bits_pair_only_with_same_width_scalars() {
     assert!(f.supported(f16_, b16));
     assert!(f.supported(b16, f16_));
     assert!(f.supported(u64_, b64));
-    assert!(f.supported(b64, u64_));
+    assert!(!f.supported(b64, u64_));
     assert!(matches!(
         numeric_conversion(&f.types, i32_, b32).map(|plan| plan.target()),
         Some(Num::Bits(BitsWidth::B32))

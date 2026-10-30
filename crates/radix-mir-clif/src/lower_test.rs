@@ -1,7 +1,6 @@
-//! Proof that the sync scalar `sermo` conversation lowers to the runtime
-//! calls the `clif` leaf exports (unit bbf72360-8.1).
-//! Hand-built MIR fixtures drive the lowering of `SermoOpen` and
-//! `SermoSetOpener`; the emitted object's symbol table is the evidence.
+//! Hand-built MIR fixtures for native lowering: supported runtime boundaries
+//! name their imports in the emitted object, and unsupported representations
+//! decline before an executable or in-memory image can be produced.
 
 use crate::{StructMeta, emit_program};
 use radix_lexer::{Interner, Span};
@@ -545,4 +544,76 @@ fn sermo_lower_text_materialization_still_declines() {
     );
 
     assert!(lowered.is_err(), "textus materialization stays declined");
+}
+
+#[test]
+fn registered_call_handler_refuses_before_opening_a_native_conversation() {
+    let (program, types, interner) = open_then_convert(Primitive::Numerus);
+    let mut structs = StructMeta::default();
+    structs
+        .handler_routes
+        .insert("tempus:monotonicum".to_owned());
+    let error = emit_program(
+        &program,
+        &types,
+        &interner,
+        Some(MirFunctionId(0)),
+        ["true", "false", "none", "tuple"].map(str::to_owned),
+        &structs,
+    )
+    .expect_err("a registered MIR handler cannot be served by the leaf runtime");
+    assert_eq!(error.shape, "call handler conversation");
+}
+
+#[test]
+fn optional_parameter_metadata_refuses_instead_of_unwrapping_none_in_the_callee() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let optional = MirType::semantic(types.option(numerus));
+    let vacuum = ty(&types, Primitive::Vacuum);
+    let param_ty = MirType::semantic(numerus);
+    let mut program = single_function(FunctionShape {
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: param_ty,
+            mode: MirParamMode::Owned,
+            span: sample_span(),
+        }],
+        locals: vec![local(0, param_ty)],
+        temps: Vec::new(),
+        statements: Vec::new(),
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+    let mut entry = program.functions[0].clone();
+    entry.id = MirFunctionId(1);
+    entry.params.clear();
+    entry.locals.clear();
+    entry.blocks[0].statements.push(MirStatement {
+        kind: MirStatementKind::Call {
+            destination: None,
+            callee: MirCallee::Function(MirFunctionId(0)),
+            args: vec![MirOperand::Constant(MirConstant::Nil)],
+        },
+        span: sample_span(),
+    });
+    program.functions.push(entry);
+    let mut structs = StructMeta::default();
+    structs
+        .optional_params
+        .insert((MirFunctionId(0), 0), optional);
+    let error = emit_program(
+        &program,
+        &types,
+        &Interner::new(),
+        Some(MirFunctionId(1)),
+        ["true", "false", "none", "tuple"].map(str::to_owned),
+        &structs,
+    )
+    .expect_err("plain optional parameter needs omission/default lowering");
+    assert_eq!(error.shape, "optional parameter omission");
 }

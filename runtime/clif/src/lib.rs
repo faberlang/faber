@@ -851,7 +851,7 @@ pub extern "C" fn __faber_clif_v1_opt_some(tag: i32, bits: i64) -> *const Presen
 pub unsafe extern "C" fn __faber_clif_v1_opt_bits(handle: *const Present) -> i64 {
     match unsafe { handle.as_ref() } {
         Some(present) => present.bits,
-        None => unsafe { __faber_clif_v1_trap(c"unwrapped a none value".as_ptr().cast(), 22) },
+        None => abort("unwrap of nihil"),
     }
 }
 
@@ -1920,11 +1920,15 @@ pub unsafe extern "C" fn __faber_clif_v1_list_extremum(
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_abort_text(handle: *const u8) -> ! {
-    flush();
     let reason = text_str(unsafe { text_bytes(handle) });
+    abort(&reason)
+}
+
+fn abort(reason: &str) -> ! {
+    flush();
     let mut stderr = std::io::stderr();
     let _ = writeln!(stderr, "abort: {reason}");
-    std::process::exit(abort_exit_status(&reason));
+    std::process::exit(abort_exit_status(reason));
 }
 
 /// Report a failed run and exit with the runner's code (D5).
@@ -2694,6 +2698,14 @@ pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
 fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
     let payload = match tag {
         TAG_OPT => return (tag, bits),
+        // Normalize small inf values to the ordinary integer tag, just as the
+        // numeric conversion path does. This also covers inf inside lists/maps.
+        TAG_INF => {
+            return (
+                TAG_OPT,
+                unsafe { inf::__faber_clif_v1_inf_box(bits as *const u8) } as i64,
+            );
+        }
         TAG_INT | TAG_FLOAT | TAG_FLOAT32 | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
         TAG_LIST => {
             let list = unsafe { list_ref(bits as *const List) };
@@ -2738,11 +2750,11 @@ fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
     (TAG_OPT, boxed as i64)
 }
 
-/// A list or map as open data: a box whose elements are open-data boxes.
+/// A scalar, list or map as open data, recursively boxing collection elements.
 ///
 /// # Safety
 ///
-/// `bits` is a live runtime list (tag `TAG_LIST`) or map (tag `TAG_MAP`).
+/// `bits` carries a live payload of `tag`, including handles for inf and collections.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const Present {
     let (_, boxed) = box_open_element(tag, bits);

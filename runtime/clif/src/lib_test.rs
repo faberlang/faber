@@ -1,3 +1,5 @@
+//! Runtime value representation, display and collection invariants.
+
 use super::*;
 
 #[test]
@@ -207,4 +209,36 @@ fn f32_tagged_float_cells_render_and_compare_at_single_precision() {
         element_order(TAG_FLOAT32, bits, (f64::from(0.2f32)).to_bits() as i64),
         std::cmp::Ordering::Less
     );
+}
+
+#[test]
+fn open_data_boxes_inf_with_canonical_integer_tags_and_exact_payloads() {
+    for (digits, tag) in [
+        ("7", TAG_INT),
+        ("-9223372036854775808", TAG_INT),
+        ("9223372036854775808", TAG_INF),
+        ("18446744073709551616", TAG_INF),
+        ("-18446744073709551617", TAG_INF),
+    ] {
+        let value = unsafe { inf::__faber_clif_v1_inf_digits(text_new(digits.as_bytes())) };
+        let boxed = unsafe { __faber_clif_v1_dyn_box(TAG_INF, value as i64) };
+        assert_eq!(unsafe { &*boxed }.tag, tag, "{digits}");
+        let recovered = unsafe { inf::__faber_clif_v1_inf_unbox(boxed) };
+        assert!(!recovered.is_null());
+        assert_eq!(unsafe { inf::text(recovered) }, digits);
+
+        let list = list_new_from(vec![(TAG_INF, value as i64)]);
+        let boxed_list = unsafe { __faber_clif_v1_dyn_box(TAG_LIST, list as i64) };
+        let elements = unsafe { list_ref((*boxed_list).bits as *const List) };
+        let (element_tag, bits) = elements.items[0];
+        assert_eq!(element_tag, TAG_OPT);
+        let element = bits as *const Present;
+        assert_eq!(unsafe { &*element }.tag, tag);
+        assert_eq!(
+            unsafe { inf::text(inf::__faber_clif_v1_inf_unbox(element)) },
+            digits
+        );
+    }
+    let not_integer = __faber_clif_v1_opt_some(TAG_BOOL, 1);
+    assert!(unsafe { inf::__faber_clif_v1_inf_unbox(not_integer) }.is_null());
 }
