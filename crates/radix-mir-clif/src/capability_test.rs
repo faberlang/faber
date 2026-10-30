@@ -399,6 +399,41 @@ fn aggregate_construction_names_gap() {
 }
 
 #[test]
+fn vector_value_and_construction_are_capable() {
+    let mut types = TypeTable::new();
+    let fractus = types.primitive(Primitive::Fractus);
+    let width = types.intern_index(radix_types::IndexExpr::Literal(3));
+    let vector = MirType::semantic(types.intern(Type::Vector(fractus, width)));
+    let program = single_function(FunctionShape {
+        params: Vec::new(),
+        locals: vec![local(0, vector)],
+        temps: Vec::new(),
+        statements: vec![MirStatement {
+            kind: MirStatementKind::Construct {
+                destination: MirPlace::local(MirLocalId(0)),
+                aggregate: MirAggregate {
+                    kind: MirAggregateKind::Vector,
+                    ty: vector,
+                    fields: MirAggregateFields::Ordered(vec![
+                        MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Float(1.0))),
+                        MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Float(2.0))),
+                        MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Float(3.0))),
+                    ]),
+                },
+            },
+            span: sample_span(),
+        }],
+        terminator: MirTerminatorKind::Return(None),
+        return_ty: ty(&types, Primitive::Vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+    });
+
+    assert!(classify_with_types(&program, &types).is_capable());
+}
+
+#[test]
 fn place_projection_names_gap() {
     let types = TypeTable::new();
     let numerus = ty(&types, Primitive::Numerus);
@@ -410,7 +445,7 @@ fn place_projection_names_gap() {
             kind: MirStatementKind::Assign {
                 place: MirPlace {
                     base: MirPlaceBase::Local(MirLocalId(0)),
-                    projections: vec![MirProjection::VectorLane(0)],
+                    projections: vec![MirProjection::MatrixCell { row: 0, column: 0 }],
                 },
                 value: MirValue {
                     id: MirValueId(0),
