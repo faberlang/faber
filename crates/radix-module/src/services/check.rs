@@ -40,11 +40,43 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     code_pack: Option<&crate::locale::LocalePack>,
     templates: Option<&std::collections::BTreeMap<String, String>>,
 ) -> CheckDiagnosticsResult {
+    check_diagnostics_for_source_with_config(
+        name,
+        source,
+        permissive,
+        code_pack,
+        templates,
+        &crate::driver::Config::default(),
+    )
+}
+
+/// Run single-file check under a caller-owned locale policy.
+///
+/// `locale_config` carries the language-pack root and product loader a
+/// declared `+++ locale = "\u{2026}" +++` frontmatter resolves through (faber
+/// installs its embedded reader packs here, so an installed binary checks a
+/// declared locale with no workspace `locale/` tree beside it).
+#[must_use]
+pub fn check_diagnostics_for_source_with_config(
+    name: &str,
+    source: &str,
+    permissive: bool,
+    code_pack: Option<&crate::locale::LocalePack>,
+    templates: Option<&std::collections::BTreeMap<String, String>>,
+    locale_config: &crate::driver::Config,
+) -> CheckDiagnosticsResult {
     // Reader-locale suggestions wait until the check result is known: an
     // edit-distance guess is shown only where an error sits at its span.
     let mut locale_candidates = Vec::new();
-    let mut result =
-        check_source_deferring_locale(name, source, permissive, code_pack, templates, &mut locale_candidates);
+    let mut result = check_source_deferring_locale(
+        name,
+        source,
+        permissive,
+        code_pack,
+        templates,
+        locale_config,
+        &mut locale_candidates,
+    );
     let kept = crate::diagnostics::Diagnostic::filter_locale_suggestions(locale_candidates, &result.diagnostics);
     result.diagnostics.extend(kept);
     // WHY: a failed check of a source with no declared locale is the case where
@@ -52,8 +84,7 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     // advisory only; it never changes the locale the source was read in.
     if !result.success && code_pack.is_none() && !source_declares_locale(name, source) {
         let body = crate::driver::peel_raw_source(name, source).map_or(source, |peeled| peeled.body);
-        let config = crate::driver::Config::default();
-        if let Some(note) = crate::driver::latin_source_reads_as_other_locale(&config, name, body) {
+        if let Some(note) = crate::driver::latin_source_reads_as_other_locale(locale_config, name, body) {
             result.diagnostics.insert(0, note);
         }
     }
@@ -92,14 +123,18 @@ pub fn normalize_locale002_notes(
 /// WHY: the wrong-locale advisory may only claim the source "has no declared
 /// locale" when that is true. Callers that assemble diagnostics outside this
 /// service use the same peel to suppress the note for declared sources.
+/// Declaration is a frontmatter fact only — it does not depend on the
+/// declared pack being loadable from any root or loader.
 #[must_use]
 pub fn source_declares_locale(name: &str, source: &str) -> bool {
     crate::driver::peel_raw_source(name, source)
         .ok()
-        .and_then(|peeled| {
-            crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
+        .is_some_and(|peeled| {
+            peeled
+                .frontmatter
+                .as_ref()
+                .is_some_and(|frontmatter| frontmatter.locale_result().is_some())
         })
-        .is_some()
 }
 
 fn check_source_deferring_locale(
@@ -108,6 +143,7 @@ fn check_source_deferring_locale(
     permissive: bool,
     code_pack: Option<&crate::locale::LocalePack>,
     templates: Option<&std::collections::BTreeMap<String, String>>,
+    locale_config: &crate::driver::Config,
     locale_candidates: &mut Vec<crate::diagnostics::Diagnostic>,
 ) -> CheckDiagnosticsResult {
     let mut diagnostics = Vec::new();
@@ -120,17 +156,36 @@ fn check_source_deferring_locale(
     };
     let body = peeled.body;
 
-    // Honor the source's `+++ locale = "…" +++` frontmatter when the caller
-    // supplied no explicit reader pack, mirroring the analysis driver. The
-    // en-surface corpus depends on it: without the pack, `const`, `fn`, and
-    // `import from …` spellings do not lex as keywords and check fails at
-    // parse with no diagnostics of substance.
-    let declared_pack = code_pack
-        .map(ToOwned::to_owned)
-        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref()));
-    let mut resolved_pack = match declared_pack {
+    // Honor the source's `+++ locale = "…" +++` frontmatter when no explicit
+    // pack won, mirroring the analysis driver (`resolve_peeled_lex_pack`): a
+    // caller-supplied pack or an explicit config pack wins over the
+    // declaration, the declaration itself wins over the session default, and
+    // the no-locale default is `en`. The en-surface corpus depends on the
+    // frontmatter branch: without the pack, `const`, `fn`, and `import from …`
+    // spellings do not lex as keywords and check fails at parse with no
+    // diagnostics of substance. A declared locale that cannot be resolved
+    // under `locale_config` fails the check with its LOCALE003 diagnostic —
+    // never a silent read in another surface.
+    let explicit_session_pack = locale_config
+        .locale_pack_explicit
+        .then(|| locale_config.locale_pack.clone())
+        .flatten();
+    let declared_pack = match code_pack.map(ToOwned::to_owned).or(explicit_session_pack) {
         Some(pack) => Some(pack),
-        None => match crate::driver::default_code_pack(&crate::driver::Config::default()) {
+        None => match crate::program::compile::frontmatter_locale_pack_from_frontmatter(
+            locale_config,
+            peeled.frontmatter.as_ref(),
+        ) {
+            Ok(pack) => pack,
+            Err(diagnostic) => {
+                diagnostics.push(*diagnostic);
+                return CheckDiagnosticsResult { diagnostics, success: false };
+            }
+        },
+    };
+    let mut resolved_pack = match declared_pack.or_else(|| locale_config.locale_pack.clone()) {
+        Some(pack) => Some(pack),
+        None => match crate::driver::default_code_pack(locale_config) {
             Ok(pack) => Some(pack),
             Err(diagnostic) => {
                 diagnostics.push(*diagnostic);
@@ -191,8 +246,13 @@ fn check_source_deferring_locale(
     // miss path (SEM014.cannot_infer_expression_type on non-literal args).
     pass_config.import_path_templates = templates.cloned();
     if let Some(path) = source_path_for_import_contract(name) {
-        let contract =
-            crate::program::compile::import_contract_for_file(&path, source, resolved_pack.as_ref(), templates);
+        let contract = crate::program::compile::import_contract_for_file_with_config(
+            &path,
+            source,
+            resolved_pack.as_ref(),
+            templates,
+            locale_config,
+        );
         if let Some(pack) = resolved_pack.as_mut()
             && let Err(err) = crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots)
         {

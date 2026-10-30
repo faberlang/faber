@@ -128,6 +128,7 @@ pub(super) fn config_with_library_bindings(
 fn compile_wgsl_with_library_bindings(
     command: &EmitCommand,
     code_pack: Option<&radix::module::locale::LocalePack>,
+    locale_base: &radix::driver::Config,
 ) -> radix::CompileResult {
     let target_spelling = command.target.to_string();
     let load_errors = std::cell::RefCell::new(Vec::new());
@@ -144,6 +145,7 @@ fn compile_wgsl_with_library_bindings(
         command.output_mode,
         command.module_name.as_deref(),
         &resolve,
+        Some(locale_base),
     );
     let errors = load_errors.into_inner();
     if !errors.is_empty() {
@@ -151,6 +153,15 @@ fn compile_wgsl_with_library_bindings(
         result.diagnostics.extend(errors);
     }
     result
+}
+
+/// The emit lane's locale base: the product's embedded reader packs as the
+/// frontmatter-locale loader, over the default root discovery (a dev checkout
+/// keeps its workspace root; an installed binary has none and the loader
+/// serves).
+pub(super) fn emit_locale_base() -> radix::driver::Config {
+    radix::driver::Config::default()
+        .with_locale_pack_loader(faber_cli::package::embedded_locale_pack_loader())
 }
 
 /// Emit a single-file target with Faber-owned reader-locale resolution.
@@ -167,7 +178,11 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
 
     // Faber owns locale → pack resolution (install layout + package manifests
     // live here, not in radix). Code pack drives emit surface; diagnostic pack
-    // drives message rendering (`--diagnostics-locale` when set).
+    // drives message rendering (`--diagnostics-locale` when set). The base
+    // config hands the compile lane the product's pack sources — the embedded
+    // reader packs serve a declared frontmatter locale on an installed binary
+    // with no workspace `locale/` tree.
+    let locale_base = emit_locale_base();
     let code_pack = match faber_cli::package::locale_pack_for_emit_with_diagnostic(
         &command.input,
         command.locale.as_deref(),
@@ -189,7 +204,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     };
 
     let result = if command.target == radix::module::codegen::Target::MirWgsl {
-        compile_wgsl_with_library_bindings(&command, code_pack.as_ref())
+        compile_wgsl_with_library_bindings(&command, code_pack.as_ref(), &locale_base)
     } else {
         radix::services::compile_cli_input_with_locale_pack(
             &command.input,
@@ -198,6 +213,7 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
             code_pack.as_ref(),
             command.output_mode,
             command.module_name.as_deref(),
+            Some(&locale_base),
         )
     };
     let result = retry_single_file_via_package_analysis(&command, code_pack.as_ref(), result);
@@ -386,6 +402,7 @@ pub(super) fn package_analysis_config(
     let config = radix::driver::Config::default()
         .with_target(command.target)
         .with_output_mode(command.output_mode)
+        .with_locale_pack_loader(faber_cli::package::embedded_locale_pack_loader())
         .with_dev_locale_root();
     let config = match &command.module_name {
         Some(name) => config.with_module_name(Some(name.clone())),

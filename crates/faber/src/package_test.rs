@@ -15,6 +15,8 @@ use super::{
 };
 #[cfg(feature = "hir-ts")]
 use super::{build_browser_product, build_browser_product_static_assets};
+#[cfg(feature = "mir-clif")]
+use super::{cmd::compile_clif_package_input, manifestless_file_declares_non_kernel_import};
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
 #[cfg(feature = "hir-rust")]
 use super::{
@@ -11093,6 +11095,10 @@ fn use_package_compiler_keeps_rust_and_metal_fab_on_package_path() {
     assert!(!use_package_compiler(Target::MirWgsl, fab, false));
     assert!(!use_package_compiler(Target::MirLlvm, fab, false));
     assert!(!use_package_compiler(Target::HirTypeScript, fab, false));
+    // A plain lone file (here: no such file on disk, so no import to declare)
+    // keeps the single-file `clif` route; only an import-declaring file is
+    // package-shaped for it.
+    assert!(!use_package_compiler(Target::MirClif, fab, false));
 }
 
 #[cfg(feature = "mir-metal")]
@@ -11274,6 +11280,68 @@ kind = "bin"
     assert!(use_package_compiler(Target::MirClif, dir.path(), false));
     let (config, _) = config_with_locale(Target::MirClif, &entry, None, None).expect("config");
     let result = compile_package_clif(&config, &entry, &super::mir::faber_mir_seams());
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error()),
+        "unexpected diagnostics: {:?}",
+        result.diagnostics
+    );
+    let Some(radix::module::Output::ClifObject(object)) = result.output else {
+        panic!("expected a clif object output");
+    };
+    assert!(!object.bytes.is_empty(), "expected emitted object bytes");
+}
+
+/// A manifestless `.fab` file that imports a sibling module is package-shaped
+/// for `clif`: the single-file object carries no linked sibling code, so the
+/// imported call declines as CODEGEN001 `external definition call`, while the
+/// package-MIR emitter links the import graph and emits a runnable object.
+/// Files without such imports keep the single-file route.
+#[cfg(feature = "mir-clif")]
+#[test]
+fn clif_file_mode_links_import_declaring_fab_through_the_package_lane() {
+    let dir = test_temp_dir("clif-file-mode-import");
+    fs::write(
+        dir.join("main.fab"),
+        r#"import from "./auxilium" auxilium
+
+main {
+    print auxilium.saluta("Marcus")
+}
+"#,
+    )
+    .expect("entry");
+    fs::write(
+        dir.join("auxilium.fab"),
+        "@ public\nfn saluta(string nomen) → string {\n    return \"Salve, §!\"(nomen)\n}\n\nmain {}\n",
+    )
+    .expect("sibling");
+    fs::write(dir.join("plain.fab"), "main {\n    print 1 + 1\n}\n").expect("plain");
+
+    let entry = dir.join("main.fab");
+    let plain = dir.join("plain.fab");
+    assert!(manifestless_file_declares_non_kernel_import(&entry));
+    assert!(!manifestless_file_declares_non_kernel_import(&plain));
+    assert!(use_package_compiler(Target::MirClif, &entry, false));
+    assert!(!use_package_compiler(Target::MirClif, &plain, false));
+
+    // The single-file route still declines the imported call by name: the
+    // routing above is what links it.
+    let single_file = radix::services::compile_cli_path(&entry, false, Target::MirClif);
+    assert!(single_file.output.is_none());
+    assert!(
+        single_file.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some("CODEGEN001")
+                && diagnostic_has_arg(diagnostic, "category", "missing-abi-fact")
+                && diagnostic_has_arg(diagnostic, "shape", "external definition call")
+        }),
+        "{:?}",
+        single_file.diagnostics
+    );
+
+    let result = compile_clif_package_input(&entry);
     assert!(
         result
             .diagnostics

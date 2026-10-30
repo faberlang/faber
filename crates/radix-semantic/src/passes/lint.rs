@@ -165,6 +165,17 @@ struct LintContext<'a> {
     /// chain itself.
     inside_add_left_child: bool,
     in_loop: bool,
+    /// A binding whose plain bind initialized it from another place's state:
+    /// `varia T b ← a` over a shareable `T` shares `a`'s object, so a write
+    /// through `b` writes what `a` names. Keyed to the ultimate source,
+    /// following chains (`c ← b ← a` maps `c` to `a`).
+    alias_of: handroll::FxHashMap<radix_hir::DefId, radix_hir::DefId>,
+    /// Bindings whose state some `varia` cell shares: WARN013's `let` advice
+    /// would turn that bind into SEM065 (`const_shared_into_var`), so the
+    /// source keeps `varia` without a warning. Every hop of a chain is
+    /// recorded — immediate source and family root alike — because SEM065
+    /// reads the initializer's immediate place root.
+    shared_into_var: FxHashSet<radix_hir::DefId>,
 }
 
 impl<'a> LintContext<'a> {
@@ -204,6 +215,8 @@ impl<'a> LintContext<'a> {
             value_literal_spellings,
             inside_add_left_child: false,
             in_loop: false,
+            alias_of: handroll::FxHashMap::default(),
+            shared_into_var: FxHashSet::default(),
         }
     }
 
@@ -298,7 +311,14 @@ impl<'a> LintContext<'a> {
         }
 
         for (def_id, span) in &self.mutable_locals {
-            if self.used.contains(def_id) && !self.mutated.contains(def_id) {
+            // WARN013 counts a write to any family member as a write to this
+            // binding; `alias_of` maps straight to the family root, so one
+            // lookup resolves the membership here instead of per write.
+            let root = self.alias_of.get(def_id).copied().unwrap_or(*def_id);
+            if self.used.contains(def_id)
+                && !self.mutated.contains(&root)
+                && !self.shared_into_var.contains(def_id)
+            {
                 self.warnings.push((
                     WarningKind::UnnecessaryVaria,
                     ISSUE_UNNECESSARY_VARIA,
@@ -457,7 +477,86 @@ impl<'a> LintContext<'a> {
             self.mutable_local_defs.insert(local.def_id);
         }
         if let Some(init) = &local.init {
+            self.note_local_alias(local.def_id, local.mutable, local.ty, init);
             self.check_expr(init, false);
+        }
+    }
+
+    /// Record what a plain bind aliases. A marker-free read of a shareable
+    /// place (`varia T b ← a`, `T` a container or genus) shares the source's
+    /// state; `copy`/`own` acquire an independent value and record nothing.
+    /// A `varia` cell sharing the source also marks its sources
+    /// `shared_into_var`: advising `let` on the source — the immediate name
+    /// or the family root behind it — would turn this bind into SEM065.
+    fn note_local_alias(
+        &mut self,
+        def_id: radix_hir::DefId,
+        mutable: bool,
+        slot_ty: Option<crate::TypeId>,
+        init: &HirExpression,
+    ) {
+        // An explicit view bind (`ref T r ← & a`) names the source's storage:
+        // writes through the view are writes to the source object.
+        let (root, value_ty) = match &init.kind {
+            HirExpressionKind::Ref(_, inner) => (root_place_def_id(inner), inner.ty.or(init.ty)),
+            _ => (root_place_def_id(init), init.ty),
+        };
+        let Some(root) = root else {
+            return;
+        };
+        // `copy`/`own` acquire an independent value and share nothing: the
+        // acquisition marker rides the declared slot's mode (the parser moves
+        // `← copy a` onto the binding's type), so both the slot and the value
+        // type must be marker-free for a plain alias. `mut`/`ref` views name
+        // the source's storage, so they stay aliases.
+        for ty in slot_ty.into_iter().chain(value_ty) {
+            if matches!(
+                self.types.peel_access_marker(ty).0,
+                Some(crate::AccessMarker::Own | crate::AccessMarker::Copy)
+            ) {
+                return;
+            }
+        }
+        let Some(ty) = value_ty.or(slot_ty) else {
+            return;
+        };
+        let (_, payload) = self.types.peel_access_marker(ty);
+        if !self.is_shareable_payload(payload) {
+            return;
+        }
+        let source = self.alias_of.get(&root).copied().unwrap_or(root);
+        if source == def_id {
+            // A bind from its own name shares nothing new; recording it would
+            // make the alias walk cycle.
+            return;
+        }
+        self.alias_of.insert(def_id, source);
+        if mutable {
+            // Both ends of the hop go into `shared_into_var`: SEM065 reads
+            // the initializer's immediate place root, so in a chain
+            // (`varia T c ← b ← a`) the intermediate source `b` needs the
+            // same protection as the ultimate source `a`, or WARN013's
+            // advice on `b` would turn this bind into SEM065.
+            self.shared_into_var.insert(root);
+            self.shared_into_var.insert(source);
+        }
+    }
+
+    /// A container or genus instance: a value a plain bind shares rather than
+    /// copies (`const` is deep, so SEM065 fires on exactly these sources).
+    fn is_shareable_payload(&self, ty: crate::TypeId) -> bool {
+        if self.types.is_aliasing_container_through_option(ty) {
+            return true;
+        }
+        match self.types.get(ty) {
+            Type::Struct(_) | Type::Interface(_) => true,
+            Type::Option(inner) | Type::Alias(_, inner) => self.is_shareable_payload(*inner),
+            // A tuple or union holding a shareable member aliases that
+            // member's state; a scalar-only aggregate still copies.
+            Type::Tuple(members) | Type::Union(members) => members
+                .iter()
+                .any(|member| self.is_shareable_payload(*member)),
+            _ => false,
         }
     }
 
@@ -577,8 +676,19 @@ impl<'a> LintContext<'a> {
 
     fn mark_place_mutated(&mut self, expr: &HirExpression) {
         if let Some(def_id) = root_place_def_id(expr) {
-            self.mutated.insert(def_id);
+            self.mark_mutated(def_id);
         }
+    }
+
+    /// Record a write. `alias_of` maps each member straight to its family
+    /// root, so storing the root once records the whole family: a plain bind
+    /// of a shareable value aliases, so after `varia T b ← a` a write through
+    /// `b` is a write to what `a` names, and the other way around. Which
+    /// members a root covers is resolved at warning generation, not per
+    /// write.
+    fn mark_mutated(&mut self, def_id: radix_hir::DefId) {
+        let root = self.alias_of.get(&def_id).copied().unwrap_or(def_id);
+        self.mutated.insert(root);
     }
 
     /// WARN013 means "never modified". A mutating call is a write to its
@@ -614,7 +724,7 @@ impl<'a> LintContext<'a> {
             .and_then(|ty| method_receiver_mutation::class_def(self.types, ty))
             .is_some_and(|class| self.mutating_methods.contains(&(class, method)));
         if reassigns || user_mutator {
-            self.mutated.insert(def_id);
+            self.mark_mutated(def_id);
         }
     }
 

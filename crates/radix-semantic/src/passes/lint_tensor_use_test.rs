@@ -76,6 +76,42 @@ main {
     assert_eq!(unused_mut_params(source), 1);
 }
 
+// A plain bind of a shareable value aliases its source (D-1), so the object a
+// `mut` parameter names can be written through the alias. WARN008 must not
+// call that `mut` unused: removing it turns the alias bind into SEM065
+// (`const_shared_into_var`, the read-only-parameter source row).
+const ALIAS_BOX: &str = "class Box {\n    mut int v = 0\n}\n";
+
+#[test]
+fn write_through_a_plain_bind_alias_is_a_mut_param_write() {
+    // The probe: `mut Box b ← p` shares the parameter's object, so `b.v ← 2`
+    // writes it even though the name `p` is never a write target.
+    let source = format!(
+        "{ALIAS_BOX}fn poke(mut Box p) {{\n    mut Box b ← p\n    b.v ← 2\n}}\nmain {{\n    mut Box x ← Box {{ v = 1 }}\n    poke(mut x)\n    print x.v\n}}"
+    );
+    assert_eq!(unused_mut_params(&source), 0);
+}
+
+#[test]
+fn mut_param_shared_into_a_varia_cell_is_not_unused() {
+    // Even without a write, the alias bind needs the parameter's `mut`:
+    // `let` on `p` makes `mut Box b ← p` SEM065.
+    let source = format!(
+        "{ALIAS_BOX}fn poke(mut Box p) {{\n    mut Box b ← p\n    print b.v\n}}\nmain {{\n    mut Box x ← Box {{ v = 1 }}\n    poke(mut x)\n    print x.v\n}}"
+    );
+    assert_eq!(unused_mut_params(&source), 0);
+}
+
+#[test]
+fn mut_param_without_alias_or_write_still_warns() {
+    // Negative twin: the parameter is only read and never aliased, so its
+    // `mut` really is unnecessary.
+    let source = format!(
+        "{ALIAS_BOX}fn peek(mut Box p) {{\n    print p.v\n}}\nmain {{\n    mut Box x ← Box {{ v = 1 }}\n    peek(mut x)\n    print x.v\n}}"
+    );
+    assert_eq!(unused_mut_params(&source), 1);
+}
+
 #[test]
 fn scalar_named_in_a_tensor_extent_is_used() {
     let source = r"fn runtime_size(int value) → int {

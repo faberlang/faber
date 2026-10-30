@@ -2889,14 +2889,16 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     );
                 } else {
                     // Binding is a store into the parameter cell: a float
-                    // bound to a bare `f32` parameter rounds to binary32.
+                    // bound to a bare `f32` parameter rounds to binary32, and
+                    // a register-class argument is copied (ruling 7b25889f
+                    // R1), so the callee's lane writes stay local.
                     let arg = match arg {
                         Value::Float(v)
                             if callee_slots.is_some_and(|slots| slots.local_is_f32(local)) =>
                         {
                             Value::Float(f64::from(v as f32))
                         }
-                        other => other,
+                        other => other.copied_register_class(),
                     };
                     write_slot(&mut frame.locals, local.0 as usize, arg, span, "local")?;
                     // A projected `mut` place cannot take the alias branch
@@ -3666,6 +3668,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             Value::Float(v) if narrows_to_f32 => Value::Float(f64::from(v as f32)),
             other => other,
         };
+        // A register-class store owns its storage (ruling 7b25889f R1): a
+        // vector or matrix written into a slot is copied, so `b ← a` never
+        // aliases the source's lanes.
+        let value = value.copied_register_class();
         match base {
             MirPlaceBase::Local(id) => {
                 write_slot(&mut frame.locals, id.0 as usize, value, span, "local")?;
@@ -3835,7 +3841,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             radix_mir::MirProjection::SharedCell => match value {
                 Value::SharedCell(cell) => {
-                    *cell.borrow_mut() = assigned;
+                    // A cell stores for one binding shared with closures; the
+                    // assigned register-class value must still be its own
+                    // storage (ruling 7b25889f R1), or a source's lanes would
+                    // alias the captured binding.
+                    *cell.borrow_mut() = assigned.copied_register_class();
                     Ok(Value::SharedCell(cell))
                 }
                 _ => Err(RunnerError::internal(

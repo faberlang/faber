@@ -11,6 +11,9 @@ domain = "numerics"
 stdout = "stdout.expected"
 check_only = false
 
+[targets.clif-jit]
+outcome = "pass"
+
 [targets.runner]
 outcome = "known-fail"
 phase = "run"

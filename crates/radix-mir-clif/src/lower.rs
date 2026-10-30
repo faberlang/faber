@@ -73,6 +73,9 @@ pub struct StructMeta {
     /// Parameters that admit none although declared with a plain type (the
     /// `optional` modifier): function, position and the optional type.
     pub optional_params: FxHashMap<(MirFunctionId, usize), MirType>,
+    /// In-process call routes: the native conversation runtime cannot dispatch
+    /// these MIR handlers or propagate their alternate exits yet.
+    pub handler_routes: FxHashSet<String>,
     /// Captured-closure environments by id.
     pub environments: FxHashMap<MirClosureEnvironmentId, MirClosureEnvironment>,
 }
@@ -149,7 +152,8 @@ pub(crate) enum Rep {
     Bool,
     /// A raw-bits value `bN`: the pattern zero-extended in an `i64`.
     Bits(BitsWidth),
-    /// `lista<T>`: a pointer to a runtime list of tagged elements.
+    /// A `lista<T>` or a host-lowered register vector: a pointer to a runtime
+    /// list of tagged elements. Vector binds duplicate this carrier at stores.
     List,
     /// A `genus` instance: a pointer to a runtime record.
     Record,
@@ -272,6 +276,12 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             }
             rep_of(table, MirType::semantic(*inner))?;
             Ok(Rep::Opt)
+        }
+        // The CLIF host subset carries fixed-width vectors as tagged lists;
+        // vector stores duplicate them, and lane projections use list access.
+        Type::Vector(element, _) => {
+            rep_of(table, MirType::semantic(*element))?;
+            Ok(Rep::List)
         }
         Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
             rep_of(table, MirType::semantic(*element))?;
@@ -460,6 +470,7 @@ impl ModuleState<'_> {
 
     fn signature_for(&self, function: &MirFunction) -> Lowered<Signature> {
         let mut signature = self.module.make_signature();
+        signature.params.push(AbiParam::new(self.pointer));
         if function.is_generator {
             // The collector: a runtime list every `cede` appends to.
             signature.params.push(AbiParam::new(types::I64));
@@ -469,6 +480,19 @@ impl ModuleState<'_> {
             signature.params.push(AbiParam::new(types::I64));
         }
         for (index, param) in function.params.iter().enumerate() {
+            if crate::capability::is_mut_union(self.input.types, param) {
+                return Err(Decline::new("mutable union parameter"));
+            }
+            // The metadata detects a plain parameter some call passes none to.
+            // Its default and none-tolerant reads are not represented here.
+            if self
+                .input
+                .structs
+                .optional_params
+                .contains_key(&(function.id, index))
+            {
+                return Err(Decline::new("optional parameter omission"));
+            }
             if !matches!(
                 param.mode,
                 MirParamMode::Owned | MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move
@@ -543,6 +567,9 @@ impl ModuleState<'_> {
             return Ok(*found);
         }
         let mut signature = self.module.make_signature();
+        if symbol.name != abi::MAIN.name {
+            signature.params.push(AbiParam::new(self.pointer));
+        }
         for param in symbol.params {
             signature
                 .params
@@ -691,6 +718,8 @@ struct FunctionLower<'f, 'a> {
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
     function_refs: FxHashMap<MirFunctionId, FuncRef>,
+    /// The arena inherited from the program entry as the hidden first parameter.
+    arena: Option<Value>,
     /// A generator's collector list, its leading parameter.
     collector: Option<Value>,
     generator: bool,
@@ -714,6 +743,9 @@ struct FunctionLower<'f, 'a> {
 }
 
 fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowered<()> {
+    if crate::capability::has_i64_edge_loop(function) {
+        return Err(Decline::new("inclusive loop with i64-max operand"));
+    }
     let signature = state.signature_for(function)?;
     let func_id = *state
         .functions
@@ -753,6 +785,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             wide_slots: handroll::FxHashSet::default(),
             narrow: handroll::FxHashSet::default(),
             huge: handroll::FxHashSet::default(),
+            arena: None,
             recovery_regions: handroll::FxHashMap::default(),
         };
         lower.run(function)?;
@@ -784,6 +817,7 @@ impl FunctionLower<'_, '_> {
             .ok_or_else(|| Decline::new("missing entry block"))?;
         self.builder.append_block_params_for_function_params(entry);
         self.builder.switch_to_block(entry);
+        self.arena = Some(self.builder.block_params(entry)[0]);
 
         let environment = self.state.closure_environment(function.id);
         self.declare_function_slots(function, environment.as_ref())?;
@@ -871,9 +905,9 @@ impl FunctionLower<'_, '_> {
         environment: Option<&MirClosureEnvironment>,
     ) -> Lowered<()> {
         let table = self.state.input.types;
-        let mut offset = usize::from(function.is_generator);
+        let mut offset = 1 + usize::from(function.is_generator);
         if function.is_generator {
-            self.collector = Some(self.builder.block_params(entry)[0]);
+            self.collector = Some(self.builder.block_params(entry)[1]);
         }
         if let Some(environment) = &environment {
             let value = self.builder.block_params(entry)[offset];
@@ -1039,6 +1073,13 @@ impl FunctionLower<'_, '_> {
                 }
                 let zero = self.builder.ins().iconst(types::I64, 0);
                 self.call_runtime(&abi::LIST_GET, &[current, zero])?
+            }
+            MirProjection::VectorLane(lane) => {
+                if current_rep != Rep::List {
+                    return Err(Decline::new("lane of a non-vector"));
+                }
+                let lane = self.builder.ins().iconst(types::I64, i64::from(*lane));
+                self.call_runtime(&abi::LIST_GET, &[current, lane])?
             }
             MirProjection::Index(index) | MirProjection::ProvenIndex(index)
                 if current_rep == Rep::Map =>
@@ -1259,7 +1300,10 @@ impl FunctionLower<'_, '_> {
     /// Call a runtime symbol; returns its first result when it has one.
     fn call_runtime(&mut self, symbol: &RuntimeSymbol, args: &[Value]) -> Lowered<Option<Value>> {
         let reference = self.runtime_ref(symbol)?;
-        let call = self.builder.ins().call(reference, args);
+        let mut values = Vec::with_capacity(args.len() + 1);
+        values.push(self.arena.expect("arena entry parameter"));
+        values.extend_from_slice(args);
+        let call = self.builder.ins().call(reference, &values);
         Ok(self.builder.inst_results(call).first().copied())
     }
 
@@ -1275,9 +1319,9 @@ impl FunctionLower<'_, '_> {
     /// The element type of a list type.
     fn element_type(&self, list: MirType) -> Lowered<MirType> {
         match resolve(self.state.input.types, list.semantic_id()) {
-            Type::Array(element) | Type::BoundedArray { element, .. } => {
-                Ok(MirType::semantic(*element))
-            }
+            Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::Vector(element, _) => Ok(MirType::semantic(*element)),
             Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
                 convert::byte_element(self.state.input.types)
                     .map(MirType::semantic)
@@ -1415,6 +1459,7 @@ impl FunctionLower<'_, '_> {
                     _ => self.element_type(ty),
                 }
             }
+            MirProjection::VectorLane(_) => self.element_type(ty),
             MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.1),
             MirProjection::VariantField { variant, field } => {
                 Ok(self.variant_slot(*variant, *field)?.1)
@@ -1853,6 +1898,13 @@ impl FunctionLower<'_, '_> {
         let tag = self.cell_tag_value(rep, cell_ty)?;
         let bits = self.element_bits(value, rep);
         match last {
+            MirProjection::VectorLane(lane) => {
+                if handle_rep != Rep::List {
+                    return Err(Decline::new("lane of a non-vector"));
+                }
+                let lane = self.builder.ins().iconst(types::I64, i64::from(*lane));
+                self.call_runtime(&abi::LIST_SET, &[handle, lane, tag, bits])?;
+            }
             MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index)
                 if handle_rep == Rep::Map =>
             {
@@ -3987,6 +4039,22 @@ impl FunctionLower<'_, '_> {
             }
             other => other,
         };
+        let computed = if place.projections.is_empty()
+            && matches!(
+                resolve(
+                    self.state.input.types,
+                    self.place_type(place)?.semantic_id()
+                ),
+                Type::Vector(..)
+            ) {
+            let Some(value) = computed else {
+                return Err(Decline::new("unit vector assignment"));
+            };
+            let tag = self.builder.ins().iconst(types::I32, abi::TAG_LIST);
+            self.call_runtime(&abi::DUPLICATE, &[tag, value])?
+        } else {
+            computed
+        };
         if !place.projections.is_empty() {
             let Some(computed) = computed else {
                 return Err(Decline::new("unit element store"));
@@ -4034,7 +4102,11 @@ impl FunctionLower<'_, '_> {
             MirStatementKind::Construct {
                 destination,
                 aggregate,
-            } if aggregate.kind == MirAggregateKind::Array => {
+            } if matches!(
+                aggregate.kind,
+                MirAggregateKind::Array | MirAggregateKind::Vector
+            ) =>
+            {
                 self.construct_array(destination, aggregate)
             }
             MirStatementKind::Construct {
@@ -4167,7 +4239,8 @@ impl FunctionLower<'_, '_> {
         {
             return Err(Decline::new("direct call of a generator"));
         }
-        let mut values = Vec::with_capacity(args.len() + 1);
+        let mut values = Vec::with_capacity(args.len() + 2);
+        values.push(self.arena.expect("arena entry parameter"));
         values.extend(environment);
         let by_address = self.address_flags(id);
         let returns = self.call_arguments(&by_address, args, &params, &mut values)?;
@@ -4220,7 +4293,7 @@ impl FunctionLower<'_, '_> {
         let list = self
             .call_runtime(&abi::LIST_NEW, &[])?
             .ok_or_else(|| Decline::new("list new result"))?;
-        let mut values = vec![list];
+        let mut values = vec![self.arena.expect("arena entry parameter"), list];
         for (position, arg) in args.iter().enumerate() {
             let (value, have) = self.scalar(arg)?;
             let value = match params.get(position) {
@@ -4276,7 +4349,8 @@ impl FunctionLower<'_, '_> {
                 MirCallee::Value(operand) => self.try_indirect_target(operand)?,
                 _ => self.try_direct_target(callee)?,
             };
-        let mut values = Vec::with_capacity(args.len() + 1);
+        let mut values = Vec::with_capacity(args.len() + 2);
+        values.push(self.arena.expect("arena entry parameter"));
         if let TryTarget::Direct(_, Some(environment)) | TryTarget::Indirect(_, environment) =
             &target
         {
@@ -4408,6 +4482,7 @@ impl FunctionLower<'_, '_> {
         };
         let flags = self.type_address_flags(signature);
         let mut abi_signature = self.state.module.make_signature();
+        abi_signature.params.push(AbiParam::new(self.state.pointer));
         abi_signature.params.push(AbiParam::new(types::I64));
         let mut params = Vec::with_capacity(signature.params.len());
         for (position, param) in signature.params.iter().enumerate() {
@@ -4554,6 +4629,9 @@ impl FunctionLower<'_, '_> {
         let text = radix_lexer::textus_literal::decode_textus_literal(
             self.state.input.interner.resolve(*symbol),
         );
+        if self.state.input.structs.handler_routes.contains(&text) {
+            return Err(Decline::new("call handler conversation"));
+        }
         let data = self.state.string_data(text.as_bytes())?;
         let global = self
             .state
@@ -4941,6 +5019,15 @@ impl FunctionLower<'_, '_> {
         conversion: &MirConversion,
         argument: &MirOperand,
     ) -> Lowered<()> {
+        if matches!(
+            resolve(self.state.input.types, conversion.source_ty.semantic_id()),
+            Type::Bits(BitsWidth::B64)
+        ) && matches!(
+            resolve(self.state.input.types, conversion.target_ty.semantic_id()),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
+        ) {
+            return Err(Decline::new("b64 to u64 conversion"));
+        }
         let (value, rep) = self.scalar(argument)?;
         let (variable, slot_rep) = self.place_slot(destination)?;
         if rep == Rep::Set && slot_rep == Rep::List {
@@ -5252,9 +5339,15 @@ impl FunctionLower<'_, '_> {
             .ins()
             .iconst(types::I64, i64::try_from(suffix.len()).unwrap_or(0));
         let reference = self.runtime_ref(&abi::DEC_TRAP_STORE)?;
-        self.builder
-            .ins()
-            .call(reference, &[value, pointer, length]);
+        self.builder.ins().call(
+            reference,
+            &[
+                self.arena.expect("arena entry parameter"),
+                value,
+                pointer,
+                length,
+            ],
+        );
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
         Ok(stored)
@@ -5389,14 +5482,29 @@ impl FunctionLower<'_, '_> {
         if self.is_wide(value) {
             let (low, high) = self.split_wide(value);
             let reference = self.runtime_ref(&abi::TRAP_STORE_WIDE)?;
-            self.builder
-                .ins()
-                .call(reference, &[low, high, pointer, length, unsigned]);
+            self.builder.ins().call(
+                reference,
+                &[
+                    self.arena.expect("arena entry parameter"),
+                    low,
+                    high,
+                    pointer,
+                    length,
+                    unsigned,
+                ],
+            );
         } else {
             let reference = self.runtime_ref(&abi::TRAP_STORE)?;
-            self.builder
-                .ins()
-                .call(reference, &[value, pointer, length, unsigned]);
+            self.builder.ins().call(
+                reference,
+                &[
+                    self.arena.expect("arena entry parameter"),
+                    value,
+                    pointer,
+                    length,
+                    unsigned,
+                ],
+            );
         }
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
@@ -5415,17 +5523,31 @@ impl FunctionLower<'_, '_> {
             Rep::Int if self.is_wide(value) => self.print_wide(stream, value)?,
             Rep::Int => {
                 let reference = self.runtime_ref(&abi::PRINT_I64)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Float => {
                 let reference = self.runtime_ref(&abi::PRINT_F64)?;
                 let narrow = self.float_narrow(argument);
                 let narrow = self.builder.ins().iconst(types::I32, narrow);
-                self.builder.ins().call(reference, &[stream, value, narrow]);
+                self.builder.ins().call(
+                    reference,
+                    &[
+                        self.arena.expect("arena entry parameter"),
+                        stream,
+                        value,
+                        narrow,
+                    ],
+                );
             }
             Rep::Bool => {
                 let reference = self.runtime_ref(&abi::PRINT_BOOL)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Bits(width) => {
                 let bits = self
@@ -5433,32 +5555,58 @@ impl FunctionLower<'_, '_> {
                     .ins()
                     .iconst(types::I32, i64::from(width.bits()));
                 let reference = self.runtime_ref(&abi::PRINT_BITS)?;
-                self.builder.ins().call(reference, &[stream, value, bits]);
+                self.builder.ins().call(
+                    reference,
+                    &[
+                        self.arena.expect("arena entry parameter"),
+                        stream,
+                        value,
+                        bits,
+                    ],
+                );
             }
             Rep::List => {
                 let reference = self.runtime_ref(&abi::PRINT_LIST)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Record => {
                 let reference = self.runtime_ref(&abi::PRINT_RECORD)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Opt => {
                 let reference = self.runtime_ref(&abi::PRINT_OPT)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Map | Rep::Set => {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Regex | Rep::Match | Rep::Dec | Rep::Inf | Rep::Ins => {
                 let text = self.render_text(value, rep)?;
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
-                self.builder.ins().call(reference, &[stream, text]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, text],
+                );
             }
             Rep::Text | Rep::Char => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Func => return Err(Decline::new("function value print")),
             Rep::Tuple => return Err(Decline::new("tuple print")),
@@ -5957,6 +6105,12 @@ impl FunctionLower<'_, '_> {
     /// operands and its result through `f32`, as the runner's `float_binop`
     /// does; the operation itself still runs in `f64`, and comparisons take
     /// the operands exactly as stored.
+    ///
+    /// TARGET: Separate CLIF `fmul`, `fadd` and `fsub` retain separate
+    /// roundings; fusion requires the distinct `fma` instruction, which this
+    /// lowering does not emit. Both object and JIT routes use `host_isa`'s
+    /// `opt_level=speed` without changing that instruction contract. The host
+    /// regression is `corpus/fractus/no-fused-multiply-add.fab`.
     fn float_binary(
         &mut self,
         op: MirBinOp,
@@ -6161,7 +6315,10 @@ impl FunctionLower<'_, '_> {
             .ins()
             .iconst(types::I64, i64::try_from(message.len()).unwrap_or(0));
         let reference = self.runtime_ref(&abi::TRAP)?;
-        self.builder.ins().call(reference, &[pointer, length]);
+        self.builder.ins().call(
+            reference,
+            &[self.arena.expect("arena entry parameter"), pointer, length],
+        );
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
         Ok(())

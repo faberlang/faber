@@ -11,7 +11,7 @@ use crate::{MirKernelDispatchSize, MirKernelWorkgroupCount, MirType, MirWorkgrou
 use std::fmt;
 
 // ---------------------------------------------------------------------------
-// LAUNCH DESCRIPTORS
+// RECIPE FAMILIES
 // ---------------------------------------------------------------------------
 
 /// The recipe family of a kernel, as a typed tag.
@@ -97,6 +97,10 @@ impl RecipeKind {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// STATIC EXECUTOR-PLAN BINDS
+// ---------------------------------------------------------------------------
 
 /// Version of the additive executor-plan bind extension frozen by M0.
 ///
@@ -361,6 +365,10 @@ impl ExecutorPlanExtension {
 /// and the v1 shape above; dynamic plans use this version and the additive
 /// allocation/view/binding facts below.
 pub const EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION: u16 = 2;
+
+// ---------------------------------------------------------------------------
+// SPECULATIVE VERIFICATION
+// ---------------------------------------------------------------------------
 
 /// Version of the additive speculative-verification record section.
 ///
@@ -745,6 +753,10 @@ fn push_verification_identity_bytes(output: &mut Vec<u8>, bytes: &[u8]) {
 fn push_verification_identity_u64(output: &mut Vec<u8>, value: u64) {
     output.extend_from_slice(&value.to_le_bytes());
 }
+
+// ---------------------------------------------------------------------------
+// RUNTIME ALLOCATION AND VIEW BINDINGS
+// ---------------------------------------------------------------------------
 
 /// The scalar data type of an allocation or typed source.
 ///
@@ -1369,6 +1381,10 @@ pub fn executor_plan_extension_v2(
     Ok(extension)
 }
 
+// ---------------------------------------------------------------------------
+// LAUNCH DESCRIPTORS AND PROJECTIONS
+// ---------------------------------------------------------------------------
+
 /// One typed buffer slot in a launch descriptor.
 ///
 /// A program fact snapshot of a [`DeviceResource`]: the binding indices, the
@@ -1497,13 +1513,22 @@ pub fn executor_plan_extension(program: &DeviceProgram) -> ExecutorPlanExtension
             .map(|(kernel_index, kernel)| {
                 let recipe = RecipeKind::from_plan(&kernel.plan);
                 let bind = bind_descriptor_for_kernel(kernel);
+                let binds = library_binds_for_kernel(kernel, &bind);
+                let offsets = binds
+                    .iter()
+                    .map(|bind| OffsetBinding {
+                        name: bind.name.clone(),
+                        offset_elements: bind.offset_elements,
+                        strides: bind.strides.clone(),
+                    })
+                    .collect();
                 LibrarySelection {
                     kernel_index,
                     library_entry: library_entry_for_kernel(kernel, recipe),
                     logical_signature: logical_signature_for_kernel(kernel, recipe),
-                    binds: library_binds_for_kernel(kernel, &bind),
+                    binds,
                     uniforms: packed_decode_uniforms_for_kernel(kernel),
-                    offsets: offsets_for_kernel(kernel, &bind),
+                    offsets,
                     workspace: None,
                     backend_requirements: packed_backend_requirements_for_kernel(kernel),
                     provenance: PlanProvenance {
@@ -1628,14 +1653,11 @@ fn library_binds_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<L
         .iter()
         .enumerate()
         .map(|(index, resource)| {
-            let (dims, strides) = if is_packed_weight_slot(kernel, resource) {
-                if let Some(packed) = packed.as_ref() {
+            let (dims, strides) = match packed.as_ref() {
+                Some(packed) if resource.binding.binding == 1 => {
                     (vec![packed.packed_bytes], vec![1])
-                } else {
-                    (bind.dims.clone(), bind.strides.clone())
                 }
-            } else {
-                (bind.dims.clone(), bind.strides.clone())
+                _ => (bind.dims.clone(), bind.strides.clone()),
             };
             LibraryBind {
                 name: format!("buffer{index}"),
@@ -1644,23 +1666,6 @@ fn library_binds_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<L
                 strides,
                 offset_elements: 0,
             }
-        })
-        .collect()
-}
-
-fn offsets_for_kernel(kernel: &KernelUnit, bind: &BindDescriptor) -> Vec<OffsetBinding> {
-    kernel
-        .resources
-        .iter()
-        .enumerate()
-        .map(|(index, resource)| OffsetBinding {
-            name: format!("buffer{index}"),
-            offset_elements: 0,
-            strides: if is_packed_weight_slot(kernel, resource) {
-                vec![1]
-            } else {
-                bind.strides.clone()
-            },
         })
         .collect()
 }
@@ -1723,10 +1728,6 @@ fn packed_region_for_plan(plan: &CollectionKernelPlan) -> Option<PackedRegionFac
         }
         _ => None,
     }
-}
-
-fn is_packed_weight_slot(kernel: &KernelUnit, resource: &DeviceResource) -> bool {
-    packed_region_for_plan(&kernel.plan).is_some() && resource.binding.binding == 1
 }
 
 fn packed_decode_uniforms_for_kernel(kernel: &KernelUnit) -> Vec<UniformBinding> {

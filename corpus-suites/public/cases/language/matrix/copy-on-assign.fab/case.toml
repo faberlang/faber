@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/matrix/copy-on-assign.fab"
+group = "language"
+input_root = "corpus"
+input = "matrix/copy-on-assign.fab"
+category = "tensor"
+domain = "tensors"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

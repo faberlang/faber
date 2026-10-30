@@ -9,6 +9,8 @@ publish = false
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }
+# Operator ruling 2026-10-30: implicit_hasher and must_use_candidate are off workspace-wide.
+must_use_candidate = "allow"
 # Carried from radix-module (whose lowering code was written under this exact
 # posture); per-lint fixes land incrementally.
 too_many_lines = "allow"

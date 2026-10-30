@@ -77,11 +77,10 @@ const SHAPE_GENUS_LOCAL_EMPTY: &str = "device genus local: empty genus";
 const SHAPE_GENUS_LOCAL_NESTED: &str = "device genus local: nested genus field";
 const SHAPE_ASYNC_GENERATOR_DEVICE_FN: &str = "async/generator device function";
 const SHAPE_DEVICE_MULTI_BLOCK_CFG: &str = "device multi-block control flow";
-/// gpu-reset C4-2e: a lane-form kernel (a Lane builtin parameter) whose CFG is
-/// acyclic structures into a region tree, which the target lane emitters
-/// consume instead of the single-block / shape-matcher forms above. A
-/// lane-form CFG the structurizer rejects (an irreducible or multi-level loop, a switch, ...) keeps the
-/// multi-block rejection.
+/// A lane-form kernel (a Lane builtin parameter) uses the region tree produced
+/// by the shared structurizer instead of the single-block / shape-matcher
+/// forms. CFGs the structurizer rejects (an irreducible or multi-level loop,
+/// a switch, ...) keep the multi-block rejection.
 fn is_structurizable_lane_form(function: &MirFunction) -> bool {
     function
         .params
@@ -435,8 +434,6 @@ impl<'a> DeviceSafeClassifier<'a> {
         });
     }
 
-    /// Whether `call` is a `Convert` between two numeric scalar types with no
-    /// store site and no recovery operand.
     fn is_scalar_extremum(&self, call: &MirRuntimeCall) -> bool {
         matches!(
             call.intrinsic,
@@ -463,6 +460,8 @@ impl<'a> DeviceSafeClassifier<'a> {
             && crate::is_d64_type(conversion.target_ty, self.types)
     }
 
+    /// Whether `call` is a `Convert` between two numeric scalar types with no
+    /// store site and no recovery operand.
     fn is_plain_scalar_conversion(&self, call: &MirRuntimeCall) -> bool {
         let MirIntrinsic::Convert(conversion) = &call.intrinsic else {
             return false;
@@ -1300,10 +1299,10 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
             MirTerminatorKind::Return(_) | MirTerminatorKind::ReturnThread => {
                 crate::visit::walk_terminator(self, terminator);
             }
-            // C4-2e: a structurizable lane-form kernel's acyclic Goto/Branch
-            // edges are expressed by its region tree.
+            // Structurizable lane-form and single-lane kernels express
+            // Goto/Branch edges, including supported loops, in their region tree.
             //
-            // A structurizable lane-form kernel has no reachable `Unreachable`
+            // A structurizable kernel has no reachable `Unreachable`
             // terminator (the structurizer refuses one), so any it carries
             // sits on a dead block the region tree never visits.
             MirTerminatorKind::Goto(_)
@@ -1590,78 +1589,56 @@ fn classify_structured_allowances(
         .filter(|temp| classifier.is_narrow_ty(temp.ty))
         .map(|temp| temp.id)
         .collect();
-    let allows_structured_return_branch = is_structured_return_branch(function);
-    let allows_structured_indexed_write_branch = is_structured_indexed_write_branch(function);
-    let allows_structured_indexed_write_goto = is_structured_indexed_write_goto(function);
-    let allows_structured_indexed_write_loop = is_structured_indexed_write_loop(function);
-    let allows_structured_indexed_write_loop_break =
-        is_structured_indexed_write_loop_break(function);
-    let allows_structured_indexed_write_loop_continue =
-        is_structured_indexed_write_loop_continue(function);
-    let allows_structured_indexed_write_switch = is_structured_indexed_write_switch(function);
-    let allows_structured_indexed_value_join_branch =
-        is_structured_indexed_value_join_branch(function);
-    let allows_structured_value_join_branch = is_structured_value_join_branch(function);
-    let allows_structured_scalar_switch = is_structured_scalar_switch(function);
-    let allows_structured_scalar_loop = is_structured_scalar_loop(function);
-    let allows_structured_scalar_loop_break = is_structured_scalar_loop_break(function);
-    let allows_structured_scalar_loop_continue = is_structured_scalar_loop_continue(function);
-    let allows_structured_scalar_return_goto = is_structured_scalar_return_goto(function);
-    let allows_structured_nested_scalar_loop_branch =
-        is_structured_nested_scalar_loop_branch(function);
-    let allows_structured_nested_indexed_write_loop_branch =
-        is_structured_nested_indexed_write_loop_branch(function);
-    let allows_structured_nested_indexed_write_loop_break =
-        is_structured_nested_indexed_write_loop_break(function);
-    let allows_structured_nested_indexed_write_loop_continue =
-        is_structured_nested_indexed_write_loop_continue(function);
-    classifier.allows_structured_return_branch = allows_structured_return_branch;
-    classifier.allows_structured_indexed_write_branch = allows_structured_indexed_write_branch;
-    classifier.allows_structured_indexed_write_goto = allows_structured_indexed_write_goto;
-    classifier.allows_structured_indexed_write_loop = allows_structured_indexed_write_loop;
+    classifier.allows_structured_return_branch = is_structured_return_branch(function);
+    classifier.allows_structured_indexed_write_branch =
+        is_structured_indexed_write_branch(function);
+    classifier.allows_structured_indexed_write_goto = is_structured_indexed_write_goto(function);
+    classifier.allows_structured_indexed_write_loop = is_structured_indexed_write_loop(function);
     classifier.allows_structured_indexed_write_loop_break =
-        allows_structured_indexed_write_loop_break;
+        is_structured_indexed_write_loop_break(function);
     classifier.allows_structured_indexed_write_loop_continue =
-        allows_structured_indexed_write_loop_continue;
-    classifier.allows_structured_indexed_write_switch = allows_structured_indexed_write_switch;
+        is_structured_indexed_write_loop_continue(function);
+    classifier.allows_structured_indexed_write_switch =
+        is_structured_indexed_write_switch(function);
     classifier.allows_structured_indexed_value_join_branch =
-        allows_structured_indexed_value_join_branch;
-    classifier.allows_structured_value_join_branch = allows_structured_value_join_branch;
-    classifier.allows_structured_scalar_switch = allows_structured_scalar_switch;
-    classifier.allows_structured_scalar_loop = allows_structured_scalar_loop;
-    classifier.allows_structured_scalar_loop_break = allows_structured_scalar_loop_break;
-    classifier.allows_structured_scalar_loop_continue = allows_structured_scalar_loop_continue;
-    classifier.allows_structured_scalar_return_goto = allows_structured_scalar_return_goto;
+        is_structured_indexed_value_join_branch(function);
+    classifier.allows_structured_value_join_branch = is_structured_value_join_branch(function);
+    classifier.allows_structured_scalar_switch = is_structured_scalar_switch(function);
+    classifier.allows_structured_scalar_loop = is_structured_scalar_loop(function);
+    classifier.allows_structured_scalar_loop_break = is_structured_scalar_loop_break(function);
+    classifier.allows_structured_scalar_loop_continue =
+        is_structured_scalar_loop_continue(function);
+    classifier.allows_structured_scalar_return_goto = is_structured_scalar_return_goto(function);
     classifier.allows_structured_nested_scalar_loop_branch =
-        allows_structured_nested_scalar_loop_branch;
+        is_structured_nested_scalar_loop_branch(function);
     classifier.allows_structured_nested_indexed_write_loop_branch =
-        allows_structured_nested_indexed_write_loop_branch;
+        is_structured_nested_indexed_write_loop_branch(function);
     classifier.allows_structured_nested_indexed_write_loop_break =
-        allows_structured_nested_indexed_write_loop_break;
+        is_structured_nested_indexed_write_loop_break(function);
     classifier.allows_structured_nested_indexed_write_loop_continue =
-        allows_structured_nested_indexed_write_loop_continue;
+        is_structured_nested_indexed_write_loop_continue(function);
     if function.is_async || function.is_generator {
         classifier.record_policy(SHAPE_ASYNC_GENERATOR_DEVICE_FN);
     }
     if function.blocks.len() != 1
-        && !allows_structured_return_branch
-        && !allows_structured_indexed_write_branch
-        && !allows_structured_indexed_write_goto
-        && !allows_structured_indexed_write_loop
-        && !allows_structured_indexed_write_loop_break
-        && !allows_structured_indexed_write_loop_continue
-        && !allows_structured_indexed_write_switch
-        && !allows_structured_indexed_value_join_branch
-        && !allows_structured_value_join_branch
-        && !allows_structured_scalar_switch
-        && !allows_structured_scalar_loop
-        && !allows_structured_scalar_loop_break
-        && !allows_structured_scalar_loop_continue
-        && !allows_structured_scalar_return_goto
-        && !allows_structured_nested_scalar_loop_branch
-        && !allows_structured_nested_indexed_write_loop_branch
-        && !allows_structured_nested_indexed_write_loop_break
-        && !allows_structured_nested_indexed_write_loop_continue
+        && !classifier.allows_structured_return_branch
+        && !classifier.allows_structured_indexed_write_branch
+        && !classifier.allows_structured_indexed_write_goto
+        && !classifier.allows_structured_indexed_write_loop
+        && !classifier.allows_structured_indexed_write_loop_break
+        && !classifier.allows_structured_indexed_write_loop_continue
+        && !classifier.allows_structured_indexed_write_switch
+        && !classifier.allows_structured_indexed_value_join_branch
+        && !classifier.allows_structured_value_join_branch
+        && !classifier.allows_structured_scalar_switch
+        && !classifier.allows_structured_scalar_loop
+        && !classifier.allows_structured_scalar_loop_break
+        && !classifier.allows_structured_scalar_loop_continue
+        && !classifier.allows_structured_scalar_return_goto
+        && !classifier.allows_structured_nested_scalar_loop_branch
+        && !classifier.allows_structured_nested_indexed_write_loop_branch
+        && !classifier.allows_structured_nested_indexed_write_loop_break
+        && !classifier.allows_structured_nested_indexed_write_loop_continue
         && !classifier.in_lane_form_function
         && !classifier.in_single_lane_function
     {

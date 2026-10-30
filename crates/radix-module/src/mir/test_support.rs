@@ -104,6 +104,10 @@ pub fn compile_metal_text_output(source: &str) -> Result<MetalTextOutput, String
 }
 
 /// Compile Metal text with the kernel safe switch enabled.
+///
+/// # Errors
+///
+/// Returns diagnostic facts when compilation does not produce Metal text output.
 #[cfg(feature = "mir-metal")]
 pub fn compile_metal_text_output_with_safe_kernels(source: &str) -> Result<MetalTextOutput, String> {
     let session = crate::driver::Session::new(

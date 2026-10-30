@@ -56,7 +56,7 @@ impl ModuleState<'_> {
             .find(|candidate| candidate.id == function)
             .ok_or_else(|| Decline::new("unknown function value"))?;
         let mut signature = self.signature_for(target)?;
-        signature.params.insert(0, AbiParam::new(types::I64));
+        signature.params.insert(1, AbiParam::new(types::I64));
         let id = self
             .module
             .declare_anonymous_function(&signature)
@@ -83,8 +83,11 @@ pub(super) fn define_value_shim(
         .find(|candidate| candidate.id == function)
         .ok_or_else(|| Decline::new("unknown function value"))?;
     let inner = state.signature_for(callee)?;
+    signature.params.push(AbiParam::new(state.pointer));
     signature.params.push(AbiParam::new(types::I64));
-    signature.params.extend(inner.params.iter().copied());
+    signature
+        .params
+        .extend(inner.params.iter().skip(1).copied());
     signature.returns.extend(inner.returns.iter().copied());
     let mut context = state.module.make_context();
     context.func.signature = signature;
@@ -96,7 +99,9 @@ pub(super) fn define_value_shim(
         builder.switch_to_block(block);
         let params = builder.block_params(block).to_vec();
         let reference = state.module.declare_func_in_func(target, builder.func);
-        let call = builder.ins().call(reference, &params[1..]);
+        let mut call_args = vec![params[0]];
+        call_args.extend_from_slice(&params[2..]);
+        let call = builder.ins().call(reference, &call_args);
         let results = builder.inst_results(call).to_vec();
         builder.ins().return_(&results);
         builder.seal_all_blocks();
@@ -174,6 +179,7 @@ impl FunctionLower<'_, '_> {
         };
         let flags = self.type_address_flags(signature);
         let mut abi_signature = self.state.module.make_signature();
+        abi_signature.params.push(AbiParam::new(self.state.pointer));
         abi_signature.params.push(AbiParam::new(types::I64));
         let mut wanted = Vec::with_capacity(signature.params.len());
         for (position, param) in signature.params.iter().enumerate() {
@@ -193,7 +199,8 @@ impl FunctionLower<'_, '_> {
         if let Some(cl) = result_rep.cl_type() {
             abi_signature.returns.push(AbiParam::new(cl));
         }
-        let mut values = Vec::with_capacity(args.len() + 1);
+        let mut values = Vec::with_capacity(args.len() + 2);
+        values.push(self.arena.expect("arena entry parameter"));
         values.push(environment);
         let returns = self.call_arguments(&flags, args, &wanted, &mut values)?;
         let signature_ref = self.builder.import_signature(abi_signature);

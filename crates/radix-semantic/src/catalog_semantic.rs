@@ -59,6 +59,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::ModeMismatch,
     SemanticErrorKind::TopLevelBindingForbidden,
     SemanticErrorKind::ConstSharedIntoVar,
+    SemanticErrorKind::CopyNonduplicable,
 ];
 
 pub(crate) const WARNING_KINDS: &[WarningKind] = &[
@@ -296,6 +297,12 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
             code: "SEM065",
             help: Some("write `← copy x` for an independent value, or `← own x` to take it over"),
         },
+        SemanticErrorKind::CopyNonduplicable => DiagnosticSpec {
+            code: "SEM066",
+            help: Some(
+                "share the value without `copy`, or take the resource over with `own` where the consumer may own it",
+            ),
+        },
         SemanticErrorKind::Warning(kind) => warning_spec(kind),
     }
 }
@@ -340,6 +347,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::VariableUndefined => semantic_undefined_variable_help(args),
         SemanticErrorKind::ArityMismatch => semantic_wrong_arity_help(args),
         SemanticErrorKind::ConstSharedIntoVar => semantic_const_shared_into_var_help(args),
+        SemanticErrorKind::CopyNonduplicable => semantic_copy_nonduplicable_help(args),
         SemanticErrorKind::Warning(WarningKind::MonomorphicHoleSolvedToUnion) => {
             semantic_monomorphic_hole_solved_to_union_help(args)
         }
@@ -1193,6 +1201,18 @@ fn semantic_const_shared_into_var_help(args: &[DiagnosticArg]) -> Option<String>
         "write `← copy x` for an independent value".to_owned()
     } else {
         "write `← copy x` for an independent value, or `← own x` to take it over".to_owned()
+    })
+}
+
+/// Help for SEM066 `copy_nonduplicable_member`.
+fn semantic_copy_nonduplicable_help(args: &[DiagnosticArg]) -> Option<String> {
+    Some(match arg_value(args, "head") {
+        Some(head) => format!(
+            "{head} is a resource with identity: share the value without `copy`, or take the resource over with `own` where the consumer may own it"
+        ),
+        None =>
+            "share the value without `copy`, or take the resource over with `own` where the consumer may own it"
+                .to_owned(),
     })
 }
 

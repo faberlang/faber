@@ -102,6 +102,9 @@ const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
 const ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM: &str = "assign_to_nonmut_tensor_param";
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
 const ISSUE_MUT_ARGUMENT_NOT_WRITABLE: &str = "mut_argument_not_writable";
+/// Ruling 7b25889f R6 (K1): a writable kernel argument overlaps another
+/// argument of the same call.
+const ISSUE_KERNEL_ARGUMENT_OVERLAP: &str = "kernel_argument_overlap";
 const ISSUE_MUTATING_METHOD_ON_IMMUTABLE: &str =
     "imperativus_operator_method_requires_varia_receiver";
 
@@ -355,6 +358,11 @@ struct BorrowChecker<'a> {
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
+    /// Kernel and kernel-fragment functions of this unit, keyed by callee
+    /// `DefId`: their arguments are device buffers live simultaneously for a
+    /// whole launch, so their call sites run the kernel argument exclusivity
+    /// rule (ruling 7b25889f R6 K1).
+    kernel_fns: FxHashSet<DefId>,
     /// Declared class-method param contracts keyed by `(class, method name)`: a
     /// user `MethodCall` carries no callee expression, so the call-site rules
     /// resolve its parameters from the receiver's class.
@@ -385,6 +393,10 @@ struct ParamUsage {
     marker: Option<AccessMarker>,
     span: radix_lexer::Span,
     mutated: bool,
+    /// A `varia` local was plain-bound from this parameter, so its state is
+    /// writable through the alias; removing the parameter's `mut` would turn
+    /// that bind into SEM065 (`const_shared_into_var`).
+    shared_into_var: bool,
     passed_in_or_ex: bool,
     passed_ex: bool,
     returned: bool,
@@ -428,6 +440,7 @@ impl<'a> BorrowChecker<'a> {
             immutable_locals: FxHashSet::default(),
             unmarked_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
+            kernel_fns: FxHashSet::default(),
             method_params: FxHashMap::default(),
             imported_method_params: FxHashMap::default(),
             resolver,
@@ -471,6 +484,9 @@ impl<'a> BorrowChecker<'a> {
 
     fn index_function(&mut self, def_id: DefId, func: &HirFunction) {
         self.func_params.insert(def_id, Self::declared_params(func));
+        if func.is_kernel || func.nucleum_fragment {
+            self.kernel_fns.insert(def_id);
+        }
     }
 
     /// Seed `imported_method_params` from the resolver's file interfaces.
@@ -570,6 +586,7 @@ impl<'a> BorrowChecker<'a> {
                     marker,
                     span: param.span,
                     mutated: false,
+                    shared_into_var: false,
                     passed_in_or_ex: false,
                     passed_ex: false,
                     returned: false,
@@ -793,6 +810,15 @@ impl<'a> BorrowChecker<'a> {
         self.note_bind_alias(local.def_id, local.ty, init, Rebind::Fresh);
         if !local.mutable {
             self.const_agg_aliases.insert(local.def_id);
+        } else if let Some(roots) = self.bind_alias_roots.get(&local.def_id).cloned() {
+            // A `varia` cell just bound from a parameter's plain place read
+            // shares that parameter's state: WARN008 must not advise removing
+            // a `mut` the bind needs (SEM065 would reject the bind after it).
+            for root in roots {
+                if let Some(usage) = self.param_usage.get_mut(&root) {
+                    usage.shared_into_var = true;
+                }
+            }
         }
     }
 
@@ -829,6 +855,11 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         let params = params.to_vec();
+        if matches!(&callee.kind, HirExpressionKind::Path(def_id)
+            if self.kernel_fns.contains(def_id))
+        {
+            self.check_kernel_argument_exclusivity(&params, args);
+        }
         // Named function Paths leave `callee.ty` unset. Applying the retired
         // lifetime simulation to those calls would reject D-1 unmarked
         // `const` → `mut` param use. Language `mut` dest borrows are
@@ -1014,6 +1045,89 @@ impl<'a> BorrowChecker<'a> {
                 );
             }
         }
+    }
+
+    /// Kernel argument exclusivity (ruling 7b25889f R6 K1).
+    ///
+    /// WHY: a kernel's arguments are device buffers that are live
+    /// simultaneously for the whole launch, so a writable argument (`mut`,
+    /// `own`) must not overlap any other argument of the same call: not the
+    /// whole tensor spelled twice, not a `←` alias of it, not a view of the
+    /// same storage. Where overlap cannot be proven absent the call is
+    /// refused at the call site. Read-only duplicates and read-only
+    /// overlapping views stay legal — nothing writes them, so a launch may
+    /// share that storage. This rule is the soundness argument every GPU
+    /// emitter cites for placing `noalias` on kernel parameter bindings; the
+    /// launch-time buffer check is the second, runtime half of the contract.
+    ///
+    /// EDGE: a view argument is skipped here in both directions — a view in
+    /// a writable position and a view overlapping a writable argument are
+    /// already named by `tensor_view_read_only`, so the pair is reported
+    /// once, by the rule that owns it. A scalar or temporary argument
+    /// carries no storage and never overlaps. When both arguments of an
+    /// overlapping pair are writable, the pair is reported once, at the
+    /// earlier position.
+    fn check_kernel_argument_exclusivity(&mut self, params: &[ParamType], args: &[HirCallArg]) {
+        let storages: Vec<FxHashSet<DefId>> = args
+            .iter()
+            .map(|arg| self.kernel_arg_storage(&arg.expr))
+            .collect();
+        for (index, arg) in args.iter().enumerate() {
+            if !params
+                .get(index)
+                .is_some_and(|param| self.dest_is_mut_or_own(param))
+                || self.stores_tensor_view(&arg.expr)
+            {
+                continue;
+            }
+            for other in 0..args.len() {
+                if other == index || self.stores_tensor_view(&args[other].expr) {
+                    continue;
+                }
+                if storages[index].is_disjoint(&storages[other]) {
+                    continue;
+                }
+                if params
+                    .get(other)
+                    .is_some_and(|param| self.dest_is_mut_or_own(param))
+                    && other < index
+                {
+                    continue;
+                }
+                self.kernel_argument_overlap_error(&arg.expr, index, other);
+                break;
+            }
+        }
+    }
+
+    /// Storage one kernel argument names: the places its root binding
+    /// aliases plus the backing roots of a view chain. A scalar or a
+    /// temporary value carries no storage, so it never overlaps.
+    fn kernel_arg_storage(&self, expr: &HirExpression) -> FxHashSet<DefId> {
+        if !self.has_tensor_value_type(expr) {
+            return FxHashSet::default();
+        }
+        let mut storage = self.storage_of_roots(&self.tensor_view_origins(expr));
+        if let Some(root) = Self::root_def_id(expr) {
+            storage.extend(self.storage_names(root));
+        }
+        storage
+    }
+
+    fn kernel_argument_overlap_error(
+        &mut self,
+        arg: &HirExpression,
+        position: usize,
+        overlap: usize,
+    ) {
+        let mut error = SemanticError::structured(SemanticErrorKind::ModeMismatch, arg.span)
+            .with_arg("issue", ISSUE_KERNEL_ARGUMENT_OVERLAP)
+            .with_arg("position", (position + 1).to_string())
+            .with_arg("overlap", (overlap + 1).to_string());
+        if let Some(spelling) = Self::root_def_id(arg).and_then(|root| self.def_spelling(root)) {
+            error = error.with_arg("binding", spelling);
+        }
+        self.errors.push(error);
     }
 
     fn check_arg_use(&mut self, arg: &HirCallArg, param: &ParamType) {
@@ -1973,9 +2087,13 @@ impl<'a> BorrowChecker<'a> {
         })
     }
 
+    /// Whether an unmarked bind of `ty` names the source's storage. A
+    /// register-class `vector`/`matrix` does not: `b ← a` copies (operator
+    /// ruling 7b25889f R1), so a later lane write through the binding never
+    /// reaches the source.
     fn is_aliasing_type(&self, ty: TypeId) -> bool {
         let (_, inner) = self.types.peel_access_marker(ty);
-        if self.types.is_aliasing_container_through_option(inner) {
+        if self.types.binds_by_sharing_through_option(inner) {
             return true;
         }
         match self.types.get(inner) {
@@ -2358,6 +2476,17 @@ impl<'a> BorrowChecker<'a> {
             // callee's own value. Either way the parameter is mutated.
             usage.mutated = true;
         }
+        // A write through one name reaches every name sharing its storage: a
+        // plain bind of a shareable value aliases, so after `mut T b ← p` a
+        // write through `b` writes the object the `mut` parameter `p` names.
+        // WARN008 must not call that parameter's `mut` unused.
+        if let Some(roots) = self.bind_alias_roots.get(&def_id).cloned() {
+            for root in roots {
+                if let Some(usage) = self.param_usage.get_mut(&root) {
+                    usage.mutated = true;
+                }
+            }
+        }
         let (_region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
@@ -2622,7 +2751,7 @@ impl<'a> BorrowChecker<'a> {
         for usage in self.param_usage.values() {
             match usage.marker {
                 Some(AccessMarker::Mut) => {
-                    if !usage.mutated && !usage.passed_in_or_ex {
+                    if !usage.mutated && !usage.passed_in_or_ex && !usage.shared_into_var {
                         warnings.push(
                             SemanticError::structured(
                                 SemanticErrorKind::Warning(WarningKind::UnusedMutRefParam),

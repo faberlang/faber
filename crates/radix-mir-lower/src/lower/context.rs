@@ -241,6 +241,7 @@ impl<'a> LoweringContextMaps<'a> {
                 layouts: MirLayoutTable::default(),
                 interner: radix_mir::MirInterner::Borrowed(unit.interner),
                 functions: FxHashMap::default(),
+                grid_reduce_helper_indexes: FxHashMap::default(),
                 method_defs: FxHashSet::default(),
                 external_function_identities: FxHashMap::default(),
                 package_product: None,

@@ -58,8 +58,9 @@ impl DenseKind {
     }
 }
 
-/// Backing array of one dense tensor. `Values` keeps today's behaviour for
-/// vector, matrix, record and unknown element kinds.
+/// Backing array of one dense tensor. `Values` is the general boxed path;
+/// [`DenseStorage::VectorValues`] marks materialized fresh vector outputs and
+/// accounts for their outer element array and per-element lane arrays.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DenseStorage {
     F32(Vec<f32>),
@@ -76,6 +77,38 @@ pub enum DenseStorage {
         bytes: Vec<u8>,
     },
     Values(Vec<Value>),
+    /// Host twin of a fresh device-kernel output that no host access has
+    /// touched yet: it reads as `len` zero elements of `kind` but holds no
+    /// element array. The first write (a download landing a read range, a
+    /// host store) materializes the whole zeros buffer; reads synthesize the
+    /// zeros. WHY: a device-resident output's twin is usually read in small
+    /// ranges or never, so allocating it at launch spends host memory the
+    /// run never touches (device dispatcher, fresh kernel outputs).
+    FreshZeros {
+        kind: DenseKind,
+        len: usize,
+    },
+    /// [`DenseStorage::FreshZeros`] for a record element: `len` zero rows of
+    /// `layout`, deferred the same way.
+    FreshRecordZeros {
+        layout: Arc<RecordLayout>,
+        len: usize,
+    },
+    /// Deferred zeros for a vector element: each element is an independent
+    /// vector of `lanes` zero scalar values. The outer element array and each
+    /// vector's lane array are allocated only on the first write.
+    FreshVectorZeros {
+        lane_kind: DenseKind,
+        lanes: u8,
+        len: usize,
+    },
+    /// Materialized vector elements originating as [`DenseStorage::FreshVectorZeros`].
+    /// `lanes` lets backing-byte accounting include both the outer array and
+    /// each element's lane array without inspecting mutable `Value`s.
+    VectorValues {
+        items: Vec<Value>,
+        lanes: u8,
+    },
 }
 
 /// A Rust element type that one `DenseStorage` variant holds.
@@ -270,8 +303,8 @@ impl DenseStorage {
         }
     }
 
-    /// Element type, or `None` for `Values` and `Record` (a record row is not
-    /// one scalar kind; see [`DenseStorage::record_layout`]).
+    /// Element type, or `None` for boxed, vector and record storage (a record
+    /// row is not one scalar kind; see [`DenseStorage::record_layout`]).
     #[must_use]
     pub fn kind(&self) -> Option<DenseKind> {
         match self {
@@ -283,7 +316,11 @@ impl DenseStorage {
             Self::U32(_) => Some(DenseKind::U32),
             Self::U64(_) => Some(DenseKind::U64),
             Self::Bool(_) => Some(DenseKind::Bool),
-            Self::Record { .. } | Self::Values(_) => None,
+            Self::Record { .. } | Self::Values(_) | Self::VectorValues { .. } => None,
+            // A deferred twin answers before any array exists: its kind is
+            // part of the deferral (the typed download path checks it).
+            Self::FreshZeros { kind, .. } => Some(*kind),
+            Self::FreshRecordZeros { .. } | Self::FreshVectorZeros { .. } => None,
         }
     }
 
@@ -292,6 +329,95 @@ impl DenseStorage {
     pub fn zeros_record(layout: Arc<RecordLayout>, len: usize) -> Self {
         let bytes = vec![0; len * layout.size()];
         Self::Record { layout, bytes }
+    }
+
+    /// Deferred zeros: storage that reads as `len` zero elements of `kind`
+    /// and materializes its array at the first write. See [`Self::FreshZeros`].
+    #[must_use]
+    pub fn fresh_zeros(kind: DenseKind, len: usize) -> Self {
+        Self::FreshZeros { kind, len }
+    }
+
+    /// [`Self::fresh_zeros`] for a record element: `len` zero rows of `layout`,
+    /// deferred until the first write.
+    #[must_use]
+    pub fn fresh_zeros_record(layout: Arc<RecordLayout>, len: usize) -> Self {
+        Self::FreshRecordZeros { layout, len }
+    }
+
+    /// Deferred zero vector elements, with independent lane storage per
+    /// element when read or materialized.
+    #[must_use]
+    pub fn fresh_zeros_vector(lane_kind: DenseKind, lanes: u8, len: usize) -> Self {
+        Self::FreshVectorZeros {
+            lane_kind,
+            lanes,
+            len,
+        }
+    }
+
+    /// Whether this storage reads as zeros it has not allocated yet.
+    #[must_use]
+    pub fn is_deferred_zeros(&self) -> bool {
+        matches!(
+            self,
+            Self::FreshZeros { .. } | Self::FreshRecordZeros { .. } | Self::FreshVectorZeros { .. }
+        )
+    }
+
+    /// Replace deferred zeros with their materialized array; every other
+    /// storage is unchanged. The one conversion every write path and typed
+    /// slice view runs through.
+    pub fn materialized_zeros(&mut self) {
+        match self {
+            Self::FreshZeros { kind, len } => {
+                let (kind, len) = (*kind, *len);
+                *self = Self::zeros(kind, len);
+            }
+            Self::FreshRecordZeros { layout, len } => {
+                let (layout, len) = (Arc::clone(layout), *len);
+                *self = Self::zeros_record(layout, len);
+            }
+            Self::FreshVectorZeros {
+                lane_kind,
+                lanes,
+                len,
+            } => {
+                let (lane_kind, lanes, len) = (*lane_kind, *lanes, *len);
+                *self = Self::VectorValues {
+                    items: (0..len)
+                        .map(|_| zero_vector_value(lane_kind, lanes))
+                        .collect(),
+                    lanes,
+                };
+            }
+            _ => {}
+        }
+    }
+
+    /// Host bytes the element array occupies now. Deferred zeros occupy
+    /// nothing until a write materializes them.
+    #[must_use]
+    pub fn backing_bytes(&self) -> usize {
+        match self {
+            Self::F32(items) => items.len() * size_of::<f32>(),
+            Self::F64(items) => items.len() * size_of::<f64>(),
+            Self::I32(items) => items.len() * size_of::<i32>(),
+            Self::I64(items) => items.len() * size_of::<i64>(),
+            Self::U8(items) => items.len() * size_of::<u8>(),
+            Self::U32(items) => items.len() * size_of::<u32>(),
+            Self::U64(items) => items.len() * size_of::<u64>(),
+            Self::Bool(items) => items.len() * size_of::<bool>(),
+            Self::Record { bytes, .. } => bytes.len(),
+            Self::Values(items) => items.len() * size_of::<Value>(),
+            Self::VectorValues { items, lanes } => {
+                items.len() * size_of::<Value>()
+                    + items.len() * usize::from(*lanes) * size_of::<Value>()
+            }
+            Self::FreshZeros { .. }
+            | Self::FreshRecordZeros { .. }
+            | Self::FreshVectorZeros { .. } => 0,
+        }
     }
 
     /// Record storage over `bytes`, taken as is (no copy). `None` unless the
@@ -308,7 +434,7 @@ impl DenseStorage {
     #[must_use]
     pub fn record_layout(&self) -> Option<&Arc<RecordLayout>> {
         match self {
-            Self::Record { layout, .. } => Some(layout),
+            Self::Record { layout, .. } | Self::FreshRecordZeros { layout, .. } => Some(layout),
             _ => None,
         }
     }
@@ -325,7 +451,10 @@ impl DenseStorage {
             Self::U64(items) => items.len(),
             Self::Bool(items) => items.len(),
             Self::Record { layout, bytes } => bytes.len() / layout.size(),
-            Self::Values(items) => items.len(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items.len(),
+            Self::FreshZeros { len, .. }
+            | Self::FreshRecordZeros { len, .. }
+            | Self::FreshVectorZeros { len, .. } => *len,
         }
     }
 
@@ -335,6 +464,7 @@ impl DenseStorage {
     }
 
     /// The element as the runner reads it today; `None` out of bounds.
+    /// Deferred zeros read as zeros without materializing.
     #[must_use]
     pub fn get(&self, index: usize) -> Option<Value> {
         Some(match self {
@@ -347,15 +477,39 @@ impl DenseStorage {
             Self::U64(items) => Value::UInt(*items.get(index)?),
             Self::Bool(items) => Value::Bool(*items.get(index)?),
             Self::Record { layout, bytes } => layout.decode(layout.row(bytes, index)?)?,
-            Self::Values(items) => items.get(index)?.clone(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items.get(index)?.clone(),
+            Self::FreshZeros { kind, len } => {
+                if index >= *len {
+                    return None;
+                }
+                zero_value(*kind)
+            }
+            Self::FreshRecordZeros { layout, len } => {
+                if index >= *len {
+                    return None;
+                }
+                layout.decode(&vec![0; layout.size()])?
+            }
+            Self::FreshVectorZeros {
+                lane_kind,
+                lanes,
+                len,
+            } => {
+                if index >= *len {
+                    return None;
+                }
+                zero_vector_value(*lane_kind, *lanes)
+            }
         })
     }
 
     /// Store `value` at `index`, rounding or narrowing per kind. `false`
     /// (storage unchanged) for an out-of-bounds index, a value of the wrong
-    /// carrier, or an integer outside the kind's range.
+    /// carrier, or an integer outside the kind's range. A store materializes
+    /// deferred zeros first.
     #[expect(clippy::cast_possible_truncation)]
     pub fn set(&mut self, index: usize, value: &Value) -> bool {
+        self.materialized_zeros();
         match (self, value) {
             (Self::F32(items), Value::Float(v)) => items.get_mut(index).map(|s| *s = *v as f32),
             (Self::F64(items), Value::Float(v)) => items.get_mut(index).map(|s| *s = *v),
@@ -374,7 +528,9 @@ impl DenseStorage {
                         .then(|| row.copy_from_slice(&encoded))
                 })
             }
-            (Self::Values(items), v) => items.get_mut(index).map(|s| *s = v.clone()),
+            (Self::Values(items), v) | (Self::VectorValues { items, .. }, v) => {
+                items.get_mut(index).map(|s| *s = v.clone())
+            }
             _ => None,
         }
         .is_some()
@@ -384,7 +540,7 @@ impl DenseStorage {
     #[must_use]
     pub fn to_values(&self) -> Vec<Value> {
         match self {
-            Self::Values(items) => items.clone(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items.clone(),
             _ => (0..self.len()).filter_map(|i| self.get(i)).collect(),
         }
     }
@@ -393,7 +549,7 @@ impl DenseStorage {
     #[must_use]
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
         match self {
-            Self::Values(items) => items[..count].to_vec(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items[..count].to_vec(),
             _ => (0..count).filter_map(|i| self.get(i)).collect(),
         }
     }
@@ -410,7 +566,8 @@ impl DenseStorage {
 
     /// Run `f` over the little-endian bytes of the element `range`: borrowed
     /// (zero-copy) on little-endian hosts, an owned copy elsewhere. `None` for
-    /// `Values` or a range outside the array.
+    /// `Values` or a range outside the array. Deferred zeros hand back zero
+    /// bytes without materializing (a deferred twin reads as zeros).
     pub fn with_le_bytes<R>(
         &self,
         range: Range<usize>,
@@ -431,7 +588,33 @@ impl DenseStorage {
                     bytes.get(range.start.checked_mul(size)?..range.end.checked_mul(size)?)?;
                 Some(f(Cow::Borrowed(part)))
             }
-            Self::Values(_) => None,
+            Self::Values(_) | Self::VectorValues { .. } => None,
+            Self::FreshZeros { kind, len } => {
+                if range.end > *len {
+                    return None;
+                }
+                Some(f(Cow::Owned(vec![0; range.len() * kind.width()])))
+            }
+            Self::FreshRecordZeros { layout, len } => {
+                let size = layout.size();
+                let start = range.start.checked_mul(size)?;
+                let end = range.end.checked_mul(size)?;
+                if range.end > *len {
+                    return None;
+                }
+                Some(f(Cow::Owned(vec![0; end - start])))
+            }
+            Self::FreshVectorZeros {
+                lane_kind,
+                lanes,
+                len,
+            } => {
+                if range.end > *len {
+                    return None;
+                }
+                let width = lane_kind.width() * usize::from(*lanes);
+                Some(f(Cow::Owned(vec![0; range.len() * width])))
+            }
         }
     }
 
@@ -445,7 +628,9 @@ impl DenseStorage {
     /// Overwrite the element `range` from little-endian `bytes`. `false`
     /// (storage unchanged) for `Values`, a range outside the array, a byte
     /// length other than `range.len() * width`, or a non-`0`/`1` bool byte.
+    /// A write materializes deferred zeros first.
     pub fn write_le_bytes(&mut self, range: Range<usize>, bytes: &[u8]) -> bool {
+        self.materialized_zeros();
         match self {
             Self::F32(items) => write_le(items, range, bytes),
             Self::F64(items) => write_le(items, range, bytes),
@@ -473,7 +658,12 @@ impl DenseStorage {
                     _ => false,
                 }
             }
-            Self::Values(_) => false,
+            Self::Values(_) | Self::VectorValues { .. } => false,
+            // `materialized_zeros` above already replaced the deferral, so
+            // this arm runs at most once and the retry sees real storage.
+            Self::FreshZeros { .. }
+            | Self::FreshRecordZeros { .. }
+            | Self::FreshVectorZeros { .. } => self.write_le_bytes(range, bytes),
         }
     }
 }
@@ -482,6 +672,23 @@ fn store<T>(items: &mut [T], index: usize, value: Option<T>) -> Option<()> {
     let value = value?;
     *items.get_mut(index)? = value;
     Some(())
+}
+
+fn zero_vector_value(kind: DenseKind, lanes: u8) -> Value {
+    Value::Vector(Rc::new(RefCell::new(
+        (0..lanes).map(|_| zero_value(kind)).collect(),
+    )))
+}
+
+/// The zero element of a dense kind, as [`DenseStorage::get`] reads it: the
+/// carrier and value a fresh zeros cell synthesizes.
+fn zero_value(kind: DenseKind) -> Value {
+    match kind {
+        DenseKind::F32 | DenseKind::F64 => Value::Float(0.0),
+        DenseKind::I32 | DenseKind::I64 | DenseKind::U8 | DenseKind::U32 => Value::Int(0),
+        DenseKind::U64 => Value::UInt(0),
+        DenseKind::Bool => Value::Bool(false),
+    }
 }
 
 fn le_bytes<T: DenseElement, R>(
@@ -869,7 +1076,33 @@ impl DenseCell {
         };
         // SAFETY: the single-thread discipline in the type documentation;
         // in debug builds the flag above proves no other borrow is live.
-        f(unsafe { &mut *self.inner.get() })
+        let storage = unsafe { &mut *self.inner.get() };
+        // A write needs the real array: materialize deferred zeros first.
+        // One discriminant compare on every write; reads stay deferred.
+        storage.materialized_zeros();
+        f(storage)
+    }
+
+    /// Materialize deferred zeros in place: the typed shared slice view below
+    /// hands out bytes, so it runs through here first. Reads elsewhere stay
+    /// deferred.
+    fn materialize(&self) {
+        if !self.read(DenseStorage::is_deferred_zeros) {
+            return;
+        }
+        if cfg!(debug_assertions) {
+            assert!(
+                self.borrow.get() == 0,
+                "DenseCell: mutable borrow while already borrowed"
+            );
+            self.borrow.set(-1);
+        }
+        // SAFETY: the single-thread discipline in the type documentation; in
+        // debug builds the flag above proves no other borrow is live.
+        unsafe { &mut *self.inner.get() }.materialized_zeros();
+        if cfg!(debug_assertions) {
+            self.borrow.set(0);
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -880,7 +1113,7 @@ impl DenseCell {
         self.len() == 0
     }
 
-    /// Element type, or `None` for `Values` and `Record`.
+    /// Element type, or `None` for boxed, vector and record storage.
     pub fn kind(&self) -> Option<DenseKind> {
         self.read(DenseStorage::kind)
     }
@@ -907,7 +1140,10 @@ impl DenseCell {
     pub fn to_values(&self) -> Vec<Value> {
         self.read(|storage| {
             let values = storage.to_values();
-            if !matches!(storage, DenseStorage::Values(_)) {
+            if !matches!(
+                storage,
+                DenseStorage::Values(_) | DenseStorage::VectorValues { .. }
+            ) {
                 self.boxed.fetch_add(
                     u64::try_from(storage.len()).unwrap_or(u64::MAX),
                     Ordering::Relaxed,
@@ -930,11 +1166,13 @@ impl DenseCell {
         self.stored.load(Ordering::Relaxed)
     }
 
-    /// Run `f` over the boxed elements when the storage is `Values`; `None`
+    /// Run `f` over boxed elements in either boxed storage variant; `None`
     /// for a typed storage (use [`DenseCell::to_values`]).
     pub fn with_values<R>(&self, f: impl FnOnce(&[Value]) -> R) -> Option<R> {
         self.read(|storage| match storage {
-            DenseStorage::Values(items) => Some(f(items)),
+            DenseStorage::Values(items) | DenseStorage::VectorValues { items, .. } => {
+                Some(f(items))
+            }
             _ => None,
         })
     }
@@ -944,11 +1182,23 @@ impl DenseCell {
         self.read(DenseStorage::clone)
     }
 
+    /// Host bytes the element backing occupies now; deferred zeros occupy
+    /// nothing until a write materializes them. For fresh vector outputs this
+    /// includes both the outer element array and the per-element lane arrays.
+    /// The dispatcher's host storage accounting reads this around downloads.
+    #[must_use]
+    pub fn backing_bytes(&self) -> usize {
+        self.read(DenseStorage::backing_bytes)
+    }
+
     /// The first `count` elements boxed; `count` must not exceed `len()`.
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
         self.read(|storage| {
             let values = storage.values_prefix(count);
-            if !matches!(storage, DenseStorage::Values(_)) {
+            if !matches!(
+                storage,
+                DenseStorage::Values(_) | DenseStorage::VectorValues { .. }
+            ) {
                 self.boxed
                     .fetch_add(u64::try_from(count).unwrap_or(u64::MAX), Ordering::Relaxed);
             }
@@ -957,7 +1207,9 @@ impl DenseCell {
     }
 
     /// Typed shared slice for the duration of `f`; `None` on a kind mismatch.
+    /// A slice view reads real bytes, so deferred zeros materialize first.
     pub fn with_slice<T: DenseElement, R>(&self, f: impl FnOnce(&[T]) -> R) -> Option<R> {
+        self.materialize();
         self.read(|storage| storage.slice::<T>().map(f))
     }
 
@@ -1000,9 +1252,22 @@ impl std::fmt::Debug for DenseCell {
 }
 
 impl PartialEq for DenseCell {
-    /// Equality by storage content.
+    /// Equality by storage content. A deferred zeros cell is its zeros: both
+    /// sides materialize first, so a fresh twin compares equal to the zeros
+    /// buffer it stands for (and to another twin of the same shape). Deferred
+    /// vector values also compare by their elements with ordinary `Values`.
     fn eq(&self, other: &Self) -> bool {
-        self.read(|a| other.read(|b| a == b))
+        self.materialize();
+        other.materialize();
+        self.read(|a| {
+            other.read(|b| match (a, b) {
+                (DenseStorage::VectorValues { items, .. }, DenseStorage::Values(other))
+                | (DenseStorage::Values(other), DenseStorage::VectorValues { items, .. }) => {
+                    items == other
+                }
+                _ => a == b,
+            })
+        })
     }
 }
 

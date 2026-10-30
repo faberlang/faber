@@ -2,8 +2,8 @@
 //! this process, with the same stdout, stderr and exit status as the runner
 //! and as a `--target clif` executable.
 //!
-//! Each case is compared against the runner (`faber run`); the runner and the
-//! linked clif executable agree on these programs (see
+//! Each case is compared against the runner (`faber run --target runner`);
+//! the runner and the linked clif executable agree on these programs (see
 //! `trap_text_parity_test.rs`), so agreement with the runner is agreement with
 //! both without linking anything here. The refusal cases compare against
 //! `faber build --target clif`, whose compile step is the same route.
@@ -85,7 +85,7 @@ fn clif_jit_matches_the_runner_on_stdout_stderr_and_status() {
     let dir = tempfile::tempdir().expect("scratch");
     for (name, text, status) in cases() {
         let source = write(dir.path(), name, text);
-        let runner = outcome(faber().arg("run").arg(&source));
+        let runner = outcome(faber().args(["run", "--target", "runner"]).arg(&source));
         let jit = outcome(faber().args(["run", "--target", "clif-jit"]).arg(&source));
         assert_eq!(runner.status, Some(status), "{name}: runner status");
         assert!(
@@ -105,6 +105,31 @@ fn clif_jit_matches_the_runner_on_stdout_stderr_and_status() {
             "{name}: error line"
         );
     }
+}
+
+/// A lone `.fab` file that imports a sibling module runs on `clif-jit` with
+/// the runner's output. The file is package-shaped — a single-file object
+/// carries no linked sibling code, so the imported call would decline as
+/// CODEGEN001 `external definition call` — so both routes link the import
+/// graph through the package machinery.
+#[test]
+fn clif_jit_runs_an_importing_lone_file_like_the_runner() {
+    let dir = tempfile::tempdir().expect("scratch");
+    let source = write(
+        dir.path(),
+        "main",
+        "import from \"./auxilium\" auxilium\n\nmain {\n    print auxilium.saluta(\"Marcus\")\n}\n",
+    );
+    write(
+        dir.path(),
+        "auxilium",
+        "@ public\nfn saluta(string nomen) → string {\n    return \"Salve, §!\"(nomen)\n}\n\nmain {}\n",
+    );
+    let runner = outcome(faber().arg("run").arg(&source));
+    let jit = outcome(faber().args(["run", "--target", "clif-jit"]).arg(&source));
+    assert_eq!(runner.stdout, "Salve, Marcus!\n");
+    assert_eq!(jit.stdout, runner.stdout, "stdout");
+    assert_eq!(jit.status, runner.status, "exit status");
 }
 
 #[test]

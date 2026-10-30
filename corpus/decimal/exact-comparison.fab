@@ -1,0 +1,107 @@
++++
+term = "d64 exact comparison"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "additive_expr", "multiplicative_expr", "comparison", "equality", "equality_tail", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = false
+summary = "d64 comparisons join the exact expression scales — 5×10⁻⁹ is greater than 0, and a scale-16 product equals its scale-8 literal."
+syntax = "d64 x ≻ d64 y | d64 x ≻ int n"
+related = ["d64", "numerus", "≻", "≅", "≡"]
+locale = "en"
++++
+# =============================================================================
+# d64 — a comparison aligns the exact scales, it never rounds a store first
+# =============================================================================
+#
+# What this teaches:
+#   • A comparison is not a rounding cell. Both sides are brought to the larger
+#     of their expression scales exactly (`carrier × 10^(scale gap)`) and the
+#     carriers are compared, so a store's half-even rounding never decides a
+#     verdict: `0.00000001 * 0.5` is 5×10⁻⁹ exactly, and it is `≻ 0.0` even
+#     though the same value stored in a `d64` slot rounds to `0`.
+#   • Every ordering operator takes the joined scale: `≺`, `≤`, `≻`, `≥` and
+#     the equality tiers `≡`, `≢`, `≅`, `≇` all answer from the same ordering,
+#     so `x ≻ y` and `x ≤ y` are exact opposites and `≅` is true exactly when
+#     neither `≺` nor `≻` holds.
+#   • A product keeps its own scale until a slot rounds it, so a scale-16
+#     product compares against a scale-8 literal by scaling the literal up:
+#     `0.5 * 0.5 ≅ 0.25` and `4.2 * 4.2 ≻ 17.6` compare the true values.
+#   • A decimal joins an integer peer exactly: the integer is a scale-0 value,
+#     so `4.2 ≻ 4` and `4.2 ≺ 5` hold without a `↦` conversion, matching the
+#     cross-family ordering rule (`int × decimal` compares, it does not mix
+#     arithmetically).
+#   • A written constant beside a `d64` is a decimal at the d64 scale, so
+#     `4.2 ≻ 4.1`, `4.2 ≺ 4.3` and `4.2 ≅ 4.2` are exact.
+#
+# Common mistakes:
+#   • Expecting a comparison to round like a store — only a slot (a binder, a
+#     `mut` re-assignment, a `¶` cell) rounds; a comparison keeps the exact
+#     value of both sides.
+#   • Expecting `0.00000001 * 0.5 ≅ 0.0` because the product rounds to zero on
+#     the way into a `d64` slot — it does not: the product never becomes a
+#     stored decimal, so it stays greater than zero.
+#   • Expecting a decimal and an integer to need `↦` in a comparison — the
+#     ordering gate joins them; only arithmetic crosses families by refusal.
+#
+# See also: d64, ≻, ≅, mixed-ordering-join, store-rounding
+# =============================================================================
+
+# decimal/exact-comparison — the comparison aligns exact scales
+#
+# WHY: pins the D11.7 comparison contract end-to-end. The leading block is the
+# discriminating case: `tiny * half` is 5×10⁻⁹ at scale 16, which the store in
+# `store-rounding` rounds to `0`; a comparison must see the exact value, so it
+# is greater than zero, not equal to it.
+#
+# EXPECTED OUTPUT:
+#   exact-comparison.expected — one verdict per print, in print order.
+
+main {
+    let d64 tiny ← 0.00000001
+    let d64 half ← 0.5
+    let d64 zero ← 0.0
+
+    # ------------------------------------------- exact at the expression scale
+    # 5×10⁻⁹ compares against a stored scale-8 zero; rounding first would make
+    # every line here the opposite of what it is.
+    print tiny * half ≻ zero
+    print tiny * half ≅ zero
+    print zero ≺ tiny * half
+    print tiny * half ≥ zero
+    print tiny * half ≤ zero
+    print zero ≤ tiny * half
+
+    # --------------------------------------- scale 16 against a d64 literal
+    # The literal is the scale-8 carrier; the product is scale 16. Both align
+    # to scale 16, so 0.25 and 17.64 are compared exactly.
+    print half * half ≅ 0.25
+    print half * half ≺ 0.25
+    print 4.2 * 4.2 ≻ 17.6
+
+    # ------------------------------------------------- decimal against d64
+    let d64 a ← 4.2
+    let d64 b ← 4.2
+    let d64 c ← 4.3
+    print a ≅ b
+    print a ≺ c
+    print a ≻ c
+    print a ≤ b
+    print a ≥ c
+    print a ≡ b
+    print a ≢ b
+
+    # ------------------------------------------------ decimal against integer
+    # The integer peer joins at scale 0, exactly: 4.2 is above 4 and below 5.
+    let int four ← 4
+    let int five ← 5
+    print a ≻ four
+    print a ≺ five
+    print a ≻ five
+    print a ≥ four
+    print four ≺ a
+
+    # ---------------------------------------------- decimal against a literal
+    print a ≻ 4.1
+    print a ≺ 4.3
+    print a ≅ 4.2
+}
