@@ -295,3 +295,75 @@ fn a_transfer_outside_its_scope_adds_no_duplicate_diagnostic() {
         );
     }
 }
+
+/// Every source-reachable shape the CFG builder refuses as an out-of-loop
+/// transfer is already the resolver's own named rejection: at the top level
+/// of a function and inside a closure body — even when the closure is created
+/// inside a loop, since the resolver's scope chain and the builder's
+/// components both stop at the function boundary. (Lane bodies are the third
+/// component kind, but the Faber surface only admits expression-bodied
+/// lanes, so no statement-form transfer can reach one.) Each case reports
+/// SEM030/SEM031 and never the region engine's silent SEM008 absence: facts
+/// stay unavailable, but the named rejection the engine leans on is present.
+#[test]
+fn every_out_of_loop_transfer_refusal_is_the_resolvers_named_rejection() {
+    use crate::test_support::{analyze_source, issue};
+
+    let cases = [
+        (
+            "top-level rumpe",
+            "incipit {\n    rumpe\n}\n",
+            "SEM030",
+            "break_outside_breakable",
+        ),
+        (
+            "top-level perge",
+            "incipit {\n    perge\n}\n",
+            "SEM031",
+            "continue_outside_loop",
+        ),
+        (
+            "rumpe inside a closure created in a loop",
+            "incipit {\n    dum verum {\n        sit _ f ← () ∴ capta {\n            rumpe\n        }\n        rumpe\n    }\n}\n",
+            "SEM030",
+            "break_outside_breakable",
+        ),
+        (
+            "perge inside a closure created in a loop",
+            "incipit {\n    dum verum {\n        sit _ f ← (numerus a) ∴ fac {\n            perge\n            redde a\n        }\n        nota f(1)\n        rumpe\n    }\n}\n",
+            "SEM031",
+            "continue_outside_loop",
+        ),
+        (
+            "perge inside a closure at function top level",
+            "incipit {\n    sit _ f ← (numerus a) ∴ fac {\n        perge\n        redde a\n    }\n    nota f(1)\n}\n",
+            "SEM031",
+            "continue_outside_loop",
+        ),
+    ];
+
+    for (label, source, code, issue_name) in cases {
+        let result = analyze_source(source);
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .any(
+                    |diagnostic| crate::catalog_semantic::semantic_spec(diagnostic.kind).code
+                        == code
+                        && issue(diagnostic) == Some(issue_name)
+                ),
+            "{label} must report the resolver's {code}.{issue_name}; diagnostics: {:?}",
+            result.diagnostics
+        );
+        assert!(
+            result
+                .diagnostics
+                .iter()
+                .all(|diagnostic| issue(diagnostic)
+                    != Some(borrow_region::ISSUE_REGION_FACTS_NOT_BUILT)),
+            "{label} must not surface the region engine's fail-closed issue; diagnostics: {:?}",
+            result.diagnostics
+        );
+    }
+}
