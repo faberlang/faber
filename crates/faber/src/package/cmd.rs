@@ -1232,7 +1232,7 @@ fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: 
             )
             .with_phase(radix::module::diagnostics::DiagnosticPhase::Codegen)
             .with_code("INFO001");
-            node.path.display().to_string().clone_into(&mut row.file);
+            row.file = node.path.display().to_string();
             rows.push(row);
         }
         let regions = &analysis.kernel_requirements.regions;
@@ -1281,7 +1281,7 @@ fn print_region_report(config: &radix::module::Config, input_path: &Path, mode: 
             )
             .with_phase(radix::module::diagnostics::DiagnosticPhase::Codegen)
             .with_code("INFO001");
-            node.path.display().to_string().clone_into(&mut row.file);
+            row.file = node.path.display().to_string();
             rows.push(row);
         }
     }
