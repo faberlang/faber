@@ -560,6 +560,27 @@ pub fn build_device_program(
         builder.build_function(function)?;
     }
 
+    // A kernel's RETURN output whose host value a later call re-feeds to any
+    // kernel parameter is consumed by that call — a chained intermediate
+    // (`cubus(quadratum(x))`) or a host loop's carry (`t ← quadratum(t)`).
+    // The strict buffer joins cannot record that consumption (a repeated
+    // producer's value set strictly contains a chained consumer's; a
+    // kernel's own slots never value-join), so without this fact every
+    // chained output would land on the observation-point lifetime and be
+    // read back at each production. The value identity itself proves the
+    // consumption; mark the buffer consumed so it stays a per-step
+    // intermediate, read back only at an explicit host read.
+    for buffer in &mut builder.buffers {
+        if buffer.written
+            && !buffer.consumed
+            && buffer
+                .host_slot
+                .is_some_and(|slot| builder.wiring.result_value_feeds_a_param(slot))
+        {
+            buffer.consumed = true;
+        }
+    }
+
     // S5A-U1: the declared per-step observation of a RepeatingStep training
     // program — the forward kernel's RETURN output (the loss the training
     // loop measures), identified from the training facts, never a shape scan:

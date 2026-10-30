@@ -1107,6 +1107,14 @@ help = "use `target = {functio}` in v1"
 message = "a declaration carries more than one `@ nucleum` annotation"
 help = "keep a single `@ {nucleum}` annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "a declaration carries both the `@ {nucleum}` annotation and the `{nucleum}` declaration head"
+help = "keep one head: the `@ {nucleum}` annotation or the `{nucleum}` declaration head"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` names a host conversion; a `{nucleum}` head names a device kernel"
+help = "remove `@ {conversio}` or the `{nucleum}` head; a conversion row is a host function"
+
 [diagnostics.PARSE018.issues.duplicate_nucleum_tier]
 message = "the `@ {nucleum}` annotation names more than one tier"
 help = "write `{laxus}` or `{intutus}`, or neither for the default tier"
