@@ -5,16 +5,16 @@ use radix_hir::HirBinOp;
 pub use radix_target::Target;
 
 fn target_name(target: Target) -> &'static str {
-    match target {
-        Target::HirRust => "Rust",
-        Target::HirTypeScript => "TypeScript",
-        Target::HirGo => "Go",
-        Target::HirSwift => "Swift",
-        Target::MirLlvm | Target::MirLlvmHost => "LLVM",
-        Target::MirWasm => "WebAssembly",
-        Target::HirHaskell => "Haskell",
-        Target::HirCobol => "COBOL",
-        Target::HirPython => "Python",
+    match target.as_str() {
+        "rust" => "Rust",
+        "ts" => "TypeScript",
+        "go" => "Go",
+        "swift" => "Swift",
+        "llvm-text" | "llvm-host" => "LLVM",
+        "wasm-text" => "WebAssembly",
+        "haskell" => "Haskell",
+        "cobol" => "COBOL",
+        "python" => "Python",
         _ => "target",
     }
 }
@@ -54,12 +54,12 @@ pub fn reject_genus_collection_keys(
         }
     }
 
-    let issue = match target {
-        Target::HirTypeScript => "ts_genus_collection_key_unsupported",
-        Target::HirPython => "python_genus_collection_key_unsupported",
-        Target::HirSwift => "swift_genus_collection_key_unsupported",
-        Target::MirLlvm | Target::MirLlvmHost => "llvm_genus_collection_key_unsupported",
-        Target::MirWasm => "wasm_genus_collection_key_unsupported",
+    let issue = match target.as_str() {
+        "ts" => "ts_genus_collection_key_unsupported",
+        "python" => "python_genus_collection_key_unsupported",
+        "swift" => "swift_genus_collection_key_unsupported",
+        "llvm-text" | "llvm-host" => "llvm_genus_collection_key_unsupported",
+        "wasm-text" => "wasm_genus_collection_key_unsupported",
         _ => return Ok(()),
     };
     for index in 0..types.type_count() {

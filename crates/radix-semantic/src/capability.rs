@@ -920,12 +920,10 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 TypeLaw::ReflexiveEquality,
                 TypeCapabilityProof::ReflexivelyEqual,
             ),
-            TypeCapabilityKind::CanonicalHashEligibility => {
-                law_proof(
-                    TypeLaw::CanonicalHash,
-                    TypeCapabilityProof::CanonicalHashEligible,
-                )
-            }
+            TypeCapabilityKind::CanonicalHashEligibility => law_proof(
+                TypeLaw::CanonicalHash,
+                TypeCapabilityProof::CanonicalHashEligible,
+            ),
             TypeCapabilityKind::Ordering => {
                 law_proof(TypeLaw::Ordering, TypeCapabilityProof::Ordered)
             }
