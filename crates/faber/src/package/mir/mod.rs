@@ -326,7 +326,7 @@ pub(crate) fn mir_issue_diag(
 /// (D3). An unavailable explicit device fails closed before anything lowers
 /// onto it; there is no fallback.
 ///
-/// Returns the discovery receipt line that was printed.
+/// Returns the discovery receipt line reported to stderr.
 ///
 /// # Errors
 /// Structured diagnostics: device admission (`E_DEVICE_UNAVAILABLE`,
@@ -652,8 +652,8 @@ fn run_declared_kernels_on_device_session<H: radix_mir_runner::Host + ?Sized>(
     .map_err(|failure| failure.into_session_failure(receipt))
 }
 
-/// An admitted, opened device session: the discovery receipt line has been
-/// printed, and the session waits for the lowered unit to dispatch.
+/// An admitted, opened device session: the discovery receipt has been
+/// reported to stderr, and the session waits for the lowered unit to dispatch.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub(crate) struct AdmittedDeviceSession {
     session: radix_device_core::session::DeviceSession,
@@ -665,7 +665,7 @@ pub(crate) struct AdmittedDeviceSession {
     pub(crate) trace_kernels: bool,
 }
 
-/// Open the selected device, print the discovery receipt, and pick the
+/// Open the selected device, report the discovery receipt to stderr, and pick the
 /// per-kernel image backend.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub(crate) fn admit_device_session(
@@ -675,11 +675,11 @@ pub(crate) fn admit_device_session(
     cpu: CpuDeviceShape,
 ) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
     let admitted = open_device_session(input, selection, registry, cpu)?;
-    println!("{}", admitted.receipt);
+    eprintln!("{}", admitted.receipt);
     Ok(admitted)
 }
 
-/// [`admit_device_session`] without printing the discovery receipt: a proba
+/// [`admit_device_session`] without reporting the discovery receipt: a proba
 /// route opens one session per case and keeps its report clean.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 fn open_device_session(
@@ -821,6 +821,29 @@ fn session_dispatcher(
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
+    /// The row layout of every record (fixed-layout genus) element type the
+    /// kernel units bind as a tensor resource.
+    fn record_layouts(
+        units: &[radix_mir::KernelUnit],
+        validation: &radix_mir::MirValidationContext<'_>,
+    ) -> std::collections::HashMap<
+        radix_types::TypeId,
+        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
+    > {
+        let types = validation.types.as_table();
+        let mut records = std::collections::HashMap::new();
+        for resource in units.iter().flat_map(|unit| &unit.resources) {
+            let ty = resource.version.element_ty.semantic_id();
+            if matches!(types.get(ty), radix_types::Type::Struct(_))
+                && !records.contains_key(&ty)
+                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
+            {
+                records.insert(ty, std::sync::Arc::new(layout));
+            }
+        }
+        records
+    }
+
     let AdmittedDeviceSession {
         session, backend, ..
     } = admitted;
@@ -855,8 +878,9 @@ fn session_dispatcher(
     // Owned slabs are CUDA spanning only. The plan lays out only the roles the
     // spanning runtime can launch, so it must read the image before the
     // dispatcher takes its parts.
-    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned)
-        .then(|| super::device::placement_plan(lowered, &image, |role| role.launchable()));
+    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned).then(|| {
+        super::device::placement_plan(lowered, &image, super::device::SlabRole::launchable)
+    });
     let interner = validated
         .validation()
         .interner
@@ -913,29 +937,6 @@ fn session_dispatcher(
         image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
     let fused_entries = fusions.iter().map(|fused| fused.entry.clone()).collect();
-    /// The row layout of every record (fixed-layout genus) element type the
-    /// kernel units bind as a tensor resource.
-    fn record_layouts(
-        units: &[radix_mir::KernelUnit],
-        validation: &radix_mir::MirValidationContext<'_>,
-    ) -> std::collections::HashMap<
-        radix_types::TypeId,
-        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
-    > {
-        let types = validation.types.as_table();
-        let mut records = std::collections::HashMap::new();
-        for resource in units.iter().flat_map(|unit| &unit.resources) {
-            let ty = resource.version.element_ty.semantic_id();
-            if matches!(types.get(ty), radix_types::Type::Struct(_))
-                && !records.contains_key(&ty)
-                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
-            {
-                records.insert(ty, std::sync::Arc::new(layout));
-            }
-        }
-        records
-    }
-
     // gpu-reset Q02: a tensor of fixed-layout records binds as typed row
     // bytes; each record element type the kernels name gets its row layout
     // from the layout law (a type with no layout stays unsupported by name).
@@ -1045,6 +1046,7 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         errors
             .into_iter()
             .map(|error| {
+                let exit_status = error.exit_status().to_string();
                 // A device error keeps its stable `E_DEVICE_*` code as the
                 // diagnostic issue, so the terminal prints `error: <code>: ..`.
                 let issue = if error.issue.starts_with("E_DEVICE_") {
@@ -1055,6 +1057,7 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
                 mir_diag(input, error.message)
                     .with_arg("issue", issue)
                     .with_arg("code", error.issue)
+                    .with_arg("exit_status", exit_status)
             })
             .collect::<Vec<_>>()
     };

@@ -5988,6 +5988,12 @@ impl FunctionLower<'_, '_> {
     /// operands and its result through `f32`, as the runner's `float_binop`
     /// does; the operation itself still runs in `f64`, and comparisons take
     /// the operands exactly as stored.
+    ///
+    /// TARGET: Separate CLIF `fmul`, `fadd` and `fsub` retain separate
+    /// roundings; fusion requires the distinct `fma` instruction, which this
+    /// lowering does not emit. Both object and JIT routes use `host_isa`'s
+    /// `opt_level=speed` without changing that instruction contract. The host
+    /// regression is `corpus/fractus/no-fused-multiply-add.fab`.
     fn float_binary(
         &mut self,
         op: MirBinOp,

@@ -201,14 +201,14 @@ pub(crate) fn run_ts_program(
     program: &TsProgram,
     args: &[String],
 ) -> Result<ExitStatus, Diagnostic> {
-    let argv = program.recipe.run_argv(&program.launcher);
-    let tool = require_tool(&argv)?;
+    let run_command = program.recipe.run_argv(&program.launcher);
+    let tool = require_tool(&run_command)?;
     Command::new(&tool)
-        .args(&argv[1..])
+        .args(&run_command[1..])
         .args(args)
         .current_dir(std::env::current_dir().unwrap_or_else(|_| program.root.clone()))
         .status()
-        .map_err(|err| build_error(format!("failed to execute `{}`: {err}", argv[0])))
+        .map_err(|err| build_error(format!("failed to execute `{}`: {err}", run_command[0])))
 }
 
 /// `faber run --target ts`: build the package, run it with `program_args`,

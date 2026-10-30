@@ -596,6 +596,20 @@ fn run_case(
             json!({"argv":build_args,"cwd":case_dir}),
         )
     } else if let Some(api_target) = api_target {
+        // A `clif` file input that imports sibling modules compiles through
+        // the package-MIR object emitter — the route `faber build -t clif`
+        // gives it — because a lone-file object carries no linked sibling
+        // code and the imported call would decline as CODEGEN001
+        // `external definition call`.
+        #[cfg(feature = "mir-clif")]
+        let compilation = if api_target == radix::module::Target::MirClif
+            && faber_cli::package::use_package_compiler(api_target, &case.input, false)
+        {
+            faber_cli::package::compile_clif_package_input(&case.input)
+        } else {
+            radix::services::compile_cli_path(&case.input, false, api_target)
+        };
+        #[cfg(not(feature = "mir-clif"))]
         let compilation = radix::services::compile_cli_path(&case.input, false, api_target);
         let emit_ms = ms(emitting);
         let diagnostics = compilation

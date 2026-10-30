@@ -1532,6 +1532,24 @@ fn control_kernel(i32 j, i32 k) → i32 {
 }
 
 #[test]
+fn negative_divisor_uses_floor_quotient_for_constant_range_proofs() {
+    let fixture = analyze_en(
+        r#"
+@ kernel
+@ public
+fn quotient() → i8 {
+    return -255 / -2
+}
+main {}
+"#,
+    );
+
+    assert!(fixture.is_ok(), "{:?}", fixture.diagnostics);
+    let quotient = target_row(&fixture, "quotient", Target::MirMetal);
+    assert!(quotient.admitted, "{:?}", quotient.failures);
+}
+
+#[test]
 fn lane_quotient_by_a_positive_size_class_parameter_is_provable() {
     let fixture = analyze_en(
         r"
