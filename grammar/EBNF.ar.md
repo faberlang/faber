@@ -3093,8 +3093,11 @@ comment.
 when its body escapes through the error channel, and a case that completes
 cleanly fails (strict expected-failure). The other modifiers are `أهمل`,
 `مستقبلي`, `فقط`, `حصري`, `وسم`, `زمني`, `قس`, `معاد`, and
-`هش`. The counts of `زمني`, `معاد` and `هش` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`هش`. `معاد N` runs the case N times and passes only if every run
+passes; it does not retry until a pass. `هش N` is rejected by `faber test`
+because flaky retries are not executed, so the case body does not run. The
+counts of `زمني`, `معاد` and `هش` are non-negative integer literals;
+a float is `test_modifier_integer`.
 
 ---
 
