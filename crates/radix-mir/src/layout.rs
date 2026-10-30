@@ -682,6 +682,12 @@ fn layout_kind_for_type(
         Type::Enum(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Enum)),
         Type::Union(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Union)),
         Type::Tuple(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Tuple)),
+        Type::Applied(base, _) => match types.get(*base) {
+            Type::Struct(_) => {
+                LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Struct))
+            }
+            _ => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
+        },
         Type::Primitive(
             Primitive::Ascii
             | Primitive::Littera
@@ -706,7 +712,6 @@ fn layout_kind_for_type(
         | Type::Ref(_, _)
         | Type::Interface(_)
         | Type::Func(_)
-        | Type::Applied(_, _)
         | Type::BoundedQueue { .. }
         | Type::BoundedStack { .. } => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
     };
