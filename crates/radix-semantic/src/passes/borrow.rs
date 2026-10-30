@@ -385,6 +385,10 @@ struct ParamUsage {
     marker: Option<AccessMarker>,
     span: radix_lexer::Span,
     mutated: bool,
+    /// A `varia` local was plain-bound from this parameter, so its state is
+    /// writable through the alias; removing the parameter's `mut` would turn
+    /// that bind into SEM065 (`const_shared_into_var`).
+    shared_into_var: bool,
     passed_in_or_ex: bool,
     passed_ex: bool,
     returned: bool,
@@ -570,6 +574,7 @@ impl<'a> BorrowChecker<'a> {
                     marker,
                     span: param.span,
                     mutated: false,
+                    shared_into_var: false,
                     passed_in_or_ex: false,
                     passed_ex: false,
                     returned: false,
@@ -793,6 +798,15 @@ impl<'a> BorrowChecker<'a> {
         self.note_bind_alias(local.def_id, local.ty, init, Rebind::Fresh);
         if !local.mutable {
             self.const_agg_aliases.insert(local.def_id);
+        } else if let Some(roots) = self.bind_alias_roots.get(&local.def_id).cloned() {
+            // A `varia` cell just bound from a parameter's plain place read
+            // shares that parameter's state: WARN008 must not advise removing
+            // a `mut` the bind needs (SEM065 would reject the bind after it).
+            for root in roots {
+                if let Some(usage) = self.param_usage.get_mut(&root) {
+                    usage.shared_into_var = true;
+                }
+            }
         }
     }
 
@@ -2358,6 +2372,17 @@ impl<'a> BorrowChecker<'a> {
             // callee's own value. Either way the parameter is mutated.
             usage.mutated = true;
         }
+        // A write through one name reaches every name sharing its storage: a
+        // plain bind of a shareable value aliases, so after `mut T b ← p` a
+        // write through `b` writes the object the `mut` parameter `p` names.
+        // WARN008 must not call that parameter's `mut` unused.
+        if let Some(roots) = self.bind_alias_roots.get(&def_id).cloned() {
+            for root in roots {
+                if let Some(usage) = self.param_usage.get_mut(&root) {
+                    usage.mutated = true;
+                }
+            }
+        }
         let (_region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
@@ -2622,7 +2647,7 @@ impl<'a> BorrowChecker<'a> {
         for usage in self.param_usage.values() {
             match usage.marker {
                 Some(AccessMarker::Mut) => {
-                    if !usage.mutated && !usage.passed_in_or_ex {
+                    if !usage.mutated && !usage.passed_in_or_ex && !usage.shared_into_var {
                         warnings.push(
                             SemanticError::structured(
                                 SemanticErrorKind::Warning(WarningKind::UnusedMutRefParam),
