@@ -1172,7 +1172,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::Handled { body, catch } => {
                 self.check_handled_block(body, catch, expected)
             }
-            HirExpressionKind::Trap(body) => self.check_trap(body, expected, expr.span),
+            HirExpressionKind::Trap(body) => self.check_trap(body, expr.span),
             HirExpressionKind::CallDefault {
                 body,
                 default,

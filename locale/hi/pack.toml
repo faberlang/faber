@@ -3708,6 +3708,15 @@ help = "हर प्लेसहोल्डर को क्रमांक �
 message = "इस टेम्पलेट में सादे और क्रमांकित प्लेसहोल्डर मिले हुए हैं; सादे प्लेसहोल्डर ये पढ़ते हैं: {reads}"
 help = "हर प्लेसहोल्डर को क्रमांक दें (`§0`, `§1`, …) ताकि हर एक वही आर्ग्युमेंट पढ़े जो आप चाहते हैं"
 
+
+[diagnostics.WARN036]
+message = "इस {capta} सीमा के भीतर कुछ भी विफल नहीं हो सकता: इसका त्रुटि चैनल खाली है"
+help = "सीमा हटा दें, या उसके भीतर कोई विफल हो सकने वाली कॉल करें"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "इस {capta} सीमा के भीतर कुछ भी विफल नहीं हो सकता: इसका त्रुटि चैनल खाली है"
+help = "सीमा हटा दें, या उसके भीतर कोई विफल हो सकने वाली कॉल करें"
+
 [llm]
 system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged. जब किसी स्ट्रिंग में उद्धरण चिह्न (\" या ') हो, तो उसे «…» से लिखें: गुइलेमे को किसी एस्केप की आवश्यकता नहीं होती।"
 exemplars = ["./exemplars/salve-munde.hi.fab"]

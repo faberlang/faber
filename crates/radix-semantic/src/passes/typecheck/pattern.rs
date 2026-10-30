@@ -73,6 +73,49 @@ pub fn resolve_type_test_target(
 }
 
 impl TypeChecker<'_> {
+    /// Substitute an applied scrutinee's generic witnesses into a variant's
+    /// declared payload field types.
+    ///
+    /// `fields` are the definition's field types, which may mention the
+    /// parent's `Type::Param` slots. When `expected` is an application of the
+    /// same parent, each param is replaced by the corresponding applied
+    /// argument (U-D1). Any other scrutinee shape returns the fields as they
+    /// were declared.
+    fn applied_variant_field_types(
+        &mut self,
+        parent: DefId,
+        expected: TypeId,
+        fields: Vec<TypeId>,
+    ) -> Vec<TypeId> {
+        let resolved = self.resolve_inferred_type(expected);
+        let Type::Applied(base, args) = self.types.get(resolved).clone() else {
+            return fields;
+        };
+        if !matches!(self.types.get(base), Type::Enum(found) if *found == parent) {
+            return fields;
+        }
+        let Some(params) = self.type_params_by_def.get(&parent).cloned() else {
+            return fields;
+        };
+        let mut vars = FxHashMap::default();
+        for (param, arg) in params.iter().zip(args.iter()) {
+            if let radix_types::AppliedArg::Type(witness) = arg {
+                vars.insert(*param, *witness);
+            }
+        }
+        if vars.is_empty() {
+            return fields;
+        }
+        // `substitute_type_params` maps each declared param to its applied
+        // witness (a param without a witness degrades to a fresh hole, never
+        // a rigid binding), so the arm's payload bindings carry the
+        // application's field types.
+        fields
+            .into_iter()
+            .map(|field| self.substitute_type_params(field, &mut vars, None))
+            .collect()
+    }
+
     /// Whether a type-pattern target belongs to the scrutinee's closed set:
     /// a member of its union (looking through option and alias), or the
     /// scrutinee's own type when it is not a union.
@@ -194,6 +237,12 @@ impl TypeChecker<'_> {
                 if fields.len() != patterns.len() {
                     self.wrong_arity("variant_pattern_arity_mismatch", span);
                 }
+                // U-D1 pattern twin: an applied scrutinee substitutes its
+                // witnesses into the declared payload fields, so each binding
+                // gets the field's type at this application — never the raw
+                // `Type::Param` (the builtin `trapped<R, T>` variants and a
+                // user `discretio Cista<T>` ride the same rail).
+                let fields = self.applied_variant_field_types(parent, expected, fields);
                 for (sub, field_ty) in patterns.iter().zip(fields.iter()) {
                     self.check_pattern(sub, *field_ty, span);
                 }

@@ -3708,6 +3708,15 @@ help = "ใส่เลขกำกับให้ทุกช่อง (`§0`, 
 message = "เทมเพลตนี้ผสมช่องแทนค่าแบบธรรมดากับแบบมีเลขกำกับ; ช่องแบบธรรมดาอ่านค่า {reads}"
 help = "ใส่เลขกำกับให้ทุกช่อง (`§0`, `§1`, …) เพื่อให้แต่ละช่องอ่านอาร์กิวเมนต์ที่ตั้งใจ"
 
+
+[diagnostics.WARN036]
+message = "ไม่มีสิ่งใดภายในขอบเขต {capta} นี้ที่จะล้มเหลวได้: ช่องทางข้อผิดพลาดว่างเปล่า"
+help = "ตัดขอบเขตนี้ออก หรือเรียกบางสิ่งที่อาจล้มเหลวภายใน"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "ไม่มีสิ่งใดภายในขอบเขต {capta} นี้ที่จะล้มเหลวได้: ช่องทางข้อผิดพลาดว่างเปล่า"
+help = "ตัดขอบเขตนี้ออก หรือเรียกบางสิ่งที่อาจล้มเหลวภายใน"
+
 [llm]
 system_prompt_snippet = "Emit Thai reader-locale Faber using Thai keywords for declarations, control flow, loops, returns, booleans, common primitive types, and lista/tabula collections. Keep Faber glyph syntax unchanged. เมื่อสตริงมีอักขระเครื่องหมายคำพูด (\" หรือ ') ให้เขียนด้วย «…»: กิลเลอเมต์ไม่ต้องใช้การหลีกอักขระใด ๆ"
 exemplars = ["./exemplars/salve-munde.th-TH.fab"]

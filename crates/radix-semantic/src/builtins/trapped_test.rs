@@ -2,8 +2,9 @@
 //!
 //! `trapped<R, T>` resolves as a two-variant generic union carrying the
 //! `trap { … }` outcome. These tests pin how the builtin's variants match:
-//! coverage over the two variants, and contextual (unreserved) variant names.
-//! The `trap` expression itself lands in later units.
+//! coverage over the two variants, payload bindings at the applied witnesses,
+//! and contextual (unreserved) variant names. The `trap` expression re-typing
+//! itself lives in `passes::typecheck::trap_test`.
 
 use crate::test_support::{assert_accepts, assert_rejects_with_issue};
 
@@ -36,13 +37,27 @@ fn trapped_match_is_coverage_checked() {
     );
 }
 
-// DEBT(f9d8a611-1.2): the arm-binding payload-type test is deferred. Pattern
-// payload bindings over a generic `discretio` (and this builtin genus) are
-// bound to the declared field's raw `Type::Param` by
-// `passes::typecheck::pattern::check_pattern`, which never substitutes the
-// scrutinee's applied witnesses. The same source fails identically with a user
-// `discretio Cista<T> { Plena { T res } }`, so this is a typecheck-pass gap,
-// not `trapped` wiring, and it is outside this unit's write scope.
+// The arm-binding payload-type gap that deferred a test here is closed:
+// `check_pattern` substitutes the scrutinee's applied witnesses into the
+// variant payload fields (U-D1 pattern twin), so `casu returned sit value`
+// over `trapped<numerus, textus>` binds `value : numerus`.
+
+#[test]
+fn trapped_variant_arms_bind_applied_payload_witnesses() {
+    // The payload bindings carry the application's witnesses, never the
+    // declared `R`/`T` parameters: `value` is a `numerus` and `error` a
+    // `textus` at this application, so each arm body may use them as such.
+    assert_accepts(
+        "functio f(trapped<numerus, textus> t) → numerus {\n    discerne t {\n        casu returned sit value { redde value + 1 }\n        casu thrown sit error { redde error.longitudo() }\n    }\n}\n",
+    );
+    // And the witness is real: a textus-only member access inside the
+    // `returned` arm is a typed error rather than an open hole that defers
+    // to MIR validation.
+    assert_rejects_with_issue(
+        "functio f(trapped<numerus, textus> t) → vacuum {\n    discerne t {\n        casu returned sit value { nota value.longitudo() }\n        casu thrown sit error { nota error }\n    }\n}\n",
+        "unknown_method",
+    );
+}
 
 #[test]
 fn trapped_variant_names_stay_contextual() {

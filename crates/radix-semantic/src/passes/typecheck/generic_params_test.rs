@@ -52,6 +52,43 @@ functio facere() → Cista<numerus> {
 }
 
 #[test]
+fn generic_union_pattern_binds_applied_witness() {
+    // U-D1 pattern twin: a `casu` arm over an applied generic union binds
+    // each payload field to the declared field type with the application's
+    // witnesses in place of the params — never the raw `Type::Param` (the
+    // builtin `trapped<R, T>` variants ride the same rail).
+    accepts(
+        r"discretio Cista<T> {
+    Plena { T res }
+}
+
+functio legere(Cista<numerus> c) → numerus {
+    discerne c {
+        casu Plena sit res {
+            redde res + 1
+        }
+    }
+}",
+    );
+    // The witness is real: a textus-only member access inside the arm is a
+    // typed error, not an open hole that defers to MIR validation.
+    rejects_with_issue(
+        r"discretio Cista<T> {
+    Plena { T res }
+}
+
+functio legere(Cista<numerus> c) → vacuum {
+    discerne c {
+        casu Plena sit res {
+            nota res.longitudo()
+        }
+    }
+}",
+        "unknown_method",
+    );
+}
+
+#[test]
 fn generic_class_construction_substitutes_expected_witness() {
     // U-D1: generic genus construction substitutes the expected witness into
     // the field type before the initializer is checked.

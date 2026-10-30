@@ -2,14 +2,22 @@
 locale = "en"
 +++
 
-# u5 — `trap` over `→ void ⇥ E`: vacuum stays an explicit member (only
-# nihil is extracted), so the union is a distinguishable two members.
+# u5 — `trap` over `→ void ⇥ E`: the `R` slot stays the explicit `void`
+# (it is a slot, not a member to normalize away), so `returned` and
+# `thrown` stay distinguishable.
 
 fn nothing() → void ⇥ string {
     return
 }
 
 main {
-    let ∪ r ← trap { nothing() }
-    print r
+    let _ r ← trap { nothing() }
+    match r {
+        case returned let value {
+            print "returned"
+        }
+        case thrown let error {
+            print error
+        }
+    }
 }
