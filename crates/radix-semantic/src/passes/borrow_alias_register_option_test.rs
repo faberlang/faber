@@ -1,12 +1,15 @@
-//! al2: register-class `vector`/`matrix` and optional containers alias on an
-//! unmarked bind, like every other aggregate (advisor ruling 2026-09-30,
-//! Q1/Q2; R1 in `faber/docs/semantics-rulings.md` has no register-class
-//! carve-out).
+//! al2: an unmarked bind of an optional container aliases the container place
+//! through the option (advisor ruling 2026-09-30 Q2).
 //!
-//! The classification is `TypeTable::is_aliasing_container` (and its
+//! The classification is `TypeTable::binds_by_sharing` (and its
 //! `_through_option` peel), shared with the Rust alias-bind emitter. These
 //! tests pin the semantic side: a write through an unmarked alias of a `de`
 //! parameter is rejected, and reads stay legal.
+//!
+//! Register-class `vector`/`matrix` values are silent values: `b ← a` copies
+//! (operator ruling 7b25889f R1, which retires the 2026-09-30 Q1 aliasing
+//! posture for them), so a lane write through an unmarked bind of a `de`
+//! vector parameter writes the copy and is legal.
 
 fn latin_pack() -> crate::locale::LocalePack {
     crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
@@ -48,10 +51,17 @@ fn assert_accepted(body: &str) {
 }
 
 #[test]
-fn vector_alias_of_de_param_rejects_element_write() {
-    assert_rejected(
-        "functio f(de vector<f32, magnitudo 4> v) → vacuum { sit vector<f32, magnitudo 4> w ← v\n w[0] ← 9.0 }",
+fn vector_copy_of_de_param_allows_element_write() {
+    // R1: `w ← v` copies, so the lane write reaches `w` and never `v`.
+    assert_accepted(
+        "functio f(de vector<f32, magnitudo 4> v) → vacuum { varia vector<f32, magnitudo 4> w ← v\n w[0] ← 9.0 }",
     );
+}
+
+#[test]
+fn vector_lane_write_into_a_de_param_is_still_rejected() {
+    let found = issues("functio f(de vector<f32, magnitudo 4> v) → vacuum { v[0] ← 9.0 }");
+    assert!(!found.is_empty(), "a lane write into a `de` parameter must be refused");
 }
 
 #[test]

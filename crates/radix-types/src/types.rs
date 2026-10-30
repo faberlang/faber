@@ -862,12 +862,12 @@ impl TypeTable {
     /// well but are decided by each consumer (the Rust emitter carves out
     /// `dyn Trait` carriers), and scalars and text are not containers here.
     ///
-    /// Register-class `vector`/`matrix` values ALIAS like every other aggregate
-    /// (al2, advisor ruling 2026-09-30 Q1: R1 has no register-class
-    /// carve-out). Targets whose by-value carrier cannot yet observe the
-    /// difference keep it as their own explicit carve-out (the Rust emitter's
-    /// `rust_copies_register_class`), never by narrowing this predicate.
-    /// An optional container aliases through the option
+    /// Register-class `vector`/`matrix` values carry lanes of their own, so
+    /// they are containers here, but an unmarked bind of one COPIES rather
+    /// than aliases (operator ruling 7b25889f R1 — `b ← a` copies, `ref` is
+    /// refused as for scalars). Consumers asking the bind question use
+    /// [`Self::binds_by_sharing`], not this predicate. An optional container
+    /// aliases through the option
     /// ([`Self::is_aliasing_container_through_option`]).
     #[must_use]
     pub fn is_aliasing_container(&self, ty: TypeId) -> bool {
@@ -901,6 +901,36 @@ impl TypeTable {
             || self
                 .nullable_inner(ty)
                 .is_some_and(|inner| self.is_aliasing_container_through_option(inner))
+    }
+
+    /// Whether an unmarked bind of `ty` shares its source's storage instead of
+    /// taking a value of its own.
+    ///
+    /// This is the predicate the bind rules consume — the semantic borrow
+    /// pass, the shared-payload check and the Rust alias-bind emitter — so
+    /// they cannot disagree about which types alias on `b ← a`. It is
+    /// [`Self::is_aliasing_container`] without the register-class silent
+    /// values: `b ← a` on a `vector`/`matrix` copies (operator ruling
+    /// 7b25889f R1), exactly as it does for a scalar, and only a `ref`-marked
+    /// bind would name the same storage — which R1 refuses outright.
+    #[must_use]
+    pub fn binds_by_sharing(&self, ty: TypeId) -> bool {
+        match self.get(ty) {
+            Type::Alias(_, inner) => self.binds_by_sharing(*inner),
+            Type::Vector(..) | Type::Matrix(..) => false,
+            _ => self.is_aliasing_container(ty),
+        }
+    }
+
+    /// [`Self::binds_by_sharing`] peeled through `T ∪ nihil`: an unmarked bind
+    /// of an optional container aliases the container place through the
+    /// option, and an optional register-class value still copies (R1).
+    #[must_use]
+    pub fn binds_by_sharing_through_option(&self, ty: TypeId) -> bool {
+        self.binds_by_sharing(ty)
+            || self
+                .nullable_inner(ty)
+                .is_some_and(|inner| self.binds_by_sharing_through_option(inner))
     }
 
     /// Silent values reject `ref`/`mut`/`own`/`copy` markers: the widthless
