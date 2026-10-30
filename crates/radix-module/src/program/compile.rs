@@ -146,7 +146,15 @@ pub fn resolve_package_mode(path: &Path, force_package: bool) -> bool {
 /// Compile command input after applying stdin and package-mode policy.
 #[must_use]
 pub fn compile_cli_input(input: &[String], package: bool, target: crate::codegen::Target) -> crate::CompileResult {
-    compile_cli_input_with_locale_pack(input, package, target, None, crate::codegen::OutputMode::Application, None)
+    compile_cli_input_with_locale_pack(
+        input,
+        package,
+        target,
+        None,
+        crate::codegen::OutputMode::Application,
+        None,
+        None,
+    )
 }
 
 /// Compile command input with optional reader-pack source tokenization.
@@ -158,8 +166,18 @@ pub fn compile_cli_input_with_locale_pack(
     code_pack: ReaderPackRef<'_>,
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::CompileResult {
-    compile_cli_input_with_locale_pack_inner(input, package, target, code_pack, output_mode, module_name, false)
+    compile_cli_input_with_locale_pack_inner(
+        input,
+        package,
+        target,
+        code_pack,
+        output_mode,
+        module_name,
+        false,
+        locale_base,
+    )
 }
 
 /// Compile command input with an explicit reader pack that must win over any
@@ -172,8 +190,18 @@ pub fn compile_cli_input_with_locale_pack_explicit(
     code_pack: ReaderPackRef<'_>,
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::CompileResult {
-    compile_cli_input_with_locale_pack_inner(input, package, target, code_pack, output_mode, module_name, true)
+    compile_cli_input_with_locale_pack_inner(
+        input,
+        package,
+        target,
+        code_pack,
+        output_mode,
+        module_name,
+        true,
+        locale_base,
+    )
 }
 
 /// Resolves the opaque route-to-spelling maps for the library package roots a
@@ -194,19 +222,43 @@ pub fn compile_cli_input_with_library_bindings(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
     library_bindings: LibraryBindingsResolver<'_>,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::CompileResult {
     let Some(first) = input.first().filter(|first| first.as_str() != "-") else {
-        return compile_cli_input_with_locale_pack(input, package, target, code_pack, output_mode, module_name);
+        return compile_cli_input_with_locale_pack(
+            input,
+            package,
+            target,
+            code_pack,
+            output_mode,
+            module_name,
+            locale_base,
+        );
     };
     let path = PathBuf::from(first);
     if resolve_package_mode(&path, package) {
-        return compile_cli_input_with_locale_pack(input, package, target, code_pack, output_mode, module_name);
+        return compile_cli_input_with_locale_pack(
+            input,
+            package,
+            target,
+            code_pack,
+            output_mode,
+            module_name,
+            locale_base,
+        );
     }
     let source = match read_input_source(input) {
         Ok((_name, source)) => source,
         Err(diagnostic) => return crate::CompileResult { output: None, diagnostics: vec![diagnostic] },
     };
-    let session = crate::driver::Session::new(config_for_target(target, code_pack, output_mode, module_name, false));
+    let session = crate::driver::Session::new(config_for_target(
+        target,
+        code_pack,
+        output_mode,
+        module_name,
+        false,
+        locale_base,
+    ));
     match prepare_program_module_with_bindings(&path, &source, &session, Some(library_bindings)) {
         Ok(prepared) => crate::driver::compile(
             &prepared.session,
@@ -230,6 +282,7 @@ fn compile_cli_input_with_locale_pack_inner(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
     explicit: bool,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::CompileResult {
     if input.is_empty() || input[0] == "-" {
         if package {
@@ -248,6 +301,7 @@ fn compile_cli_input_with_locale_pack_inner(
             output_mode,
             module_name,
             explicit,
+            locale_base,
         );
     }
 
@@ -260,6 +314,7 @@ fn compile_cli_input_with_locale_pack_inner(
         output_mode,
         module_name,
         explicit,
+        locale_base,
     )
 }
 
@@ -279,7 +334,7 @@ pub fn compile_cli_path_with_locale_pack(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
 ) -> crate::CompileResult {
-    compile_cli_path_with_locale_pack_inner(path, package, target, code_pack, output_mode, module_name, false)
+    compile_cli_path_with_locale_pack_inner(path, package, target, code_pack, output_mode, module_name, false, None)
 }
 
 fn compile_cli_path_with_locale_pack_inner(
@@ -290,6 +345,7 @@ fn compile_cli_path_with_locale_pack_inner(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
     explicit: bool,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::CompileResult {
     if package || should_treat_as_package(path) {
         return package_reject(
@@ -312,7 +368,14 @@ fn compile_cli_path_with_locale_pack_inner(
         }
     };
     let name = path.display().to_string();
-    let session = crate::driver::Session::new(config_for_target(target, code_pack, output_mode, module_name, explicit));
+    let session = crate::driver::Session::new(config_for_target(
+        target,
+        code_pack,
+        output_mode,
+        module_name,
+        explicit,
+        locale_base,
+    ));
     let mut result = compile_prepared_program_path(&session, path, &source);
 
     if target == crate::codegen::Target::HirFaber && result.success() {
@@ -340,7 +403,7 @@ pub fn compile_cli_source_with_locale_pack(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
 ) -> crate::CompileResult {
-    compile_cli_source_with_locale_pack_inner(name, source, target, code_pack, output_mode, module_name, false)
+    compile_cli_source_with_locale_pack_inner(name, source, target, code_pack, output_mode, module_name, false, None)
 }
 
 fn compile_cli_source_with_locale_pack_inner(
@@ -351,8 +414,9 @@ fn compile_cli_source_with_locale_pack_inner(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
     explicit: bool,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::CompileResult {
-    compiler_for_target(target, code_pack, output_mode, module_name, explicit).compile_str(name, source)
+    compiler_for_target(target, code_pack, output_mode, module_name, explicit, locale_base).compile_str(name, source)
 }
 
 fn compiler_for_target(
@@ -361,8 +425,16 @@ fn compiler_for_target(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
     explicit: bool,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::Compiler {
-    crate::Compiler::new(config_for_target(target, code_pack, output_mode, module_name, explicit))
+    crate::Compiler::new(config_for_target(
+        target,
+        code_pack,
+        output_mode,
+        module_name,
+        explicit,
+        locale_base,
+    ))
 }
 
 fn config_for_target(
@@ -371,11 +443,22 @@ fn config_for_target(
     output_mode: crate::codegen::OutputMode,
     module_name: Option<&str>,
     explicit: bool,
+    locale_base: Option<&crate::driver::Config>,
 ) -> crate::driver::Config {
-    let config = crate::driver::Config::default()
+    let mut config = crate::driver::Config::default()
         .with_target(target)
         .with_output_mode(output_mode)
         .with_dev_locale_root();
+    // The caller's locale base is the pack source a product tool installs
+    // (faber's embedded reader packs): its root and loader serve the source's
+    // declared frontmatter locale, so an installed binary with no workspace
+    // `locale/` tree resolves `+++ locale = "…" +++` instead of failing
+    // `no_root` or silently reading English. A base root of `None` models
+    // exactly that binary, so it wins over dev-root discovery here.
+    if let Some(base) = locale_base {
+        config.locale_root = base.locale_root.clone();
+        config.locale_pack_loader = base.locale_pack_loader.clone();
+    }
     let config = match module_name {
         Some(name) => config.with_module_name(Some(name.to_owned())),
         None => config,
@@ -546,7 +629,11 @@ fn prepare_program_module_with_bindings(
     let mut pack = if session.config.locale_pack_explicit {
         session.config.locale_pack.clone()
     } else {
-        frontmatter_locale_pack_from_source(&session.config, &path.display().to_string(), source)
+        // A declared-but-unresolvable frontmatter locale fails closed here
+        //: falling back to the session pack would install it
+        // as an explicit override and the driver would never report the
+        // malformed declaration — the source silently compiled as English.
+        frontmatter_locale_pack_from_source(&session.config, &path.display().to_string(), source)?
             .or_else(|| session.config.locale_pack.clone())
     };
     let mut parsed = parse_program_for_namespace_exports(&path.display().to_string(), source, pack.as_ref());
@@ -965,14 +1052,15 @@ fn apply_tensor_edge_policy_requirements(interface: &mut FileInterface, provider
 }
 
 /// Analyze one parsed import target under the contract codegen needs
-/// (ARCH-U4 / S01-3): bodyless functions, the dev locale root, and the target
-/// package's `[reader] locale` pack — the exact configuration the Rust
-/// provider-module emitter analyzed under when it re-entered the front half
-/// from disk, aligned rather than forked, so carried emission facts cannot
-/// differ from the analysis-time facts they replace. Failures are carried as
-/// the marker, never propagated: the consumer's compile path does not analyze
-/// providers today and must not start failing on their diagnostics; emission
-/// fails closed on the marker instead.
+/// (ARCH-U4 / S01-3): the importing session's own config plus bodyless
+/// functions and the target package's `[reader] locale` pack — the exact
+/// configuration the Rust provider-module emitter analyzed under when it
+/// re-entered the front half from disk, aligned rather than forked, so
+/// carried emission facts cannot differ from the analysis-time facts they
+/// replace. Failures are carried as the marker, never propagated: the
+/// consumer's compile path does not analyze providers today and must not
+/// start failing on their diagnostics; emission fails closed on the marker
+/// instead.
 ///
 /// Public so the package-analysis path (radix-program) mints carriage through
 /// this same entry instead of forking the provider analysis config.
@@ -984,9 +1072,20 @@ pub fn provider_unit_for_target(
 ) -> crate::driver::CarriedProviderUnit {
     use crate::driver::CarriedProviderUnit;
 
-    let mut config = crate::driver::Config::default()
-        .with_bodyless_functions()
-        .with_dev_locale_root();
+    // Derives from the importing session's config: the
+    // provider analysis shares the run's locale policy — the caller's
+    // language-pack root and product loader — instead of minting a fresh
+    // default that re-discovers a workspace root the session explicitly has
+    // none of (an installed binary resolves the provider's declared locale
+    // through its embedded packs). The target, warning and praefixum policies
+    // ride along the same way, so carried emission facts match the analysis
+    // facts of the run that asked for them.
+    let mut config = session.config.clone().with_bodyless_functions();
+    // The provider's own reader surface wins over the importing session's
+    // pack selection (chain steps 1–2 of `import_target_locale_pack`): the
+    // session pack rides only as the non-explicit fallback, never as an
+    // explicit override that would mask a declared provider locale.
+    config.locale_pack_explicit = false;
     // The package `[reader] locale` (e.g. tela's `locale = "en"` for
     // `tela:valida`) is threaded as a non-explicit session pack so an English
     // provider stays English under an otherwise Latin-default session instead
@@ -1066,17 +1165,35 @@ pub fn provider_unit_for_target(
 ///
 /// Resolves relative paths, `norma:*`, and other `provider:module` imports via
 /// the configured library home.
+/// Test-support entry: the check walk now carries its own locale policy
+/// through [`import_contract_for_file_with_config`]; the in-repo tests keep
+/// the dev-default session this entry mints.
+#[cfg(test)]
 pub(crate) fn import_contract_for_file(
     path: &Path,
     source: &str,
     code_pack: ReaderPackRef<'_>,
     templates: Option<&BTreeMap<String, String>>,
 ) -> ImportContract {
+    import_contract_for_file_with_config(path, source, code_pack, templates, &crate::driver::Config::default())
+}
+
+/// [`import_contract_for_file`] under a caller-owned locale policy: the
+/// session the walk mints resolves a declared frontmatter locale through
+/// `config`'s root and product loader, so a product tool (faber's embedded
+/// reader packs) keeps its pack sources on this check-path walk too.
+pub(crate) fn import_contract_for_file_with_config(
+    path: &Path,
+    source: &str,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+    config: &crate::driver::Config,
+) -> ImportContract {
     // Session-less entry (check path, tests): one call is its own driver run,
     // so it mints a fresh session and its memo scope ends with the call. The
     // compile path threads the driver's own session through
     // `import_contract_for_parsed_file` instead.
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let session = crate::driver::Session::new(config.clone());
     import_contract_for_session(&session, path, source, code_pack, templates)
 }
 
@@ -1091,10 +1208,15 @@ fn import_contract_for_session(
     // into a reader pack before lexing, so the import contract must recognize
     // the same keyword surface or English-surface `import from …` / `const`
     // spellings are missed and module exports never install (corpus converted
-    // to the default English locale). Explicit caller packs still win.
-    let resolved_pack = code_pack
-        .map(ToOwned::to_owned)
-        .or_else(|| frontmatter_locale_pack_from_source(&session.config, &path.display().to_string(), source));
+    // to the default English locale). Explicit caller packs still win. A
+    // declared locale that cannot be resolved reads as no pack here — the
+    // authoritative diagnostic comes from the compile pass, which fails
+    // closed before this walk re-parses the consumer.
+    let resolved_pack = code_pack.map(ToOwned::to_owned).or_else(|| {
+        frontmatter_locale_pack_from_source(&session.config, &path.display().to_string(), source)
+            .ok()
+            .flatten()
+    });
     let Some((program, interner)) =
         parse_program_for_namespace_exports(&path.display().to_string(), source, resolved_pack.as_ref())
     else {
@@ -1390,15 +1512,20 @@ fn collect_transitive_same_package_interfaces(
 /// session that will parse the source is also the one that resolves its
 /// declared locale.
 ///
-/// Returns `None` when the source declares no locale or the declared pack
-/// cannot be loaded; the analysis driver surfaces the authoritative
-/// diagnostic for a malformed locale during the real compile.
+/// Returns `Ok(None)` when the source declares no locale. A declared locale
+/// that cannot be resolved (non-string value, invalid id, unloadable pack)
+/// returns its `LOCALE003` diagnostic: the caller fails closed instead of
+/// silently reading the source in another surface.
 pub(crate) fn frontmatter_locale_pack_from_source(
     config: &crate::driver::Config,
     name: &str,
     source: &str,
-) -> Option<crate::locale::LocalePack> {
-    let peeled = crate::driver::peel_raw_source(name, source).ok()?;
+) -> Result<Option<crate::locale::LocalePack>, Box<crate::Diagnostic>> {
+    // A source whose frontmatter block itself does not peel has no locale to
+    // resolve here; the real compile surfaces the source-load diagnostic.
+    let Ok(peeled) = crate::driver::peel_raw_source(name, source) else {
+        return Ok(None);
+    };
     frontmatter_locale_pack_from_frontmatter(config, peeled.frontmatter.as_ref())
 }
 
@@ -1406,14 +1533,26 @@ pub(crate) fn frontmatter_locale_pack_from_source(
 ///
 /// Shared by the tool surfaces that hold a [`crate::driver::SourceFile`] (whose
 /// `content` is already frontmatter-stripped) and by source-level callers that
-/// re-peel first. Returns `None` when no locale is declared or the declared
-/// pack cannot be loaded from `config`'s pack sources.
+/// re-peel first. Returns `Ok(None)` when no locale is declared; a declared
+/// locale that cannot be loaded from `config`'s pack sources returns its
+/// diagnostic (the same identity the analysis driver reports).
 pub(crate) fn frontmatter_locale_pack_from_frontmatter(
     config: &crate::driver::Config,
     frontmatter: Option<&crate::driver::FileFrontmatter>,
-) -> Option<crate::locale::LocalePack> {
-    let locale_id = frontmatter?.locale_result()?.ok()?;
-    crate::driver::resolve_frontmatter_locale_pack(config, locale_id).ok()
+) -> Result<Option<crate::locale::LocalePack>, Box<crate::Diagnostic>> {
+    let Some(frontmatter) = frontmatter else {
+        return Ok(None);
+    };
+    match frontmatter.locale_result() {
+        None => Ok(None),
+        Some(Err(())) => Err(Box::new(
+            crate::Diagnostic::error("frontmatter 'locale' key must be a string")
+                .with_phase(crate::diagnostics::DiagnosticPhase::Lex)
+                .with_code(crate::diagnostics::locale_unknown_spec().code)
+                .with_arg("issue", "not_a_string"),
+        )),
+        Some(Ok(locale_id)) => crate::driver::resolve_frontmatter_locale_pack(config, locale_id).map(Some),
+    }
 }
 
 /// Resolve an explicit `--locale <name>` to its reader pack via stdlib.
@@ -1440,7 +1579,10 @@ pub fn explicit_locale_pack(locale: Option<&str>) -> Result<Option<crate::locale
 /// A provider module is lexed in its own reader surface, not the importing
 /// module's. Resolution chain:
 ///
-/// 1. The target's own `+++ locale = "…" +++` frontmatter.
+/// 1. The target's own `+++ locale = "…" +++` frontmatter (a declared id that
+///    cannot be loaded falls through — the loose-file chain is a selection,
+///    and the fail-closed parse gate below reports a target that then does
+///    not parse).
 /// 2. The target package's `faber.toml` locale (no frontmatter).
 /// 3. The importing module's pack (loose same-locale files keep the session
 ///    `--locale` behavior).
@@ -1452,12 +1594,20 @@ pub(crate) fn import_target_locale_pack(
     reader_pack: ReaderPackRef<'_>,
 ) -> Option<crate::locale::LocalePack> {
     frontmatter_locale_pack_from_source(&session.config, &target_path.display().to_string(), target_source)
+        .ok()
+        .flatten()
         .or_else(|| package_reader_locale_pack(session, target_path))
         .or_else(|| reader_pack.cloned())
 }
 
 /// Resolve the `[reader] locale` reader pack declared by the package
 /// `faber.toml` containing `path`, when present.
+///
+/// Resolution goes through the session's own config (root + product loader):
+/// a caller-configured root or an installed binary's embedded packs serve the
+/// manifest locale, never a freshly discovered workspace default. An
+/// unresolvable manifest locale returns `None` — the caller's chain then
+/// keeps the importing module's pack, the documented loose-file fallback.
 pub(crate) fn package_reader_locale_pack(
     session: &crate::driver::Session,
     path: &Path,
@@ -1466,8 +1616,7 @@ pub(crate) fn package_reader_locale_pack(
     let manifest_path = package_root.join("faber.toml");
     let manifest = std::fs::read_to_string(manifest_path).ok()?;
     let locale_id = reader_locale_from_manifest(&manifest)?;
-    let config = crate::driver::Config::default();
-    crate::driver::resolve_frontmatter_locale_pack(&config, &locale_id).ok()
+    crate::driver::resolve_frontmatter_locale_pack(&session.config, &locale_id).ok()
 }
 
 /// Parse the `locale = "…"` value from a `faber.toml` manifest source.

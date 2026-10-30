@@ -544,6 +544,11 @@ pub(super) fn format_session(
         Config::default()
             .with_target(Target::HirFaber)
             .with_resolved_locale_pack(pack)
+            // Import targets resolve their own frontmatter/manifest locales
+            // through this session; the embedded reader packs keep that
+            // resolution working on an installed binary with no workspace
+            // `locale/` tree.
+            .with_locale_pack_loader(faber_cli::package::embedded_locale_pack_loader())
             .with_dev_locale_root(),
     ))
 }
