@@ -498,25 +498,35 @@ impl Builder {
     ) -> Result<Fragment, CfgError> {
         let mut clauses = Vec::new();
         for clause in &custodi.clauses {
+            // Each clause condition's operand chain runs ahead of its own
+            // condition node, in clause order (see `build_si`).
+            let mut cond_fragment = Fragment::empty();
+            self.build_nested_components(&clause.cond, &mut cond_fragment)?;
             let condition = self.cfg.add_node(
                 CfgNodeKind::Condition,
                 location(Some(clause.cond.id), None, clause.cond.span),
             );
+            self.connect_normals(&cond_fragment, condition, CfgEdgeKind::Next);
+            let cond_entry = cond_fragment.entry.unwrap_or(condition);
             let body = self.build_block(&clause.body)?;
-            clauses.push((condition, body));
+            clauses.push((condition, cond_entry, body));
         }
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(statement.id), None, statement.span),
         );
-        for (index, (condition, body)) in clauses.iter().enumerate() {
-            let successor = clauses.get(index + 1).map_or(join, |(next, _)| *next);
+        for (index, (condition, _cond_entry, body)) in clauses.iter().enumerate() {
+            let successor = clauses
+                .get(index + 1)
+                .map_or(join, |(_, next_entry, _)| *next_entry);
             self.cfg
                 .add_edge(*condition, successor, CfgEdgeKind::BranchFalse);
             self.connect_branch(*condition, body, successor, CfgEdgeKind::BranchTrue);
             self.connect_normals(body, successor, CfgEdgeKind::Next);
         }
-        let entry = clauses.first().map_or(join, |(condition, _)| *condition);
+        let entry = clauses
+            .first()
+            .map_or(join, |(_, cond_entry, _)| *cond_entry);
         Ok(Fragment::terminal_with_entry(entry, join))
     }
 
@@ -645,21 +655,22 @@ impl Builder {
     /// initializer may be a whole closure or reduction value), otherwise its
     /// value children in evaluation order. Plain value children recurse
     /// without nodes (their uses key to the ambient location); component
-    /// constructs are built through [`Self::build_expression`] so their
-    /// operand chains, component bodies and site nodes all exist and
-    /// sequence into `fragment`.
+    /// constructs and nested control expressions are built through
+    /// [`Self::build_expression`] so their operand chains, bodies, conditions
+    /// and site nodes all exist and sequence into `fragment` — folding a
+    /// control expression here would leave its branches without locations.
     fn build_nested_components(
         &mut self,
         expression: &HirExpression,
         fragment: &mut Fragment,
     ) -> Result<(), CfgError> {
-        if is_separate_component(&expression.kind) {
+        if is_separate_component(&expression.kind) || is_control_expression(expression) {
             let next = self.build_expression(expression)?;
             self.sequence(fragment, next);
             return Ok(());
         }
         for child in value_children(&expression.kind) {
-            if is_separate_component(&child.kind) {
+            if is_separate_component(&child.kind) || is_control_expression(child) {
                 let next = self.build_expression(child)?;
                 self.sequence(fragment, next);
             } else {
@@ -677,10 +688,18 @@ impl Builder {
         then_catch: Option<&HirCape>,
         else_block: Option<&HirBlock>,
     ) -> Result<Fragment, CfgError> {
+        // The condition's own operand chain (a closure or nested control
+        // expression written inside it) evaluates before the branch, so it
+        // sequences into the flow ahead of the condition node instead of
+        // silently keying its uses to the ambient location.
+        let mut cond_fragment = Fragment::empty();
+        self.build_nested_components(cond, &mut cond_fragment)?;
         let condition = self.cfg.add_node(
             CfgNodeKind::Condition,
             location(Some(cond.id), None, cond.span),
         );
+        self.connect_normals(&cond_fragment, condition, CfgEdgeKind::Next);
+        let cond_entry = cond_fragment.entry.unwrap_or(condition);
         let then_watermark = self.cfg.nodes.len();
         let then_fragment = self.build_block(then_block)?;
         let then_end = self.cfg.nodes.len();
@@ -710,7 +729,7 @@ impl Builder {
             };
             self.connect_branch(condition, &else_fragment, join, CfgEdgeKind::BranchFalse);
             self.connect_normals(&else_fragment, join, CfgEdgeKind::Next);
-            return Ok(Fragment::terminal_with_entry(condition, join));
+            return Ok(Fragment::terminal_with_entry(cond_entry, join));
         }
         let else_fragment = if let Some(else_block) = else_block {
             self.build_block(else_block)?
@@ -721,7 +740,7 @@ impl Builder {
         self.connect_branch(condition, &else_fragment, join, CfgEdgeKind::BranchFalse);
         self.connect_normals(&then_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&else_fragment, join, CfgEdgeKind::Next);
-        Ok(Fragment::terminal_with_entry(condition, join))
+        Ok(Fragment::terminal_with_entry(cond_entry, join))
     }
 
     fn build_dum(
@@ -730,6 +749,13 @@ impl Builder {
         cond: &HirExpression,
         body: &HirBlock,
     ) -> Result<Fragment, CfgError> {
+        // The condition re-evaluates every iteration, so its operand chain
+        // (a closure or nested control expression written inside it) sits on
+        // the loop cycle: entry and every back edge re-enter it before the
+        // header. Keeping the chain off the cycle would shorten anchored
+        // regions below their true liveness across the body.
+        let mut cond_fragment = Fragment::empty();
+        self.build_nested_components(cond, &mut cond_fragment)?;
         let header = self.cfg.add_node(
             CfgNodeKind::Condition,
             location(Some(cond.id), None, cond.span),
@@ -738,9 +764,11 @@ impl Builder {
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
+        let cond_entry = cond_fragment.entry.unwrap_or(header);
+        self.connect_normals(&cond_fragment, header, CfgEdgeKind::Next);
         self.scopes.push(Scope {
             break_to: exit,
-            continue_to: Some(header),
+            continue_to: Some(cond_entry),
         });
         let body_fragment = self.build_block(body);
         self.scopes.pop();
@@ -749,11 +777,11 @@ impl Builder {
             self.cfg
                 .add_edge(header, body_entry, CfgEdgeKind::BranchTrue);
         } else {
-            self.cfg.add_edge(header, header, CfgEdgeKind::LoopBack);
+            self.cfg.add_edge(header, cond_entry, CfgEdgeKind::LoopBack);
         }
         self.cfg.add_edge(header, exit, CfgEdgeKind::BranchFalse);
-        self.connect_normals(&body_fragment, header, CfgEdgeKind::LoopBack);
-        Ok(Fragment::terminal_with_entry(header, exit))
+        self.connect_normals(&body_fragment, cond_entry, CfgEdgeKind::LoopBack);
+        Ok(Fragment::terminal_with_entry(cond_entry, exit))
     }
 
     fn build_loop(
@@ -1119,7 +1147,14 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
         }
         K::Field(object, _) => children.push(object),
         K::Index(object, index) => children.extend([object.as_ref(), index.as_ref()]),
-        K::OptionalChain(object, _) | K::NonNull(object, _) => children.push(object),
+        K::OptionalChain(object, kind) => {
+            children.push(object);
+            optional_payload(kind, &mut children);
+        }
+        K::NonNull(object, kind) => {
+            children.push(object);
+            non_null_payload(kind, &mut children);
+        }
         K::Intervallum {
             start, end, step, ..
         } => {
@@ -1205,6 +1240,37 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
         _ => {}
     }
     children
+}
+
+/// The value-position payload of a null-safe suffix: its index operand and
+/// its call arguments all evaluate in the enclosing flow, so a component or
+/// control expression written in them must reach the CFG builder.
+fn optional_payload<'a>(
+    kind: &'a radix_hir::HirOptionalChainKind,
+    children: &mut Vec<&'a HirExpression>,
+) {
+    match kind {
+        radix_hir::HirOptionalChainKind::Member(_) => {}
+        radix_hir::HirOptionalChainKind::Index(index) => children.push(index),
+        radix_hir::HirOptionalChainKind::Call(args) => {
+            children.extend(args.iter().map(|arg| &arg.expr));
+        }
+    }
+}
+
+/// The value-position payload of a non-null suffix, same rule as
+/// [`optional_payload`].
+fn non_null_payload<'a>(
+    kind: &'a radix_hir::HirNonNullKind,
+    children: &mut Vec<&'a HirExpression>,
+) {
+    match kind {
+        radix_hir::HirNonNullKind::Value | radix_hir::HirNonNullKind::Member(_) => {}
+        radix_hir::HirNonNullKind::Index(index) => children.push(index),
+        radix_hir::HirNonNullKind::Call(args) => {
+            children.extend(args.iter().map(|arg| &arg.expr));
+        }
+    }
 }
 
 /// Whether a local binding's initializer determines control flow and so must
