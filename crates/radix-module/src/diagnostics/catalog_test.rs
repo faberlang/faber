@@ -195,6 +195,7 @@ fn semantic_code_table() -> Vec<(SemanticErrorKind, &'static str)> {
         (SemanticErrorKind::MemberInaccessible, "SEM063"),
         (SemanticErrorKind::PraefixumInvalid, "SEM064"),
         (SemanticErrorKind::ConstSharedIntoVar, "SEM065"),
+        (SemanticErrorKind::CopyNonduplicable, "SEM066"),
     ]
 }
 
