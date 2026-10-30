@@ -192,6 +192,10 @@ mod borrow_region_stress_test;
 mod borrow_region_parity_test;
 
 #[cfg(test)]
+#[path = "borrow_region_coverage_test.rs"]
+mod borrow_region_coverage_test;
+
+#[cfg(test)]
 #[path = "collect_test.rs"]
 mod collect_test;
 

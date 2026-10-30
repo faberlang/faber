@@ -4380,3 +4380,7 @@ help = "检查原因，并使用所选设备支持的内核形式。"
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "内核 `{kernel}`：其跨 {partitions} 个分区的 {kind} 是可以避免的：{avoidable}（{reason}）"
 help = "根据审计原因查找依赖。尽可能让分区读写保持在各自车道内，并使用匹配的缓冲区布局。"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "尚不能为 '{construct}' 构建借用区域事实；借用检查器直接报错而不做近似"
+help = "该构造的借用判定需要区域推断；请报告以便区域引擎覆盖它"
