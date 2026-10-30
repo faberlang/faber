@@ -772,6 +772,14 @@ help = "把层级写在 `@ {nucleum}` 函数声明上，或删除它"
 message = "`@ nucleum` fragment 与图形 fragment annotation 冲突"
 help = "移除其中一个 fragment annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "该声明同时带有 `@ {nucleum}` 注解和 `{nucleum}` 声明头"
+help = "只保留一个声明头：`@ {nucleum}` 注解或 `{nucleum}` 声明头"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` 表示主机端转换；`{nucleum}` 声明头表示设备内核"
+help = "删除 `@ {conversio}` 或 `{nucleum}` 声明头；转换行是主机函数"
+
 [diagnostics.PARSE019]
 message = "重复修饰符"
 help = "删除重复的修饰符"
