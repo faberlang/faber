@@ -3089,15 +3089,18 @@ comment.
 
 ## Testing
 
-`ทดสอบ` modifiers include `คาดหวัง_ล้มเหลว` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `ละเว้น`,
+`ทดสอบ` modifiers include `คาดหวัง_ล้มเหลว` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `คาดหวัง_ล้มเหลว`, because it does not establish that the body failed. With
+`ทำซ้ำ N`, every run must satisfy `คาดหวัง_ล้มเหลว`. The other modifiers are `ละเว้น`,
 `ค้าง`, `เฉพาะ`, `เฉพาะใน`, `แท็ก`, `เวลา`, `วัด`, `ทำซ้ำ`, and
 `เปราะบาง`. `ทำซ้ำ N` runs the case N times and passes only if every run
-passes; it does not retry until a pass. `เปราะบาง N` is rejected by `faber test`
-because flaky retries are not executed, so the case body does not run. The
-counts of `เวลา`, `ทำซ้ำ` and `เปราะบาง` are non-negative integer literals;
-a float is `test_modifier_integer`.
+satisfies the case's expectations; it does not retry until a pass. `เปราะบาง N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `เวลา`, `ทำซ้ำ` and `เปราะบาง` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 

@@ -3089,15 +3089,18 @@ comment.
 
 ## Testing
 
-`اختبر` modifiers include `توقع_الفشل` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `أهمل`,
+`اختبر` modifiers include `توقع_الفشل` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `توقع_الفشل`, because it does not establish that the body failed. With
+`معاد N`, every run must satisfy `توقع_الفشل`. The other modifiers are `أهمل`,
 `مستقبلي`, `فقط`, `حصري`, `وسم`, `زمني`, `قس`, `معاد`, and
 `هش`. `معاد N` runs the case N times and passes only if every run
-passes; it does not retry until a pass. `هش N` is rejected by `faber test`
-because flaky retries are not executed, so the case body does not run. The
-counts of `زمني`, `معاد` and `هش` are non-negative integer literals;
-a float is `test_modifier_integer`.
+satisfies the case's expectations; it does not retry until a pass. `هش N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `زمني`, `معاد` and `هش` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 

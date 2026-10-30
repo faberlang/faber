@@ -3089,15 +3089,18 @@ comment.
 
 ## Testing
 
-`測試` modifiers include `預期失敗` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `略過`,
+`測試` modifiers include `預期失敗` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `預期失敗`, because it does not establish that the body failed. With
+`重複 N`, every run must satisfy `預期失敗`. The other modifiers are `略過`,
 `預期`, `僅限`, `僅限於`, `標籤`, `時限`, `測量`, `重複`, and
 `脆弱`. `重複 N` runs the case N times and passes only if every run
-passes; it does not retry until a pass. `脆弱 N` is rejected by `faber test`
-because flaky retries are not executed, so the case body does not run. The
-counts of `時限`, `重複` and `脆弱` are non-negative integer literals;
-a float is `test_modifier_integer`.
+satisfies the case's expectations; it does not retry until a pass. `脆弱 N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `時限`, `重複` and `脆弱` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 
