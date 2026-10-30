@@ -280,7 +280,7 @@ impl FunctionBuilder<'_> {
             _ => identity.as_deref(),
         };
         Some(self.lower_filum_reduce_expr(
-            super::control::FilumReduceLowering {
+            &super::control::FilumReduceLowering {
                 op: *op,
                 form: MirFilumForm::Grid,
                 source: tensor,
@@ -310,7 +310,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         self.lower_filum_reduce_expr(
-            super::control::FilumReduceLowering {
+            &super::control::FilumReduceLowering {
                 op: *op,
                 form: MirFilumForm::Grid,
                 source,

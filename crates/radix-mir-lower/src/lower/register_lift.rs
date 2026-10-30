@@ -435,7 +435,7 @@ impl FunctionBuilder<'_> {
         let value = self.lower_expr_value(operand)?;
         if self.lift_operand(operand) == LiftOperand::Matrix {
             let ty = MirType::semantic(operand.ty?);
-            return Some(LaneSource::Cells(self.value_base_place(value, ty, operand.span)?));
+            return Some(LaneSource::Cells(self.value_base_place(value, ty, operand.span)));
         }
         Some(LaneSource::Scalar(value))
     }

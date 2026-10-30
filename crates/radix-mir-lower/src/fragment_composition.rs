@@ -105,7 +105,7 @@ impl FragmentCompositionError {
     pub fn message(&self) -> String {
         let rendered = match self.issue {
             ISSUE_CYCLE => nucleum_fragment_cycle_message(&self.args),
-            ISSUE_EXPANSION => nucleum_fragment_expansion_message(self.reason, &self.args),
+            ISSUE_EXPANSION => Some(nucleum_fragment_expansion_message(self.reason, &self.args)),
             _ => None,
         };
         rendered.unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))
@@ -119,12 +119,12 @@ fn nucleum_fragment_cycle_message(args: &[DiagnosticArg]) -> Option<String> {
     Some(format!("nucleum fragment call cycle: {cycle}"))
 }
 
-fn nucleum_fragment_expansion_message(reason: &str, args: &[DiagnosticArg]) -> Option<String> {
+fn nucleum_fragment_expansion_message(reason: &str, args: &[DiagnosticArg]) -> String {
     let kind = arg_value(args, "kind").or(Some(reason));
     let observed = arg_value(args, "observed");
     let limit = arg_value(args, "limit");
     let chain = arg_value(args, "chain");
-    Some(match (kind, observed, limit, chain) {
+    match (kind, observed, limit, chain) {
         (Some("survived"), _, _, _) => "nucleum fragment call survived composition".to_owned(),
         (Some("unresolved"), _, _, _) => "nucleum fragment call could not be resolved for composition".to_owned(),
         (Some("failable"), _, _, _) => "nucleum fragment call cannot use a failable terminator".to_owned(),
@@ -135,7 +135,7 @@ fn nucleum_fragment_expansion_message(reason: &str, args: &[DiagnosticArg]) -> O
             format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed})")
         }
         _ => "nucleum fragment expansion exceeds the documented budget".to_owned(),
-    })
+    }
 }
 
 /// Compose every device call into its caller with the explicit metadata
@@ -192,10 +192,9 @@ pub fn compose_keeping_template_callees(
     templates: &[MirFunction],
 ) -> Vec<FragmentCompositionError> {
     let template_callees = {
-        let resolver = Resolver { functions: templates, monomorphizations, roles, metadata };
         templates
             .iter()
-            .flat_map(|template| resolver.all_callees(template))
+            .flat_map(Resolver::all_callees)
             .map(|site| site.callee)
             .collect::<Vec<_>>()
     };
@@ -353,13 +352,7 @@ impl CompositionPass<'_> {
             }
         }
         for function in self.functions.iter() {
-            let resolver = Resolver {
-                functions: self.functions,
-                monomorphizations: self.monomorphizations,
-                roles: self.roles,
-                metadata: self.metadata,
-            };
-            for site in resolver.all_callees(function) {
+            for site in Resolver::all_callees(function) {
                 match site.callee {
                     MirCallee::Function(id) => {
                         referenced_ids.insert(id);
@@ -1038,14 +1031,14 @@ impl Resolver<'_> {
     /// pass only expands device callers, so host-boundary call sites stay
     /// untouched.
     fn device_sites(&self, function: &MirFunction) -> Vec<CallSite> {
-        self.all_callees(function)
+        Self::all_callees(function)
             .into_iter()
             .filter(|site| self.is_device_callee(&site.callee))
             .collect()
     }
 
     /// Every call site in one function, device or not (prune reference scan).
-    fn all_callees(&self, function: &MirFunction) -> Vec<CallSite> {
+    fn all_callees(function: &MirFunction) -> Vec<CallSite> {
         let mut sites = Vec::new();
         for (block_index, block) in function.blocks.iter().enumerate() {
             for (stmt_index, stmt) in block.statements.iter().enumerate() {
