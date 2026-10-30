@@ -1223,8 +1223,9 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                                     // lane lowers per element (`t.sqrt()` /
                                     // `t.exp()`); the other `MirMathFunction`
                                     // members keep the named reject below.
-                                    | MirCollectionOp::TensorMath(MirMathFunction::Sqrt)
-                                    | MirCollectionOp::TensorMath(MirMathFunction::Exp),
+                                    | MirCollectionOp::TensorMath(
+                                        MirMathFunction::Sqrt | MirMathFunction::Exp,
+                                    ),
                             )
                             | MirIntrinsic::FilumReduce(_)
                             | MirIntrinsic::Scan(_)
