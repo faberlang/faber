@@ -3832,12 +3832,19 @@ fn multiply(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
 
 fn floor_divide(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> Option<KernelRangeExpr> {
     if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
-        if rhs == 0 {
-            return None;
-        }
-        return lhs.checked_div_euclid(rhs).map(KernelRangeExpr::Constant);
+        return checked_floor_quotient(lhs, rhs).map(KernelRangeExpr::Constant);
     }
     Some(KernelRangeExpr::FloorDivide(Box::new(lhs), Box::new(rhs)))
+}
+
+fn checked_floor_quotient(lhs: i128, rhs: i128) -> Option<i128> {
+    let quotient = lhs.checked_div(rhs)?;
+    let remainder = lhs.checked_rem(rhs)?;
+    if remainder != 0 && (lhs < 0) != (rhs < 0) {
+        quotient.checked_sub(1)
+    } else {
+        Some(quotient)
+    }
 }
 
 fn minimum(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
@@ -3864,10 +3871,7 @@ fn constant(expr: &KernelRangeExpr) -> Option<i128> {
         KernelRangeExpr::Subtract(lhs, rhs) => constant(lhs)?.checked_sub(constant(rhs)?),
         KernelRangeExpr::Multiply(lhs, rhs) => constant(lhs)?.checked_mul(constant(rhs)?),
         KernelRangeExpr::FloorDivide(lhs, rhs) => {
-            let rhs = constant(rhs)?;
-            (rhs != 0)
-                .then(|| constant(lhs)?.checked_div_euclid(rhs))
-                .flatten()
+            checked_floor_quotient(constant(lhs)?, constant(rhs)?)
         }
         KernelRangeExpr::Minimum(lhs, rhs) => Some(constant(lhs)?.min(constant(rhs)?)),
         KernelRangeExpr::Maximum(lhs, rhs) => Some(constant(lhs)?.max(constant(rhs)?)),
@@ -4035,19 +4039,19 @@ fn symbolic_bounds(expr: &KernelRangeExpr) -> SymbolicBounds {
                 SymbolicBounds {
                     minimum: numerator
                         .minimum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                     maximum: numerator
                         .maximum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                 }
             } else {
                 SymbolicBounds {
                     minimum: numerator
                         .maximum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                     maximum: numerator
                         .minimum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                 }
             }
         }
