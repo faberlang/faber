@@ -258,27 +258,27 @@ impl Parser {
             let (name, path, name_str, authored_word) = self.parse_type_head()?;
             if let Some(width) = radix_types::numeric_width::lista_sugar_width_marker(&name_str) {
                 form = TypeFormLevel::SHORT;
-                self.parse_lista_width_sugar(name, width)?
+                self.parse_lista_width_sugar(&name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::tensor_sugar_width_marker(&name_str)
             {
                 form = TypeFormLevel::SHORT;
-                self.parse_tensor_width_sugar(name, width)?
+                self.parse_tensor_width_sugar(&name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::vector_sugar_width_marker(&name_str)
             {
                 form = TypeFormLevel::SHORT;
-                self.parse_vector_width_sugar(name, width)?
+                self.parse_vector_width_sugar(&name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::matrix_sugar_width_marker(&name_str)
             {
                 form = TypeFormLevel::SHORT;
-                self.parse_matrix_width_sugar(name, width)?
+                self.parse_matrix_width_sugar(&name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::sparsa_sugar_width_marker(&name_str)
             {
                 form = TypeFormLevel::SHORT;
-                self.parse_sparsa_width_sugar(name, width)?
+                self.parse_sparsa_width_sugar(&name, width)?
             } else if path.len() == 1
                 && matches!(name_str.as_str(), "numerus" | "fractus")
                 && self.check(&TokenKind::LtAscii)
@@ -641,7 +641,7 @@ impl Parser {
 
     fn parse_lista_width_sugar(
         &mut self,
-        name: Ident,
+        name: &Ident,
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("lista")?;
@@ -657,7 +657,7 @@ impl Parser {
 
     fn parse_tensor_width_sugar(
         &mut self,
-        name: Ident,
+        name: &Ident,
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("tensor")?;
@@ -672,7 +672,7 @@ impl Parser {
 
     fn parse_vector_width_sugar(
         &mut self,
-        name: Ident,
+        name: &Ident,
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("vector")?;
@@ -687,7 +687,7 @@ impl Parser {
 
     fn parse_matrix_width_sugar(
         &mut self,
-        name: Ident,
+        name: &Ident,
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("matrix")?;
@@ -701,7 +701,7 @@ impl Parser {
 
     fn parse_sparsa_width_sugar(
         &mut self,
-        name: Ident,
+        name: &Ident,
         width: &str,
     ) -> Result<TypeExprKind, ParseError> {
         self.reject_type_sugar_angle_bracket("sparsa")?;
