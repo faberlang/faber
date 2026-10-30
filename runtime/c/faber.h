@@ -1942,7 +1942,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
  * drift: a list is a pointer to an arena-allocated `faber_list_<name>`, so
  * every bind aliases (semantics R1); growth doubles into a fresh arena
  * buffer. */
-#define FABER_LIST_FAMILY(NAME, TYPE)                                                   \
+#define FABER_LIST_FAMILY(NAME, TYPE, ZERO)                                              \
     typedef struct faber_list_##NAME {                                                  \
         TYPE *items;                                                                    \
         int64_t len;                                                                    \
@@ -1972,8 +1972,24 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
     static inline faber_list_##NAME *faber_list_##NAME##_new_fixed(faber_arena *arena,  \
                                                                   int64_t capacity) {   \
         faber_list_##NAME *list = faber_list_##NAME##_new(arena, capacity);             \
+        int64_t at;                                                                     \
+        for (at = 0; at < capacity; at++) {                                             \
+            list->items[at] = (ZERO);                                                   \
+        }                                                                               \
         list->fixed = true;                                                             \
         return list;                                                                    \
+    }                                                                                   \
+                                                                                        \
+    static inline void faber_list_##NAME##_clear(faber_list_##NAME *list) {             \
+        int64_t at;                                                                     \
+        if (list->fixed) {                                                              \
+            for (at = 0; at < list->cap; at++) {                                        \
+                list->items[at] = (ZERO);                                               \
+            }                                                                           \
+        }                                                                               \
+        list->len = 0;                                                                  \
+        list->set_slots = NULL;                                                         \
+        list->set_mask = 0;                                                             \
     }                                                                                   \
                                                                                         \
     static inline faber_list_##NAME *faber_list_##NAME##_of(                            \
@@ -2094,26 +2110,26 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         list->items[faber_list_index(index, list->len)] = item;                         \
     }
 
-FABER_LIST_FAMILY(i64, int64_t)
-FABER_LIST_FAMILY(text, faber_text)
-FABER_LIST_FAMILY(bool, bool)
-FABER_LIST_FAMILY(f64, double)
-FABER_LIST_FAMILY(f32, float)
+FABER_LIST_FAMILY(i64, int64_t, 0)
+FABER_LIST_FAMILY(text, faber_text, faber_text_empty.s)
+FABER_LIST_FAMILY(bool, bool, false)
+FABER_LIST_FAMILY(f64, double, 0.0)
+FABER_LIST_FAMILY(f32, float, 0.0)
 /* Raw bits have their own ABI families: they must not alias the `uN`
  * modular-word family even though both use the same unsigned C cell. */
-FABER_LIST_FAMILY(b8, uint8_t)
-FABER_LIST_FAMILY(b16, uint16_t)
-FABER_LIST_FAMILY(b32, uint32_t)
-FABER_LIST_FAMILY(b64, uint64_t)
+FABER_LIST_FAMILY(b8, uint8_t, 0)
+FABER_LIST_FAMILY(b16, uint16_t, 0)
+FABER_LIST_FAMILY(b32, uint32_t, 0)
+FABER_LIST_FAMILY(b64, uint64_t, 0)
 /* `list<wrapping<W>>` (modular words): the stored cell is the plain width,
  * written only through the modular store and read widened by the emitter. */
-FABER_LIST_FAMILY(i8, int8_t)
-FABER_LIST_FAMILY(i16, int16_t)
-FABER_LIST_FAMILY(i32, int32_t)
-FABER_LIST_FAMILY(u8, uint8_t)
-FABER_LIST_FAMILY(u16, uint16_t)
-FABER_LIST_FAMILY(u32, uint32_t)
-FABER_LIST_FAMILY(u64, uint64_t)
+FABER_LIST_FAMILY(i8, int8_t, 0)
+FABER_LIST_FAMILY(i16, int16_t, 0)
+FABER_LIST_FAMILY(i32, int32_t, 0)
+FABER_LIST_FAMILY(u8, uint8_t, 0)
+FABER_LIST_FAMILY(u16, uint16_t, 0)
+FABER_LIST_FAMILY(u32, uint32_t, 0)
+FABER_LIST_FAMILY(u64, uint64_t, 0)
 
 /* A list of raw b8 cells is a byte view of a list at another fixed width.
  * `faber_bits_to_bytes` copies the elements in their host memory order;
@@ -2409,7 +2425,7 @@ static inline int32_t faber_f32_total_key(float value) {
 #define FABER_LIST_LT_F64(a, b) (faber_f64_total_key(a) < faber_f64_total_key(b))
 #define FABER_LIST_LT_F32(a, b) (faber_f32_total_key(a) < faber_f32_total_key(b))
 
-#define FABER_LIST_OPS(NAME, TYPE, EQ, LT)                                              \
+#define FABER_LIST_OPS(NAME, TYPE, EQ, LT, ZERO)                                       \
     /* `xs.get(i)` / `first` / `last`: false when there is no such element. */          \
     static inline bool faber_list_##NAME##_get(const faber_list_##NAME *list,           \
                                                faber_i128 index, TYPE *out) {           \
@@ -2532,6 +2548,9 @@ static inline int32_t faber_f32_total_key(float value) {
         *out = list->items[0];                                                          \
         memmove(list->items, list->items + 1, (size_t)(list->len - 1) * sizeof *list->items);\
         list->len--;                                                                    \
+        if (list->fixed) {                                                              \
+            list->items[list->len] = (ZERO);                                            \
+        }                                                                               \
         return true;                                                                    \
     }                                                                                   \
                                                                                         \
@@ -2541,25 +2560,28 @@ static inline int32_t faber_f32_total_key(float value) {
             return false;                                                               \
         }                                                                               \
         *out = list->items[--list->len];                                                \
+        if (list->fixed) {                                                              \
+            list->items[list->len] = (ZERO);                                            \
+        }                                                                               \
         return true;                                                                    \
     }
 
-FABER_LIST_OPS(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT)
-FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64)
-FABER_LIST_OPS(f32, float, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F32)
-FABER_LIST_OPS(i8, int8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(i16, int16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(i32, int32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(u8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(b8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(b16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(b32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
-FABER_LIST_OPS(b64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR)
+FABER_LIST_OPS(i64, int64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(text, faber_text, FABER_LIST_EQ_TEXT, FABER_LIST_LT_TEXT, faber_text_empty.s)
+FABER_LIST_OPS(bool, bool, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, false)
+FABER_LIST_OPS(f64, double, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F64, 0.0)
+FABER_LIST_OPS(f32, float, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_F32, 0.0)
+FABER_LIST_OPS(i8, int8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(i16, int16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(i32, int32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(u8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(u16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(u32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(u64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(b8, uint8_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(b16, uint16_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(b32, uint32_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
+FABER_LIST_OPS(b64, uint64_t, FABER_LIST_EQ_SCALAR, FABER_LIST_LT_SCALAR, 0)
 
 /* Sets (`copia<T>`): the list storage under the set contract, plus an
  * open-addressing index over the element positions so membership stays
