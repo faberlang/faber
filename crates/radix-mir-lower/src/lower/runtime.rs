@@ -1787,6 +1787,7 @@ impl FunctionBuilder<'_> {
             join_block: fail_block,
             error_paths: false,
             depth: self.capture_depth,
+            carrier: TrapCarrier::RawError,
         });
         let call = self.lower_failable_call(callee, args, ty, err_ty, None, span);
         let error_paths = self.traps.pop().is_some_and(|trap| trap.error_paths);
@@ -3832,7 +3833,7 @@ impl FunctionBuilder<'_> {
                     span,
                 );
                 self.switch_to(error_block);
-                self.assign(trap.destination, MirOperand::Temp(error_temp), err_ty, span);
+                self.store_trapped_error(&trap, MirOperand::Temp(error_temp), err_ty, span);
                 self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
                 self.switch_to(ok_block);
                 return Some(MirOperand::Constant(MirConstant::Unit));
@@ -3851,7 +3852,7 @@ impl FunctionBuilder<'_> {
                 span,
             );
             self.switch_to(error_block);
-            self.assign(trap.destination, MirOperand::Temp(error_temp), err_ty, span);
+            self.store_trapped_error(&trap, MirOperand::Temp(error_temp), err_ty, span);
             self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
             self.switch_to(ok_block);
             return Some(MirOperand::Temp(destination));
