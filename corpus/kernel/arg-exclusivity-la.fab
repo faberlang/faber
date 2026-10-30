@@ -1,0 +1,68 @@
++++
+term = "nucleum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "fixum_decl", "incipit_stmt", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "transfer", "assignment", "place", "additive_expr", "redde_stmt"]
+category = "kernel"
+canonical = false
+summary = "Nuclei argumentorum exklusivitas (la): argumentum scribendum (`varia`/`penes`) cellam cum nullo alio argumento eius vocationis habet; duplicationes et vistas lectae manent licitae."
+syntax = "axpy(varia t, t)"
+related = ["nucleum", "mutabilitas", "tensor"]
+locale = "la"
+no_expected = "needs-device"
++++
+# =============================================================================
+# nucleum — kernel argument exclusivity at the call site (la)
+# =============================================================================
+#
+# What this teaches:
+#   • A kernel's arguments are device buffers that stay live together for the
+#     whole launch, so a writable argument (`varia`, `penes`) must not overlap
+#     any other argument of the same call: not the whole tensor spelled
+#     twice, not a `←` alias of it, not a view of the same storage.
+#   • Read-only arguments may overlap freely: duplicate tensors and
+#     overlapping views are legal because nothing writes them.
+#   • An independent value — an `exemplum` bind or a `materialize()` result —
+#     is fresh storage, so it never overlaps the writable argument.
+#
+# Common mistakes:
+#   • passing `t` twice, one side `varia` — see arg-exclusivity-reject-la
+#   • assuming argument order matters — the rule is about storage overlap,
+#     and it holds whichever side the writable argument is on
+#
+# See also: nucleum, mutabilitas, tensor
+# =============================================================================
+
+@ nucleum
+@ publica
+functio axpy(varia tf32[3] y, tf32[3] x) → vacuum {
+    y ⇇ x
+}
+
+@ nucleum
+@ publica
+functio add2(tf32[3] a, tf32[3] b) → f32 {
+    redde a[[0]] + b[[0]]
+}
+
+incipit {
+    varia tf32[3] t ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    sit tf32[3] s ← [9.0, 8.0, 7.0] ↦ tf32[3]
+
+    # Read-only duplicates stay legal: nothing writes, so the launch may
+    # share storage.
+    add2(t, t)
+
+    # Read-only overlapping views of one tensor stay legal.
+    add2(t.forma([3]), t.forma([3]))
+    sit tf32[3] rv ← t.forma([3])
+    add2(rv, t.forma([3]))
+
+    # A writable argument beside a disjoint tensor is the ordinary shape.
+    axpy(varia t, s)
+
+    # An independent copy is fresh storage, never an overlap.
+    sit tf32[3] dup ← exemplum t
+    axpy(varia t, dup)
+    sit tf32[3] solid ← t.forma([3]).materialize()
+    axpy(varia t, solid)
+}

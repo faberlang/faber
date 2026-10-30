@@ -102,6 +102,9 @@ const ISSUE_MUT_TENSOR_PARAM_REBIND: &str = "mut_tensor_param_rebind";
 const ISSUE_ASSIGN_TO_NONMUT_TENSOR_PARAM: &str = "assign_to_nonmut_tensor_param";
 const ISSUE_IMMUTABLE_SECOND_ASSIGNMENT: &str = "immutable_second_assignment";
 const ISSUE_MUT_ARGUMENT_NOT_WRITABLE: &str = "mut_argument_not_writable";
+/// Ruling 7b25889f R6 (K1): a writable kernel argument overlaps another
+/// argument of the same call.
+const ISSUE_KERNEL_ARGUMENT_OVERLAP: &str = "kernel_argument_overlap";
 const ISSUE_MUTATING_METHOD_ON_IMMUTABLE: &str =
     "imperativus_operator_method_requires_varia_receiver";
 
@@ -355,6 +358,11 @@ struct BorrowChecker<'a> {
     /// Function param contracts keyed by callee `DefId` (named calls leave
     /// `callee.ty` unset; this index supplies own-param dest facts).
     func_params: FxHashMap<DefId, Vec<ParamType>>,
+    /// Kernel and kernel-fragment functions of this unit, keyed by callee
+    /// `DefId`: their arguments are device buffers live simultaneously for a
+    /// whole launch, so their call sites run the kernel argument exclusivity
+    /// rule (ruling 7b25889f R6 K1).
+    kernel_fns: FxHashSet<DefId>,
     /// Declared class-method param contracts keyed by `(class, method name)`: a
     /// user `MethodCall` carries no callee expression, so the call-site rules
     /// resolve its parameters from the receiver's class.
@@ -428,6 +436,7 @@ impl<'a> BorrowChecker<'a> {
             immutable_locals: FxHashSet::default(),
             unmarked_params: FxHashSet::default(),
             func_params: FxHashMap::default(),
+            kernel_fns: FxHashSet::default(),
             method_params: FxHashMap::default(),
             imported_method_params: FxHashMap::default(),
             resolver,
@@ -471,6 +480,9 @@ impl<'a> BorrowChecker<'a> {
 
     fn index_function(&mut self, def_id: DefId, func: &HirFunction) {
         self.func_params.insert(def_id, Self::declared_params(func));
+        if func.is_kernel || func.nucleum_fragment {
+            self.kernel_fns.insert(def_id);
+        }
     }
 
     /// Seed `imported_method_params` from the resolver's file interfaces.
@@ -829,6 +841,11 @@ impl<'a> BorrowChecker<'a> {
             return;
         };
         let params = params.to_vec();
+        if matches!(&callee.kind, HirExpressionKind::Path(def_id)
+            if self.kernel_fns.contains(def_id))
+        {
+            self.check_kernel_argument_exclusivity(&params, args);
+        }
         // Named function Paths leave `callee.ty` unset. Applying the retired
         // lifetime simulation to those calls would reject D-1 unmarked
         // `const` → `mut` param use. Language `mut` dest borrows are
@@ -1014,6 +1031,91 @@ impl<'a> BorrowChecker<'a> {
                 );
             }
         }
+    }
+
+    /// Kernel argument exclusivity (ruling 7b25889f R6 K1).
+    ///
+    /// WHY: a kernel's arguments are device buffers that are live
+    /// simultaneously for the whole launch, so a writable argument (`mut`,
+    /// `own`) must not overlap any other argument of the same call: not the
+    /// whole tensor spelled twice, not a `←` alias of it, not a view of the
+    /// same storage. Where overlap cannot be proven absent the call is
+    /// refused at the call site. Read-only duplicates and read-only
+    /// overlapping views stay legal — nothing writes them, so a launch may
+    /// share that storage. This rule is the soundness argument every GPU
+    /// emitter cites for placing `noalias` on kernel parameter bindings; the
+    /// launch-time buffer check is the second, runtime half of the contract.
+    ///
+    /// EDGE: a view argument is skipped here in both directions — a view in
+    /// a writable position and a view overlapping a writable argument are
+    /// already named by `tensor_view_read_only`, so the pair is reported
+    /// once, by the rule that owns it. A scalar or temporary argument
+    /// carries no storage and never overlaps. When both arguments of an
+    /// overlapping pair are writable, the pair is reported once, at the
+    /// earlier position.
+    fn check_kernel_argument_exclusivity(&mut self, params: &[ParamType], args: &[HirCallArg]) {
+        let storages: Vec<FxHashSet<DefId>> = args
+            .iter()
+            .map(|arg| self.kernel_arg_storage(&arg.expr))
+            .collect();
+        for (index, arg) in args.iter().enumerate() {
+            if !params
+                .get(index)
+                .is_some_and(|param| self.dest_is_mut_or_own(param))
+                || self.stores_tensor_view(&arg.expr)
+            {
+                continue;
+            }
+            for other in 0..args.len() {
+                if other == index || self.stores_tensor_view(&args[other].expr) {
+                    continue;
+                }
+                if storages[index].is_disjoint(&storages[other]) {
+                    continue;
+                }
+                if params
+                    .get(other)
+                    .is_some_and(|param| self.dest_is_mut_or_own(param))
+                    && other < index
+                {
+                    continue;
+                }
+                self.kernel_argument_overlap_error(&arg.expr, index, other);
+                break;
+            }
+        }
+    }
+
+    /// Storage one kernel argument names: the places its root binding
+    /// aliases plus the backing roots of a view chain. A scalar or a
+    /// temporary value carries no storage, so it never overlaps.
+    fn kernel_arg_storage(&self, expr: &HirExpression) -> FxHashSet<DefId> {
+        if !self.has_tensor_value_type(expr) {
+            return FxHashSet::default();
+        }
+        let mut storage = self.storage_of_roots(&self.tensor_view_origins(expr));
+        if let Some(root) = Self::root_def_id(expr) {
+            storage.extend(self.storage_names(root));
+        }
+        storage
+    }
+
+    fn kernel_argument_overlap_error(
+        &mut self,
+        arg: &HirExpression,
+        position: usize,
+        overlap: usize,
+    ) {
+        let mut error = SemanticError::structured(SemanticErrorKind::ModeMismatch, arg.span)
+            .with_arg("issue", ISSUE_KERNEL_ARGUMENT_OVERLAP)
+            .with_arg("position", (position + 1).to_string())
+            .with_arg("overlap", (overlap + 1).to_string());
+        if let Some(spelling) =
+            Self::root_def_id(arg).and_then(|root| self.def_spelling(root))
+        {
+            error = error.with_arg("binding", spelling);
+        }
+        self.errors.push(error);
     }
 
     fn check_arg_use(&mut self, arg: &HirCallArg, param: &ParamType) {

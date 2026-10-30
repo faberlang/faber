@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/kernel/arg-exclusivity-reject-la.fab"
+group = "language"
+input_root = "corpus"
+input = "kernel/arg-exclusivity-reject-la.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.kernel_argument_overlap"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "SEM057.kernel_argument_overlap"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "SEM057:kernel_argument_overlap"
