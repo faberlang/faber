@@ -110,6 +110,20 @@ pub(super) fn single_file_build_config_with_locale(
     cli_locale: Option<&str>,
     cli_diagnostics_locale: Option<&str>,
 ) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
+    // A diagnostics-only override must leave the single-file code config on
+    // the same path as a build with no locale flags. In particular, resolving
+    // the diagnostics pack must not make package-manifest locale selection an
+    // accidental code-locale override.
+    if cli_locale.is_none() && cli_diagnostics_locale.is_some() {
+        let config = default_config_with_locale(target)?.with_dev_locale_root();
+        let diagnostic_pack = resolve_diagnostics_locale_pack(
+            input,
+            cli_diagnostics_locale,
+            config.locale_pack.as_ref(),
+        )?;
+        return Ok((config, diagnostic_pack));
+    }
+
     let (config, diagnostic_pack) =
         config_with_locale(target, input, cli_locale, cli_diagnostics_locale)?;
     Ok((config.with_dev_locale_root(), diagnostic_pack))
@@ -132,6 +146,9 @@ pub(crate) fn resolve_diagnostics_locale_pack(
                 )
                 .with_arg("flag", "--diagnostics-locale"),
             ));
+        }
+        if input == Path::new("-") {
+            return embedded_conversion_locale_pack(trimmed).map(Some);
         }
         return load_locale_pack_for_input(input, Some(trimmed));
     }

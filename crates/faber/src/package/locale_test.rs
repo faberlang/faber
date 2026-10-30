@@ -1,7 +1,7 @@
 use super::*;
 use radix::module::diagnostics::DiagnosticArg;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -110,6 +110,56 @@ fn single_file_build_cli_locale_overrides_frontmatter_code_locale() {
     assert_eq!(diagnostic_pack.expect("diagnostic pack").metadata.id, "la");
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn diagnostics_locale_alone_preserves_single_file_code_locale() {
+    let (root, entry) = temp_package_entry();
+    let manifest_path = root.join("faber.toml");
+    let manifest = fs::read_to_string(&manifest_path)
+        .expect("manifest")
+        .replace("[build]", "[locale]\nlocale = \"la\"\n\n[build]");
+    fs::write(manifest_path, manifest).expect("localized manifest");
+
+    let (config, diagnostic_pack) =
+        single_file_build_config_with_locale(Target::HirGo, &entry, None, Some("th-TH"))
+            .expect("diagnostics-only single-file locale config");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    assert!(!config.locale_pack_explicit);
+    assert_eq!(
+        diagnostic_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("th-TH")
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn single_file_stdin_diagnostics_locale_uses_embedded_pack() {
+    let (config, diagnostic_pack) =
+        single_file_build_config_with_locale(Target::HirGo, Path::new("-"), None, Some("th-TH"))
+            .expect("stdin diagnostics locale config");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    assert_eq!(
+        diagnostic_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("th-TH")
+    );
 }
 
 #[test]
