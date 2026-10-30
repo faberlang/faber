@@ -285,11 +285,6 @@ pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), UpdateError> {
             })?
     };
 
-    if targets.is_empty() {
-        println!("no installed faber versions in {}", bin_dir.display());
-        return Ok(());
-    }
-
     let link = bin_dir.join("faber");
     let mut removed_link = false;
     for version in &targets {
@@ -302,7 +297,7 @@ pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), UpdateError> {
             }
             Err(err) => return Err(format!("cannot remove {}: {err}", path.display()).into()),
         }
-        if active.as_deref() == Some(name.as_str()) && !removed_link {
+        if !args.all && active.as_deref() == Some(name.as_str()) && !removed_link {
             match fs::remove_file(&link) {
                 Ok(()) => {
                     println!("removed {}", link.display());
@@ -312,6 +307,25 @@ pub(crate) fn run_uninstall(args: &UninstallArgs) -> Result<(), UpdateError> {
                 Err(err) => return Err(format!("cannot remove {}: {err}", link.display()).into()),
             }
         }
+    }
+
+    if args.all && !removed_link {
+        match fs::symlink_metadata(&link) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                fs::remove_file(&link)
+                    .map_err(|err| format!("cannot remove {}: {err}", link.display()))?;
+                println!("removed {}", link.display());
+                removed_link = true;
+            }
+            Ok(_) => {}
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+            Err(err) => return Err(format!("cannot inspect {}: {err}", link.display()).into()),
+        }
+    }
+
+    if targets.is_empty() {
+        println!("no installed faber versions in {}", bin_dir.display());
+        return Ok(());
     }
 
     let remaining = installed_versions(&bin_dir);
