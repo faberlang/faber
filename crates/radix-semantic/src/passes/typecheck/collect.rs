@@ -121,6 +121,17 @@ impl TypeChecker<'_> {
         }
 
         for field in &struct_item.fields {
+            // A `sponte` field's nullable carrier (`Option<T>`) is part of the
+            // field's representation contract with the LLVM lane, which lays
+            // nullable fields out through a carrier `TypeId` it cannot intern
+            // itself (the arena is immutable at emit time). Field access
+            // interns exactly this carrier (`Typechecker::field_type_from_type`);
+            // interning it here too keeps the carrier present even when no
+            // body ever reads the field, instead of refusing emission for a
+            // program whose only fault is leaving an optional field unread.
+            if field.sponte {
+                self.types.option(field.ty);
+            }
             fields.insert(
                 field.name,
                 StructFieldInfo {
@@ -280,6 +291,14 @@ impl TypeChecker<'_> {
             .zip(field_names)
         {
             let sponte = crate::builtins::frame_types::scrinium_field_sponte(field_name);
+            // Same carrier contract as a user `sponte` field (see
+            // `collect_struct`): the LLVM lane lays nullable fields out
+            // through the `Option<T>` carrier, so the builtin table interns it
+            // for every nullable scrinium field, not only the ones a body
+            // reads.
+            if sponte {
+                self.types.option(ty);
+            }
             fields.insert(
                 *name,
                 StructFieldInfo {
