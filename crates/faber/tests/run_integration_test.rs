@@ -480,6 +480,82 @@ fn run_refuses_built_fmir_images_by_name() {
     assert_eq!(stdout.trim(), "hi");
 }
 
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_does_not_override_single_file_code_locale() {
+    let package = temp_dir("build-diagnostics-locale-code");
+    let source_dir = package.join("src");
+    fs::create_dir_all(&source_dir).expect("create source dir");
+    fs::write(
+        package.join("faber.toml"),
+        r#"
+[package]
+name = "build-diagnostics-locale-code"
+version = "0.0.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[locale]
+locale = "la"
+
+[build]
+target = "go"
+kind = "bin"
+"#,
+    )
+    .expect("write manifest");
+    let entry = source_dir.join("main.fab");
+    fs::write(&entry, "main {}\n").expect("write English source");
+    let output_dir = package.join("out");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--target",
+        "go",
+        "--diagnostics-locale",
+        "th-TH",
+        "--out-dir",
+        output_dir.to_str().expect("utf8 output dir"),
+        entry.to_str().expect("utf8 entry"),
+    ]);
+
+    assert!(
+        ok,
+        "diagnostics locale changed the source code locale:\n{stderr}"
+    );
+    assert!(
+        PathBuf::from(stdout.trim()).exists(),
+        "expected generated Go output, got:\n{stdout}"
+    );
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_keeps_stdin_build_available() {
+    let output_dir = temp_dir("build-diagnostics-locale-stdin");
+    let (stdout, stderr, ok) = run_faber_with_stdin(
+        &[
+            "build",
+            "--target",
+            "go",
+            "--diagnostics-locale",
+            "th-TH",
+            "--out-dir",
+            output_dir.to_str().expect("utf8 output dir"),
+            "-",
+        ],
+        b"main {}\n",
+    );
+
+    assert!(ok, "stdin build with diagnostics locale failed:\n{stderr}");
+    assert!(
+        PathBuf::from(stdout.trim()).exists(),
+        "expected generated stdin output, got:\n{stdout}"
+    );
+}
+
 #[cfg(feature = "hir-rust")]
 #[test]
 fn build_reader_locale_accepts_direct_entry_file_input() {
