@@ -3523,10 +3523,6 @@ help = "use '⊥' for a failable call: the optional default only covers an absen
 message = "trap member type mismatch"
 help = "check the member type flowing into the {capta} trap"
 
-[diagnostics.SEM010.issues.trap_union_collapsed]
-message = "{capta} trap union collapsed to '{type}': success and error are the same type, so the trap cannot distinguish them"
-help = "make the success type and the error channel distinguishable, or handle the error with {fac}/cape instead"
-
 [diagnostics.SEM011.issues.generic_type_arg_domain]
 message = "type argument {rejected} is not allowed for {param}; expected one of {accepted}"
 help = "choose one of the allowed type arguments for this generic parameter"
