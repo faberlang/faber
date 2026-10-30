@@ -527,7 +527,11 @@ impl FunctionBuilder<'_> {
         let (trapped_ty, returned_variant) = match &carrier {
             TrapCarrier::Tagged { ty, returned_variant, thrown_variant: _ } => (*ty, *returned_variant),
             TrapCarrier::RawError => {
-                unreachable!("trapped_carrier returns the tagged carrier for a capta boundary")
+                self.errors.push(MirError::validation(
+                    span,
+                    "trapped_carrier returns the tagged carrier for a capta boundary",
+                ));
+                return None;
             }
         };
 
