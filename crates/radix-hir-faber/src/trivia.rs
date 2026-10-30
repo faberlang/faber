@@ -20,8 +20,10 @@ pub struct TriviaIndex {
     attachments: FxHashMap<HirSourceAnchorId, Vec<HirTrivia>>,
     /// Semantic `HirId` (item or statement) → owning anchor.
     by_hir: FxHashMap<HirId, HirSourceAnchorId>,
-    /// Semantic `DefId` (genus field/method, implendum method) → owning anchor.
+    /// Semantic `DefId` (genus/implendum member) → owning anchor.
     by_def: FxHashMap<DefId, HirSourceAnchorId>,
+    /// `(union DefId, shared-field ordinal)` → owning anchor.
+    by_union_shared_field: FxHashMap<(DefId, u32), HirSourceAnchorId>,
     /// Anchor for the explicit entry (`incipit`) leading trivia, when present.
     entry_start_anchor: Option<HirSourceAnchorId>,
     /// Anchor of the program's structural end.
@@ -34,6 +36,7 @@ impl Default for TriviaIndex {
             attachments: FxHashMap::default(),
             by_hir: FxHashMap::default(),
             by_def: FxHashMap::default(),
+            by_union_shared_field: FxHashMap::default(),
             entry_start_anchor: None,
             program_end_anchor: HirSourceAnchorId(0),
         }
@@ -59,21 +62,30 @@ impl TriviaIndex {
         }
         let mut by_hir = FxHashMap::default();
         let mut by_def = FxHashMap::default();
+        let mut by_union_shared_field = FxHashMap::default();
         for owner in &presentation.owners {
-            match &owner.semantic {
-                Some(HirOwnerRef::Hir(id)) => {
-                    by_hir.insert(*id, owner.id.clone());
+            match &owner.kind {
+                radix_hir::HirTriviaOwnerKind::UnionSharedField { ordinal } => {
+                    if let Some(HirOwnerRef::Def(def_id)) = &owner.semantic {
+                        by_union_shared_field.insert((*def_id, *ordinal), owner.id.clone());
+                    }
                 }
-                Some(HirOwnerRef::Def(def_id)) => {
-                    by_def.insert(*def_id, owner.id.clone());
-                }
-                None => {}
+                _ => match &owner.semantic {
+                    Some(HirOwnerRef::Hir(id)) => {
+                        by_hir.insert(*id, owner.id.clone());
+                    }
+                    Some(HirOwnerRef::Def(def_id)) => {
+                        by_def.insert(*def_id, owner.id.clone());
+                    }
+                    None => {}
+                },
             }
         }
         Self {
             attachments,
             by_hir,
             by_def,
+            by_union_shared_field,
             entry_start_anchor: presentation.entry_start_anchor.clone(),
             program_end_anchor: presentation.program_end.id.clone(),
         }
@@ -97,6 +109,14 @@ impl TriviaIndex {
     pub fn for_def(&self, def_id: DefId) -> Option<&[HirTrivia]> {
         self.by_def
             .get(&def_id)
+            .and_then(|anchor| self.for_anchor(anchor))
+    }
+
+    /// Trivia attached to one shared field of a union declaration.
+    #[must_use]
+    pub fn for_union_shared_field(&self, def_id: DefId, ordinal: u32) -> Option<&[HirTrivia]> {
+        self.by_union_shared_field
+            .get(&(def_id, ordinal))
             .and_then(|anchor| self.for_anchor(anchor))
     }
 

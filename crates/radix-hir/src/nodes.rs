@@ -2376,10 +2376,15 @@ pub enum HirTriviaOwnerKind {
     /// An executable statement (`HirStatement`).
     Statement,
 
-    /// A genus field or method (`HirField` / `HirMethod`).
+    /// A named declaration member with its own `DefId`: genus fields/methods,
+    /// enum members/union variants, or interface methods.
     Member,
 
-    /// The explicit program entry (`incipit`).
+    /// A union `@ commune` field. The owning enum definition and source-order
+    /// field ordinal identify a field that has no standalone HIR definition.
+    UnionSharedField { ordinal: u32 },
+
+    /// An explicit program entry (`incipit`).
     Entry,
 
     /// An executable block's structural end.
@@ -2394,15 +2399,19 @@ pub enum HirTriviaOwnerKind {
 
 /// Back-reference from a presentation owner to the semantic node it annotates.
 ///
-/// Items and statements use [`HirOwnerRef::Hir`]; members use
+/// Items and statements use [`HirOwnerRef::Hir`]; named members use
 /// [`HirOwnerRef::Def`]. This keeps the semantic tree trivia-blind — no new
-/// fields on `HirItem`, `HirStatement`, `HirMethod`, or `HirField`.
+/// fields on `HirItem`, `HirStatement`, `HirMethod`, or `HirField`. Named
+/// declaration members use their existing definition id; union shared fields
+/// use the owning enum `DefId` with their ordinal in
+/// [`HirTriviaOwnerKind::UnionSharedField`].
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HirOwnerRef {
     /// An annotatable HIR node: `HirItem.id` or `HirStatement.id`.
     Hir(HirId),
 
-    /// A named semantic definition: `HirMethod.def_id` or `HirField.def_id`.
+    /// A named semantic definition (genus field/method, enum member/variant,
+    /// or interface method).
     Def(DefId),
 }
 

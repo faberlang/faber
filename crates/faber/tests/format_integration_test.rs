@@ -67,6 +67,112 @@ fn run_faber_format_stdout(path: &Path) -> String {
 }
 
 #[test]
+fn format_convert_and_doc_keep_declaration_member_comments() {
+    let temp_root = TempDir::new("faber-format", "declaration-member-comments");
+    let fixture = temp_root.join("members.fab");
+    fs::write(
+        &fixture,
+        concat!(
+            "+++\nlocale = \"en\"\n+++\n",
+            "@ public\n",
+            "union Chess {\n",
+            "    # Every piece has a rank.\n",
+            "    @ shared\n",
+            "    int rank\n",
+            "    # Every piece has a side.\n",
+            "    string side\n\n",
+            "    # A pawn and its steps.\n",
+            "    Pawn { int steps },\n",
+            "    # A rook.\n",
+            "    Rook\n",
+            "}\n\n",
+            "@ public\n",
+            "enum Color {\n",
+            "    # The light square color.\n",
+            "    Light,\n",
+            "    # The dark square color.\n",
+            "    Dark\n",
+            "}\n\n",
+            "@ public\n",
+            "interface Piece {\n",
+            "    # Returns the piece name.\n",
+            "    fn name() → string\n",
+            "}\n",
+        ),
+    )
+    .expect("write member comments fixture");
+    let path = fixture.to_str().expect("utf8 fixture path");
+    let expected_docs = [
+        "Every piece has a rank.",
+        "Every piece has a side.",
+        "A pawn and its steps.",
+        "A rook.",
+        "The light square color.",
+        "The dark square color.",
+        "Returns the piece name.",
+    ];
+
+    let formatted = run_faber_format_stdout(&fixture);
+    for doc in expected_docs {
+        assert!(
+            formatted.contains(&format!("# {doc}")),
+            "format must preserve declaration member comment `{doc}`:\n{formatted}"
+        );
+    }
+    fs::write(&fixture, &formatted).expect("write first format pass");
+    let second = run_faber_format_stdout(&fixture);
+    assert_eq!(
+        formatted, second,
+        "format must be idempotent for member comments"
+    );
+
+    let latin = run_faber_command(&["convert", "--to", "la", "--stdout", path]);
+    for doc in expected_docs {
+        assert!(
+            latin.contains(&format!("# {doc}")),
+            "convert must preserve declaration member comment `{doc}`:\n{latin}"
+        );
+    }
+    let latin_path = temp_root.join("members-la.fab");
+    fs::write(&latin_path, latin).expect("write converted source");
+    let back = run_faber_command(&[
+        "convert",
+        "--to",
+        "en",
+        "--stdout",
+        latin_path.to_str().expect("utf8 converted path"),
+    ]);
+    for doc in expected_docs {
+        assert!(
+            back.contains(&format!("# {doc}")),
+            "convert round trip must preserve declaration member comment `{doc}`:\n{back}"
+        );
+    }
+
+    let documented = run_faber_command(&["doc", "--json", path]);
+    for doc in expected_docs {
+        assert!(
+            documented.contains(doc),
+            "faber doc must expose formatted member comment `{doc}`:\n{documented}"
+        );
+    }
+}
+
+fn run_faber_command(args: &[&str]) -> String {
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(args)
+        .output()
+        .expect("run faber command");
+    assert!(
+        output.status.success(),
+        "faber {:?} failed:\n{}",
+        args,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).expect("faber stdout is utf8")
+}
+
+#[test]
 fn format_cmd_stdout_reparses_salve_munde() {
     let path = exempla("incipit/salve-munde.fab");
     let formatted = run_faber_format_stdout(&path);
