@@ -93,7 +93,7 @@ impl Arena {
         let mut count = 0;
         // SAFETY: single-threaded test; walk the live chunk chain.
         let mut chunk = unsafe { *self.current.get() };
-        while let Some(found) = (unsafe { chunk.as_ref() }) {
+        while let Some(found) = unsafe { chunk.as_ref() } {
             count += 1;
             chunk = found.previous;
         }
