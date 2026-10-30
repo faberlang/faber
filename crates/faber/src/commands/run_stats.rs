@@ -162,9 +162,80 @@ pub(crate) struct DeviceRuntimeMetadata {
     /// A logical device spanning several partitions (rule 18) only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) span: Option<DeviceSpanMetadata>,
+    /// The CPU runtime's completed-launch partition coverage (the CPU's own
+    /// one-shared-store model); absent on every other runtime and in
+    /// artifacts from before the block existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) cpu_partitions: Option<DeviceCpuPartitionMetadata>,
     /// Per-retired-batch GPU work/idle accounting, when provided by the device.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub(crate) gpu_steps: Vec<DeviceGpuStepMetadata>,
+}
+
+/// The CPU runtime's partition coverage (`device.runtime.cpu_partitions`):
+/// how its launches split workgroups over the one shared buffer store's
+/// partitions, and how much of each split actually completed. Local
+/// shared-memory execution coverage only — not particle-state slab readiness,
+/// per-partition buffer ownership (the store is shared) or physical-cluster
+/// and GPU launch-mode evidence.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuPartitionMetadata {
+    pub(crate) partitions: u64,
+    /// Total workers of the one shared worker pool.
+    pub(crate) workers: u64,
+    /// The memory model; the CPU runtime spells it `shared-store`.
+    pub(crate) memory_model: String,
+    /// The per-launch log's bound; launches past it are per-entry totals only.
+    pub(crate) launch_log_bound: u64,
+    pub(crate) logged_launches: u64,
+    /// Launches dropped by the bound: their coverage cannot be certified
+    /// per-launch.
+    pub(crate) unlogged_launches: u64,
+    pub(crate) entries: Vec<DeviceCpuEntryCoverage>,
+    pub(crate) launches: Vec<DeviceCpuLaunchCoverage>,
+}
+
+/// Per-entry CPU coverage totals over a whole run.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuEntryCoverage {
+    pub(crate) entry: String,
+    pub(crate) launches: u64,
+    pub(crate) logged_launches: u64,
+    pub(crate) scheduled_workgroups: u64,
+    pub(crate) completed_workgroups: u64,
+    pub(crate) complete_launches: u64,
+    pub(crate) faulted_launches: u64,
+}
+
+/// One CPU launch's coverage: the scheduled per-partition workgroup ranges
+/// and the completed prefixes that actually ran and committed. Scheduled and
+/// completed are reported distinctly, so a planned range alone can never
+/// certify execution.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuLaunchCoverage {
+    pub(crate) launch: u64,
+    pub(crate) entry: String,
+    pub(crate) workgroups: u64,
+    /// Every partition the plan gave work to, in partition order; a
+    /// partition with no workgroups has no row.
+    pub(crate) partitions: Vec<DeviceCpuLaunchPartitionCoverage>,
+    /// Every scheduled workgroup completed and committed.
+    pub(crate) complete: bool,
+    /// A chunk faulted, stopped at a recoverable site, or the launch was
+    /// refused before its writes landed.
+    pub(crate) faulted: bool,
+}
+
+/// One partition's share of one CPU launch: `[start, end)` workgroup ranges.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuLaunchPartitionCoverage {
+    pub(crate) partition: u64,
+    pub(crate) scheduled: [u64; 2],
+    pub(crate) completed: [u64; 2],
 }
 
 /// GPU busy and idle accounting for one retired launch batch.
@@ -542,6 +613,51 @@ impl DeviceMetadata {
                 device_to_host_bytes: runtime.device_to_host_bytes,
                 span: runtime.span.as_ref().map(|span| {
                     DeviceSpanMetadata::from_stats(span).with_avoidable(&receipt.span_avoidable)
+                }),
+                // Mapped by field access: the open-core ratchet counts
+                // every private-crate path mention, even in comments.
+                cpu_partitions: runtime.cpu_partitions.as_ref().map(|coverage| {
+                    DeviceCpuPartitionMetadata {
+                        partitions: coverage.partitions,
+                        workers: coverage.workers,
+                        memory_model: coverage.memory_model.as_str().to_owned(),
+                        launch_log_bound: coverage.launch_log_bound,
+                        logged_launches: coverage.logged_launches,
+                        unlogged_launches: coverage.unlogged_launches,
+                        entries: coverage
+                            .entries
+                            .iter()
+                            .map(|entry| DeviceCpuEntryCoverage {
+                                entry: entry.entry.clone(),
+                                launches: entry.launches,
+                                logged_launches: entry.logged_launches,
+                                scheduled_workgroups: entry.scheduled_workgroups,
+                                completed_workgroups: entry.completed_workgroups,
+                                complete_launches: entry.complete_launches,
+                                faulted_launches: entry.faulted_launches,
+                            })
+                            .collect(),
+                        launches: coverage
+                            .launches
+                            .iter()
+                            .map(|launch| DeviceCpuLaunchCoverage {
+                                launch: launch.launch,
+                                entry: launch.entry.clone(),
+                                workgroups: launch.workgroups,
+                                partitions: launch
+                                    .partitions
+                                    .iter()
+                                    .map(|row| DeviceCpuLaunchPartitionCoverage {
+                                        partition: row.partition,
+                                        scheduled: [row.scheduled.start, row.scheduled.end],
+                                        completed: [row.completed.start, row.completed.end],
+                                    })
+                                    .collect(),
+                                complete: launch.complete,
+                                faulted: launch.faulted,
+                            })
+                            .collect(),
+                    }
                 }),
                 gpu_steps: runtime
                     .gpu_steps
