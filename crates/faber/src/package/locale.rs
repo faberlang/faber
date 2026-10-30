@@ -20,14 +20,15 @@ pub const DEFAULT_CODE_LOCALE: &str = "en";
 /// Returns an error when no embedded pack exists for `locale`; the diagnostic
 /// names the embedded reader-locale ids.
 pub fn embedded_conversion_locale_pack(locale: &str) -> Result<LocalePack, Box<Diagnostic>> {
-    load_embedded_locale_pack(locale).map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
+    load_embedded_locale_pack(locale)
+        .map_err(|err| Box::new(embedded_load_diagnostic(locale, &err)))
 }
 
 fn embedded_locales_list() -> String {
     EMBEDDED_LOCALE_IDS.join(", ")
 }
 
-fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnostic {
+fn embedded_load_diagnostic(locale: &str, err: &EmbeddedLocaleError) -> Diagnostic {
     let embedded_locales = embedded_locales_list();
     crate::exit_status::config_diagnostic_error(format!(
         "failed to load reader locale '{locale}': {err}\n\
@@ -215,7 +216,7 @@ fn load_selected_locale_pack(
         return load_locale_pack_from_file(input, locale, &pack_path);
     }
     let pack = load_embedded_locale_pack(locale).map_err(|err| {
-        Box::new(embedded_load_diagnostic(locale, err).with_file(input.display().to_string()))
+        Box::new(embedded_load_diagnostic(locale, &err).with_file(input.display().to_string()))
     })?;
     if pack.metadata.id != locale {
         return Err(Box::new(
@@ -332,7 +333,7 @@ pub fn locale_pack_for_emit_with_diagnostic(
     // Stdin: no package context, use the embedded pack for the locale.
     load_embedded_locale_pack(locale)
         .map(Some)
-        .map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
+        .map_err(|err| Box::new(embedded_load_diagnostic(locale, &err)))
 }
 
 /// Compatibility wrapper for library callers that only need the normalized

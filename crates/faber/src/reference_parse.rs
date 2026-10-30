@@ -55,7 +55,7 @@ pub fn entry_from_exempla(
         .category
         .ok_or_else(|| ExplainError::new(format!("{path_label}: frontmatter missing category")))?;
     let summary =
-        normalize_summary(fm.summary.ok_or_else(|| {
+        normalize_summary(fm.summary.as_deref().ok_or_else(|| {
             ExplainError::new(format!("{path_label}: frontmatter missing summary"))
         })?);
     let syntax = fm
@@ -112,7 +112,7 @@ pub fn legacy_entry_from_redirect(
         kind: Kind::Legacy,
         category: canonical_entry.category.clone(),
         canonical: false,
-        summary: normalize_summary(message.to_owned()),
+        summary: normalize_summary(message),
         syntax: canonical_entry.syntax.clone(),
         examples: Vec::new(),
         grammar: Vec::new(),
@@ -219,7 +219,7 @@ fn first_fab_block(body: &str) -> Option<&str> {
     Some(body[code_start..code_end].trim())
 }
 
-fn normalize_summary(summary: String) -> String {
+fn normalize_summary(summary: &str) -> String {
     let summary = summary.trim().to_owned();
     if summary.ends_with('.') {
         summary
