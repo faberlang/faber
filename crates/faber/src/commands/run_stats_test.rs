@@ -246,6 +246,13 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
             host_to_device_bytes: 64,
             device_to_host_bytes: 32,
             span: None,
+            gpu_steps: vec![run_stats::DeviceGpuStepMetadata {
+                launches: 4,
+                timed_launches: 3,
+                gpu_busy_ns: 18,
+                wall_ns: Some(25),
+                idle_ns: Some(7),
+            }],
         },
         entries: vec![
             run_stats::DeviceEntryMetadata {
@@ -270,6 +277,8 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     assert_eq!(value["device"]["host_blocked_ns"], 20);
     assert_eq!(value["device"]["gpu_timer_available"], true);
     assert_eq!(value["device"]["gpu_sample_launch_capacity"], 1_024);
+    assert_eq!(value["device"]["runtime"]["gpu_steps"][0]["idle_ns"], 7);
+    assert_eq!(value["device"]["runtime"]["gpu_steps"][0]["wall_ns"], 25);
     let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("device schema");
     assert_eq!(decoded, artifact);
 
@@ -277,11 +286,16 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     device.remove("gpu_timer_available");
     device.remove("gpu_sample_launch_capacity");
     device.remove("host_blocked_ns");
+    value["device"]["runtime"]
+        .as_object_mut()
+        .expect("runtime object")
+        .remove("gpu_steps");
     let old_decoded: RunStatsArtifact =
         serde_json::from_value(value).expect("old device artifact without sampling metadata");
     let old_device = old_decoded.device.expect("old device metadata");
     assert_eq!(old_device.gpu_timer_available, None);
     assert_eq!(old_device.gpu_sample_launch_capacity, None);
+    assert!(old_device.runtime.gpu_steps.is_empty());
     // An artifact from before the encode/blocked split reads as unsplit: its
     // `host_encode_ns` still includes the waits.
     assert_eq!(old_device.host_blocked_ns, None);
@@ -685,6 +699,7 @@ fn device_span_stats_appear_only_for_a_spanned_device() {
         host_to_device_bytes: 16,
         device_to_host_bytes: 8,
         span,
+        gpu_steps: Vec::new(),
     };
     let spanned = runtime(Some(run_stats::DeviceSpanMetadata::from_stats(&span)));
     let value = serde_json::to_value(&spanned).expect("spanned JSON");
