@@ -2694,16 +2694,20 @@ fn source_declares_locale_is_independent_of_pack_loadability() {
 fn verify_resolves_frontmatter_locale_through_config_loader() {
     let source = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio salve() { }\n";
     let result = crate::services::verify_source_with_config("la.fab", source, None, &loader_only_config());
+    // A clean Latin read under the declared locale produces no diagnostics at
+    // all — not merely none of the lost-locale codes — and the aspect
+    // machinery still ran (the coverage report is present).
     assert!(
-        !result
-            .diagnostics
-            .iter()
-            .any(|d| d.code == Some("PARSE001") || d.code == Some("LOCALE003")),
-        "verify must read the Latin source under its declared locale: {:?}",
+        result.diagnostics.is_empty(),
+        "verify must read the Latin source cleanly under its declared locale: {:?}",
         result
             .diagnostics
             .iter()
             .map(|d| (d.code, d.issue(), d.args.clone()))
             .collect::<Vec<_>>()
+    );
+    assert!(
+        result.coverage.is_some(),
+        "verify must still produce its aspect coverage report"
     );
 }
