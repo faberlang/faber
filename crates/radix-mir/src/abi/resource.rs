@@ -650,6 +650,31 @@ pub(crate) fn genus_param_layout(
         })
 }
 
+/// The device-vector layout of a kernel parameter type: `Ok(None)` when `ty`
+/// is not a register-class vector, and `Ok(Some(layout))` for an admitted
+/// by-value vector parameter. The admission mirrors the vector-element law of
+/// `require_kernel_device_view` (G15-3): only widths whose size equals their
+/// alignment (2 and 4; width 3 fails closed at layout time) whose lane is a
+/// kernel element. A matrix stays refused (`buffer_element_type` names it).
+pub(crate) fn vector_param_layout(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<crate::MirDeviceVectorLayout>, MirAbiError> {
+    let layout = validation
+        .layouts
+        .layout_for_type(ty)
+        .map_err(|error| MirAbiError::new(error.message))?;
+    let MirLayoutKind::DeviceVector(vector) = layout.kind else {
+        return Ok(None);
+    };
+    if matches!(vector.width, 2 | 4) && crate::tensor_type::is_kernel_element_layout(vector.element)
+    {
+        Ok(Some(vector))
+    } else {
+        Err(MirAbiError::new(ERR_KERNEL_VECTOR_PARAM))
+    }
+}
+
 pub(crate) fn buffer_element_type(
     ty: MirType,
     validation: &MirValidationContext<'_>,

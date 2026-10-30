@@ -23,7 +23,7 @@ use super::{
     device_view_element_type, dispatch_size_for_1d_elements, genus_param_layout, is_vacuum,
     kernel_element_byte_width, kernel_has_collection_op, named_builtin_for_param,
     param_source_name, reject_kernel_matrix_abi, require_same_element_type, require_u32_index,
-    result_tuple_count, storage_buffer_limit_error,
+    result_tuple_count, storage_buffer_limit_error, vector_param_layout,
 };
 
 struct IndexedViewKernelContext<'a> {
@@ -2373,13 +2373,26 @@ impl MirKernelSignature {
 
         let mut input_resources = Vec::with_capacity(inputs.len());
         for (binding, input) in inputs.iter().enumerate() {
-            let input_element_ty =
-                buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
-            let input_element_count = buffer_element_count(input.ty, validation)?;
+            let vector = vector_param_layout(input.ty, validation)?;
+            let (input_element_ty, input_element_count) = if vector.is_some() {
+                // A by-value vector parameter (`vf32[4]`) is a count-one
+                // input resource whose element is the vector itself: the
+                // reflection resolves its lane scalar and packed byte width,
+                // and the emitters declare it as one constant/uniform value
+                // (`float4` on Metal). It does not participate in the tensor
+                // elementwise equality law — its value is supplied once and
+                // read lane-wise by the kernel body, like a scalar.
+                (input.ty, 1)
+            } else {
+                (
+                    buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?,
+                    buffer_element_count(input.ty, validation)?,
+                )
+            };
             // A device-safe scalar is a count-one input resource. It does
             // not participate in the tensor elementwise equality law: its
             // value is supplied once and broadcast by the kernel body.
-            if !Self::is_kernel_scalar_input(input.ty, validation)? {
+            if vector.is_none() && !Self::is_kernel_scalar_input(input.ty, validation)? {
                 require_same_element_type(input_element_ty, return_element_ty, validation)?;
                 if input_element_count != return_element_count {
                     return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
