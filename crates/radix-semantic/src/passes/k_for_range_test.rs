@@ -163,6 +163,40 @@ fn scratch_write_with_non_lane_leading_coordinate_rejected() {
 }
 
 #[test]
+fn owned_row_may_not_reuse_the_lane_coordinate_inside() {
+    // The lane's own coordinate owns the row only when it appears once:
+    // reusing it in an inner slot is not row ownership.
+    rejected(
+        &kernel(
+            "itera ab 0‥n sit j {
+                scratch[[i, i]] ← w[[i, j]]
+            }",
+        ),
+        "write_not_own_coordinate",
+    );
+    rejected(
+        &kernel(
+            "itera ab 0‥n sit j {
+                scratch[[i, i + 1]] ← w[[i, j]]
+            }",
+        ),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn owned_row_inner_coordinates_may_be_anything() {
+    // Inner coordinates only pick cells inside the lane's own row: a
+    // lane-local def names a cell as well as a loop binder does.
+    accepted(&kernel(
+        "itera ab 0‥n sit j {
+            sit numerus q ← j + 1
+            scratch[[i, q]] ← w[[i, j]]
+        }",
+    ));
+}
+
+#[test]
 fn bound_reading_a_lane_written_tensor_rejected() {
     // `lens` is written by the lane (at a constant cell), so its value is not a
     // lane-invariant bound.
