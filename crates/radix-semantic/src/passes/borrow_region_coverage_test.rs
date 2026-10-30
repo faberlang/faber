@@ -219,3 +219,79 @@ fn region_facts_cover_corpus_product_and_norma() {
     // deliverable, not only the failure detail.
     print!("{report}");
 }
+
+// ---------------------------------------------------------------------------
+// Fail-closed identity
+// ---------------------------------------------------------------------------
+
+/// An engine gap maps to the named SEM008 `region_facts_not_built`
+/// diagnostic, never to silence: identity is the issue name plus the
+/// construct arg, asserted — never message prose.
+#[test]
+fn an_unsupported_shape_fails_closed_with_the_named_diagnostic() {
+    let span = radix_lexer::Span::new(4, 8);
+    let error = borrow_region::fail_closed_diagnostic(&borrow_region::RegionError::Cfg(
+        super::borrow_region_cfg::CfgError::UnsupportedShape {
+            construct: "widget",
+            span,
+        },
+    ))
+    .expect("unsupported shape must fail closed");
+    assert_eq!(
+        error.kind,
+        radix_diagnostics::SemanticErrorKind::LoweringError
+    );
+    assert!(error.span == span);
+    let issue = error
+        .args
+        .iter()
+        .find(|arg| arg.name == "issue")
+        .expect("issue arg");
+    assert_eq!(issue.value, borrow_region::ISSUE_REGION_FACTS_NOT_BUILT);
+    let construct = error
+        .args
+        .iter()
+        .find(|arg| arg.name == "construct")
+        .expect("construct arg");
+    assert_eq!(construct.value, "widget");
+    assert_eq!(
+        crate::catalog_semantic::semantic_spec(error.kind).code,
+        "SEM008"
+    );
+}
+
+/// A missing borrow-start location is an engine gap like any other: it
+/// fails closed under the same named issue.
+#[test]
+fn a_missing_location_fails_closed_with_the_named_diagnostic() {
+    let error =
+        borrow_region::fail_closed_diagnostic(&borrow_region::RegionError::MissingLocation {
+            hir_id: radix_hir::HirId(7),
+            span: radix_lexer::Span::new(1, 2),
+        })
+        .expect("missing location must fail closed");
+    let issue = error
+        .args
+        .iter()
+        .find(|arg| arg.name == "issue")
+        .expect("issue arg");
+    assert_eq!(issue.value, borrow_region::ISSUE_REGION_FACTS_NOT_BUILT);
+}
+
+/// A transfer outside its scope is the resolver's own named rejection
+/// (SEM030/SEM031): the region engine adds no duplicate diagnostic.
+#[test]
+fn a_transfer_outside_its_scope_adds_no_duplicate_diagnostic() {
+    for transfer in ["rumpe", "perge"] {
+        let diagnostic = borrow_region::fail_closed_diagnostic(&borrow_region::RegionError::Cfg(
+            super::borrow_region_cfg::CfgError::TransferOutsideLoop {
+                transfer,
+                span: radix_lexer::Span::new(1, 2),
+            },
+        ));
+        assert!(
+            diagnostic.is_none(),
+            "{transfer} must stay with the resolver"
+        );
+    }
+}

@@ -4377,3 +4377,7 @@ help = "檢查原因，並使用所選裝置支援的核心形式。"
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"
 help = "依照稽核原因找出相依性。讓分區讀寫留在各通道本地，並盡可能使用相符的緩衝區配置。"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "尚不能為 '{construct}' 建構借用區域事實；借用檢查器直接報錯而不做近似"
+help = "該構造的借用判定需要區域推斷；請回報以便區域引擎涵蓋它"

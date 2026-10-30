@@ -18,6 +18,41 @@ use radix_lexer::Span;
 use radix_types::{RegionRelationship, ReturnedBorrowProvenance};
 use std::collections::VecDeque;
 
+/// SEM008 `region_facts_not_built`: the region engine rejected a shape whose
+/// borrow decisions it owns, so the pipeline fails closed with a named
+/// diagnostic instead of silently keeping the block-scope approximation.
+pub const ISSUE_REGION_FACTS_NOT_BUILT: &str = "region_facts_not_built";
+
+/// The named fail-closed diagnostic for one engine gap.
+///
+/// `construct` names the HIR shape the engine could not cover (the
+/// [`CfgError`] variant's own construct, or the missing-location site).
+#[must_use]
+pub fn region_facts_unavailable_error(construct: &str, span: Span) -> crate::SemanticError {
+    crate::SemanticError::structured(radix_diagnostics::SemanticErrorKind::LoweringError, span)
+        .with_arg("issue", ISSUE_REGION_FACTS_NOT_BUILT)
+        .with_arg("construct", construct)
+        .with_arg("context", "borrow-region inference")
+}
+
+/// Map one engine failure to its fail-closed outcome: the named diagnostic
+/// when the engine owns the shape, or `None` when the resolver's own named
+/// rejection (SEM030/SEM031, a transfer outside its scope) already covers
+/// the construct and a second diagnostic would only duplicate it.
+#[must_use]
+pub fn fail_closed_diagnostic(error: &RegionError) -> Option<crate::SemanticError> {
+    match error {
+        RegionError::Cfg(CfgError::UnsupportedShape { construct, span }) => {
+            Some(region_facts_unavailable_error(construct, *span))
+        }
+        RegionError::MissingLocation { span, .. } => Some(region_facts_unavailable_error(
+            "borrow-region start location",
+            *span,
+        )),
+        RegionError::Cfg(CfgError::TransferOutsideLoop { .. }) => None,
+    }
+}
+
 /// Borrow flavor tracked by a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RegionBorrowKind {

@@ -4392,3 +4392,7 @@ help = "कारण देखें और चुने गए device द्व
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "कर्नेल `{kernel}`: {partitions} विभाजनों के पार इसका {kind} टाला जा सकता है: {avoidable} ({reason})"
 help = "ऑडिट कारण का अनुसरण करके निर्भरता खोजें। विभाजित पठन और लेखन को lane-local रखें और जहाँ संभव हो, मेल खाते buffer layouts का उपयोग करें।"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "उधार-क्षेत्र तथ्य अभी '{construct}' के लिए नहीं बनते; उधार परीक्षक सन्निकटन के बजाय बंद रहता है"
+help = "इस रचना के उधार निर्णयों के लिए क्षेत्र-निष्कर्षण चाहिए; क्षेत्र इंजन को इसे ढकने के लिए इसकी सूचना दें"

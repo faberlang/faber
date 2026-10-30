@@ -804,11 +804,21 @@ pub fn analyze_with_cli(
 
     // BRI-2: construct the sole typed-HIR fact table only after both AIR
     // passes, hand the same borrowed table to region inference, then carry it
-    // forward for the analyzed-application snapshot. Unsupported HIR shapes
-    // leave region facts unavailable rather than receiving an approximation.
+    // forward for the analyzed-application snapshot. An engine gap fails
+    // closed: the shape gets the named SEM008 `region_facts_not_built`
+    // diagnostic and region facts stay absent — the block-scope approximation
+    // is never used silently where region facts decide soundness.
     let access_facts = analyze_access_facts_with_types(&hir, &types);
     let region_facts =
-        passes::borrow_region::analyze_with_interner(&hir, &types, &access_facts, interner).ok();
+        match passes::borrow_region::analyze_with_interner(&hir, &types, &access_facts, interner) {
+            Ok(facts) => Some(facts),
+            Err(error) => {
+                if let Some(diagnostic) = passes::borrow_region::fail_closed_diagnostic(&error) {
+                    diagnostics.push(diagnostic);
+                }
+                None
+            }
+        };
 
     diagnostics
         .extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);

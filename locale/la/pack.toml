@@ -1869,6 +1869,10 @@ help = "condiciones, limites et argumenta scalaria ad valores ante regionem noto
 message = "nucleum fractum saturatum nondum adhibere potest ({site}); nucleorum structio fractorum saturatorum nondum efficitur"
 help = "in nucleo latitudinem fractionis nudam adhibe et ad limitem hospitis per `↦` muta"
 
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "regionum mutuandi facta de '{construct}' nondum efficiuntur; censor mutuandi claudit potius quam adpropinquat"
+help = "haec forma ad suas decisiones mutuandi regionum inference indiget; nuntia ut machina regionum eam complectatur"
+
 [diagnostics.SEM008.issues.nucleum_typed_error_channel]
 message = "nucleum '{kernel}' canalem erroris typatum declarat; nucleum solum errorem textus declarare potest"
 help = "`⇥ text` declara (nuntius constans pro quovis loco defectus) et hospes lanciens eum ad suum genus erroris vertat"

@@ -2159,6 +2159,10 @@ help = "keep conditions, bounds and scalar arguments to values known before the 
 message = "a kernel cannot use a saturating float yet ({site}); device lowering of saturating floats is not built"
 help = "use a bare float width in the kernel; keep `{saturatus}<f32>` at the host boundary and convert with `↦`"
 
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "borrow-region facts are not built for '{construct}' yet; the borrow checker fails closed instead of approximating"
+help = "this construct needs region inference for its borrow decisions; report it so the region engine covers it"
+
 [diagnostics.SEM008.issues.nucleum_typed_error_channel]
 message = "kernel '{kernel}' declares a typed error channel; a kernel may declare only a text error"
 help = "declare `⇥ {textus}` (one constant message per failure site) and let the launching host map it to its own error type"
