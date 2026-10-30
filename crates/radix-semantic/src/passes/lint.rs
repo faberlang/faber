@@ -172,7 +172,9 @@ struct LintContext<'a> {
     alias_of: handroll::FxHashMap<radix_hir::DefId, radix_hir::DefId>,
     /// Bindings whose state some `varia` cell shares: WARN013's `let` advice
     /// would turn that bind into SEM065 (`const_shared_into_var`), so the
-    /// source keeps `varia` without a warning.
+    /// source keeps `varia` without a warning. Every hop of a chain is
+    /// recorded — immediate source and family root alike — because SEM065
+    /// reads the initializer's immediate place root.
     shared_into_var: FxHashSet<radix_hir::DefId>,
 }
 
@@ -309,8 +311,12 @@ impl<'a> LintContext<'a> {
         }
 
         for (def_id, span) in &self.mutable_locals {
+            // WARN013 counts a write to any family member as a write to this
+            // binding; `alias_of` maps straight to the family root, so one
+            // lookup resolves the membership here instead of per write.
+            let root = self.alias_of.get(def_id).copied().unwrap_or(*def_id);
             if self.used.contains(def_id)
-                && !self.mutated.contains(def_id)
+                && !self.mutated.contains(&root)
                 && !self.shared_into_var.contains(def_id)
             {
                 self.warnings.push((
@@ -479,8 +485,9 @@ impl<'a> LintContext<'a> {
     /// Record what a plain bind aliases. A marker-free read of a shareable
     /// place (`varia T b ← a`, `T` a container or genus) shares the source's
     /// state; `copy`/`own` acquire an independent value and record nothing.
-    /// A `varia` cell sharing the source also marks it `shared_into_var`:
-    /// advising `let` on the source would turn this bind into SEM065.
+    /// A `varia` cell sharing the source also marks its sources
+    /// `shared_into_var`: advising `let` on the source — the immediate name
+    /// or the family root behind it — would turn this bind into SEM065.
     fn note_local_alias(
         &mut self,
         def_id: radix_hir::DefId,
@@ -525,6 +532,12 @@ impl<'a> LintContext<'a> {
         }
         self.alias_of.insert(def_id, source);
         if mutable {
+            // Both ends of the hop go into `shared_into_var`: SEM065 reads
+            // the initializer's immediate place root, so in a chain
+            // (`varia T c ← b ← a`) the intermediate source `b` needs the
+            // same protection as the ultimate source `a`, or WARN013's
+            // advice on `b` would turn this bind into SEM065.
+            self.shared_into_var.insert(root);
             self.shared_into_var.insert(source);
         }
     }
@@ -663,28 +676,19 @@ impl<'a> LintContext<'a> {
 
     fn mark_place_mutated(&mut self, expr: &HirExpression) {
         if let Some(def_id) = root_place_def_id(expr) {
-            self.mark_mutated_with_aliases(def_id);
+            self.mark_mutated(def_id);
         }
     }
 
-    /// Mark a place written, and with it every name sharing its state: a
-    /// plain bind of a shareable value aliases, so after `varia T b ← a` a
-    /// write through `b` is a write to what `a` names, and the other way
-    /// around. WARN013 counts a binding as modified when any of them is.
-    fn mark_mutated_with_aliases(&mut self, def_id: radix_hir::DefId) {
-        let mut root = def_id;
-        while let Some(&source) = self.alias_of.get(&root) {
-            root = source;
-        }
+    /// Record a write. `alias_of` maps each member straight to its family
+    /// root, so storing the root once records the whole family: a plain bind
+    /// of a shareable value aliases, so after `varia T b ← a` a write through
+    /// `b` is a write to what `a` names, and the other way around. Which
+    /// members a root covers is resolved at warning generation, not per
+    /// write.
+    fn mark_mutated(&mut self, def_id: radix_hir::DefId) {
+        let root = self.alias_of.get(&def_id).copied().unwrap_or(def_id);
         self.mutated.insert(root);
-        let family: Vec<radix_hir::DefId> = self
-            .alias_of
-            .iter()
-            .filter_map(|(&member, source)| (source == &root).then_some(member))
-            .collect();
-        for member in family {
-            self.mutated.insert(member);
-        }
     }
 
     /// WARN013 means "never modified". A mutating call is a write to its
@@ -720,7 +724,7 @@ impl<'a> LintContext<'a> {
             .and_then(|ty| method_receiver_mutation::class_def(self.types, ty))
             .is_some_and(|class| self.mutating_methods.contains(&(class, method)));
         if reassigns || user_mutator {
-            self.mark_mutated_with_aliases(def_id);
+            self.mark_mutated(def_id);
         }
     }
 

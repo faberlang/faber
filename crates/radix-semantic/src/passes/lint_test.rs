@@ -1160,6 +1160,33 @@ fn varia_source_shared_into_a_varia_cell_stays_unflagged() {
 }
 
 #[test]
+fn chained_alias_intermediate_source_stays_unflagged_and_advice_applies() {
+    // Chain `b ← a`, then `c ← b`: SEM065 reads the initializer's immediate
+    // place root, so the intermediate `b` needs `varia` exactly like the
+    // ultimate source `a`. Only the never-shared tail `c` is advised, and
+    // applying that advice must stay legal: the rewritten source compiles
+    // without SEM065 (the helper asserts error-freeness).
+    let source = format!(
+        "{ALIAS_BOX}main {{\n    mut Box a ← Box {{ v = 1 }}\n    mut Box b ← a\n    mut Box c ← b\n    print a.v\n    print b.v\n    print c.v\n}}"
+    );
+    assert_eq!(en_unnecessary_varia_count(&source), 1);
+    let rewritten = format!(
+        "{ALIAS_BOX}main {{\n    mut Box a ← Box {{ v = 1 }}\n    mut Box b ← a\n    let Box c ← b\n    print a.v\n    print b.v\n    print c.v\n}}"
+    );
+    assert_eq!(en_unnecessary_varia_count(&rewritten), 1);
+}
+
+#[test]
+fn write_through_a_chained_alias_counts_as_mutation_for_the_whole_family() {
+    // `b ← a`, `c ← b`: one write through the tail mutates the shared
+    // object, so no member of the family may be advised `let`.
+    let source = format!(
+        "{ALIAS_BOX}main {{\n    mut Box a ← Box {{ v = 1 }}\n    mut Box b ← a\n    mut Box c ← b\n    c.v ← 2\n    print a.v\n    print b.v\n    print c.v\n}}"
+    );
+    assert_eq!(en_unnecessary_varia_count(&source), 0);
+}
+
+#[test]
 fn copy_source_of_a_varia_cell_stays_flagged() {
     // `copy` acquires an independent value: no alias, no share, so the
     // never-written source keeps its warning (negative twin).
