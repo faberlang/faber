@@ -525,11 +525,7 @@ impl FunctionBuilder<'_> {
         let span = expr.span;
         let carrier = self.trapped_carrier(mir_ty, span)?;
         let (trapped_ty, returned_variant) = match &carrier {
-            TrapCarrier::Tagged {
-                ty,
-                returned_variant,
-                thrown_variant: _,
-            } => (*ty, *returned_variant),
+            TrapCarrier::Tagged { ty, returned_variant, thrown_variant: _ } => (*ty, *returned_variant),
             TrapCarrier::RawError => {
                 unreachable!("trapped_carrier returns the tagged carrier for a capta boundary")
             }
@@ -552,12 +548,7 @@ impl FunctionBuilder<'_> {
             depth: self.capture_depth,
             carrier,
         });
-        self.lower_block_to_destination(
-            body,
-            MirPlace::temp(success_temp),
-            MirType::semantic(success_ty),
-            span,
-        );
+        self.lower_block_to_destination(body, MirPlace::temp(success_temp), MirType::semantic(success_ty), span);
         let Some(trap) = self.traps.pop() else {
             self.errors.push(MirError::validation(
                 span,
@@ -567,8 +558,7 @@ impl FunctionBuilder<'_> {
         };
 
         let value = MirOperand::Temp(success_temp);
-        let returned_fields =
-            self.variant_payload(returned_variant, vec![value], span);
+        let returned_fields = self.variant_payload(returned_variant, vec![value], span);
         let wrapped = self.construct_temp(
             MirAggregateKind::EnumVariant(returned_variant),
             returned_fields,
@@ -613,35 +603,35 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let variant = |name: &'static str| {
-            interner
-                .lookup(name)
-                .and_then(|symbol| self.context.enum_variant_by_name.get(&(trapped_def, symbol)).copied())
+            interner.lookup(name).and_then(|symbol| {
+                self.context
+                    .enum_variant_by_name
+                    .get(&(trapped_def, symbol))
+                    .copied()
+            })
         };
-        let (Some(returned_variant), Some(thrown_variant)) = (variant("returned"), variant("thrown"))
-        else {
+        let (Some(returned_variant), Some(thrown_variant)) = (variant("returned"), variant("thrown")) else {
             self.errors.push(MirError::unsupported(
                 span,
                 "capta trap carrier is missing the builtin trapped variant metadata",
             ));
             return None;
         };
-        Some(TrapCarrier::Tagged {
-            ty: MirType::semantic(ty),
-            returned_variant,
-            thrown_variant,
-        })
+        Some(TrapCarrier::Tagged { ty: MirType::semantic(ty), returned_variant, thrown_variant })
     }
 
     /// The `R` slot of a `trapped<R, T>` application.
     fn trapped_success_slot(&mut self, ty: MirType, span: Span) -> Option<TypeId> {
         let Type::Applied(_, args) = self.types.get(ty.semantic_id()).clone() else {
-            self.errors.push(MirError::missing_type(span, "capta trap success slot"));
+            self.errors
+                .push(MirError::missing_type(span, "capta trap success slot"));
             return None;
         };
         match args.first() {
             Some(radix_types::AppliedArg::Type(success)) => Some(*success),
             _ => {
-                self.errors.push(MirError::missing_type(span, "capta trap success slot"));
+                self.errors
+                    .push(MirError::missing_type(span, "capta trap success slot"));
                 None
             }
         }
@@ -659,19 +649,10 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) {
         match &trap.carrier {
-            TrapCarrier::Tagged {
-                ty,
-                thrown_variant,
-                returned_variant: _,
-            } => {
-                let thrown_fields =
-                    self.variant_payload(*thrown_variant, vec![payload], span);
-                let wrapped = self.construct_temp(
-                    MirAggregateKind::EnumVariant(*thrown_variant),
-                    thrown_fields,
-                    *ty,
-                    span,
-                );
+            TrapCarrier::Tagged { ty, thrown_variant, returned_variant: _ } => {
+                let thrown_fields = self.variant_payload(*thrown_variant, vec![payload], span);
+                let wrapped =
+                    self.construct_temp(MirAggregateKind::EnumVariant(*thrown_variant), thrown_fields, *ty, span);
                 self.assign(trap.destination.clone(), wrapped, *ty, span);
             }
             TrapCarrier::RawError => {
