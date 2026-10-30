@@ -1179,7 +1179,7 @@ impl FunctionBuilder<'_> {
         match mode {
             HirIteraMode::Ab => {
                 if let HirExpressionKind::Intervallum { start, end, step, kind } = &iter.kind {
-                    self.lower_range_itera(RangeIteraLowering {
+                    self.lower_range_itera(&RangeIteraLowering {
                         binding,
                         name,
                         mutable,
@@ -1218,7 +1218,7 @@ impl FunctionBuilder<'_> {
                         MirType::semantic(array_ty),
                         iter.span,
                     );
-                    self.lower_array_itera(ArrayIteraLowering {
+                    self.lower_array_itera(&ArrayIteraLowering {
                         mode,
                         coordinates,
                         binding,
@@ -1231,7 +1231,7 @@ impl FunctionBuilder<'_> {
                 }
             }
             HirIteraMode::Ex | HirIteraMode::De => {
-                self.lower_array_itera(ArrayIteraLowering {
+                self.lower_array_itera(&ArrayIteraLowering {
                     mode,
                     coordinates,
                     binding,
@@ -1283,7 +1283,7 @@ impl FunctionBuilder<'_> {
         {
             if self.is_lane_region(expr) {
                 return self.lower_filum_reduce_expr(
-                    FilumReduceLowering {
+                    &FilumReduceLowering {
                         op,
                         form: MirFilumForm::Grid,
                         source,
@@ -1320,7 +1320,7 @@ impl FunctionBuilder<'_> {
             && !self.is_host_kernel_lowering()
         {
             return self.lower_filum_reduce_expr(
-                FilumReduceLowering {
+                &FilumReduceLowering {
                     op,
                     form: MirFilumForm::Declared,
                     source,
@@ -2102,11 +2102,11 @@ impl FunctionBuilder<'_> {
 
     pub(super) fn lower_filum_reduce_expr(
         &mut self,
-        request: FilumReduceLowering<'_>,
+        request: &FilumReduceLowering<'_>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         use radix_hir::HirReductionOp as Op;
-        let FilumReduceLowering { op, form, source, group, coordinates, filum, binding, body, identity } = request;
+        let FilumReduceLowering { op, form, source, group, coordinates, filum, binding, body, identity } = *request;
         let Some(reduce_op) = mir_reduce_op(op) else {
             // The selected element rides a `T ∪ none` result and an earliest-lane
             // selection no device reduce recipe carries yet: a named decline,
@@ -2762,7 +2762,7 @@ impl FunctionBuilder<'_> {
                     return None;
                 }
                 _ => {
-                    return self.lower_unit_variant_discerne(value, scrutinee, arms, expr);
+                    return self.lower_unit_variant_discerne(&value, scrutinee, arms, expr);
                 }
             }
         }
@@ -2873,7 +2873,7 @@ impl FunctionBuilder<'_> {
             if self.types.equals(*ty, scrutinee_ty) {
                 has_default = true;
                 if let Some((def_id, name)) = binding {
-                    self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span)?;
+                    self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span);
                 }
                 self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
                 reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
@@ -2895,7 +2895,7 @@ impl FunctionBuilder<'_> {
 
             self.switch_to(then_id);
             if let Some((def_id, name)) = binding {
-                self.bind_type_test_family(*def_id, *name, &scrutinee_place, *ty, arm.span)?;
+                self.bind_type_test_family(*def_id, *name, &scrutinee_place, *ty, arm.span);
             }
             self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
             reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
@@ -2934,7 +2934,7 @@ impl FunctionBuilder<'_> {
         scrutinee_place: &MirPlace,
         bound_ty: TypeId,
         span: Span,
-    ) -> Option<()> {
+    ) {
         let binding_ty = MirType::semantic(bound_ty);
         let local = self.next_local_id();
         self.locals
@@ -2947,7 +2947,6 @@ impl FunctionBuilder<'_> {
             binding_ty,
             span,
         );
-        Some(())
     }
 
     fn lower_type_test_arm_body(
@@ -2971,7 +2970,7 @@ impl FunctionBuilder<'_> {
 
     fn lower_unit_variant_discerne(
         &mut self,
-        value: MirOperand,
+        value: &MirOperand,
         scrutinee: &HirExpression,
         arms: &[HirCasuArm],
         expr: &HirExpression,
@@ -2990,7 +2989,7 @@ impl FunctionBuilder<'_> {
                         *variant,
                         fields,
                         pattern,
-                        &value,
+                        value,
                         &scrutinee_place,
                         scrutinee_ty,
                         join_id,
@@ -3003,7 +3002,7 @@ impl FunctionBuilder<'_> {
                         *variant,
                         fields,
                         pattern,
-                        &value,
+                        value,
                         &scrutinee_place,
                         scrutinee_ty,
                         join_id,
@@ -3014,7 +3013,7 @@ impl FunctionBuilder<'_> {
                 HirPattern::Or(alternatives) if is_variant_alternatives(alternatives) => {
                     self.lower_variant_alternatives_arm(
                         alternatives,
-                        &value,
+                        value,
                         &scrutinee_place,
                         scrutinee_ty,
                         join_id,
@@ -3962,7 +3961,7 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
+    fn lower_range_itera(&mut self, range: &RangeIteraLowering<'_>) -> Option<()> {
         let index_ty = coordinate_type(range.body, range.binding).map_or_else(
             || self.range_index_ty(&[Some(range.start), Some(range.end), range.step]),
             MirType::semantic,
@@ -4700,7 +4699,7 @@ impl FunctionBuilder<'_> {
         Some((operand, array_ty))
     }
 
-    fn lower_array_itera(&mut self, iter: ArrayIteraLowering<'_>) -> Option<()> {
+    fn lower_array_itera(&mut self, iter: &ArrayIteraLowering<'_>) -> Option<()> {
         let Some(iter_ty) = iter.iter.ty else {
             self.errors
                 .push(MirError::missing_type(iter.iter.span, "itera collection source"));
@@ -4806,7 +4805,7 @@ impl FunctionBuilder<'_> {
         });
         let collection = self.materialize_operand_place(collection, collection_ty, iter.iter.span);
         if let CollectionIteraKind::Shaped { element, rank, literal, matrix } = &collection_kind {
-            return self.lower_shaped_itera(&iter, collection, *element, *rank, literal.as_deref(), *matrix);
+            return self.lower_shaped_itera(iter, collection, *element, *rank, literal.as_deref(), *matrix);
         }
 
         // The map itself stays addressable for the per-key value read.
@@ -4897,7 +4896,7 @@ impl FunctionBuilder<'_> {
                 self.normalized_type(collection_semantic),
                 Type::BoundedAscii { .. } | Type::BoundedTextus { .. }
             );
-            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, *capacity, text);
+            return self.lower_bounded_array_itera_split(iter, iteration_place, binding_ty, *capacity, text);
         }
 
         let index = self.next_local_id();
@@ -5036,7 +5035,7 @@ impl FunctionBuilder<'_> {
             key_place
                 .projections
                 .push(MirProjection::Index(source_index));
-            self.lower_map_entry_key_binding(&iter, *key, key_place, map_place)
+            self.lower_map_entry_key_binding(iter, *key, key_place, map_place)
         } else if matches!(&collection_kind, CollectionIteraKind::Queue(_) | CollectionIteraKind::Stack(_)) {
             // Queue/stack carriers intentionally remain opaque MIR handles for
             // method access. Read their array-backed runtime value through the
@@ -5386,7 +5385,7 @@ impl FunctionBuilder<'_> {
         } else if let Some(dimensions) = matrix {
             self.lower_shaped_matrix_body(
                 iter,
-                collection,
+                &collection,
                 element,
                 binding,
                 coordinate,
@@ -5475,7 +5474,7 @@ impl FunctionBuilder<'_> {
     fn lower_shaped_matrix_body(
         &mut self,
         iter: &ArrayIteraLowering<'_>,
-        collection: MirPlace,
+        collection: &MirPlace,
         element: TypeId,
         binding: MirLocalId,
         column: MirLocalId,

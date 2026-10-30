@@ -717,7 +717,7 @@ impl FunctionBuilder<'_> {
                         .captured_binding_metadata
                         .get(def_id)
                         .map(|(_, ty)| *ty);
-                    return self.adapt_narrowed_place(place, storage_ty, expr);
+                    return Some(self.adapt_narrowed_place(place, storage_ty, expr));
                 }
                 let Some(binding) = self.bindings.get(def_id).copied() else {
                     self.errors.push(MirError::unsupported(
@@ -726,7 +726,7 @@ impl FunctionBuilder<'_> {
                     ));
                     return None;
                 };
-                self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr)
+                Some(self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr))
             }
             HirExpressionKind::Field(object, name) => {
                 // A folded imported module constant (`module.NAME`) has no
@@ -944,23 +944,19 @@ impl FunctionBuilder<'_> {
         place: MirPlace,
         storage_ty: Option<MirType>,
         expr: &HirExpression,
-    ) -> Option<MirPlace> {
+    ) -> MirPlace {
         let Some(storage_ty) = storage_ty else {
-            return Some(place);
+            return place;
         };
         let Some(use_ty) = expr.ty.map(MirType::semantic) else {
-            return Some(place);
+            return place;
         };
         if let Type::Union(members) = self.normalized_type(storage_ty.semantic_id()) {
             let member_match = members
                 .iter()
                 .any(|member| self.types.equals(*member, use_ty.semantic_id()));
             if member_match {
-                return Some(self.assign_temp_place(
-                    MirValueKind::Operand(MirOperand::Place(place)),
-                    use_ty,
-                    expr.span,
-                ));
+                return self.assign_temp_place(MirValueKind::Operand(MirOperand::Place(place)), use_ty, expr.span);
             }
         }
         // An access marker on the use type (`ref Node ∪ none cur` narrows to
@@ -974,26 +970,26 @@ impl FunctionBuilder<'_> {
             .nullable_inner(storage_payload)
             .map(MirType::semantic)
         else {
-            return Some(place);
+            return place;
         };
         if self.types.nullable_inner(use_payload).is_some()
             || !self
                 .types
                 .is_assignable(inner_ty.semantic_id(), use_payload)
         {
-            return Some(place);
+            return place;
         }
         // The MIR layer does not track access markers (the local lowering
         // already peels ref views), so both cases unwrap to the payload type.
         let unwrapped_ty = inner_ty;
-        Some(self.assign_temp_place(
+        self.assign_temp_place(
             MirValueKind::Option(MirOptionOp::Unwrap {
                 value: MirOperand::Place(place),
                 mode: MirOptionUnwrapMode::Assume,
             }),
             unwrapped_ty,
             expr.span,
-        ))
+        )
     }
 
     fn assign_temp_place(&mut self, kind: MirValueKind, ty: MirType, span: Span) -> MirPlace {

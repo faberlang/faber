@@ -42,7 +42,7 @@ impl FragmentInstantiationError {
     #[must_use]
     pub fn message(&self) -> String {
         let rendered = match self.issue {
-            ISSUE_CONTEXT => nucleum_fragment_context_message(self.reason, &self.args),
+            ISSUE_CONTEXT => Some(nucleum_fragment_context_message(self.reason, &self.args)),
             ISSUE_TYPE => nucleum_fragment_type_message(self.reason, &self.args),
             ISSUE_THROW_CALLER => {
                 Some("@ nucleum caller of a throwing kernel must declare the same `⇥ text` error channel".to_owned())
@@ -55,23 +55,19 @@ impl FragmentInstantiationError {
 
 /// Message prose for this module's issues lives here; the semantic catalog
 /// carries only the code and help text for them.
-fn nucleum_fragment_context_message(reason: &str, args: &[DiagnosticArg]) -> Option<String> {
+fn nucleum_fragment_context_message(reason: &str, args: &[DiagnosticArg]) -> String {
     let caller = arg_value(args, "caller");
-    Some(
-        match (caller, reason) {
-            (_, "entry_callee") => "@ nucleum fragment cannot call an @ nucleum entry",
-            (_, "nested_dispatch") => "@ nucleum cannot call another @ nucleum entry",
-            (Some("entry"), "graphics_stage") => "@ nucleum cannot call a graphics @ fragment or @ vertex",
-            (_, "graphics_stage") => "@ nucleum fragment cannot call a graphics @ fragment or @ vertex",
-            (Some("host"), "host_callable") => "host code cannot call an @ nucleum fragment",
-            (Some("entry"), "host_callable") => {
-                "@ nucleum cannot call a host function or other non-device-safe callable"
-            }
-            (_, "host_callable") => "@ nucleum fragment cannot call a host function or other non-device-safe callable",
-            _ => "@ nucleum fragment call is not legal in this context",
-        }
-        .to_owned(),
-    )
+    match (caller, reason) {
+        (_, "entry_callee") => "@ nucleum fragment cannot call an @ nucleum entry",
+        (_, "nested_dispatch") => "@ nucleum cannot call another @ nucleum entry",
+        (Some("entry"), "graphics_stage") => "@ nucleum cannot call a graphics @ fragment or @ vertex",
+        (_, "graphics_stage") => "@ nucleum fragment cannot call a graphics @ fragment or @ vertex",
+        (Some("host"), "host_callable") => "host code cannot call an @ nucleum fragment",
+        (Some("entry"), "host_callable") => "@ nucleum cannot call a host function or other non-device-safe callable",
+        (_, "host_callable") => "@ nucleum fragment cannot call a host function or other non-device-safe callable",
+        _ => "@ nucleum fragment call is not legal in this context",
+    }
+    .to_owned()
 }
 
 fn nucleum_fragment_type_message(reason: &str, args: &[DiagnosticArg]) -> Option<String> {
@@ -316,7 +312,7 @@ impl<'a> InstantiationChecker<'a> {
                 self.ty(caller, "argument", span, definition_span, Some(&expected), Some(&actual));
                 return;
             }
-            if !self.mode_legal(param.mode, arg) {
+            if !Self::mode_legal(param.mode, arg) {
                 self.ty(
                     caller,
                     "mode",
@@ -333,7 +329,7 @@ impl<'a> InstantiationChecker<'a> {
             return;
         }
         if let Some(dest) = destination
-            && let Some(expected_ty) = self.place_ty(caller_fn, dest)
+            && let Some(expected_ty) = Self::place_ty(caller_fn, dest)
             && !self.types_fit(expected_ty, sig.return_ty)
         {
             let expected = self.type_label(expected_ty);
@@ -529,7 +525,7 @@ impl<'a> InstantiationChecker<'a> {
 
     fn operand_ty(&self, function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
         match operand {
-            MirOperand::Place(place) => self.place_ty(function, place),
+            MirOperand::Place(place) => Self::place_ty(function, place),
             MirOperand::Temp(id) => function.temp_ty(*id),
             MirOperand::Value(id) => self.value_types.get(&(function.id, *id)).copied(),
             MirOperand::Constant(_) => None,
@@ -542,7 +538,7 @@ impl<'a> InstantiationChecker<'a> {
     /// `None` (skip the check) and leaves projected places to MIR validation,
     /// which types every projection (`validate_place`) and checks call
     /// arguments against the callee signature.
-    fn place_ty(&self, function: &MirFunction, place: &MirPlace) -> Option<MirType> {
+    fn place_ty(function: &MirFunction, place: &MirPlace) -> Option<MirType> {
         if !place.projections.is_empty() {
             return None;
         }
@@ -605,7 +601,7 @@ impl<'a> InstantiationChecker<'a> {
         type_label(self.types, ty.semantic_id())
     }
 
-    fn mode_legal(&self, expected: MirParamMode, arg: &MirOperand) -> bool {
+    fn mode_legal(expected: MirParamMode, arg: &MirOperand) -> bool {
         match expected {
             MirParamMode::Owned | MirParamMode::Lane | MirParamMode::LaneInherited => true,
             MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move => matches!(arg, MirOperand::Place(_)),
