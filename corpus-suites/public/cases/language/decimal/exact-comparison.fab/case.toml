@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/decimal/exact-comparison.fab"
+group = "language"
+input_root = "corpus"
+input = "decimal/exact-comparison.fab"
+category = "arithmetic"
+domain = "numerics"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

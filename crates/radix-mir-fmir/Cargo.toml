@@ -26,6 +26,9 @@ radix-lexer = { path = "../radix-lexer" }
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }
+# Operator ruling 2026-10-30: implicit_hasher and must_use_candidate are off workspace-wide.
+implicit_hasher = "allow"
+must_use_candidate = "allow"
 # Structural: test fixture builders serialize large literal payloads
 # (device_payload_test, distributed tests); the schema validator keeps its
 # gate checks in one function.

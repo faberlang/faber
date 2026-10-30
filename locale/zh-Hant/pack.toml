@@ -3608,6 +3608,14 @@ help = "寫 `{varia} {name} ← {copy} {binding}` 取得獨立的值，或寫 `{
 message = "`{name}` 會把唯讀值 `{binding}` 共享為可寫名稱（`{fixum}` 是深層的）"
 help = "寫 `{varia} {name} ← {copy} {binding}` 取得獨立的值，或寫 `{varia} {name} ← {own} {binding}` 接管它"
 
+[diagnostics.SEM066]
+message = "拒絕 `copy`：{head} 無法複製{?path|——成員路徑為 `|`}"
+help = "{head} 是有身分的資源：請不帶 `{copy}` 地共享該值，或在使用者可擁有它時用 `{own}` 接管"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "拒絕 `copy`：{head} 無法複製{?path|——成員路徑為 `|`}"
+help = "{head} 是有身分的資源：請不帶 `{copy}` 地共享該值，或在使用者可擁有它時用 `{own}` 接管"
+
 [diagnostics.WARN001]
 message = "未使用的變數"
 help = "移除變數，或在其前面加上 '_'"
@@ -4377,3 +4385,7 @@ help = "檢查原因，並使用所選裝置支援的核心形式。"
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"
 help = "依照稽核原因找出相依性。讓分區讀寫留在各通道本地，並盡可能使用相符的緩衝區配置。"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "尚不能為 '{construct}' 建構借用區域事實；借用檢查器直接報錯而不做近似"
+help = "該構造的借用判定需要區域推斷；請回報以便區域引擎涵蓋它"

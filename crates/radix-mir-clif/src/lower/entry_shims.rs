@@ -17,9 +17,9 @@ pub(super) fn define_entry_shims(
         .collect::<Lowered<_>>()?;
     let set_tokens = state.runtime_id(&abi::SET_DISPLAY_TOKENS)?;
 
-    // faber_clif_incipit() -> i32: the process exit status the entry hands back
-    // (`main exit <expr>`), 0 when the entry returns nothing.
+    // faber_clif_incipit(arena) -> i32: the process exit status the entry hands back.
     let mut incipit_signature = state.module.make_signature();
+    incipit_signature.params.push(AbiParam::new(state.pointer));
     incipit_signature.returns.push(AbiParam::new(types::I32));
     let incipit_id = state
         .module
@@ -31,8 +31,10 @@ pub(super) fn define_entry_shims(
     {
         let mut builder = FunctionBuilder::new(&mut context.func, &mut builder_context);
         let block = builder.create_block();
+        builder.append_block_params_for_function_params(block);
         builder.switch_to_block(block);
-        let mut args = Vec::new();
+        let arena = builder.block_params(block)[0];
+        let mut args = vec![arena];
         for (data, token) in token_data.iter().zip(&tokens) {
             let global = state.module.declare_data_in_func(*data, builder.func);
             args.push(builder.ins().symbol_value(state.pointer, global));
@@ -52,7 +54,7 @@ pub(super) fn define_entry_shims(
                 .first()
                 .is_some_and(|param| param.value_type == types::I64);
             let entry_ref = state.module.declare_func_in_func(entry, builder.func);
-            let call = builder.ins().call(entry_ref, &[]);
+            let call = builder.ins().call(entry_ref, &[arena]);
             if returns_status {
                 // The status is a `numerus`; the process keeps its low 32 bits,
                 // as the runner does.

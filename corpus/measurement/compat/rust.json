@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 560,
-    "analyzable": 564
+    "capable": 562,
+    "analyzable": 566
   },
   "terms": [
     {
@@ -510,8 +510,8 @@
     {
       "term": "matrix",
       "rule": "type",
-      "capable": 6,
-      "analyzable": 6
+      "capable": 7,
+      "analyzable": 7
     },
     {
       "term": "metior",
@@ -972,8 +972,8 @@
     {
       "term": "vector",
       "rule": "type",
-      "capable": 16,
-      "analyzable": 16
+      "capable": 17,
+      "analyzable": 17
     },
     {
       "term": "vel",

@@ -9,6 +9,8 @@ license = "MIT OR Apache-2.0"
 # Carried from radix-module (whose semantic code was written under this
 # exact posture); per-lint fixes land incrementally.
 pedantic = { level = "deny", priority = -1 }
+# Operator ruling 2026-10-30: implicit_hasher and must_use_candidate are off workspace-wide.
+must_use_candidate = "allow"
 too_many_lines = "allow"
 match_same_arms = "allow"
 struct_excessive_bools = "allow"

@@ -74,6 +74,31 @@ fn unbounded_octeti_primitive_stays_opaque() {
     assert_eq!(layout.kind, MirLayoutKind::OpaqueHandle);
 }
 
+#[test]
+fn applied_generic_struct_uses_physical_aggregate_carrier() {
+    let mut types = TypeTable::new();
+    let int = types.primitive(Primitive::Numerus);
+    let base = types.intern(Type::Struct(radix_types::DefId(500)));
+    let applied = types.intern(Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Type(int)],
+    ));
+    let table = MirLayoutTable::from_types(&types);
+
+    let layout = table
+        .layout_for_type(MirType::semantic(applied))
+        .expect("generic struct instance layout fact");
+    assert_eq!(
+        layout.kind,
+        MirLayoutKind::Aggregate(MirAggregateLayout {
+            family: MirAggregateFamily::Struct,
+            carrier: MirAggregateCarrier::PhysicalValue,
+            element: None,
+            capacity: None,
+        })
+    );
+}
+
 // MLC-2: the fallthrough law and the pin table — the layout census made
 // permanent.
 //
@@ -104,7 +129,7 @@ enum Bucket {
 /// Intended bucket for every `Type` variant. The exhaustive match is the
 /// audit made permanent: a new variant without a row here fails to compile.
 /// `Alias` is transparent and is refused a census seat on purpose.
-fn intended_bucket(ty: &Type) -> Bucket {
+fn intended_bucket(ty: &Type, types: &TypeTable) -> Bucket {
     match ty {
         Type::Primitive(
             Primitive::Bivalens
@@ -139,6 +164,10 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::Matrix(_, _)
         | Type::Atomic(_) => Bucket::Physical,
         Type::Record(_) | Type::Struct(_) | Type::Tuple(_) => Bucket::Physical,
+        Type::Applied(base, _) => match types.get(*base) {
+            Type::Struct(_) => Bucket::Physical,
+            _ => Bucket::OpaqueHandle,
+        },
         // MLC-3: the bounded families with literal capacities are physical
         // aggregates (row-of-T / byte-storage + length member).
         Type::BoundedArray { .. } | Type::BoundedTextus { .. } | Type::BoundedAscii { .. } => {
@@ -178,8 +207,7 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::BoundedStack { .. }
         | Type::Ref(_, _)
         | Type::Interface(_)
-        | Type::Func(_)
-        | Type::Applied(_, _) => Bucket::OpaqueHandle,
+        | Type::Func(_) => Bucket::OpaqueHandle,
     }
 }
 
@@ -321,7 +349,7 @@ fn pin_table_census_is_53_rows_across_the_four_buckets() {
     let mut opaque = 0;
     let mut internal = 0;
     for ty in &rows {
-        match intended_bucket(ty) {
+        match intended_bucket(ty, &types) {
             Bucket::Physical => physical += 1,
             Bucket::OpaqueAggregate => aggregate += 1,
             Bucket::OpaqueHandle => opaque += 1,
@@ -351,7 +379,10 @@ fn pin_table_buckets_agree_with_the_resolver_on_nominal_rows() {
     // complete arena, so row types are present when the resolver runs.
     let interned: Vec<(radix_types::TypeId, Bucket)> = rows
         .iter()
-        .map(|ty| (types.intern(ty.clone()), intended_bucket(ty)))
+        .map(|ty| {
+            let bucket = intended_bucket(ty, &types);
+            (types.intern(ty.clone()), bucket)
+        })
         .collect();
     let table = MirLayoutTable::from_types(&types);
 
@@ -400,8 +431,9 @@ fn alias_is_transparent_and_not_a_census_row() {
     let float64_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F64);
     let alias = Type::Alias(DefId(20), float64_ty);
 
-    let refused =
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| intended_bucket(&alias)));
+    let refused = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        intended_bucket(&alias, &types)
+    }));
     assert!(refused.is_err(), "alias must not occupy a census bucket");
 
     let alias_ty = types.intern(alias);

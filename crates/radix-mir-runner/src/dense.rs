@@ -58,8 +58,9 @@ impl DenseKind {
     }
 }
 
-/// Backing array of one dense tensor. `Values` keeps today's behaviour for
-/// vector, matrix, record and unknown element kinds.
+/// Backing array of one dense tensor. `Values` is the general boxed path;
+/// [`DenseStorage::VectorValues`] marks materialized fresh vector outputs and
+/// accounts for their outer element array and per-element lane arrays.
 #[derive(Clone, Debug, PartialEq)]
 pub enum DenseStorage {
     F32(Vec<f32>),
@@ -92,6 +93,21 @@ pub enum DenseStorage {
     FreshRecordZeros {
         layout: Arc<RecordLayout>,
         len: usize,
+    },
+    /// Deferred zeros for a vector element: each element is an independent
+    /// vector of `lanes` zero scalar values. The outer element array and each
+    /// vector's lane array are allocated only on the first write.
+    FreshVectorZeros {
+        lane_kind: DenseKind,
+        lanes: u8,
+        len: usize,
+    },
+    /// Materialized vector elements originating as [`DenseStorage::FreshVectorZeros`].
+    /// `lanes` lets backing-byte accounting include both the outer array and
+    /// each element's lane array without inspecting mutable `Value`s.
+    VectorValues {
+        items: Vec<Value>,
+        lanes: u8,
     },
 }
 
@@ -287,8 +303,8 @@ impl DenseStorage {
         }
     }
 
-    /// Element type, or `None` for `Values` and `Record` (a record row is not
-    /// one scalar kind; see [`DenseStorage::record_layout`]).
+    /// Element type, or `None` for boxed, vector and record storage (a record
+    /// row is not one scalar kind; see [`DenseStorage::record_layout`]).
     #[must_use]
     pub fn kind(&self) -> Option<DenseKind> {
         match self {
@@ -300,11 +316,11 @@ impl DenseStorage {
             Self::U32(_) => Some(DenseKind::U32),
             Self::U64(_) => Some(DenseKind::U64),
             Self::Bool(_) => Some(DenseKind::Bool),
-            Self::Record { .. } | Self::Values(_) => None,
+            Self::Record { .. } | Self::Values(_) | Self::VectorValues { .. } => None,
             // A deferred twin answers before any array exists: its kind is
             // part of the deferral (the typed download path checks it).
             Self::FreshZeros { kind, .. } => Some(*kind),
-            Self::FreshRecordZeros { .. } => None,
+            Self::FreshRecordZeros { .. } | Self::FreshVectorZeros { .. } => None,
         }
     }
 
@@ -329,12 +345,23 @@ impl DenseStorage {
         Self::FreshRecordZeros { layout, len }
     }
 
+    /// Deferred zero vector elements, with independent lane storage per
+    /// element when read or materialized.
+    #[must_use]
+    pub fn fresh_zeros_vector(lane_kind: DenseKind, lanes: u8, len: usize) -> Self {
+        Self::FreshVectorZeros {
+            lane_kind,
+            lanes,
+            len,
+        }
+    }
+
     /// Whether this storage reads as zeros it has not allocated yet.
     #[must_use]
     pub fn is_deferred_zeros(&self) -> bool {
         matches!(
             self,
-            Self::FreshZeros { .. } | Self::FreshRecordZeros { .. }
+            Self::FreshZeros { .. } | Self::FreshRecordZeros { .. } | Self::FreshVectorZeros { .. }
         )
     }
 
@@ -350,6 +377,19 @@ impl DenseStorage {
             Self::FreshRecordZeros { layout, len } => {
                 let (layout, len) = (Arc::clone(layout), *len);
                 *self = Self::zeros_record(layout, len);
+            }
+            Self::FreshVectorZeros {
+                lane_kind,
+                lanes,
+                len,
+            } => {
+                let (lane_kind, lanes, len) = (*lane_kind, *lanes, *len);
+                *self = Self::VectorValues {
+                    items: (0..len)
+                        .map(|_| zero_vector_value(lane_kind, lanes))
+                        .collect(),
+                    lanes,
+                };
             }
             _ => {}
         }
@@ -370,7 +410,13 @@ impl DenseStorage {
             Self::Bool(items) => items.len() * size_of::<bool>(),
             Self::Record { bytes, .. } => bytes.len(),
             Self::Values(items) => items.len() * size_of::<Value>(),
-            Self::FreshZeros { .. } | Self::FreshRecordZeros { .. } => 0,
+            Self::VectorValues { items, lanes } => {
+                items.len() * size_of::<Value>()
+                    + items.len() * usize::from(*lanes) * size_of::<Value>()
+            }
+            Self::FreshZeros { .. }
+            | Self::FreshRecordZeros { .. }
+            | Self::FreshVectorZeros { .. } => 0,
         }
     }
 
@@ -405,8 +451,10 @@ impl DenseStorage {
             Self::U64(items) => items.len(),
             Self::Bool(items) => items.len(),
             Self::Record { layout, bytes } => bytes.len() / layout.size(),
-            Self::Values(items) => items.len(),
-            Self::FreshZeros { len, .. } | Self::FreshRecordZeros { len, .. } => *len,
+            Self::Values(items) | Self::VectorValues { items, .. } => items.len(),
+            Self::FreshZeros { len, .. }
+            | Self::FreshRecordZeros { len, .. }
+            | Self::FreshVectorZeros { len, .. } => *len,
         }
     }
 
@@ -429,7 +477,7 @@ impl DenseStorage {
             Self::U64(items) => Value::UInt(*items.get(index)?),
             Self::Bool(items) => Value::Bool(*items.get(index)?),
             Self::Record { layout, bytes } => layout.decode(layout.row(bytes, index)?)?,
-            Self::Values(items) => items.get(index)?.clone(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items.get(index)?.clone(),
             Self::FreshZeros { kind, len } => {
                 if index >= *len {
                     return None;
@@ -441,6 +489,16 @@ impl DenseStorage {
                     return None;
                 }
                 layout.decode(&vec![0; layout.size()])?
+            }
+            Self::FreshVectorZeros {
+                lane_kind,
+                lanes,
+                len,
+            } => {
+                if index >= *len {
+                    return None;
+                }
+                zero_vector_value(*lane_kind, *lanes)
             }
         })
     }
@@ -470,7 +528,9 @@ impl DenseStorage {
                         .then(|| row.copy_from_slice(&encoded))
                 })
             }
-            (Self::Values(items), v) => items.get_mut(index).map(|s| *s = v.clone()),
+            (Self::Values(items), v) | (Self::VectorValues { items, .. }, v) => {
+                items.get_mut(index).map(|s| *s = v.clone())
+            }
             _ => None,
         }
         .is_some()
@@ -480,7 +540,7 @@ impl DenseStorage {
     #[must_use]
     pub fn to_values(&self) -> Vec<Value> {
         match self {
-            Self::Values(items) => items.clone(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items.clone(),
             _ => (0..self.len()).filter_map(|i| self.get(i)).collect(),
         }
     }
@@ -489,7 +549,7 @@ impl DenseStorage {
     #[must_use]
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
         match self {
-            Self::Values(items) => items[..count].to_vec(),
+            Self::Values(items) | Self::VectorValues { items, .. } => items[..count].to_vec(),
             _ => (0..count).filter_map(|i| self.get(i)).collect(),
         }
     }
@@ -528,7 +588,7 @@ impl DenseStorage {
                     bytes.get(range.start.checked_mul(size)?..range.end.checked_mul(size)?)?;
                 Some(f(Cow::Borrowed(part)))
             }
-            Self::Values(_) => None,
+            Self::Values(_) | Self::VectorValues { .. } => None,
             Self::FreshZeros { kind, len } => {
                 if range.end > *len {
                     return None;
@@ -543,6 +603,17 @@ impl DenseStorage {
                     return None;
                 }
                 Some(f(Cow::Owned(vec![0; end - start])))
+            }
+            Self::FreshVectorZeros {
+                lane_kind,
+                lanes,
+                len,
+            } => {
+                if range.end > *len {
+                    return None;
+                }
+                let width = lane_kind.width() * usize::from(*lanes);
+                Some(f(Cow::Owned(vec![0; range.len() * width])))
             }
         }
     }
@@ -587,12 +658,12 @@ impl DenseStorage {
                     _ => false,
                 }
             }
-            Self::Values(_) => false,
+            Self::Values(_) | Self::VectorValues { .. } => false,
             // `materialized_zeros` above already replaced the deferral, so
             // this arm runs at most once and the retry sees real storage.
-            Self::FreshZeros { .. } | Self::FreshRecordZeros { .. } => {
-                self.write_le_bytes(range, bytes)
-            }
+            Self::FreshZeros { .. }
+            | Self::FreshRecordZeros { .. }
+            | Self::FreshVectorZeros { .. } => self.write_le_bytes(range, bytes),
         }
     }
 }
@@ -601,6 +672,12 @@ fn store<T>(items: &mut [T], index: usize, value: Option<T>) -> Option<()> {
     let value = value?;
     *items.get_mut(index)? = value;
     Some(())
+}
+
+fn zero_vector_value(kind: DenseKind, lanes: u8) -> Value {
+    Value::Vector(Rc::new(RefCell::new(
+        (0..lanes).map(|_| zero_value(kind)).collect(),
+    )))
 }
 
 /// The zero element of a dense kind, as [`DenseStorage::get`] reads it: the
@@ -1036,7 +1113,7 @@ impl DenseCell {
         self.len() == 0
     }
 
-    /// Element type, or `None` for `Values` and `Record`.
+    /// Element type, or `None` for boxed, vector and record storage.
     pub fn kind(&self) -> Option<DenseKind> {
         self.read(DenseStorage::kind)
     }
@@ -1063,7 +1140,10 @@ impl DenseCell {
     pub fn to_values(&self) -> Vec<Value> {
         self.read(|storage| {
             let values = storage.to_values();
-            if !matches!(storage, DenseStorage::Values(_)) {
+            if !matches!(
+                storage,
+                DenseStorage::Values(_) | DenseStorage::VectorValues { .. }
+            ) {
                 self.boxed.fetch_add(
                     u64::try_from(storage.len()).unwrap_or(u64::MAX),
                     Ordering::Relaxed,
@@ -1086,11 +1166,13 @@ impl DenseCell {
         self.stored.load(Ordering::Relaxed)
     }
 
-    /// Run `f` over the boxed elements when the storage is `Values`; `None`
+    /// Run `f` over boxed elements in either boxed storage variant; `None`
     /// for a typed storage (use [`DenseCell::to_values`]).
     pub fn with_values<R>(&self, f: impl FnOnce(&[Value]) -> R) -> Option<R> {
         self.read(|storage| match storage {
-            DenseStorage::Values(items) => Some(f(items)),
+            DenseStorage::Values(items) | DenseStorage::VectorValues { items, .. } => {
+                Some(f(items))
+            }
             _ => None,
         })
     }
@@ -1100,9 +1182,10 @@ impl DenseCell {
         self.read(DenseStorage::clone)
     }
 
-    /// Host bytes the element array occupies now; deferred zeros occupy
-    /// nothing until a write materializes them. The dispatcher's host
-    /// storage accounting reads this around its downloads.
+    /// Host bytes the element backing occupies now; deferred zeros occupy
+    /// nothing until a write materializes them. For fresh vector outputs this
+    /// includes both the outer element array and the per-element lane arrays.
+    /// The dispatcher's host storage accounting reads this around downloads.
     #[must_use]
     pub fn backing_bytes(&self) -> usize {
         self.read(DenseStorage::backing_bytes)
@@ -1112,7 +1195,10 @@ impl DenseCell {
     pub fn values_prefix(&self, count: usize) -> Vec<Value> {
         self.read(|storage| {
             let values = storage.values_prefix(count);
-            if !matches!(storage, DenseStorage::Values(_)) {
+            if !matches!(
+                storage,
+                DenseStorage::Values(_) | DenseStorage::VectorValues { .. }
+            ) {
                 self.boxed
                     .fetch_add(u64::try_from(count).unwrap_or(u64::MAX), Ordering::Relaxed);
             }
@@ -1168,11 +1254,20 @@ impl std::fmt::Debug for DenseCell {
 impl PartialEq for DenseCell {
     /// Equality by storage content. A deferred zeros cell is its zeros: both
     /// sides materialize first, so a fresh twin compares equal to the zeros
-    /// buffer it stands for (and to another twin of the same shape).
+    /// buffer it stands for (and to another twin of the same shape). Deferred
+    /// vector values also compare by their elements with ordinary `Values`.
     fn eq(&self, other: &Self) -> bool {
         self.materialize();
         other.materialize();
-        self.read(|a| other.read(|b| a == b))
+        self.read(|a| {
+            other.read(|b| match (a, b) {
+                (DenseStorage::VectorValues { items, .. }, DenseStorage::Values(other))
+                | (DenseStorage::Values(other), DenseStorage::VectorValues { items, .. }) => {
+                    items == other
+                }
+                _ => a == b,
+            })
+        })
     }
 }
 

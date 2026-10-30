@@ -150,6 +150,10 @@ pub struct MirValidationContext<'a> {
     pub layouts: MirLayoutTable,
     pub interner: MirInterner<'a>,
     pub functions: FxHashMap<DefId, MirFunctionSignature>,
+    /// Derived from the current validated program, after helper composition.
+    /// Values are parameter positions with unproven tensor indexes. Missing
+    /// helpers conservatively reserve resources for every capture.
+    pub grid_reduce_helper_indexes: FxHashMap<crate::MirFunctionId, Vec<u32>>,
     /// Functions lowered from genus methods: the first MIR parameter of each is
     /// the method's receiver, lowered as an `Owned` parameter that MIR itself
     /// cannot tell from an `own Genus` parameter. Backends that must treat a
@@ -214,6 +218,7 @@ impl<'a> MirValidationContext<'a> {
             layouts: MirLayoutTable::from_types(types),
             interner: MirInterner::Absent,
             functions: FxHashMap::default(),
+            grid_reduce_helper_indexes: FxHashMap::default(),
             method_defs: FxHashSet::default(),
             external_function_identities: FxHashMap::default(),
             package_product: None,
@@ -268,6 +273,9 @@ impl<'a> MirValidationContext<'a> {
         let mut context = MirValidationContext::<'b>::new(types);
         context.interner = self.interner.clone();
         context.functions.clone_from(&self.functions);
+        context
+            .grid_reduce_helper_indexes
+            .clone_from(&self.grid_reduce_helper_indexes);
         context.method_defs.clone_from(&self.method_defs);
         context
             .external_function_identities
@@ -329,6 +337,7 @@ impl<'a> MirValidationContext<'a> {
         let Self {
             interner,
             functions,
+            grid_reduce_helper_indexes,
             method_defs,
             external_function_identities,
             package_product,
@@ -359,6 +368,7 @@ impl<'a> MirValidationContext<'a> {
             layouts,
             interner,
             functions,
+            grid_reduce_helper_indexes,
             method_defs,
             external_function_identities,
             package_product,

@@ -225,7 +225,7 @@ impl TypeChecker<'_> {
     }
 
     /// A genus that declares `implet Closable`.
-    fn def_is_closable(&self, def: DefId) -> bool {
+    pub(super) fn def_is_closable(&self, def: DefId) -> bool {
         let Some(contract) = self.types.closing_contract else {
             return false;
         };
