@@ -538,6 +538,9 @@ fn a_single_lane_kernel_guards_its_unproven_indexes_in_metal_text() {
         single_lane("dst[k + write] ← src[k + read] * 2.0", "dst[0] ← dst[0] + 0.5")
     );
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    // Kernel argument exclusivity (de628999) puts Clang's `__restrict` on
+    // every Metal buffer parameter, the fault channel included (OV-1
+    // `refuse_written_overlap` plus the separate per-launch allocation).
     assert!(text.contains("device atomic_uint* __restrict u9_fault"), "{text}");
     // The load guard (site 0, against `src`'s count) precedes the `src`
     // read, the store guard (site 1, against `dst`'s count) the `dst` write.
@@ -586,6 +589,9 @@ main {
 "#;
     let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    // Kernel argument exclusivity (de628999) puts Clang's `__restrict` on
+    // every Metal buffer parameter, the fault channel included (OV-1
+    // `refuse_written_overlap` plus the separate per-launch allocation).
     assert!(text.contains("device atomic_uint* __restrict u9_fault"), "{text}");
     assert_eq!(deferred_slots(&text, 1), [0], "the vector fault uses site 0: {text}");
     assert!(text.contains("(ulong)(4u)"), "the guard uses the vector width: {text}");
@@ -634,6 +640,9 @@ main {
 "#;
     let source = format!("+++\nlocale = \"en\"\n+++\n{source}");
     let text = super::test_support::compile_metal_text(&source).unwrap_or_else(|error| panic!("metal text: {error}"));
+    // Kernel argument exclusivity (de628999) puts Clang's `__restrict` on
+    // every Metal buffer parameter, the fault channel included (OV-1
+    // `refuse_written_overlap` plus the separate per-launch allocation).
     assert!(text.contains("device atomic_uint* __restrict u9_fault"), "{text}");
     assert_eq!(deferred_slots(&text, 1), [0], "the vector store uses site 0: {text}");
     assert!(text.contains("(ulong)(4u)"), "the store guard uses the vector width: {text}");
