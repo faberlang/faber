@@ -3093,8 +3093,11 @@ comment.
 when its body escapes through the error channel, and a case that completes
 cleanly fails (strict expected-failure). The other modifiers are `bỏ_qua`,
 `việc_cần_làm`, `chỉ`, `chỉ_trong`, `nhãn`, `thời_gian`, `đo_lường`, `lặp_lại`, and
-`mong_manh`. The counts of `thời_gian`, `lặp_lại` and `mong_manh` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`mong_manh`. `lặp_lại N` runs the case N times and passes only if every run
+passes; it does not retry until a pass. `mong_manh N` is rejected by `faber test`
+because flaky retries are not executed, so the case body does not run. The
+counts of `thời_gian`, `lặp_lại` and `mong_manh` are non-negative integer literals;
+a float is `test_modifier_integer`.
 
 ---
 

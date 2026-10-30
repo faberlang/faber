@@ -3093,8 +3093,11 @@ comment.
 when its body escapes through the error channel, and a case that completes
 cleanly fails (strict expected-failure). The other modifiers are `छोड़ो`,
 `लंबित`, `केवल`, `केवलमें`, `टैग`, `समय`, `मापो`, `पुनरावृत्ति`, and
-`नाज़ुक`. The counts of `समय`, `पुनरावृत्ति` and `नाज़ुक` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`नाज़ुक`. `पुनरावृत्ति N` runs the case N times and passes only if every run
+passes; it does not retry until a pass. `नाज़ुक N` is rejected by `faber test`
+because flaky retries are not executed, so the case body does not run. The
+counts of `समय`, `पुनरावृत्ति` and `नाज़ुक` are non-negative integer literals;
+a float is `test_modifier_integer`.
 
 ---
 

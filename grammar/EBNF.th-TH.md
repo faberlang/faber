@@ -3093,8 +3093,11 @@ comment.
 when its body escapes through the error channel, and a case that completes
 cleanly fails (strict expected-failure). The other modifiers are `ละเว้น`,
 `ค้าง`, `เฉพาะ`, `เฉพาะใน`, `แท็ก`, `เวลา`, `วัด`, `ทำซ้ำ`, and
-`เปราะบาง`. The counts of `เวลา`, `ทำซ้ำ` and `เปราะบาง` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`เปราะบาง`. `ทำซ้ำ N` runs the case N times and passes only if every run
+passes; it does not retry until a pass. `เปราะบาง N` is rejected by `faber test`
+because flaky retries are not executed, so the case body does not run. The
+counts of `เวลา`, `ทำซ้ำ` and `เปราะบาง` are non-negative integer literals;
+a float is `test_modifier_integer`.
 
 ---
 
