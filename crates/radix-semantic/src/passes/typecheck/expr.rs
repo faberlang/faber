@@ -247,7 +247,9 @@ impl TypeChecker<'_> {
             return;
         }
         match lit {
-            HirLiteral::Int(value) => *lit = HirLiteral::Float(*value as f64),
+            HirLiteral::Int(value) => {
+                *lit = HirLiteral::Float(radix_types::Magnus::from_u64(*value).to_f64());
+            }
             // A big literal in a float slot (ruling 34) rounds to nearest;
             // `literal_type` already proved it inside the float's range.
             HirLiteral::BigInt(digits) => {

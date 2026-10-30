@@ -46,7 +46,7 @@ impl HirVisitorMut for Respell<'_> {
             return;
         }
         expr.kind = HirExpressionKind::Literal(HirLiteral::FloatText {
-            value: *value as f64,
+            value: radix_types::Magnus::from_u64(*value).to_f64(),
             text: self.interner.intern(&value.to_string()),
         });
     }

@@ -237,6 +237,10 @@ impl TypeChecker<'_> {
     ) -> Option<Result<Vec<IndexId>, ()>> {
         let mut unified_dims = Vec::with_capacity(actual_dims.len());
         for (axis, (actual, expected)) in actual_dims.into_iter().zip(expected_dims).enumerate() {
+            let Ok(axis) = u32::try_from(axis) else {
+                self.incompatible_tensor_index(span);
+                return Some(Err(()));
+            };
             let mut actual = self.resolve_index(actual);
             // The same compile-time dimension term on both sides (a
             // function's own `N` returned or passed as `N`) is equal by
@@ -276,11 +280,10 @@ impl TypeChecker<'_> {
                     // Keep a stable immutable scalar witness for generic
                     // shape inference, but still guard the physical carrier
                     // axis against it for every argument at this call.
-                    if let Some((runtime_axis, boundary)) = self.runtime_boundary_axis(axis as u32)
-                    {
+                    if let Some((runtime_axis, boundary)) = self.runtime_boundary_axis(axis) {
                         self.record_shape_relation(runtime_axis, actual, span, boundary);
                     }
-                } else if let Some((runtime_axis, _)) = self.runtime_boundary_axis(axis as u32) {
+                } else if let Some((runtime_axis, _)) = self.runtime_boundary_axis(axis) {
                     actual = runtime_axis;
                 }
             }
@@ -322,7 +325,7 @@ impl TypeChecker<'_> {
                     continue;
                 }
 
-                let (runtime_actual, _) = self.runtime_boundary_axis(axis as u32)?;
+                let (runtime_actual, _) = self.runtime_boundary_axis(axis)?;
                 // A value-shape extent (a whole-figura `list<int>` value
                 // name) has no scalar read: the producing conversion's
                 // runtime count check owns the fact, so no axis equation
@@ -444,13 +447,15 @@ impl TypeChecker<'_> {
                 continue;
             };
             for (axis, dim) in dims.into_iter().enumerate() {
+                let Ok(axis) = u32::try_from(axis) else {
+                    self.incompatible_tensor_index(span);
+                    return;
+                };
                 let expected = self.runtime_substitute_shape_params(dim);
                 let actual = self
                     .types
                     .intern_index(IndexExpr::Runtime(runtime_formal_axis(
-                        parameter,
-                        &fields,
-                        axis as u32,
+                        parameter, &fields, axis,
                     )));
                 // A statically known extent is a compile-time fact, and a
                 // non-scalar term (a rank tuple passed as a size argument,
@@ -490,6 +495,10 @@ impl TypeChecker<'_> {
                 continue;
             };
             for (axis, dim) in dims.into_iter().enumerate() {
+                let Ok(axis) = u32::try_from(axis) else {
+                    self.incompatible_tensor_index(*span);
+                    return;
+                };
                 // Size-type Z3 (Q3): a `_` extent parameter is an anonymous
                 // size chosen per call. At entry the hole falls through to
                 // the carrier: the formal axis is the witness the body reads
@@ -501,9 +510,7 @@ impl TypeChecker<'_> {
                     let axis_witness =
                         self.types
                             .intern_index(IndexExpr::Runtime(runtime_formal_axis(
-                                *parameter,
-                                fields,
-                                axis as u32,
+                                *parameter, fields, axis,
                             )));
                     self.index_infer.rebind(var, axis_witness);
                 }
@@ -526,7 +533,7 @@ impl TypeChecker<'_> {
                 let Some(inverse) = offset.checked_neg() else {
                     continue;
                 };
-                let axis_source = runtime_formal_axis(*parameter, fields, axis as u32);
+                let axis_source = runtime_formal_axis(*parameter, fields, axis);
                 let axis_witness = self.types.intern_index(IndexExpr::Runtime(axis_source));
                 let Ok(witness) =
                     radix_types::add_index_constant(self.types, axis_witness, inverse)
@@ -535,15 +542,12 @@ impl TypeChecker<'_> {
                 };
                 let binding = params[*parameter as usize].def_id;
                 let call_source = if fields.is_empty() {
-                    RuntimeExtentId::TensorBindingAxis {
-                        binding,
-                        axis: axis as u32,
-                    }
+                    RuntimeExtentId::TensorBindingAxis { binding, axis }
                 } else {
                     RuntimeExtentId::TensorFieldAxis {
                         binding,
                         fields: fields.clone(),
-                        axis: axis as u32,
+                        axis,
                     }
                 };
                 let call_axis = self.types.intern_index(IndexExpr::Runtime(call_source));
