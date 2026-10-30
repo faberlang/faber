@@ -101,7 +101,7 @@ pub fn build_package_fhir(
                 format!("could not read source for FHIR package: {error}"),
             )]
         })?;
-        let local_links = local_links_for_unit(&package, unit, &library_resolver, &package_root)?;
+        let local_links = local_links_for_unit(&package, unit, &library_resolver, &package_root);
         inputs.push(PackageUnitInput {
             relative_path,
             module_segments: unit.module_segments.clone(),
@@ -254,7 +254,7 @@ fn local_links_for_unit(
     unit: &AnalyzedProgramNode,
     library_resolver: &crate::library::LibraryResolver,
     package_root: &Path,
-) -> Result<Vec<LocalLinkWire>, Vec<Diagnostic>> {
+) -> Vec<LocalLinkWire> {
     let mut links = Vec::new();
     let mut seen = BTreeSet::new();
     for item in &unit.analysis.hir.items {
@@ -285,7 +285,7 @@ fn local_links_for_unit(
             }
         }
     }
-    Ok(links)
+    links
 }
 
 /// Library import references for one unit (binding/package/module — no

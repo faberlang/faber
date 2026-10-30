@@ -458,15 +458,9 @@ fn package_mir_accepts_octeti_option_operand_and_rest_operand() {
     // The record field type is `list<b8>`; a rest operand is a list of those.
     let mut types = radix_module::semantic::TypeTable::new();
     let bytes = types.octeti_list();
-    assert_eq!(
-        cli_record_type(&mut types, &CliType::Octeti, false),
-        Some(bytes)
-    );
+    assert_eq!(cli_record_type(&mut types, &CliType::Octeti, false), bytes);
     let rows = types.array(bytes);
-    assert_eq!(
-        cli_record_type(&mut types, &CliType::Octeti, true),
-        Some(rows)
-    );
+    assert_eq!(cli_record_type(&mut types, &CliType::Octeti, true), rows);
 }
 
 // ── fmir_text_cli_value_type ───────────────────────────────────────────────
