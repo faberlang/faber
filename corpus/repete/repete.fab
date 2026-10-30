@@ -5,21 +5,22 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "proba_stmt", "proba_modifier", "adfirma_stmt", "expression", "literal"]
 category = "testing"
 canonical = true
-summary = "Repeats a test a fixed number of times."
+summary = "Runs a test N times and passes only if every run passes."
 syntax = "repete <number>"
 related = ["fragilis"]
 locale = "en"
 +++
 # =============================================================================
-# repete — Repeats a test a fixed number of times.
+# repete — Runs a test N times; every run must pass.
 # =============================================================================
 #
 # What this teaches:
-#   • Test flakiness mitigation — `repete <N>` runs a test case up to N times
-#     until it passes; useful for non-deterministic or flaky tests
+#   • `repete <N>` runs the test case N times and passes only if every run
+#     passes; it does not retry until one run passes.
 #   • Declared as a test modifier on `proba`
 #
 # Common mistakes:
+#   • Treating `repete` as retry-until-pass — all N runs must pass.
 #   • Confusing `repete` (test repetition modifier) with `itera` (loop iterator) or `fac`/`dum` (loop constructs).
 #
 # See also: fragilis
@@ -30,13 +31,14 @@ locale = "en"
 # GRAMMAR:
 #   testModifier :← 'repete' integer
 #
-# EXPECTED OUTPUT:
-#   No incipit — declaration or test-runner surface only.
+# EXPECTED RUNNER OUTCOME:
+#   `faber test corpus/repete/repete.fab` runs the passing case twice; it passes
+#   only when both executions pass.
 #
 # BACKEND:
 #   declaration-only test modifier (whitelist: repete/repete.fab).
 #
 
-test "flaky guard" repeat 2 {
+test "two passing runs" repeat 2 {
     assert true
 }

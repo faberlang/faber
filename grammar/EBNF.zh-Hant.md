@@ -3093,8 +3093,11 @@ comment.
 when its body escapes through the error channel, and a case that completes
 cleanly fails (strict expected-failure). The other modifiers are `略過`,
 `預期`, `僅限`, `僅限於`, `標籤`, `時限`, `測量`, `重複`, and
-`脆弱`. The counts of `時限`, `重複` and `脆弱` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`脆弱`. `重複 N` runs the case N times and passes only if every run
+passes; it does not retry until a pass. `脆弱 N` is rejected by `faber test`
+because flaky retries are not executed, so the case body does not run. The
+counts of `時限`, `重複` and `脆弱` are non-negative integer literals;
+a float is `test_modifier_integer`.
 
 ---
 
