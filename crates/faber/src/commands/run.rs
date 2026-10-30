@@ -137,9 +137,7 @@ pub(super) fn cmd_run(args: RunArgs) {
                     Some(never) => match never {},
                     None => {
                         if args.debug {
-                            eprintln!(
-                                "debug: engine: runner (clif-jit declined at compile time)"
-                            );
+                            eprintln!("debug: engine: runner (clif-jit declined at compile time)");
                         }
                     }
                 }
@@ -233,7 +231,7 @@ fn default_engine_takes_clif_jit(args: &RunArgs, input_path: &Path) -> bool {
     // package route on the interpreter (`norma:` and kernel imports are its
     // exceptions); the single-file clif compile resolves no file imports, so
     // those files keep the runner rather than silently unlink them.
-    if manifestless_file_declares_non_kernel_import(input_path) {
+    if package::manifestless_file_declares_non_kernel_import(input_path) {
         return false;
     }
     #[cfg(feature = "device-runtime")]

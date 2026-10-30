@@ -112,7 +112,11 @@ pub fn cmd_run_clif_jit(
             diagnostics,
             locale_pack,
         } => {
-            crate::postprocess::print_diagnostics(&diagnostics, diagnostic_mode, locale_pack.as_ref());
+            crate::postprocess::print_diagnostics(
+                &diagnostics,
+                diagnostic_mode,
+                locale_pack.as_ref(),
+            );
             eprintln!("compilation failed");
             crate::exit_status::exit_for_compile_failure(&diagnostics);
         }
@@ -121,7 +125,11 @@ pub fn cmd_run_clif_jit(
             image,
             locale_pack,
         } => {
-            crate::postprocess::print_diagnostics(&diagnostics, diagnostic_mode, locale_pack.as_ref());
+            crate::postprocess::print_diagnostics(
+                &diagnostics,
+                diagnostic_mode,
+                locale_pack.as_ref(),
+            );
             run_image(&image, program_args);
         }
     }
@@ -147,8 +155,7 @@ pub fn run_default_engine_or_decline(
     program_args: &[String],
     note: bool,
 ) -> Option<Infallible> {
-    let JitCompile::Accepted { image, .. } = compile_jit(input, locale, diagnostics_locale)
-    else {
+    let JitCompile::Accepted { image, .. } = compile_jit(input, locale, diagnostics_locale) else {
         return None;
     };
     if note {

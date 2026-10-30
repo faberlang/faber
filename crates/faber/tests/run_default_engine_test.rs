@@ -117,7 +117,11 @@ fn plain_run_of_a_refused_program_falls_back_to_the_runner() {
         assert_eq!(plain.status, runner.status, "{name}: exit status");
         assert_eq!(plain.stdout, runner.stdout, "{name}: stdout");
         assert_eq!(plain.stderr, runner.stderr, "{name}: stderr");
-        assert_eq!(plain.status, Some(0), "{name}: the runner runs it: {plain:?}");
+        assert_eq!(
+            plain.status,
+            Some(0),
+            "{name}: the runner runs it: {plain:?}"
+        );
         // The explicit target never falls back.
         assert_eq!(jit.status, Some(65), "{name}: refusal status");
         assert!(jit.stdout.is_empty(), "{name}: refusal precedes execution");
@@ -224,7 +228,11 @@ fn cli_options_and_file_imports_bind_on_the_interpreted_route() {
     assert_eq!(plain.stdout, b"true\n", "the option value must bind");
 
     let imported = dir.path().join("main.fab");
-    fs::write(&imported, "import from \"./jobs\" jobs\n\nmain {\n    print jobs.answer()\n}\n").expect("entry");
+    fs::write(
+        &imported,
+        "import from \"./jobs\" jobs\n\nmain {\n    print jobs.answer()\n}\n",
+    )
+    .expect("entry");
     fs::write(
         dir.path().join("jobs.fab"),
         "@ public\nfn answer() → int { return 42 }\n",
