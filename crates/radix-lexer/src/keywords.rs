@@ -116,6 +116,10 @@ pub enum KeywordOwner {
     /// Import or binding alias marker.
     AliasMarker,
 
+    /// Kernel mode word in a kernel declaration head's signature slot, after
+    /// the parameter list (`laxus` / `intutus` / `fragment`).
+    KernelMode,
+
     /// Iteration mode keyword.
     IterationMode,
 
@@ -153,7 +157,8 @@ pub enum KeywordOwner {
     /// Statement-initial declaration introducer
     /// (`functio` / `genus` / `ordo` / `implendum` / `typus` / `discretio` /
     /// `fixum` / `varia` / `sit`; `fixum`/`varia` also mark mutability in
-    /// binding statements and pattern captures).
+    /// binding statements and pattern captures; `nucleum` introduces a kernel
+    /// declaration when a declaration name follows).
     DeclarationIntroducer,
 
     /// Control-flow keyword in statement or expression position
@@ -351,6 +356,14 @@ const ENTRY_FUNCTION_OR_PARAM_OR_MEMBER: &[KeywordOwner] = &[
     KeywordOwner::ParameterName,
     KeywordOwner::MemberIdentifier,
 ];
+const NUCLEUM_HEAD: &[KeywordOwner] = &[
+    KeywordOwner::AnnotationName,
+    KeywordOwner::DeclarationIntroducer,
+];
+const ANNOTATION_MODIFIER_OR_KERNEL_MODE: &[KeywordOwner] =
+    &[KeywordOwner::AnnotationModifier, KeywordOwner::KernelMode];
+const ANNOTATION_NAME_OR_KERNEL_MODE: &[KeywordOwner] =
+    &[KeywordOwner::AnnotationName, KeywordOwner::KernelMode];
 const ANNOTATION_NAME: &[KeywordOwner] = &[KeywordOwner::AnnotationName];
 const TYPE_PARAMETER: &[KeywordOwner] = &[KeywordOwner::TypeParameter];
 const REST_PATTERN: &[KeywordOwner] =
@@ -1469,18 +1482,19 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
         category: KeywordKind::Annotation,
     },
-    // The `@ nucleum` tier words. Claimed only after `@ nucleum`, so `relaxed`
-    // and `unsafe` stay ordinary identifiers everywhere else.
+    // The `@ nucleum` tier words. Claimed only after `@ nucleum` and in a
+    // kernel head's signature mode slot, so `relaxed` and `unsafe` stay
+    // ordinary identifiers everywhere else.
     KeywordSpec {
         text: "laxus",
         token_kind: Some(TokenKind::Laxus),
-        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
+        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER_OR_KERNEL_MODE),
         category: KeywordKind::Annotation,
     },
     KeywordSpec {
         text: "intutus",
         token_kind: Some(TokenKind::Intutus),
-        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
+        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER_OR_KERNEL_MODE),
         category: KeywordKind::Annotation,
     },
     KeywordSpec {
@@ -1524,11 +1538,13 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Annotation,
         category: KeywordKind::Annotation,
     },
-    // `nucleum` is the kernel annotation identity.
+    // `nucleum` is the kernel identity: the `@ nucleum` annotation family and
+    // (operator ruling 2026-10-30) a declaration head, claimed only when a
+    // declaration name follows the word.
     KeywordSpec {
         text: "nucleum",
         token_kind: Some(TokenKind::Nucleum),
-        scope: KeywordScope::Annotation,
+        scope: KeywordScope::Contextual(NUCLEUM_HEAD),
         category: KeywordKind::Annotation,
     },
     KeywordSpec {
@@ -1540,7 +1556,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "fragment",
         token_kind: Some(TokenKind::Fragment),
-        scope: KeywordScope::Annotation,
+        scope: KeywordScope::Contextual(ANNOTATION_NAME_OR_KERNEL_MODE),
         category: KeywordKind::Annotation,
     },
     KeywordSpec {
@@ -1721,7 +1737,8 @@ fn keyword_owner_is_identifier_like(owner: KeywordOwner) -> bool {
         | KeywordOwner::ScanHead
         | KeywordOwner::ScanTotal
         | KeywordOwner::ScanTotalMode
-        | KeywordOwner::ScanOrder => false,
+        | KeywordOwner::ScanOrder
+        | KeywordOwner::KernelMode => false,
     }
 }
 

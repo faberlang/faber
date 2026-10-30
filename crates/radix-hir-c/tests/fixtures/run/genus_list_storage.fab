@@ -1,0 +1,33 @@
++++
+locale = "en"
++++
+class Point {
+    mut int x = 0
+    mut list<Point> links
+}
+
+fn make_points() → list<Point> {
+    let Point first ← { x = 1, links = [] }
+    let Point second ← { x = 2, links = [] }
+    return [first, second]
+}
+
+main {
+    mut list<Point> points ← make_points()
+    mut Point first_alias ← points[0]
+    first_alias.x ← 10
+    print points[0].x
+
+    mut Point replacement ← { x = 5, links = [] }
+    points[1] ← replacement
+    print points[1].x
+
+    mut Point parent ← { x = 7, links = points }
+    mut Point nested_alias ← parent.links[0]
+    nested_alias.x ← 11
+    print points[0].x
+
+    for from parent.links let child {
+        print child.x
+    }
+}

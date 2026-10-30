@@ -1,6 +1,6 @@
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
-use radix::module::driver::Config;
+use radix::module::driver::{Config, LocalePackLoader};
 use radix::module::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
@@ -20,14 +20,15 @@ pub const DEFAULT_CODE_LOCALE: &str = "en";
 /// Returns an error when no embedded pack exists for `locale`; the diagnostic
 /// names the embedded reader-locale ids.
 pub fn embedded_conversion_locale_pack(locale: &str) -> Result<LocalePack, Box<Diagnostic>> {
-    load_embedded_locale_pack(locale).map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
+    load_embedded_locale_pack(locale)
+        .map_err(|err| Box::new(embedded_load_diagnostic(locale, &err)))
 }
 
 fn embedded_locales_list() -> String {
     EMBEDDED_LOCALE_IDS.join(", ")
 }
 
-fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnostic {
+fn embedded_load_diagnostic(locale: &str, err: &EmbeddedLocaleError) -> Diagnostic {
     let embedded_locales = embedded_locales_list();
     crate::exit_status::config_diagnostic_error(format!(
         "failed to load reader locale '{locale}': {err}\n\
@@ -37,6 +38,17 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
     .with_arg("embedded_locales", embedded_locales)
 }
 
+/// The product's embedded reader-pack set, as a driver [`LocalePackLoader`].
+///
+/// Frontmatter `+++ locale = "\u{2026}" +++` resolution in the module driver
+/// consults this seam when the workspace language-pack root cannot serve the
+/// id, so an installed binary reads a declared locale with no checkout beside
+/// it (`faber build -t llvm-text` on a Latin source must not fall back to the
+/// English pack on the published binary).
+pub fn embedded_locale_pack_loader() -> LocalePackLoader {
+    LocalePackLoader::new(|locale| load_embedded_locale_pack(locale).map_err(|err| err.to_string()))
+}
+
 /// Build the product-default code config for inputs without package context.
 ///
 /// # Errors
@@ -44,7 +56,10 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
 /// Returns an error if the embedded product-default `en` pack cannot be loaded.
 pub fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
     let pack = embedded_conversion_locale_pack(DEFAULT_CODE_LOCALE)?;
-    Ok(Config::default().with_target(target).with_locale_pack(pack))
+    Ok(Config::default()
+        .with_target(target)
+        .with_locale_pack_loader(embedded_locale_pack_loader())
+        .with_locale_pack(pack))
 }
 
 /// Build a driver config (code locale) and the pack used for diagnostic rendering.
@@ -66,20 +81,53 @@ pub fn config_with_locale(
     cli_diagnostics_locale: Option<&str>,
 ) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
     let code_pack = load_locale_pack_for_input(input, cli_locale)?;
+    let base = Config::default()
+        .with_target(target)
+        .with_locale_pack_loader(embedded_locale_pack_loader());
     let config = match code_pack.as_ref() {
         Some(pack) => match cli_locale {
-            Some(_) => Config::default()
-                .with_target(target)
-                .with_resolved_locale_pack(pack.clone()),
-            None => Config::default()
-                .with_target(target)
-                .with_locale_pack(pack.clone()),
+            Some(_) => base.with_resolved_locale_pack(pack.clone()),
+            None => base.with_locale_pack(pack.clone()),
         },
-        None => Config::default().with_target(target),
+        None => base,
     };
     let diagnostic_pack =
         resolve_diagnostics_locale_pack(input, cli_diagnostics_locale, code_pack.as_ref())?;
     Ok((config, diagnostic_pack))
+}
+
+/// Build the code and diagnostic config for the non-package `faber build` lane.
+///
+/// The caller uses this when a CLI locale option is present; `config_with_locale`
+/// makes `--locale` explicit so it overrides source frontmatter, while the
+/// development locale root keeps workspace packs available during compilation.
+///
+/// # Errors
+///
+/// Returns locale resolution errors from [`config_with_locale`].
+pub(super) fn single_file_build_config_with_locale(
+    target: Target,
+    input: &Path,
+    cli_locale: Option<&str>,
+    cli_diagnostics_locale: Option<&str>,
+) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
+    // A diagnostics-only override must leave the single-file code config on
+    // the same path as a build with no locale flags. In particular, resolving
+    // the diagnostics pack must not make package-manifest locale selection an
+    // accidental code-locale override.
+    if cli_locale.is_none() && cli_diagnostics_locale.is_some() {
+        let config = default_config_with_locale(target)?.with_dev_locale_root();
+        let diagnostic_pack = resolve_diagnostics_locale_pack(
+            input,
+            cli_diagnostics_locale,
+            config.locale_pack.as_ref(),
+        )?;
+        return Ok((config, diagnostic_pack));
+    }
+
+    let (config, diagnostic_pack) =
+        config_with_locale(target, input, cli_locale, cli_diagnostics_locale)?;
+    Ok((config.with_dev_locale_root(), diagnostic_pack))
 }
 
 /// Resolve the pack used for diagnostic message rendering.
@@ -99,6 +147,9 @@ pub(crate) fn resolve_diagnostics_locale_pack(
                 )
                 .with_arg("flag", "--diagnostics-locale"),
             ));
+        }
+        if input == Path::new("-") {
+            return embedded_conversion_locale_pack(trimmed).map(Some);
         }
         return load_locale_pack_for_input(input, Some(trimmed));
     }
@@ -165,7 +216,7 @@ fn load_selected_locale_pack(
         return load_locale_pack_from_file(input, locale, &pack_path);
     }
     let pack = load_embedded_locale_pack(locale).map_err(|err| {
-        Box::new(embedded_load_diagnostic(locale, err).with_file(input.display().to_string()))
+        Box::new(embedded_load_diagnostic(locale, &err).with_file(input.display().to_string()))
     })?;
     if pack.metadata.id != locale {
         return Err(Box::new(
@@ -282,7 +333,7 @@ pub fn locale_pack_for_emit_with_diagnostic(
     // Stdin: no package context, use the embedded pack for the locale.
     load_embedded_locale_pack(locale)
         .map(Some)
-        .map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
+        .map_err(|err| Box::new(embedded_load_diagnostic(locale, &err)))
 }
 
 /// Compatibility wrapper for library callers that only need the normalized

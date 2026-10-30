@@ -44,6 +44,11 @@ pub fn write_output_artifact(
     linter: bool,
 ) {
     ensure_artifact_parent(path);
+    #[cfg(feature = "mir-evm")]
+    if let Output::Evm(out) = output {
+        write_artifact_contents(path, out.init);
+        return;
+    }
 
     let code = postprocess_code(radix::services::output_code(output), target, format, linter);
     write_artifact_contents(path, code);
@@ -277,6 +282,7 @@ pub fn format_generated_code(target: Target, code: &str) -> Result<String, Strin
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirEvm
         | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir
@@ -314,6 +320,7 @@ pub fn lint_generated_code(target: Target, code: &str) -> Result<String, String>
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirEvm
         | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir

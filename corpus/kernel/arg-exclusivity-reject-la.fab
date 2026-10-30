@@ -1,0 +1,76 @@
++++
+term = "nucleum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "fixum_decl", "incipit_stmt", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "transfer", "redde_stmt"]
+category = "kernel"
+canonical = false
+summary = "Nuclei argumentorum exklusivitas (la): omnis vocatio ubi argumentum scribendum (`varia`/`penes`) cum alio argumento cellam habet nominatim refutatur."
+syntax = "axpy(varia t, t)"
+related = ["nucleum", "mutabilitas", "tensor"]
+locale = "la"
+no_expected = "rejects"
+diagnostic = "SEM057:kernel_argument_overlap"
++++
+# =============================================================================
+# nucleum — kernel argument exclusivity rejects overlap (la)
+# =============================================================================
+#
+# What this teaches:
+#   • A kernel's arguments stay live together for the whole launch, so a
+#     writable argument (`varia`, `penes`) may not overlap any other
+#     argument — whichever side of the call it is written on.
+#   • The whole tensor spelled twice, a `←` alias of it, and a view of the
+#     same storage are all the same overlap: one storage, two arguments.
+#   • Each refusal is named: `kernel_argument_overlap` for whole-tensor and
+#     alias overlap, `tensor_view_read_only` when a view is one side of the
+#     pair (a view is read-only and names its base).
+#   • To pass a value that must not overlap, bind an independent copy
+#     (`← exemplum t`) or call `materialize()` on a view first.
+#
+# Common mistakes:
+#   • relying on argument order — a read-only argument before the `varia` one
+#     overlaps exactly like one after it
+#   • passing two `penes` arguments that share storage — exclusive on both
+#     sides is still one storage
+#
+# See also: nucleum, mutabilitas, tensor
+# =============================================================================
+
+@ nucleum
+@ publica
+functio axpy(varia tf32[3] y, tf32[3] x) → vacuum {
+    y ⇇ x
+}
+
+@ nucleum
+@ publica
+functio scala(tf32[3] a, varia tf32[3] b) → vacuum {
+    b ⇇ a
+}
+
+@ nucleum
+@ publica
+functio cap2(penes tf32[3] a, penes tf32[3] b) → vacuum {
+    a ⇇ b
+}
+
+incipit {
+    varia tf32[3] t ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    sit tf32[3] u ← t
+
+    # 1. writable first, the same tensor after
+    axpy(varia t, t)
+
+    # 2. read-only first, writable second: the same overlap
+    scala(t, varia t)
+
+    # 3. a `←` alias names the same storage on either side
+    axpy(varia t, u)
+    scala(u, varia t)
+
+    # 4. a view of the writable argument's storage
+    axpy(varia t, t.forma([3]))
+
+    # 5. two `penes` arguments sharing one storage
+    cap2(penes t, penes u)
+}

@@ -44,6 +44,11 @@ use radix::program::mir::DeviceSelection;
 #[cfg(feature = "runner")]
 use radix::program::mir::mir_diag;
 
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn elapsed_nanoseconds(duration: std::time::Duration) -> Option<u64> {
+    u64::try_from(duration.as_nanos()).ok()
+}
+
 /// The faber-supplied package-MIR seams (RP5). Every faber product input the
 /// moved compiler subset needs enters as an explicit function — no ambient
 /// reads inside `radix-program`.
@@ -326,7 +331,7 @@ pub(crate) fn mir_issue_diag(
 /// (D3). An unavailable explicit device fails closed before anything lowers
 /// onto it; there is no fallback.
 ///
-/// Returns the discovery receipt line that was printed.
+/// Returns the discovery receipt line reported to stderr.
 ///
 /// # Errors
 /// Structured diagnostics: device admission (`E_DEVICE_UNAVAILABLE`,
@@ -406,6 +411,10 @@ pub struct DeviceRunReceipt {
     /// window, in nanoseconds; GPU wait, not host work. A subset of
     /// `runtime.blocking_wait_ns`.
     pub host_blocked_ns: u64,
+    /// Cumulative host bytes fresh kernel-output twins materialized during
+    /// the run: a launch allocates no host array for its output, and the
+    /// first host read that needs real bytes materializes the twin once.
+    pub host_fresh_output_bytes: u64,
     /// How much of the launch time the runtime could measure.
     pub gpu_timing: DeviceGpuTiming,
     /// The avoidable cross-partition syncs the spanned run's calls implied
@@ -531,7 +540,8 @@ pub fn run_package_on_device_session_shaped<H: radix_mir_runner::Host + ?Sized>(
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
-            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            let prepare_ns = elapsed_nanoseconds(route_start.elapsed())
+                .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
             Ok(run_admitted_device_session(
                 input,
                 admitted,
@@ -584,7 +594,8 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
-            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            let prepare_ns = elapsed_nanoseconds(route_start.elapsed())
+                .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
             if !lowered_declares_kernels(lowered) {
                 return Ok(Ok(None));
             }
@@ -652,8 +663,8 @@ fn run_declared_kernels_on_device_session<H: radix_mir_runner::Host + ?Sized>(
     .map_err(|failure| failure.into_session_failure(receipt))
 }
 
-/// An admitted, opened device session: the discovery receipt line has been
-/// printed, and the session waits for the lowered unit to dispatch.
+/// An admitted, opened device session: the discovery receipt has been
+/// reported to stderr, and the session waits for the lowered unit to dispatch.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub(crate) struct AdmittedDeviceSession {
     session: radix_device_core::session::DeviceSession,
@@ -665,7 +676,7 @@ pub(crate) struct AdmittedDeviceSession {
     pub(crate) trace_kernels: bool,
 }
 
-/// Open the selected device, print the discovery receipt, and pick the
+/// Open the selected device, report the discovery receipt to stderr, and pick the
 /// per-kernel image backend.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 pub(crate) fn admit_device_session(
@@ -675,11 +686,11 @@ pub(crate) fn admit_device_session(
     cpu: CpuDeviceShape,
 ) -> Result<AdmittedDeviceSession, Vec<Diagnostic>> {
     let admitted = open_device_session(input, selection, registry, cpu)?;
-    println!("{}", admitted.receipt);
+    eprintln!("{}", admitted.receipt);
     Ok(admitted)
 }
 
-/// [`admit_device_session`] without printing the discovery receipt: a proba
+/// [`admit_device_session`] without reporting the discovery receipt: a proba
 /// route opens one session per case and keeps its report clean.
 #[cfg(all(feature = "runner", feature = "device-runtime"))]
 fn open_device_session(
@@ -722,7 +733,8 @@ fn open_device_session(
     };
     let session =
         DeviceSession::from_opened(opened).map_err(|error| vec![host_error_diagnostic(&error)])?;
-    let admit_ns = admit_start.elapsed().as_nanos() as u64;
+    let admit_ns = elapsed_nanoseconds(admit_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     Ok(AdmittedDeviceSession {
         session,
         backend,
@@ -781,6 +793,7 @@ impl DeviceRunPhases {
             downloaded_bytes: self.dispatcher.transfers.downloaded_bytes,
             host_encode_ns: self.dispatcher.host_encode_ns,
             host_blocked_ns: self.dispatcher.host_blocked_ns,
+            host_fresh_output_bytes: self.dispatcher.host_fresh_output_bytes,
             gpu_timing,
             span_avoidable: self
                 .dispatcher
@@ -821,6 +834,29 @@ fn session_dispatcher(
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
+    /// The row layout of every record (fixed-layout genus) element type the
+    /// kernel units bind as a tensor resource.
+    fn record_layouts(
+        units: &[radix_mir::KernelUnit],
+        validation: &radix_mir::MirValidationContext<'_>,
+    ) -> std::collections::HashMap<
+        radix_types::TypeId,
+        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
+    > {
+        let types = validation.types.as_table();
+        let mut records = std::collections::HashMap::new();
+        for resource in units.iter().flat_map(|unit| &unit.resources) {
+            let ty = resource.version.element_ty.semantic_id();
+            if matches!(types.get(ty), radix_types::Type::Struct(_))
+                && !records.contains_key(&ty)
+                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
+            {
+                records.insert(ty, std::sync::Arc::new(layout));
+            }
+        }
+        records
+    }
+
     let AdmittedDeviceSession {
         session, backend, ..
     } = admitted;
@@ -836,7 +872,8 @@ fn session_dispatcher(
     };
     let (mut image, omitted, image_timing) =
         device_image_for_lowered_with(lowered, backend, cuda_libdevice.as_deref(), true)?;
-    let image_build_ns = image_start.elapsed().as_nanos() as u64;
+    let image_build_ns = elapsed_nanoseconds(image_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     if image.kernels.is_empty() {
         let reasons = omitted
             .iter()
@@ -855,8 +892,9 @@ fn session_dispatcher(
     // Owned slabs are CUDA spanning only. The plan lays out only the roles the
     // spanning runtime can launch, so it must read the image before the
     // dispatcher takes its parts.
-    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned)
-        .then(|| super::device::placement_plan(lowered, &image, |role| role.launchable()));
+    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned).then(|| {
+        super::device::placement_plan(lowered, &image, super::device::SlabRole::launchable)
+    });
     let interner = validated
         .validation()
         .interner
@@ -913,29 +951,6 @@ fn session_dispatcher(
         image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
     let fused_entries = fusions.iter().map(|fused| fused.entry.clone()).collect();
-    /// The row layout of every record (fixed-layout genus) element type the
-    /// kernel units bind as a tensor resource.
-    fn record_layouts(
-        units: &[radix_mir::KernelUnit],
-        validation: &radix_mir::MirValidationContext<'_>,
-    ) -> std::collections::HashMap<
-        radix_types::TypeId,
-        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
-    > {
-        let types = validation.types.as_table();
-        let mut records = std::collections::HashMap::new();
-        for resource in units.iter().flat_map(|unit| &unit.resources) {
-            let ty = resource.version.element_ty.semantic_id();
-            if matches!(types.get(ty), radix_types::Type::Struct(_))
-                && !records.contains_key(&ty)
-                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
-            {
-                records.insert(ty, std::sync::Arc::new(layout));
-            }
-        }
-        records
-    }
-
     // gpu-reset Q02: a tensor of fixed-layout records binds as typed row
     // bytes; each record element type the kernels name gets its row layout
     // from the layout law (a type with no layout stays unsupported by name).
@@ -949,7 +964,8 @@ fn session_dispatcher(
         records,
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
-    let module_compile_ns = dispatcher_start.elapsed().as_nanos() as u64;
+    let module_compile_ns = elapsed_nanoseconds(dispatcher_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     dispatcher.borrow_mut().set_omissions(omissions);
     dispatcher.borrow_mut().set_refusals(refusals);
     dispatcher.borrow_mut().set_result_buffers(
@@ -1045,6 +1061,7 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         errors
             .into_iter()
             .map(|error| {
+                let exit_status = error.exit_status().to_string();
                 // A device error keeps its stable `E_DEVICE_*` code as the
                 // diagnostic issue, so the terminal prints `error: <code>: ..`.
                 let issue = if error.issue.starts_with("E_DEVICE_") {
@@ -1055,6 +1072,7 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
                 mir_diag(input, error.message)
                     .with_arg("issue", issue)
                     .with_arg("code", error.issue)
+                    .with_arg("exit_status", exit_status)
             })
             .collect::<Vec<_>>()
     };
@@ -1079,7 +1097,8 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         )
     }
     .map_err(runner_diagnostics)?;
-    let execution_ns = execution_start.elapsed().as_nanos() as u64;
+    let execution_ns = elapsed_nanoseconds(execution_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     // WHY: taken here, before the exit handling (`host.exit` panics in tests)
     // and while the dispatcher `Rc` is still alive; the receipt is dropped with
     // the dispatcher at return otherwise. A failed run keeps it too: the
@@ -1242,7 +1261,8 @@ pub fn run_package_on_cpu_device_session<H: radix_mir_runner::Host + ?Sized>(
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
-            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            let prepare_ns = elapsed_nanoseconds(route_start.elapsed())
+                .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
             if !lowered_declares_kernels(lowered) {
                 return Ok(Ok(None));
             }

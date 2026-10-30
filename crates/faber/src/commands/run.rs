@@ -1,6 +1,16 @@
 #![cfg(feature = "runner")]
 
-//! `faber run` — interpreted execution unless `--target` builds and runs.
+//! `faber run` — the default engine unless `--target` names one.
+//!
+//! Without `--target`, a run first compiles through the clif-jit lane
+//! (operator ruling 2026-10-29: it is much faster than the runner); a
+//! program the Cranelift lowering accepts runs there, and any compile-time
+//! decline — the named capability refusals included — falls back to the
+//! runner with output identical to `--target runner`. The fallback is
+//! decided only from that compile-time result, never after execution has
+//! started. Device runs and the runner-only diagnostics contracts (stats,
+//! shuffle seed) keep the interpreted route; see
+//! [`default_engine_takes_clif_jit`].
 //!
 //! `faber run <path>` interprets a single `.fab` file, package directory,
 //! `faber.toml` manifest, or archive through the runner — mode is never
@@ -55,6 +65,10 @@ pub(super) fn cmd_run(args: RunArgs) {
     }
 
     match args.target {
+        // The named interpreter: exactly the route a clif-jit decline falls
+        // back to — the code below interprets the input, so behaviour, output,
+        // exit codes and trap stderr are identical to the fallback.
+        Some(crate::cli::RunTarget::Runner) => {}
         Some(crate::cli::RunTarget::Ts) => package::cmd_run_ts(
             &input_path,
             args.locale.as_deref(),
@@ -106,7 +120,29 @@ pub(super) fn cmd_run(args: RunArgs) {
             );
             exit_status::exit_usage();
         }
-        None => {}
+        None => {
+            // The default engine: try the clif-jit lane first and fall back to
+            // the runner on any compile-time decline. `run_default_engine_or_decline`
+            // only returns when the input must be interpreted, so everything
+            // below stays exactly the `--target runner` route.
+            #[cfg(feature = "mir-clif")]
+            if default_engine_takes_clif_jit(&args, &input_path) {
+                match package::run_default_engine_or_decline(
+                    &input_path,
+                    args.locale.as_deref(),
+                    args.diagnostics_locale.as_deref(),
+                    &args.args,
+                    args.debug,
+                ) {
+                    Some(never) => match never {},
+                    None => {
+                        if args.debug {
+                            eprintln!("debug: engine: runner (clif-jit declined at compile time)");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     if let Some(seed) = args.shuffle_seed {
@@ -148,6 +184,71 @@ pub(super) fn cmd_run(args: RunArgs) {
         args.stats_file.as_ref(),
         diagnostic_mode,
     );
+}
+
+/// Whether the no-`--target` route tries the clif-jit lane for this run
+/// (operator ruling 2026-10-29: clif-jit is the default engine wherever the
+/// lane applies end to end).
+///
+/// The lanes that keep the runner as the host engine:
+///
+/// * every device run — any `--device` / `--threads` / `--partitions`
+///   request, any manifest `[device] device` selection other than `auto`,
+///   and any input that declares kernels (`auto` routes those through the
+///   in-process device session, whose host lane is the runner);
+/// * the runner-only diagnostics contracts — the run-stats artifact and the
+///   map/set iteration-order shuffle seed exist on the interpreted route
+///   alone, and a requested artifact must never be silently omitted;
+/// * archives, which are extracted and interpreted — the clif lane takes
+///   filesystem inputs only.
+///
+/// A route-resolution failure (an invalid manifest device table, say) also
+/// stays here: the interpreted route reports it, exactly as before.
+#[cfg(feature = "mir-clif")]
+fn default_engine_takes_clif_jit(args: &RunArgs, input_path: &Path) -> bool {
+    if args.device.is_some()
+        || args.threads.is_some()
+        || args.partitions.is_some()
+        || args.stats
+        || args.stats_file.is_some()
+        || args.shuffle_seed.is_some()
+        || super::archive::is_zip_archive(input_path)
+    {
+        return false;
+    }
+    match resolve_route_options(args, input_path) {
+        Ok((DeviceSelection::Auto, _)) => {}
+        _ => return false,
+    }
+    // An `@ cli` program's operands and options bind through package CLI
+    // planning on the interpreter (ruling 2026-10-15); the clif lanes plan
+    // the surface but do not bind option values, so those inputs keep the
+    // runner rather than run with defaults.
+    if input_declares_cli_entry(input_path) {
+        return false;
+    }
+    // A lone `.fab` file that imports a sibling module links through the
+    // package route on the interpreter (`norma:` and kernel imports are its
+    // exceptions); the single-file clif compile resolves no file imports, so
+    // those files keep the runner rather than silently unlink them.
+    if package::manifestless_file_declares_non_kernel_import(input_path) {
+        return false;
+    }
+    #[cfg(feature = "device-runtime")]
+    {
+        let Ok((config, _)) = script_package_config(
+            input_path,
+            args.locale.as_deref(),
+            args.diagnostics_locale.as_deref(),
+            args.safe,
+        ) else {
+            return false;
+        };
+        if device_session_selected(&config, input_path, DeviceSelection::Auto) {
+            return false;
+        }
+    }
+    true
 }
 
 /// Refusal message when `path` is a built FMIR image file. `faber run` takes
@@ -587,51 +688,37 @@ fn script_package_config(
     })
 }
 
+/// Whether the entry this run would execute declares an `@ cli` root: a lone
+/// `.fab` file is its own entry, anything else resolves through package
+/// discovery. The predicate is the runner route's own
+/// ([`crate::script::source_declares_cli_entry`]); a file that cannot be read
+/// or parsed declares none, and the run itself reports why.
+#[cfg(feature = "mir-clif")]
+fn input_declares_cli_entry(input_path: &Path) -> bool {
+    let entry = if is_single_fab_file(input_path) {
+        input_path.to_path_buf()
+    } else {
+        match package::discover_package(input_path) {
+            Ok(spec) => spec.entry,
+            Err(_) => return false,
+        }
+    };
+    fs::read_to_string(&entry).is_ok_and(|source| {
+        crate::script::source_declares_cli_entry(&entry.display().to_string(), &source)
+    })
+}
+
 /// Whether `path` routes through the package-MIR runner rather than the
 /// single-source runner: manifest-backed or directory packages, or a
 /// manifestless `.fab` file that declares a non-kernel, non-`norma:` import.
 /// `norma:` imports are linked by `script::run_with_session`.
 pub(super) fn is_package_interpret_input(path: &Path) -> bool {
     package::is_manifest_backed_or_directory_package_input(path)
-        || manifestless_file_declares_non_kernel_import(path)
-}
-
-/// Whether a manifestless `.fab` file declares an import outside the kernel
-/// and outside `norma:`, which `script::run_with_session` links itself.
-fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
-    if !is_single_fab_file(path) {
-        return false;
-    }
-    let Ok(raw_source) = fs::read_to_string(path) else {
-        return false;
-    };
-    let display_name = path.display().to_string();
-    let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
-        return false;
-    };
-    // The no-locale default is `en`; a default pack that fails to load is a
-    // failed read, not a Latin fallback.
-    let Some(code_pack) = package::default_config_with_locale(radix::module::Target::HirTypeScript)
-        .ok()
-        .and_then(|config| config.locale_pack)
-    else {
-        return false;
-    };
-    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
-    let parse = radix::module::parser::parse(lex);
-    let Some(program) = parse.program else {
-        return false;
-    };
-    program.statements.iter().any(|statement| {
-        let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
-            return false;
-        };
-        let path = parse.interner.resolve(import.path);
-        !radix::module::kernel::is_kernel_import_path(path) && !path.starts_with("norma:")
-    })
+        || package::manifestless_file_declares_non_kernel_import(path)
 }
 
 /// Whether `path` is a single `.fab` file (the single-source runner input).
+#[cfg(any(test, feature = "mir-clif"))]
 pub(super) fn is_single_fab_file(path: &Path) -> bool {
     path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
@@ -900,9 +987,9 @@ fn run_on_device_session_shaped_with<H: radix_mir_runner::Host + ?Sized>(
 }
 
 /// A device run that failed after it started executing still emits its stats
-/// artifact (exit 1, the host meter and device receipt up to the failure), as
-/// a failing run does on the reference route; the caller then reports the
-/// returned diagnostics. A failure before launch has nothing to report.
+/// artifact with the run's sysexits class, the host meter and device receipt
+/// up to the failure; the caller then reports the returned diagnostics. A
+/// failure before launch has nothing to report.
 #[cfg(feature = "device-runtime")]
 fn finish_failed_device_run(
     failure: package::mir::DeviceSessionFailure,
@@ -917,8 +1004,15 @@ fn finish_failed_device_run(
         // The run's own failure is the one reported: `finish_device_run`
         // exits the process itself when the artifact cannot be written, so
         // anything it does return is added to that failure.
-        if let Err(artifact) = finish_device_run(run, metadata, started, stats, stats_file, out, 1)
-        {
+        if let Err(artifact) = finish_device_run(
+            run,
+            metadata,
+            started,
+            stats,
+            stats_file,
+            out,
+            exit_status::status_for_run_diagnostics(&diagnostics),
+        ) {
             return diagnostics.into_iter().chain(artifact).collect();
         }
     }
@@ -927,7 +1021,7 @@ fn finish_failed_device_run(
 
 /// Emit the host stats and device receipt in [`DEVICE_STATS_MARKER`] format
 /// for a finished device run that was asked to collect stats; `exit` is the
-/// run's recorded exit code (1 for a run that failed).
+/// run's process exit code, including the sysexits class of a failed run.
 #[cfg(feature = "device-runtime")]
 fn finish_device_run(
     run: package::mir::DeviceSessionRun,
@@ -947,10 +1041,10 @@ fn finish_device_run(
     if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
         // `--stats` writes the structured artifact to stdout, so stdout stays
-        // marker-only there and the peak high-water note goes to stderr; the
-        // file-only mode (`--stats-file` alone) has no other channel and keeps
-        // both receipt lines on stdout. Either way the artifact carries
-        // `peak_allocated_bytes`.
+        // marker-only there and the peak high-water note goes to stderr. In
+        // file-only mode (`--stats-file` alone), the peak note remains on
+        // stdout; the backend-selection receipt is reported to stderr in both
+        // modes. Either way the artifact carries `peak_allocated_bytes`.
         let peak_note = format!(
             "device: peak allocated {} bytes",
             device.runtime.peak_allocated_bytes

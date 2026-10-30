@@ -1595,7 +1595,9 @@ pub(super) fn rewrite_stmt(
                 );
             }
         }
-        HirStatementKind::Expr(expr) => {
+        HirStatementKind::Expr(expr)
+        | HirStatementKind::Redde(Some(expr))
+        | HirStatementKind::ReddeFilum(Some(expr)) => {
             rewrite_expr(
                 unit_path,
                 expr,
@@ -1605,17 +1607,6 @@ pub(super) fn rewrite_stmt(
                 namespaces,
                 diagnostics,
             );
-        }
-        HirStatementKind::Redde(Some(expr)) | HirStatementKind::ReddeFilum(Some(expr)) => {
-            rewrite_expr(
-                unit_path,
-                expr,
-                interner,
-                targets,
-                data_member_targets,
-                namespaces,
-                diagnostics,
-            )
         }
         HirStatementKind::IncDec(inc_dec) => rewrite_expr(
             unit_path,

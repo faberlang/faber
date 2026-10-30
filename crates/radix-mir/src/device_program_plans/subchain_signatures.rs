@@ -1,4 +1,8 @@
-//! Subchain emission signatures.
+//! Builds plan and emission signatures from typed MIR subchains.
+//!
+//! Plan signatures describe recipe resources; emission signatures additionally
+//! bind carried data-flow inputs and consumed outputs. Resource extents and
+//! source-local identities must agree across producing and consuming subchains.
 
 use super::{
     PlanMappingError, is_contract_recipe_op, is_recipe_op, kernel_matmul_shapes,
@@ -16,10 +20,6 @@ use crate::{
 };
 use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
-
-// ---------------------------------------------------------------------------
-// SUBCHAIN SIGNATURES
-// ---------------------------------------------------------------------------
 
 /// First collection runtime call that satisfies `visit`, in statement-scan
 /// order. Shared by the recipe-operand, destination, and shape scans so each
@@ -67,24 +67,18 @@ fn tensor_element_ty(
 }
 
 /// The buffer element type and element count for a data-flow input bound by
-/// [`subchain_signature_for_emission`] — a subchain param beyond the recipe
-/// operands (a local read from an earlier subchain).
+/// [`subchain_signature_for_emission`] beyond the recipe operands.
 ///
 /// Tensors bind at their device-view element type and literal dim product
-/// ([`tensor_element_ty`] / [`crate::tensor_type::tensor_literal_dims`]); a scalar data-flow
-/// param (S5-W-A1: the companion's scalar upstream seed) binds as a
-/// 1-element input at the scalar's own type — mirroring how the ABI scalar
-/// kernel path treats `F32`/`I32`/`U32`
+/// ([`tensor_element_ty`] / [`crate::tensor_type::tensor_literal_dims`]). Kernel
+/// scalars bind as one element at their own type, matching the ABI's
+/// `F32`/`I32`/`U32` scalar surface
 /// ([`crate::tensor_type::is_kernel_element_layout`]).
 ///
-/// **Fail-closed f64 scalars (S5A-U2):** an f64-class scalar data-flow value
-/// is outside the kernel scalar surface and stays fail-closed with the ABI's
-/// typed `kernel scalar layout f64` diagnostic — there is no graph-wide
-/// f64→f32 narrowing, because graph shape proves nothing about an individual
-/// f64 scalar's value (the Stage 5 CTO correction, S5A-U2). The MLP's
-/// scalar-return lane is f32 end-to-end (the fixture returns f32 and its
-/// upstream seed is f32), so it never enters this arm. Non-scalar,
-/// non-tensor layouts stay fail-closed with a typed diagnostic.
+/// An f64 scalar stays fail-closed with the ABI's `kernel scalar layout f64`
+/// diagnostic: graph shape proves nothing about an individual scalar's value,
+/// so it cannot justify f64→f32 narrowing. Other non-scalar, non-tensor layouts
+/// also stay fail-closed.
 pub(crate) fn data_flow_element_ty_and_count(
     ty: MirType,
     validation: &MirValidationContext<'_>,
@@ -215,8 +209,8 @@ fn storage_output(binding: u32, element_ty: MirType, count: u64) -> MirKernelRes
 /// device-view element counts and the output buffer sized from the resolved
 /// dispatch contract (reduction partials / matmul M·N / transpose M·N),
 /// with the corrected workgroup/dispatch [`CollectionOpContract`] applies.
-/// [`CollectionKernelPlan::from_contract`]'s signature-matching checks then
-/// pass for the subchain exactly as they do for a whole-function kernel.
+/// [`from_contract`](crate::kernel_plan::CollectionKernelPlan::from_contract)
+/// checks the subchain signature exactly as it does a whole-function kernel.
 ///
 /// Extra data-flow inputs (locals read from earlier subchains) are NOT part
 /// of this signature: they are a device-program buffer concern, not a plan
@@ -647,9 +641,9 @@ pub fn contract_shape_signature(
 /// index peer as an extra read input, and the output buffer at the flattened
 /// output dims (input dims for the same-shape softmax/LN recipes; input dims
 /// minus the reduced axis for `TensorSumAxis`), under the generic 1D contract
-/// the ABI applies to these kernels. [`CollectionKernelPlan::from_transformer_op`]'s
-/// element-count cross-checks then pass for the subchain exactly as they do
-/// for a whole-function kernel.
+/// the ABI applies to these kernels. The element-count cross-checks in
+/// [`from_transformer_op`](crate::kernel_plan::CollectionKernelPlan::from_transformer_op)
+/// then pass exactly as they do for a whole-function kernel.
 ///
 /// # Errors
 /// Returns [`PlanMappingError`] when the transformer recipe's typed shape
@@ -1001,7 +995,7 @@ pub(super) fn rope_table_local(function: &MirFunction, op: MirCollectionOp) -> O
 /// locals the synthetic exposes as kernel outputs. The first element is the
 /// primary (the contract-shaped [`MirKernelSignature::output`]); each
 /// ADDITIONAL output (`outputs[1..]`, the consumed elementwise destinations
-/// a later subchain reads) binds as an [`MirKernelSignature::extra_output`]
+/// a later subchain reads) binds as a [`MirKernelSignature::extra_outputs`] entry
 /// after the primary, sized from its local's type exactly like the input
 /// data-flow resolution (device-view element type + literal dim product).
 /// `outputs.len() == 1` keeps the existing single-output shape.
@@ -1043,21 +1037,19 @@ pub fn subchain_signature_for_emission_with_source(
 ) -> Result<MirKernelSignature, PlanMappingError> {
     let mut signature = contract_shape_signature(function, contract, validation)?;
     let operands = recipe_operand_locals(function)?;
-    let mut bound: Vec<MirLocalId> = Vec::new();
     for (binding, local) in operands.iter().copied().enumerate() {
         if binding == 0 {
             signature.input.source_local = Some(local);
         } else if let Some(extra) = signature.extra_inputs.get_mut(binding - 1) {
             extra.source_local = Some(local);
         }
-        bound.push(local);
     }
     finish_subchain_emission_signature(
         function,
         validation,
         outputs,
         &mut signature,
-        &bound,
+        &operands,
         source,
     )?;
     Ok(signature)
@@ -1220,35 +1212,20 @@ pub fn elementwise_subchain_signature_for_emission(
         }
         next_binding = next_binding.saturating_add(1);
     }
-    // The launch geometry of a run-time-shaped surface is a per-call fact, and
-    // the generic one-dimensional rule rounds that call's element count up to
-    // whole `GENERIC_1D_WORKGROUP_X` workgroups: a non-aligned tail such as
-    // `[3, 7]` (21 elements) dispatches 128 invocations. The emitted body must
-    // therefore guard on the per-call count, not on the placeholder one-lane
-    // dispatch and not on nothing. Append the count channel — the same
-    // `RuntimeExtent` binding a scalar-shaped kernel carries, which the host
-    // populates with the written tensor's whole element count before dispatch
-    // — so every invocation past the last element returns before its first
-    // indexed load or store. The channel is count-typed (`numerus<u32>`) and
-    // only appended when that width resolves; a table without it leaves the
-    // surface unbounded, which the Metal emitter refuses at emission.
+    // Run-time launch geometry rounds the per-call count up to whole
+    // workgroups, so the body must guard indexed loads and stores with the
+    // host-bound count, not the one-lane placeholder dispatch. The count type
+    // must already exist in the frozen table; without it the Metal emitter
+    // refuses the unbounded surface.
     if runtime_shaped
         && let Some(extent_ty) = validation
             .types
             .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
     {
-        signature.extra_inputs.push(MirKernelResource {
-            group: 0,
-            binding: next_binding,
-            kind: MirKernelResourceKind::RuntimeExtent,
-            role: MirKernelResourceRole::Input,
-            access: MirKernelResourceAccess::Read,
-            element_ty: MirType::semantic(extent_ty),
-            element_count: 1,
-            source_local: None,
-            source_name: None,
-            reduced_projection: None,
-        });
+        signature.extra_inputs.push(runtime_extent_count_resource(
+            next_binding,
+            MirType::semantic(extent_ty),
+        ));
     }
     Ok(signature)
 }

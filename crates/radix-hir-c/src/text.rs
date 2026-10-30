@@ -75,14 +75,14 @@ fn is_name(text: &str) -> bool {
 
 impl Emitter<'_> {
     /// `a + b` on text: one arena allocation holding both.
-    pub(crate) fn concat(&mut self, l: Operand, r: Operand) -> Operand {
+    pub(crate) fn concat(&mut self, l: Operand, r: Operand) -> Result<Operand, CodegenError> {
         self.support.need(Helper::Concat);
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let call = format!("faber_concat(faber_a, {}, {})", l.text, r.text);
-        Operand::new(crate::expr::wrap(&prelude, &call), Value::Text).with_effect(effect)
+        Ok(Operand::new(crate::expr::wrap(&prelude, &call), Value::Text).with_effect(effect))
     }
 
     /// `"…§…"(args)`: every argument that is not a constant or a plain name
@@ -102,7 +102,7 @@ impl Emitter<'_> {
         let mut prelude = String::new();
         for operand in &mut operands {
             if operand.constant.is_none() && !is_name(&operand.text) {
-                prelude.push_str(&self.bind(operand));
+                prelude.push_str(&self.bind(operand)?);
             }
         }
         let shown = operands

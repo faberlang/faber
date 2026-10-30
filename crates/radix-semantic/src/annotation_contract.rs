@@ -258,6 +258,7 @@ pub fn validate_applications(
 ) -> Result<FxHashMap<(u32, u32), ResolvedContractApplication>, Vec<SemanticError>> {
     let mut errors = Vec::new();
     let mut applications = FxHashMap::default();
+    errors.extend(crate::evm_contract::validate_syntax(program, interner));
     for stmt in &program.statements {
         validate_stmt_applications(
             stmt,
@@ -862,6 +863,11 @@ fn try_validate_application(
     annotation: &Annotation,
     context: &mut AttachmentValidationContext<'_>,
 ) {
+    if crate::evm_contract::is_contract_annotation(annotation, context.interner) {
+        // The compiler owns this family. Its class attachment and environment
+        // payload are validated separately from user-defined schemas.
+        return;
+    }
     let AnnotationKind::Braced(braced) = &annotation.kind else {
         // Bare `@ Contract` without braces: allow only when registered and all
         // fields optional. Unknown bare names fail closed (never a silent pass)

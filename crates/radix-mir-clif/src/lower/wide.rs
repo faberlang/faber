@@ -349,7 +349,15 @@ impl FunctionLower<'_, '_> {
     pub(super) fn print_wide(&mut self, stream: Value, value: Value) -> Lowered<()> {
         let (low, high) = self.split_wide(value);
         let reference = self.runtime_ref(&abi::PRINT_WIDE)?;
-        self.builder.ins().call(reference, &[stream, low, high]);
+        self.builder.ins().call(
+            reference,
+            &[
+                self.arena.expect("arena entry parameter"),
+                stream,
+                low,
+                high,
+            ],
+        );
         Ok(())
     }
 

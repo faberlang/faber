@@ -26,6 +26,7 @@
 //! parse result without a program, is converted into an explicit diagnostic so
 //! callers still receive the same failure surface.
 
+mod evm_contract;
 #[cfg(feature = "hir-faber")]
 pub mod faber_format;
 mod file_frontmatter;
@@ -42,6 +43,7 @@ mod target_bindings;
 mod target_policy;
 
 pub use crate::semantic::{AnalyzedModuleApplicationView, PackageImportIdentities};
+pub use evm_contract::{forbid_contract_environment, require_contract_execution_target};
 #[cfg(feature = "hir-faber")]
 pub use faber_format::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
@@ -50,7 +52,7 @@ pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 pub use praefixum::{evaluate_deferred, run_linked_function};
 pub use qualify::{evaluate_praefixum_for_importers, keeps_authored_form, qualify_for_target};
 pub use radix_types::KernelLowering;
-pub use session::{Config, Session, SessionMemos, WarnPolicy};
+pub use session::{Config, LocalePackLoader, Session, SessionMemos, WarnPolicy};
 pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
 pub use target_bindings::TargetBindings;
 
@@ -335,6 +337,10 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
     apply_warn_policy(&mut analysis.diagnostics, &session.config.warn_policy);
     if analysis.diagnostics.iter().any(Diagnostic::is_error) {
         return CompileResult { output: None, diagnostics: analysis.diagnostics };
+    }
+
+    if let Err(error) = evm_contract::reject_wrong_target(&analysis, session.config.target) {
+        return compile_codegen_error(analysis, name, source, error);
     }
 
     // A unit that arrives here without passing through `analyze_source` (loaded
@@ -724,7 +730,17 @@ fn compile_codegen_error(
     source: &str,
     err: SpannedCodegenError,
 ) -> CompileResult {
+    let is_evm_refusal = err
+        .args
+        .iter()
+        .any(|arg| arg.name == "issue" && matches!(arg.value.as_str(), "evm_unsupported" | "contract_target_mismatch"));
     let mut diagnostic = Diagnostic::codegen_error(&err.message).with_args(err.args);
+    // CODEGEN001 is an uncatalogued backend envelope. The experimental EVM
+    // refusal uses the existing catalogued lowering/package family so packs
+    // can render its structured reason and shape.
+    if is_evm_refusal {
+        diagnostic = diagnostic.with_code("PKG001");
+    }
     if let Some(span) = err.span {
         diagnostic = diagnostic.with_source_context(name, source, span);
     } else {
@@ -759,6 +775,10 @@ fn generate_output(
     // other target refuses it by one named issue until its emission lands.
     radix_codegen_shared::reject_list_window(&analysis.hir, &analysis.types, target)?;
     match target {
+        #[cfg(feature = "mir-evm")]
+        Target::MirEvm => generate_evm_output(analysis, no_fuse),
+        #[cfg(not(feature = "mir-evm"))]
+        Target::MirEvm => Err(unavailable_target_spanned(Target::MirEvm)),
         Target::MirStepper => Err(codegen::CodegenError {
             message: "stepper is the core interpreter target; run through the MIR stepper, not codegen emit".to_owned(),
             args: vec![
@@ -1097,6 +1117,23 @@ fn generate_llvm_text_output(
         .map_err(llvm_text_codegen_error)?
     };
     Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
+}
+
+#[cfg(feature = "mir-evm")]
+fn generate_evm_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
+    let metadata = evm_contract::resolve_metadata(analysis)?;
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let contract = evm_contract::lower_metadata(metadata, &mir.validated)?;
+    let artifact = match contract {
+        Some(contract) => radix_mir_evm::emit_evm_contract(&mir.validated, &mir.interner, &contract),
+        None => radix_mir_evm::emit_evm(&mir.validated, &mir.interner),
+    }
+    .map_err(evm_contract::backend_error)?;
+    Ok(crate::Output::Evm(crate::EvmOutput {
+        init: artifact.init,
+        runtime: artifact.runtime,
+    }))
 }
 
 /// Lower one unit with the Cranelift backend (public `clif` target): a native
@@ -4110,12 +4147,18 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     Ok(unit)
 }
 
-/// Resolve a frontmatter `locale` id to a `LocalePack` via the language-pack root.
+/// Resolve a frontmatter `locale` id to a `LocalePack`.
+///
+/// Pack sources in order: the configured language-pack root's own
+/// `<id>/pack.toml` (dev checkouts, planted test roots), then the
+/// config's product-supplied loader ([`Config::locale_pack_loader`], faber's
+/// embedded reader packs), so an installed binary resolves a declared locale
+/// with no checkout beside it. With no loader installed the root remains the
+/// only source and keeps its `no_root` / `load_failed` diagnostics.
 ///
 /// # Errors
 ///
-/// Returns a `Diagnostic` when `locale_root` is not configured or the pack
-/// cannot be loaded.
+/// Returns a `Diagnostic` when neither source can load the pack.
 pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) -> Result<LocalePack, Box<Diagnostic>> {
     // Reject empty locale ids
     if locale_id.is_empty() {
@@ -4144,8 +4187,23 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         ));
     }
 
-    let root = config.locale_root.as_ref().ok_or_else(|| {
-        Box::new(
+    let root = config.locale_root.as_deref();
+
+    // The root serves the id only when its pack file is present; a root
+    // without the file falls through to the loader (or the root's own
+    // load-failed diagnostic when no loader is installed).
+    if let Some(root) = root.filter(|root| root.join(locale_id).join("pack.toml").is_file()) {
+        return load_frontmatter_pack_from_root(root, locale_id);
+    }
+
+    if let Some(loader) = config.locale_pack_loader.as_ref() {
+        return loader
+            .load(locale_id)
+            .map_err(|detail| frontmatter_locale_load_failed(locale_id, detail));
+    }
+
+    let Some(root) = root else {
+        return Err(Box::new(
             Diagnostic::error(format!(
                 "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
             ))
@@ -4153,9 +4211,18 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
             .with_code(locale_unknown_spec().code)
             .with_arg("locale_id", locale_id)
             .with_arg("issue", "no_root"),
-        )
-    })?;
+        ));
+    };
+    load_frontmatter_pack_from_root(root, locale_id)
+}
 
+/// Load `<root>/<locale_id>/pack.toml`, with the root's containment check.
+///
+/// # Errors
+///
+/// Returns a `Diagnostic` when the resolved path escapes the root after
+/// symlink resolution or the pack cannot be loaded.
+fn load_frontmatter_pack_from_root(root: &std::path::Path, locale_id: &str) -> Result<LocalePack, Box<Diagnostic>> {
     let pack_path = root.join(locale_id).join("pack.toml");
 
     // Defense-in-depth containment check: verify the resolved path stays within
@@ -4177,16 +4244,20 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         ));
     }
 
-    LocalePack::from_toml_path(&pack_path).map_err(|err| {
-        Box::new(
-            Diagnostic::error(format!("unknown reader locale '{locale_id}' in frontmatter: {err}"))
-                .with_phase(DiagnosticPhase::Lex)
-                .with_code(locale_unknown_spec().code)
-                .with_arg("locale_id", locale_id)
-                .with_arg("issue", "load_failed")
-                .with_arg("detail", err.to_string()),
-        )
-    })
+    LocalePack::from_toml_path(&pack_path).map_err(|err| frontmatter_locale_load_failed(locale_id, err.to_string()))
+}
+
+/// The `LOCALE003` `load_failed` diagnostic for a frontmatter locale whose
+/// pack could not be loaded from any source.
+fn frontmatter_locale_load_failed(locale_id: &str, detail: String) -> Box<Diagnostic> {
+    Box::new(
+        Diagnostic::error(format!("unknown reader locale '{locale_id}' in frontmatter: {detail}"))
+            .with_phase(DiagnosticPhase::Lex)
+            .with_code(locale_unknown_spec().code)
+            .with_arg("locale_id", locale_id)
+            .with_arg("issue", "load_failed")
+            .with_arg("detail", detail),
+    )
 }
 
 /// The reader pack a source with no declared locale is read with: `en`.
@@ -4401,6 +4472,7 @@ fn collect_target_policy_diagnostics(
         | Target::MirMetal
         | Target::MirScena
         | Target::MirSexp
+        | Target::MirEvm
         | Target::MirBasic
         | Target::HirSwift
         | Target::HirPython

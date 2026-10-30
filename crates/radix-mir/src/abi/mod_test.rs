@@ -74,6 +74,46 @@ fn launch_geometry_authority_pins_dispatch_families() {
     }
 }
 
+#[test]
+fn unary_byte_vector_params_keep_count_one_packed_abi_widths() {
+    for (width, expected_layout) in [
+        (NumericWidth::U8, MirScalarLayout::U8),
+        (NumericWidth::I8, MirScalarLayout::I8),
+    ] {
+        let mut types = TypeTable::new();
+        let lane = types.sized_numeric(Primitive::Numerus, width);
+        let vector_width = types.intern_index(IndexExpr::Literal(4));
+        let vector = types.vector_with_width(lane, vector_width);
+        let result = types.sized_numeric(
+            Primitive::Numerus,
+            if width == NumericWidth::U8 {
+                NumericWidth::U32
+            } else {
+                NumericWidth::I32
+            },
+        );
+        let vector_ty = MirType::semantic(vector);
+        let mut function = scalar_kernel_function(vector_ty);
+        function.return_ty = MirType::semantic(result);
+        let validation = MirValidationContext::new(&types);
+
+        let signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+            .expect("one vector parameter synthesizes the return-buffer ABI");
+        assert_eq!(signature.input.element_ty, vector_ty);
+        assert_eq!(signature.input.element_count, 1);
+        assert_eq!(signature.input.source_local, Some(MirLocalId(0)));
+        assert_eq!(signature.output.element_ty, MirType::semantic(result));
+        assert_eq!(signature.output.element_count, 1);
+
+        let reflection =
+            MirKernelReflection::from_signature("unary_vector", &signature, &validation)
+                .expect("vector parameter reflects");
+        assert_eq!(reflection.resources[0].element_layout, expected_layout);
+        assert_eq!(reflection.resources[0].element_byte_width, 4);
+        assert_eq!(reflection.resources[0].buffer_byte_len, 4);
+    }
+}
+
 /// One-param scalar kernel: `functio add_one(x: f32) -> f32 { x }`.
 fn scalar_kernel_function(ty: MirType) -> MirFunction {
     MirFunction {

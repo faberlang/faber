@@ -223,6 +223,9 @@ impl TypeChecker<'_> {
                 if self.types.is_own_view(*ty) {
                     self.check_own_bind_rhs(init);
                 }
+                // A `copy`-marked slot duplicates its source at acquisition
+                // (D-6); refuse a value that holds a member with identity.
+                self.refuse_copy_slot_of_nonduplicable(*ty, init.span);
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
                 self.warn_union_annotation_guardrails(*ty, init.span);
                 *ty
@@ -231,6 +234,9 @@ impl TypeChecker<'_> {
                 // Bare-annotation locals carry no own span; the declaration
                 // site is the best available teach location.
                 self.warn_union_annotation_guardrails(*ty, radix_lexer::Span::default());
+                // The same refusal for a declared-but-uninitialized `copy`
+                // slot: the acquisition happens at its first store.
+                self.refuse_copy_slot_of_nonduplicable(*ty, radix_lexer::Span::default());
                 *ty
             }
             (None, Some(init)) => {
@@ -556,7 +562,9 @@ impl TypeChecker<'_> {
     /// copies.
     fn is_shareable_payload(&self, ty: TypeId) -> bool {
         let ty = self.resolve_inferred_type(ty);
-        if self.types.is_aliasing_container_through_option(ty) {
+        // A register-class `vector`/`matrix` copies on a plain bind (operator
+        // ruling 7b25889f R1), so it is never a shared payload.
+        if self.types.binds_by_sharing_through_option(ty) {
             return true;
         }
         match self.types.get(ty) {

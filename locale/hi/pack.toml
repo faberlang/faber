@@ -728,6 +728,14 @@ help = "स्तर को `@ {nucleum}` फ़ंक्शन घोषणा 
 message = "`@ nucleum` fragment ग्राफ़िक्स fragment annotation से टकराता है"
 help = "fragment annotation में से एक हटाएं"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "एक घोषणा में `@ {nucleum}` एनोटेशन और `{nucleum}` घोषणा-शीर्ष दोनों हैं"
+help = "एक ही शीर्ष रखें: `@ {nucleum}` एनोटेशन या `{nucleum}` घोषणा-शीर्ष"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` होस्ट रूपांतरण का नाम देता है; `{nucleum}` शीर्ष डिवाइस कर्नेल का नाम देता है"
+help = "`@ {conversio}` या `{nucleum}` शीर्ष हटाएँ; रूपांतरण पंक्ति एक होस्ट फ़ंक्शन है"
+
 [diagnostics.PARSE019]
 message = "दोहराया गया modifier"
 help = "duplicate modifier हटाएं"
@@ -3580,6 +3588,14 @@ help = "स्वतंत्र मान के लिए `{varia} {name} ← 
 message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
 help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
 
+[diagnostics.SEM066]
+message = "`copy` अस्वीकृत: {head} की प्रतिलिपि नहीं बन सकती{?path| — सदस्य पथ है `|`}"
+help = "{head} एक पहचान वाला संसाधन है: मान को `{copy}` के बिना साझा करें, या संसाधन को `{own}` से अपने अधिकार में लें जहाँ उपभोक्ता उसे रख सके"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` अस्वीकृत: {head} की प्रतिलिपि नहीं बन सकती{?path| — सदस्य पथ है `|`}"
+help = "{head} एक पहचान वाला संसाधन है: मान को `{copy}` के बिना साझा करें, या संसाधन को `{own}` से अपने अधिकार में लें जहाँ उपभोक्ता उसे रख सके"
+
 [diagnostics.WARN001]
 message = "अप्रयुक्त variable"
 help = "variable हटाएँ या उसके आगे '_' लगाएँ"
@@ -4366,6 +4382,18 @@ help = "'⇇' अब दाईं ओर के मानों को बाई
 message = "sinking contract में एक type parameter पर ठीक `sink(T) → vacuum ⇥ E` और `flush() → vacuum ⇥ E` घोषित होना चाहिए"
 help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E` और `{functio} flush() → vacuum ⇥ E` घोषित करें"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "कंपाइलर contract annotation अमान्य है: {reason}"
+help = 'एक वर्ग पर `@ contract { target = "evm" }` लिखें'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "असमर्थित प्रयोगात्मक EVM contract आकार: {reason}"
+help = "एक ऐसा वर्ग उपयोग करें जिसमें फ़ील्ड न हों, अदिश विधियाँ हों, और स्पष्ट सार्वजनिक प्रविष्टियाँ हों"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contract को लक्ष्य `{required}` चाहिए, पर चुना गया लक्ष्य `{target}` है"
+help = "contract का अपेक्षित निष्पादन लक्ष्य चुनें; स्रोत फ़ॉर्मेटिंग और HIR क्रमानुसारण annotation को बनाए रखते हैं"
+
 [diagnostics.INFO001]
 message = "कर्नेल `{kernel}` {device} डिवाइस पर क्रमिक रूप से चलता है"
 
@@ -4392,3 +4420,11 @@ help = "कारण देखें और चुने गए device द्व
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "कर्नेल `{kernel}`: {partitions} विभाजनों के पार इसका {kind} टाला जा सकता है: {avoidable} ({reason})"
 help = "ऑडिट कारण का अनुसरण करके निर्भरता खोजें। विभाजित पठन और लेखन को lane-local रखें और जहाँ संभव हो, मेल खाते buffer layouts का उपयोग करें।"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "उधार-क्षेत्र तथ्य अभी '{construct}' के लिए नहीं बनते; उधार परीक्षक सन्निकटन के बजाय बंद रहता है"
+help = "इस रचना के उधार निर्णयों के लिए क्षेत्र-निष्कर्षण चाहिए; क्षेत्र इंजन को इसे ढकने के लिए इसकी सूचना दें"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM स्पाइक {shape} ({reason}) मना करता है"
+help = "केवल सीमित अदिश evm_entry उपसमुच्चय का उपयोग करें; इस प्रयोगात्मक लक्ष्य का कोई पैकेज या निष्पादन पहलू नहीं है।"

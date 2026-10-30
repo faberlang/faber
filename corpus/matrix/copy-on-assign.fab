@@ -1,0 +1,44 @@
++++
+term = "matrix"
+kind = "exemplum"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "assignment", "place", "member_suffix", "nota_stmt", "expression", "literal"]
+category = "tensor"
+canonical = false
+summary = "A matrix is a silent value: `b ← a` copies, so a cell write through b never reaches a."
+syntax = "mut mf32[2, 2] b ← a"
+related = ["matrix", "element-access"]
+locale = "en"
++++
+# =============================================================================
+# matrix — a matrix is a silent value, so `b ← a` copies
+# =============================================================================
+#
+# What this teaches:
+#   • `b ← a` COPIES a matrix, exactly as it copies a vector. The two bindings
+#     hold independent cells, so a cell write through one is invisible to the
+#     other.
+#   • A cell write (`b[[0, 0]] ← 9.0`) therefore leaves `a[[0, 0]]` at 1.0 on
+#     every target that admits the register matrix, not only where the carrier
+#     happens to be a value.
+#   • This is why `ref` is refused over a matrix, exactly as over a scalar
+#     (`SEM008 scalar_access_marker`): there is no storage for a marker to
+#     name.
+#
+# Common mistakes:
+#   • Reading `b ← a` as an alias and expecting `a[[0, 0]]` to change. Write
+#     `ref` for a second name — which a matrix refuses, so the intent is
+#     always the copy.
+#
+# See also: matrix, element-access
+#
+# EXPECTED OUTPUT:
+#   copy-on-assign.expected
+# =============================================================================
+
+main {
+    let mf32[2, 2] a ← [[1.0, 2.0], [3.0, 4.0]] ↦ mf32[2, 2]
+    mut mf32[2, 2] b ← a
+    b[[0, 0]] ← 9.0
+    print a[[0, 0]]
+    print b[[0, 0]]
+}

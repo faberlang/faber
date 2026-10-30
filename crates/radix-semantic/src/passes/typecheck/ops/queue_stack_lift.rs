@@ -6,7 +6,10 @@
 //! `⊘`, exactly as for a list; a scalar still broadcasts on `* / %`. The glyph
 //! forms lower to the same collection runtime ops as the list glyphs.
 
-use super::*;
+use super::{
+    GLYPH_ELEMENT_TYPE_MISMATCH, GLYPH_OP_NUMERIC_ELEMENT_REQUIRED, GLYPH_OPERANDS_UNSUPPORTED,
+    HirBinOp, QueueStackArithmeticKind, TypeChecker, TypeId,
+};
 
 /// `queue * queue` / `stack * stack` is not elementwise; the glyph says which
 /// product is meant.

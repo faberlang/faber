@@ -108,6 +108,9 @@ pub enum Target {
     /// BASIC V2 compatible subset). Default-off; scalar programs only.
     MirBasic,
 
+    /// Experimental Shanghai EVM deployment bytecode; emit only, default-off.
+    MirEvm,
+
     /// `MIR` package artifact executed by the `scena` runtime.
     MirScena,
 
@@ -161,6 +164,7 @@ impl Target {
             Target::MirWgsl => "wgsl-text",
             Target::MirSexp => "sexp",
             Target::MirBasic => "basic",
+            Target::MirEvm => "evm",
             Target::MirScena => "scena",
             Target::MirFmir => "fmir-text",
             Target::MirFmirBinary => "fmir",
@@ -275,6 +279,7 @@ impl Target {
             Target::MirWgsl => &["wgsl", "wgsl-text"],
             Target::MirSexp => &["sexp", "racket", "lisp", "rkt"],
             Target::MirBasic => &["basic", "bas"],
+            Target::MirEvm => &["evm"],
             Target::MirScena => &["scena"],
             Target::MirFmir => &["fmir-text"],
             Target::MirFmirBinary => &["fmir"],
@@ -315,6 +320,7 @@ impl Target {
         Target::MirWgsl,
         Target::MirSexp,
         Target::MirBasic,
+        Target::MirEvm,
         Target::MirScena,
         Target::MirFmir,
         Target::MirFmirBinary,
@@ -387,6 +393,7 @@ impl Target {
             Target::MirMetal => Some("mir-metal"),
             Target::MirSexp => Some("mir-sexp"),
             Target::MirBasic => Some("mir-basic"),
+            Target::MirEvm => Some("mir-evm"),
             Target::MirAmd => Some("mir-amd"),
             Target::MirWasm => Some("mir-wasm"),
             Target::MirWgsl => Some("mir-wgsl"),
@@ -418,6 +425,7 @@ impl Target {
             Target::MirMetal => cfg!(feature = "mir-metal"),
             Target::MirSexp => cfg!(feature = "mir-sexp"),
             Target::MirBasic => cfg!(feature = "mir-basic"),
+            Target::MirEvm => cfg!(feature = "mir-evm"),
             Target::MirAmd => cfg!(feature = "mir-amd"),
             Target::MirWasm => cfg!(feature = "mir-wasm"),
             Target::MirWgsl => cfg!(feature = "mir-wgsl"),
@@ -459,6 +467,7 @@ impl Target {
             | Target::MirMetal
             | Target::MirWgsl
             | Target::MirSexp
+            | Target::MirEvm
             | Target::MirBasic
             | Target::MirScena
             | Target::MirFmir
@@ -503,6 +512,7 @@ impl Target {
             | Target::MirMetal
             | Target::MirWgsl
             | Target::MirSexp
+            | Target::MirEvm
             | Target::MirBasic
             | Target::MirScena => &[],
         }

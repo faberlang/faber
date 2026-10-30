@@ -4524,7 +4524,33 @@ fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
     let packed_bytes = crate::abi::PackedStorageLayout::Q8_0
         .packed_bytes_for_elements(32 * 32)
         .expect("Q8_0 32x32 packs");
+    assert_eq!(selection.binds.len(), 3);
+    assert_eq!(selection.binds[0].dims, vec![1, 32]);
+    assert_eq!(selection.binds[0].strides, vec![32, 1]);
     assert_eq!(selection.binds[1].dims, vec![packed_bytes]);
+    assert_eq!(selection.binds[1].strides, vec![1]);
+    assert_eq!(selection.binds[2].dims, vec![1, 32]);
+    assert_eq!(selection.binds[2].strides, vec![32, 1]);
+    assert_eq!(
+        selection.offsets,
+        vec![
+            OffsetBinding {
+                name: "buffer0".to_owned(),
+                offset_elements: 0,
+                strides: vec![32, 1],
+            },
+            OffsetBinding {
+                name: "buffer1".to_owned(),
+                offset_elements: 0,
+                strides: vec![1],
+            },
+            OffsetBinding {
+                name: "buffer2".to_owned(),
+                offset_elements: 0,
+                strides: vec![32, 1],
+            },
+        ]
+    );
     assert_eq!(
         selection
             .uniforms
@@ -4563,6 +4589,28 @@ fn static_executor_plan_remains_v1() {
     extension
         .validate_for_kernel_count(program.kernels.len())
         .expect("legacy static executor plan remains valid");
+    let selection = &extension.selections[0];
+    assert_eq!(selection.binds.len(), 2);
+    for bind in &selection.binds {
+        assert_eq!(bind.dims, vec![4]);
+        assert_eq!(bind.strides, vec![1]);
+        assert_eq!(bind.offset_elements, 0);
+    }
+    assert_eq!(
+        selection.offsets,
+        vec![
+            OffsetBinding {
+                name: "buffer0".to_owned(),
+                offset_elements: 0,
+                strides: vec![1],
+            },
+            OffsetBinding {
+                name: "buffer1".to_owned(),
+                offset_elements: 0,
+                strides: vec![1],
+            },
+        ]
+    );
 }
 
 fn v2_facts_for_elementwise() -> ExecutorPlanV2Facts {

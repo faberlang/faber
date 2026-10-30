@@ -204,7 +204,9 @@ pub(crate) fn numeric_conversion(
             from.policy == IntPolicy::Trap && width.bits() == int_bits(from.width)
         }
         (Num::Bits(width), Num::Int(to)) => {
-            to.policy == IntPolicy::Trap && width.bits() == int_bits(to.width)
+            to.policy == IntPolicy::Trap
+                && to.width != NumericWidth::U64
+                && width.bits() == int_bits(to.width)
         }
         (Num::Float(float), Num::Bits(width)) | (Num::Bits(width), Num::Float(float)) => {
             matches!(
@@ -964,7 +966,7 @@ impl FunctionLower<'_, '_> {
             (Num::Float(_), Num::Bool) => self.convert_float_bool(value),
             (Num::Text, Num::Bool) => self.convert_text_bool(value)?,
             (Num::Int(_), Num::Bits(width)) => (self.mask_pattern(value, width), None),
-            (Num::Bits(width), Num::Int(to)) => self.convert_bits_int(value, to, width),
+            (Num::Bits(width), Num::Int(to)) => self.convert_bits_int(value, to, width)?,
             (Num::Float(NumericWidth::F16), Num::Bits(_)) => self.convert_float_bits_half(value)?,
             (Num::Bits(_), Num::Float(NumericWidth::F16)) => self.convert_bits_float_half(value)?,
             (Num::Float(_), Num::Bits(width)) => self.convert_float_bits(value, width),
@@ -1359,22 +1361,15 @@ impl FunctionLower<'_, '_> {
         value: Value,
         to: IntKind,
         width: BitsWidth,
-    ) -> (Value, Option<(Value, Failure)>) {
-        let read = self.extend_pattern(value, width, signed_width(to.width));
+    ) -> Lowered<(Value, Option<(Value, Failure)>)> {
+        // The upper half of u64 is valid, but does not fit the signed carrier.
+        // Decline the conversion before execution, not only those bit patterns
+        // that happen to set the top bit at run time.
         if to.width == NumericWidth::U64 {
-            // A pattern with the top bit set is a u64 the i64 carrier
-            // cannot hold: refuse it by name at run time.
-            let zero = self.builder.ins().iconst(types::I64, 0);
-            let beyond = self.builder.ins().icmp(IntCC::SignedLessThan, read, zero);
-            return (
-                read,
-                Some((
-                    beyond,
-                    Failure::Static("u64 value beyond 2^63 is not carried by the clif target"),
-                )),
-            );
+            return Err(Decline::new("b64 to u64 conversion"));
         }
-        (read, None)
+        let read = self.extend_pattern(value, width, signed_width(to.width));
+        Ok((read, None))
     }
 
     fn convert_float_bits_half(
@@ -1686,7 +1681,10 @@ impl FunctionLower<'_, '_> {
                         .map_err(|_| Decline::new("text header offset"))?,
                 );
                 let reference = self.runtime_ref(&abi::TRAP_CONVERSION)?;
-                self.builder.ins().call(reference, &[bytes, length]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), bytes, length],
+                );
                 self.builder.ins().trap(TrapCode::unwrap_user(1));
             }
             Some(_) => return Err(Decline::new("conversion failure channel type")),

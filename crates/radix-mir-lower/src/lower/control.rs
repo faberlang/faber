@@ -1179,7 +1179,7 @@ impl FunctionBuilder<'_> {
         match mode {
             HirIteraMode::Ab => {
                 if let HirExpressionKind::Intervallum { start, end, step, kind } = &iter.kind {
-                    self.lower_range_itera(RangeIteraLowering {
+                    self.lower_range_itera(&RangeIteraLowering {
                         binding,
                         name,
                         mutable,
@@ -1218,7 +1218,7 @@ impl FunctionBuilder<'_> {
                         MirType::semantic(array_ty),
                         iter.span,
                     );
-                    self.lower_array_itera(ArrayIteraLowering {
+                    self.lower_array_itera(&ArrayIteraLowering {
                         mode,
                         coordinates,
                         binding,
@@ -1231,7 +1231,7 @@ impl FunctionBuilder<'_> {
                 }
             }
             HirIteraMode::Ex | HirIteraMode::De => {
-                self.lower_array_itera(ArrayIteraLowering {
+                self.lower_array_itera(&ArrayIteraLowering {
                     mode,
                     coordinates,
                     binding,
@@ -1283,7 +1283,7 @@ impl FunctionBuilder<'_> {
         {
             if self.is_lane_region(expr) {
                 return self.lower_filum_reduce_expr(
-                    FilumReduceLowering {
+                    &FilumReduceLowering {
                         op,
                         form: MirFilumForm::Grid,
                         source,
@@ -1320,7 +1320,7 @@ impl FunctionBuilder<'_> {
             && !self.is_host_kernel_lowering()
         {
             return self.lower_filum_reduce_expr(
-                FilumReduceLowering {
+                &FilumReduceLowering {
                     op,
                     form: MirFilumForm::Declared,
                     source,
@@ -2102,11 +2102,11 @@ impl FunctionBuilder<'_> {
 
     pub(super) fn lower_filum_reduce_expr(
         &mut self,
-        request: FilumReduceLowering<'_>,
+        request: &FilumReduceLowering<'_>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         use radix_hir::HirReductionOp as Op;
-        let FilumReduceLowering { op, form, source, group, coordinates, filum, binding, body, identity } = request;
+        let FilumReduceLowering { op, form, source, group, coordinates, filum, binding, body, identity } = *request;
         let Some(reduce_op) = mir_reduce_op(op) else {
             // The selected element rides a `T ∪ none` result and an earliest-lane
             // selection no device reduce recipe carries yet: a named decline,
@@ -2398,6 +2398,28 @@ impl FunctionBuilder<'_> {
             self.device_role,
             None,
         );
+        // Admission above proved each tensor read against the source
+        // coordinates. Carry that fact on the existing checked-index carrier;
+        // the helper itself has no lane from which to rediscover it.
+        struct ProvenReads<'a> {
+            types: &'a TypeTable,
+            ids: Vec<radix_hir::HirId>,
+        }
+        impl HirVisitor for ProvenReads<'_> {
+            fn visit_expr(&mut self, expr: &HirExpression) {
+                if let HirExpressionKind::Index(receiver, _) = &expr.kind
+                    && receiver.ty.is_some_and(|ty| {
+                        matches!(self.types.get(self.types.peel_access_marker(ty).1), Type::Tensor(..))
+                    })
+                {
+                    self.ids.push(expr.id);
+                }
+                radix_hir::visit::walk_expr(self, expr);
+            }
+        }
+        let mut reads = ProvenReads { types: self.types, ids: Vec::new() };
+        reads.visit_expr(key);
+        Arc::make_mut(&mut nested.context.proven_indexes).extend(reads.ids);
         for capture in captures {
             nested.add_param(
                 capture.source,
@@ -2740,7 +2762,7 @@ impl FunctionBuilder<'_> {
                     return None;
                 }
                 _ => {
-                    return self.lower_unit_variant_discerne(value, scrutinee, arms, expr);
+                    return self.lower_unit_variant_discerne(&value, scrutinee, arms, expr);
                 }
             }
         }
@@ -2851,7 +2873,7 @@ impl FunctionBuilder<'_> {
             if self.types.equals(*ty, scrutinee_ty) {
                 has_default = true;
                 if let Some((def_id, name)) = binding {
-                    self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span)?;
+                    self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span);
                 }
                 self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
                 reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
@@ -2873,7 +2895,7 @@ impl FunctionBuilder<'_> {
 
             self.switch_to(then_id);
             if let Some((def_id, name)) = binding {
-                self.bind_type_test_family(*def_id, *name, &scrutinee_place, *ty, arm.span)?;
+                self.bind_type_test_family(*def_id, *name, &scrutinee_place, *ty, arm.span);
             }
             self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
             reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
@@ -2912,7 +2934,7 @@ impl FunctionBuilder<'_> {
         scrutinee_place: &MirPlace,
         bound_ty: TypeId,
         span: Span,
-    ) -> Option<()> {
+    ) {
         let binding_ty = MirType::semantic(bound_ty);
         let local = self.next_local_id();
         self.locals
@@ -2925,7 +2947,6 @@ impl FunctionBuilder<'_> {
             binding_ty,
             span,
         );
-        Some(())
     }
 
     fn lower_type_test_arm_body(
@@ -2949,7 +2970,7 @@ impl FunctionBuilder<'_> {
 
     fn lower_unit_variant_discerne(
         &mut self,
-        value: MirOperand,
+        value: &MirOperand,
         scrutinee: &HirExpression,
         arms: &[HirCasuArm],
         expr: &HirExpression,
@@ -2968,7 +2989,7 @@ impl FunctionBuilder<'_> {
                         *variant,
                         fields,
                         pattern,
-                        &value,
+                        value,
                         &scrutinee_place,
                         scrutinee_ty,
                         join_id,
@@ -2981,7 +3002,7 @@ impl FunctionBuilder<'_> {
                         *variant,
                         fields,
                         pattern,
-                        &value,
+                        value,
                         &scrutinee_place,
                         scrutinee_ty,
                         join_id,
@@ -2992,7 +3013,7 @@ impl FunctionBuilder<'_> {
                 HirPattern::Or(alternatives) if is_variant_alternatives(alternatives) => {
                     self.lower_variant_alternatives_arm(
                         alternatives,
-                        &value,
+                        value,
                         &scrutinee_place,
                         scrutinee_ty,
                         join_id,
@@ -3940,7 +3961,7 @@ impl FunctionBuilder<'_> {
         }
     }
 
-    fn lower_range_itera(&mut self, range: RangeIteraLowering<'_>) -> Option<()> {
+    fn lower_range_itera(&mut self, range: &RangeIteraLowering<'_>) -> Option<()> {
         let index_ty = coordinate_type(range.body, range.binding).map_or_else(
             || self.range_index_ty(&[Some(range.start), Some(range.end), range.step]),
             MirType::semantic,
@@ -4475,8 +4496,10 @@ impl FunctionBuilder<'_> {
             // Route B (AEU-4): runtime-len `lista<T, magnitudo N>` lowers in the base
             // lane to a static split on the carrier `len` with N+1
             // guard-free arms (total N(N+1)/2 lanes). The N <= 10
-            // code-size cap keeps the split bounded; non-literal capacities
-            // (shape-generics) and N > 10 fall through to Unsupported.
+            // code-size cap keeps the split bounded; above the cap, and for
+            // non-literal capacities (shape-generics), the value loop lowers
+            // as the plain runtime-length loop an unbounded lista uses
+            // instead of declining.
             // `de` binds the index, not a lane, so it is a plain index loop
             // over the runtime length: the same shape as an unbounded lista,
             // independent of any literal capacity.
@@ -4487,14 +4510,14 @@ impl FunctionBuilder<'_> {
             }
             Type::BoundedArray { element, capacity } => {
                 let literal_n = if matches!(mode, HirIteraMode::Ex) {
-                    i64s_from_literal_index(*capacity, self.types)
-                        .and_then(|dims| dims.first().copied())
-                        .filter(|n| (0..=10).contains(n))
+                    i64s_from_literal_index(*capacity, self.types).and_then(|dims| dims.first().copied())
                 } else {
                     None
                 };
                 match literal_n {
-                    Some(n) => CollectionIteraKind::BoundedArray(*element, n),
+                    Some(n) if (0..=10).contains(&n) => CollectionIteraKind::BoundedArray(*element, n),
+                    Some(_) => CollectionIteraKind::Array(*element),
+                    None if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::Array(*element),
                     None => CollectionIteraKind::Unsupported,
                 }
             }
@@ -4676,7 +4699,7 @@ impl FunctionBuilder<'_> {
         Some((operand, array_ty))
     }
 
-    fn lower_array_itera(&mut self, iter: ArrayIteraLowering<'_>) -> Option<()> {
+    fn lower_array_itera(&mut self, iter: &ArrayIteraLowering<'_>) -> Option<()> {
         let Some(iter_ty) = iter.iter.ty else {
             self.errors
                 .push(MirError::missing_type(iter.iter.span, "itera collection source"));
@@ -4782,7 +4805,7 @@ impl FunctionBuilder<'_> {
         });
         let collection = self.materialize_operand_place(collection, collection_ty, iter.iter.span);
         if let CollectionIteraKind::Shaped { element, rank, literal, matrix } = &collection_kind {
-            return self.lower_shaped_itera(&iter, collection, *element, *rank, literal.as_deref(), *matrix);
+            return self.lower_shaped_itera(iter, collection, *element, *rank, literal.as_deref(), *matrix);
         }
 
         // The map itself stays addressable for the per-key value read.
@@ -4873,7 +4896,7 @@ impl FunctionBuilder<'_> {
                 self.normalized_type(collection_semantic),
                 Type::BoundedAscii { .. } | Type::BoundedTextus { .. }
             );
-            return self.lower_bounded_array_itera_split(&iter, iteration_place, binding_ty, *capacity, text);
+            return self.lower_bounded_array_itera_split(iter, iteration_place, binding_ty, *capacity, text);
         }
 
         let index = self.next_local_id();
@@ -5012,7 +5035,7 @@ impl FunctionBuilder<'_> {
             key_place
                 .projections
                 .push(MirProjection::Index(source_index));
-            self.lower_map_entry_key_binding(&iter, *key, key_place, map_place)
+            self.lower_map_entry_key_binding(iter, *key, key_place, map_place)
         } else if matches!(&collection_kind, CollectionIteraKind::Queue(_) | CollectionIteraKind::Stack(_)) {
             // Queue/stack carriers intentionally remain opaque MIR handles for
             // method access. Read their array-backed runtime value through the
@@ -5362,7 +5385,7 @@ impl FunctionBuilder<'_> {
         } else if let Some(dimensions) = matrix {
             self.lower_shaped_matrix_body(
                 iter,
-                collection,
+                &collection,
                 element,
                 binding,
                 coordinate,
@@ -5451,7 +5474,7 @@ impl FunctionBuilder<'_> {
     fn lower_shaped_matrix_body(
         &mut self,
         iter: &ArrayIteraLowering<'_>,
-        collection: MirPlace,
+        collection: &MirPlace,
         element: TypeId,
         binding: MirLocalId,
         column: MirLocalId,

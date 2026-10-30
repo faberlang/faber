@@ -4257,6 +4257,7 @@ fn library_bindings_route_reports_missing_source_read() {
         crate::codegen::OutputMode::Application,
         None,
         &resolve,
+        None,
     );
     assert!(result.output.is_none(), "a missing source must not produce output");
     crate::test_support::assert_has_error_issue(&result.diagnostics, "IO001", "source_read_failed");
@@ -4320,5 +4321,447 @@ fn resolvable_norma_import_is_not_unknown_library_module() {
             .iter()
             .any(|diagnostic| diagnostic.issue() == Some("unknown_library_module")),
         "resolvable Norma module must not be reported as unknown"
+    );
+}
+
+// ── frontmatter locales fail closed and resolve on every program lane ──
+//
+// A declared `+++ locale = "…" +++` that cannot be resolved must stop the
+// compile with its LOCALE003 diagnostic: the program layer
+// used to swallow the resolver error, substitute the session pack, install it
+// as an explicit override, and the driver then short-circuited past the
+// malformed declaration — the source silently compiled as English. The
+// discriminators below install that exact regression condition: a
+// non-explicit session English pack over an English body that would compile
+// cleanly if the error were swallowed again.
+
+/// A config with no language-pack root and a loader serving only `en` and
+/// `la`: the installed-binary condition, where only the embedded packs remain.
+fn loader_only_config() -> crate::driver::Config {
+    let en = en_locale_pack();
+    let la = la_locale_pack();
+    let mut config = crate::driver::Config::default();
+    config.locale_root = None;
+    config.with_locale_pack_loader(crate::driver::LocalePackLoader::new(move |locale_id| match locale_id {
+        "en" => Ok(en.clone()),
+        "la" => Ok(la.clone()),
+        other => Err(format!("no pack for locale '{other}'")),
+    }))
+}
+
+/// The discriminator condition of the swallowed-error bug: the loader-only
+/// config plus a **non-explicit** session English pack. A declaration that
+/// still resolves must win over it; a declaration that fails must stop the
+/// compile instead of reading an English body under this fallback.
+fn english_session_fallback() -> crate::driver::Config {
+    loader_only_config().with_locale_pack(en_locale_pack())
+}
+
+/// Assert the compile stopped with no output on an error-severity `LOCALE003`
+/// carrying the named issue: the previously swallowed resolver error, now the
+/// leading failure.
+fn assert_locale003_error(result: &crate::CompileResult, issue: &str, label: &str) {
+    assert!(result.output.is_none(), "{label}: a failing declaration must not emit");
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.is_error() && diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some(issue)
+        }),
+        "{label}: expected error-severity LOCALE003/{issue}, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue(), diagnostic.severity))
+            .collect::<Vec<_>>()
+    );
+}
+
+fn compile_with_config(config: crate::driver::Config, source: &str) -> crate::CompileResult {
+    let (_td, home) = temp_dir("locale-fail");
+    let app = home.join("main.fab");
+    fs::write(&app, source).expect("write app");
+    crate::Compiler::new(config).compile(&app)
+}
+
+#[test]
+fn program_compile_fails_closed_on_non_string_frontmatter_locale() {
+    // With a non-explicit English session pack installed, the pre-fix
+    // swallow read the English body under the session pack and compiled
+    // silently; the fix must surface the LOCALE003 not_a_string error.
+    let result = compile_with_config(english_session_fallback(), "+++\nlocale = 7\n+++\n\n@ public\nfn salve() { }\n");
+    assert_locale003_error(&result, "not_a_string", "non-string locale");
+}
+
+#[test]
+fn program_compile_fails_closed_on_invalid_frontmatter_locale_ids() {
+    for (label, locale) in [
+        ("empty", "\"\""),
+        ("path shaped", "\"../escape\""),
+        ("absolute", "\"/etc\""),
+    ] {
+        let source = format!("+++\nlocale = {locale}\n+++\n\n@ public\nfn salve() {{ }}\n");
+        let result = compile_with_config(english_session_fallback(), &source);
+        assert_locale003_error(&result, "invalid_id", label);
+    }
+}
+
+#[test]
+fn program_compile_fails_closed_on_unloadable_frontmatter_locale() {
+    let result = compile_with_config(
+        english_session_fallback(),
+        "+++\nlocale = \"zh-Hant\"\n+++\n\n@ public\nfn salve() { }\n",
+    );
+    assert_locale003_error(&result, "load_failed", "unloadable locale");
+}
+
+#[test]
+fn program_compile_fails_closed_without_any_pack_source() {
+    // No root, no loader: the declared locale has no source at all — only a
+    // non-explicit session English pack remains. The resolver's own
+    // `no_root` diagnostic is the failure, never a silent English read.
+    let mut config = crate::driver::Config::default();
+    config.locale_root = None;
+    let config = config.with_locale_pack(en_locale_pack());
+    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ public\nfn salve() { }\n");
+    assert_locale003_error(&result, "no_root", "no pack source");
+}
+
+#[test]
+fn program_compile_fails_closed_on_malformed_root_pack() {
+    // A present but malformed root pack fails loud over every later chain
+    // step that could mask it: the configured loader loads `la` fine (the
+    // root serves the id first, so the loader is never reached) and a
+    // non-explicit session English pack sits over an English body.
+    let (_td, home) = temp_dir("malformed-pack");
+    let broken = home.join("la");
+    fs::create_dir_all(&broken).expect("pack dir");
+    fs::write(broken.join("pack.toml"), "not [ a valid pack").expect("malformed pack");
+    let config = english_session_fallback().with_locale_root(home);
+    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ public\nfn salve() { }\n");
+    assert_locale003_error(&result, "load_failed", "malformed root pack");
+}
+
+#[test]
+fn program_compile_still_honours_a_resolvable_frontmatter_locale() {
+    // Declaration-over-session precedence: the loadable `la` declaration
+    // wins against a non-explicit session English pack, so the Latin body
+    // parses as Latin and the compile still emits.
+    let config = english_session_fallback().with_target(crate::codegen::Target::HirRust);
+    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio salve() { }\n");
+    assert!(
+        result.success(),
+        "a loadable declared locale must still compile over a session fallback: {:?}",
+        result.diagnostics
+    );
+    assert!(result.output.is_some(), "a loadable declared locale must emit output");
+}
+
+#[test]
+fn program_compile_explicit_session_pack_overrides_frontmatter_declaration() {
+    // Control for driver policy: an explicitly resolved session pack (CLI
+    // `--locale en` semantics) is authoritative, so even an unloadable
+    // declaration never reaches the resolver and the English body compiles.
+    // The fail-closed tests above must not change this precedence.
+    let config = loader_only_config().with_resolved_locale_pack(en_locale_pack());
+    let result = compile_with_config(config, "+++\nlocale = \"zh-Hant\"\n+++\n\n@ public\nfn salve() { }\n");
+    assert!(
+        result.success(),
+        "an explicit session pack must stay authoritative over the declaration: {:?}",
+        result.diagnostics
+    );
+    assert!(result.output.is_some(), "an explicit session pack must emit output");
+}
+
+// ── provider analysis derives its locale policy from the session ──
+//
+// The provider-module analysis used to mint a fresh default config and
+// re-discover a workspace language-pack root: a session whose
+// root served the provider's declared locale (or a loader-installed installed
+// binary) never reached the provider parse, which failed closed as a
+// `provider_module_analysis_failed` marker at Rust emission.
+
+/// Plant a language-pack root serving one re-identified locale: the workspace
+/// `en` pack as `prov-en`, so only the session's configured root can read a
+/// source declaring it (the from_toml_path validation needs the pack's
+/// exemplar tree beside it).
+fn plant_reidentified_pack(root: &Path, source_id: &str, planted_id: &str) {
+    let workspace = crate::locale::workspace_locale_root().join(source_id);
+    let destination = root.join(planted_id);
+    copy_locale_dir(&workspace, &destination);
+    let pack_path = destination.join("pack.toml");
+    let pack_toml = fs::read_to_string(&pack_path).expect("planted pack");
+    fs::write(
+        &pack_path,
+        pack_toml.replacen(&format!("id = \"{source_id}\""), &format!("id = \"{planted_id}\""), 1),
+    )
+    .expect("re-identified pack");
+}
+
+fn copy_locale_dir(source: &Path, destination: &Path) {
+    fs::create_dir_all(destination).expect("planted dir");
+    for entry in fs::read_dir(source).expect("planted source") {
+        let entry = entry.expect("planted entry").path();
+        let target = destination.join(entry.file_name().expect("name"));
+        if entry.is_dir() {
+            copy_locale_dir(&entry, &target);
+        } else {
+            fs::copy(&entry, &target).expect("planted file");
+        }
+    }
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn provider_unit_analysis_derives_locale_root_from_session_config() {
+    // The provider declares a locale only the session's planted root serves.
+    // A fresh-minted default config re-discovers the workspace root, misses
+    // `prov-en`, parses the English provider on the built-in Latin surface,
+    // and Rust emission fails with the provider-analysis marker; the derived
+    // config reads the provider under its declared locale and emits it.
+    let (_td, home) = temp_dir("provider-session-root");
+    plant_reidentified_pack(&home, "en", "prov-en");
+    let provider = home.join("valida.fab");
+    fs::write(
+        &provider,
+        "+++\nlocale = \"prov-en\"\n+++\n\n@ public\nfn nomen(string s) → string {\n    return s\n}\n",
+    )
+    .expect("provider source");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        "+++\nlocale = \"prov-en\"\n+++\nimport from \"./valida\" valida\n\nmain {\n    print valida.nomen(\"salve\")\n}\n",
+    )
+    .expect("app source");
+
+    let config = crate::driver::Config::default()
+        .with_target(crate::codegen::Target::HirRust)
+        .with_locale_root(home);
+    let result = crate::Compiler::new(config).compile(&app);
+    assert!(
+        result.success(),
+        "the session's locale root must serve the provider's declared locale: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod valida"),
+        "expected the analyzed provider module, got:\n{}",
+        output.code
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn provider_unit_analysis_resolves_declared_locale_through_loader_without_root() {
+    // The installed-binary condition (need done_when): no language
+    // pack root at all, the session's loader serves the provider's declared
+    // frontmatter locale.
+    let (_td, home) = temp_dir("provider-loader");
+    let provider = home.join("valida.fab");
+    fs::write(
+        &provider,
+        "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio nomen(textus s) → textus {\n    redde s\n}\n",
+    )
+    .expect("provider source");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        "+++\nlocale = \"en\"\n+++\nimport from \"./valida\" valida\n\nmain {\n    print valida.nomen(\"salve\")\n}\n",
+    )
+    .expect("app source");
+
+    let result = crate::Compiler::new(loader_only_config().with_target(crate::codegen::Target::HirRust)).compile(&app);
+    assert!(
+        result.success(),
+        "the session's loader must serve the provider's declared locale: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod valida"),
+        "expected the analyzed provider module, got:\n{}",
+        output.code
+    );
+}
+
+// ── manifest reader locales resolve through the session config ──
+//
+// `package_reader_locale_pack` used to resolve a package `[reader] locale`
+// through a freshly minted default config: a session root or
+// loader never reached the manifest locale.
+
+#[test]
+fn manifest_reader_locale_resolves_through_session_loader_without_root() {
+    let (_td, home) = temp_dir("manifest-loader");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    write_provider_manifest(&tela, "tela", "la");
+    fs::write(
+        tela.join("src/valida.fab"),
+        r#"
+@ publica
+functio nomen_tag(textus nomen) → bivalens {
+    redde nomen ≢ ""
+}
+"#,
+    )
+    .expect("provider source");
+    let valida = tela.join("src/valida.fab");
+
+    let session = crate::driver::Session::new(loader_only_config());
+    let pack = super::package_reader_locale_pack(&session, &valida)
+        .expect("the session's loader must serve the manifest locale");
+    assert_eq!(pack.metadata.id, "la", "the manifest-selected pack is the la pack");
+
+    // No loader and no root: the manifest locale resolves to nothing and the
+    // documented fallback (the importing module's pack) applies — asserted
+    // here as the intentional `None`.
+    let mut bare = crate::driver::Config::default();
+    bare.locale_root = None;
+    let bare_session = crate::driver::Session::new(bare);
+    assert!(
+        super::package_reader_locale_pack(&bare_session, &valida).is_none(),
+        "an unresolvable manifest locale falls back, it does not error"
+    );
+}
+
+#[test]
+fn manifest_reader_locale_resolves_through_session_root() {
+    let (_td, home) = temp_dir("manifest-root");
+    plant_reidentified_pack(&home, "la", "prov-la");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    fs::write(
+        tela.join("faber.toml"),
+        "[package]\nname = \"tela\"\n[reader]\nlocale = \"prov-la\"\n[paths]\nsource = \"src\"\n[build]\nkind = \"lib\"\ntargets = [\"rust\"]\n",
+    )
+    .expect("manifest");
+    let valida = tela.join("src/valida.fab");
+    fs::write(&valida, "@ publica\nfunctio salve() { }\n").expect("provider source");
+
+    let config = crate::driver::Config::default().with_locale_root(home);
+    let session = crate::driver::Session::new(config);
+    let pack = super::package_reader_locale_pack(&session, &valida)
+        .expect("the session's configured root must serve the manifest locale");
+    assert_eq!(pack.metadata.id, "prov-la");
+}
+
+#[test]
+fn contract_walk_resolves_manifest_locale_through_session_loader_without_root() {
+    // End to end (need done_when): an en consumer imports a Latin
+    // provider whose package manifest selects `la`; with no workspace root the
+    // session's loader serves the manifest locale and the interface installs.
+    let (_td, home) = temp_dir("manifest-loader-contract");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    write_provider_manifest(&tela, "tela", "la");
+    fs::write(
+        tela.join("src/valida.fab"),
+        r#"
+@ publica
+functio nomen_tag(textus nomen) → bivalens {
+    redde nomen ≢ ""
+}
+"#,
+    )
+    .expect("provider source");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        "+++\nlocale = \"en\"\n+++\nimport from \"tela:valida\" valida\n\nmain {\n    print valida.nomen_tag(\"a\")\n}\n",
+    )
+    .expect("app source");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let session = crate::driver::Session::new(loader_only_config());
+    let contract = super::import_contract_for_session(&session, &app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("valida")
+        .expect("the manifest-selected locale must parse the provider");
+    assert!(
+        interface.exports.contains_key("nomen_tag"),
+        "expected the Latin provider's export, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_emit_resolves_manifest_locale_through_session_loader_without_root() {
+    // Program-entry companion to the contract walk above (need
+    // done_when): the whole `Compiler::compile` of an en consumer importing
+    // a Latin provider whose package manifest declares `[reader] locale =
+    // "prov-la"`, with no workspace root. The session's loader serves the
+    // manifest locale under a re-identified id the workspace tree does not
+    // carry, so a regression to a freshly minted default config (which
+    // re-discovers the workspace root and finds no `prov-la` there) cannot
+    // pass: the provider would fall back to the importing pack, parse the
+    // Latin surface as English, and fail PARSE001.
+    let prov_la = {
+        let mut pack = la_locale_pack();
+        pack.metadata.id = "prov-la".to_owned();
+        pack
+    };
+    let mut config = crate::driver::Config::default();
+    config.locale_root = None;
+    let config =
+        config.with_locale_pack_loader(crate::driver::LocalePackLoader::new(move |locale_id| match locale_id {
+            "en" => Ok(en_locale_pack()),
+            "prov-la" => Ok(prov_la.clone()),
+            other => Err(format!("no pack for locale '{other}'")),
+        }));
+
+    let (_td, home) = temp_dir("manifest-loader-emit");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    write_provider_manifest(&tela, "tela", "prov-la");
+    fs::write(
+        tela.join("src/valida.fab"),
+        r#"
+@ publica
+functio nomen_tag(textus nomen) → bivalens {
+    redde nomen ≢ ""
+}
+"#,
+    )
+    .expect("provider source");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        "+++\nlocale = \"en\"\n+++\nimport from \"tela:valida\" valida\n\nmain {\n    print valida.nomen_tag(\"a\")\n}\n",
+    )
+    .expect("app source");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::Compiler::new(config.with_target(crate::codegen::Target::HirRust)).compile(&app);
+    assert!(
+        result.success(),
+        "the session's loader must serve the manifest locale through the whole compile: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod valida"),
+        "expected the manifest-locale provider module, got:\n{}",
+        output.code
     );
 }

@@ -95,6 +95,11 @@ fn typescript_tensor_method_forms_use_the_checked_carrier_call() {
 fn go_tensor_method_forms_use_the_checked_carrier_call() {
     let code = emit(Target::HirGo);
     assert!(
+        // The capacity-2 `[0, 1]` literal fills its carrier exactly, so the
+        // exact-fill carrier law (a literal whose length equals its capacity
+        // emits the compact composite literal — pinned by radix-hir-go
+        // `bounded_list_test`) passes the plain `[]int{0, 1}` instead of the
+        // reserve-cells accumulator closure.
         code.contains("v, err := p_grid.AccipeChecked([]int{0, 1}); if err != nil { panic(err) }"),
         "an in-range literal call is a plain value:\n{code}"
     );

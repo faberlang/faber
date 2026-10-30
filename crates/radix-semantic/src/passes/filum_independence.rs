@@ -19,9 +19,9 @@ use calls::{EffectScan, Frame, Module, Receiver};
 use handroll::{FxHashMap, FxHashSet};
 use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
-    DefId, HirArrayElement, HirBlock, HirCallArg, HirConversioTarget, HirExpression,
+    DefId, HirArrayElement, HirBinOp, HirBlock, HirCallArg, HirConversioTarget, HirExpression,
     HirExpressionKind, HirFunction, HirLocal, HirModule, HirObjectKey, HirParam, HirParamMode,
-    HirStatement, HirStatementKind,
+    HirRangeKind, HirStatement, HirStatementKind, HirUnOp,
 };
 use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 use radix_lexer::{Interner, Span, Symbol};
@@ -102,6 +102,17 @@ struct Aliases {
     stores: Vec<(HirExpression, HirExpression)>,
     values: FxHashMap<DefId, Facts>,
     fields: FxHashMap<(DefId, Symbol), Facts>,
+    /// Initializers of the immutable locals of the analysed body: an affine
+    /// address or a constant bound may resolve through them, because an
+    /// immutable local keeps its initializer's value for its whole life.
+    /// Mutable, awaited and runtime-provided bindings are excluded: their
+    /// value is not their initializer.
+    inits: FxHashMap<DefId, HirExpression>,
+    /// The affine coordinate each immutable local's initializer resolves to,
+    /// computed once per body and memoized here. A local resolves only when
+    /// every binding its initializer names is value-stable (see
+    /// [`InitCoords`]); anything else keeps the local an opaque variable.
+    init_coords: FxHashMap<DefId, Coordinate>,
     /// Variables a call may rebind (the call's argument variables).
     poisoned_vars: FxHashSet<DefId>,
     /// Roots whose field facts a call may rewrite.
@@ -125,6 +136,23 @@ impl Aliases {
         scan: Option<&Module<'_>>,
         receiver: Option<&Receiver>,
     ) -> Self {
+        let mut result = Self::build_aliases(params, body, types, interner, mode, scan, receiver);
+        result.init_coords =
+            InitCoords::resolve(&result.inits, &result.bindings, &result.poisoned_vars);
+        result
+    }
+
+    /// The alias equations of the body, without the initializer-coordinate
+    /// memo (which needs the settled poison sets of [`Aliases::build`]).
+    fn build_aliases(
+        params: &[HirParam],
+        body: &HirBlock,
+        types: &TypeTable,
+        interner: &Interner,
+        mode: ParamRoots,
+        scan: Option<&Module<'_>>,
+        receiver: Option<&Receiver>,
+    ) -> Self {
         let mut declarations = Declarations::default();
         declarations.visit_block(body);
         let locals: FxHashSet<DefId> = params
@@ -136,10 +164,17 @@ impl Aliases {
         if scan.is_some() {
             effects.visit_block(body);
         }
+        let inits = declarations
+            .bindings
+            .iter()
+            .filter(|local| !local.mutable && !local.is_await && !local.runtime_provided)
+            .filter_map(|local| local.init.clone().map(|init| (local.def_id, init)))
+            .collect();
         let mut result = Self {
             bindings: declarations.bindings,
             stores: declarations.stores,
             values: parameter_roots(params, types, mode),
+            inits,
             ..Self::default()
         };
         if let Some(receiver) = receiver {
@@ -624,49 +659,407 @@ impl HirVisitor for Declarations {
     }
 }
 
+/// One storage coordinate as an affine address `Σ coefficient · variable +
+/// offset`, each variable named at most once and never with a zero
+/// coefficient. A constant address names no variable.
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Coordinate {
-    variable: Option<DefId>,
-    scale: i128,
+    terms: Vec<(DefId, i128)>,
     offset: i128,
 }
 
-fn coordinates(expr: &HirExpression) -> Option<Vec<Coordinate>> {
+impl Coordinate {
+    fn constant(offset: i128) -> Self {
+        Self {
+            terms: Vec::new(),
+            offset,
+        }
+    }
+
+    fn variable(def: DefId) -> Self {
+        Self {
+            terms: vec![(def, 1)],
+            offset: 0,
+        }
+    }
+
+    /// The variable the coordinate names exactly: coefficient one, no
+    /// offset, no other term. The lane coordinates of a loop are exactly
+    /// this shape.
+    fn plain_variable(&self) -> Option<DefId> {
+        match self.terms.as_slice() {
+            [(def, 1)] if self.offset == 0 => Some(*def),
+            _ => None,
+        }
+    }
+
+    /// Whether the coordinate names `def` with any coefficient.
+    fn names(&self, def: DefId) -> bool {
+        self.terms.iter().any(|(variable, _)| *variable == def)
+    }
+
+    /// The coefficient of `def`, or `None` when the coordinate does not
+    /// name it.
+    fn coefficient(&self, def: DefId) -> Option<i128> {
+        self.terms
+            .iter()
+            .find(|(variable, _)| *variable == def)
+            .map(|(_, coefficient)| *coefficient)
+    }
+
+    /// The coordinate without the term of `def`: the residual beside a
+    /// lane's own term.
+    fn without(mut self, def: DefId) -> Self {
+        self.terms.retain(|(variable, _)| *variable != def);
+        self
+    }
+
+    /// `self + other`, one term per variable; cancelled terms fold away.
+    fn plus(self, other: &Self) -> Option<Self> {
+        let mut terms = self.terms;
+        for (variable, coefficient) in &other.terms {
+            if let Some(slot) = terms.iter_mut().find(|(v, _)| v == variable) {
+                slot.1 = slot.1.checked_add(*coefficient)?;
+            } else {
+                terms.push((*variable, *coefficient));
+            }
+        }
+        terms.retain(|(_, coefficient)| *coefficient != 0);
+        Some(Self {
+            terms,
+            offset: self.offset.checked_add(other.offset)?,
+        })
+    }
+
+    /// `self - other`.
+    fn minus(self, other: &Self) -> Option<Self> {
+        self.plus(&other.clone().scaled(-1)?)
+    }
+
+    /// `self * scale`; a zero scale is the constant zero.
+    fn scaled(mut self, scale: i128) -> Option<Self> {
+        for (_, coefficient) in &mut self.terms {
+            *coefficient = coefficient.checked_mul(scale)?;
+        }
+        self.terms.retain(|(_, coefficient)| *coefficient != 0);
+        self.offset = self.offset.checked_mul(scale)?;
+        Some(self)
+    }
+
+    /// The value interval of the coordinate over the loop binders with
+    /// proven constant ranges; `None` when a term names a variable without
+    /// one. WHY: the terms name independent variables, so the interval sums
+    /// per term, the smaller product at the minimum and the larger at the
+    /// maximum whatever the coefficient's sign.
+    fn interval(&self, ranges: &[(DefId, (i128, i128))]) -> Option<(i128, i128)> {
+        let mut lo = self.offset;
+        let mut hi = self.offset;
+        for (variable, coefficient) in &self.terms {
+            let (bound_lo, bound_hi) = ranges
+                .iter()
+                .find(|(def, _)| def == variable)
+                .map(|(_, range)| *range)?;
+            let (term_lo, term_hi) = if *coefficient >= 0 {
+                (
+                    coefficient.checked_mul(bound_lo)?,
+                    coefficient.checked_mul(bound_hi)?,
+                )
+            } else {
+                (
+                    coefficient.checked_mul(bound_hi)?,
+                    coefficient.checked_mul(bound_lo)?,
+                )
+            };
+            lo = lo.checked_add(term_lo)?;
+            hi = hi.checked_add(term_hi)?;
+        }
+        Some((lo, hi))
+    }
+}
+
+/// Resolution of an immutable local's initializer to the affine coordinate
+/// the local keeps for its whole life. A local resolves only when every
+/// binding its initializer names is value-stable across that life: a def no
+/// store, call or rebind of the body can change — a parameter, a loop
+/// binder, a module constant, or another immutable local whose own
+/// initializer is value-stable. An initializer that names a mutable or
+/// call-poisoned binding reads a value later stores may change, so the local
+/// keeps its own opaque variable instead of the source's live identity.
+///
+/// Each initializer is walked once and memoized, so a chain that names a
+/// local twice (`a₁ ← a₀ + a₀`, …) costs one walk per local instead of
+/// doubling with the chain. A total node budget bounds the whole map:
+/// when it runs out, the locals still unresolved keep the opaque-variable
+/// decline, which loses proofs but proves nothing false.
+struct InitCoords;
+
+/// Total initializer nodes one body may expand across all its locals.
+const INIT_COORDINATE_BUDGET: u64 = 8192;
+
+impl InitCoords {
+    fn resolve(
+        inits: &FxHashMap<DefId, HirExpression>,
+        bindings: &[HirLocal],
+        poisoned: &FxHashSet<DefId>,
+    ) -> FxHashMap<DefId, Coordinate> {
+        let mut unstable: FxHashSet<DefId> = poisoned.iter().copied().collect();
+        unstable.extend(
+            bindings
+                .iter()
+                .filter(|local| local.mutable)
+                .map(|local| local.def_id),
+        );
+        let mut resolver = Resolver {
+            inits,
+            unstable,
+            memo: FxHashMap::default(),
+            visiting: Vec::new(),
+            budget: INIT_COORDINATE_BUDGET,
+        };
+        // Sorted for a deterministic budget cutoff: hash-map order would
+        // decide which locals keep their proofs when the budget runs out.
+        let mut defs: Vec<DefId> = inits.keys().copied().collect();
+        defs.sort_unstable_by_key(|def| def.0);
+        for def in defs {
+            resolver.of(def);
+        }
+        resolver.memo
+    }
+}
+
+struct Resolver<'a> {
+    inits: &'a FxHashMap<DefId, HirExpression>,
+    unstable: FxHashSet<DefId>,
+    memo: FxHashMap<DefId, Coordinate>,
+    visiting: Vec<DefId>,
+    budget: u64,
+}
+
+impl Resolver<'_> {
+    /// The coordinate accesses through `def` name: its initializer's
+    /// coordinate when that is value-stable, `def` as an opaque variable
+    /// otherwise.
+    fn of(&mut self, def: DefId) -> Coordinate {
+        if let Some(resolved) = self.memo.get(&def) {
+            return resolved.clone();
+        }
+        if self.visiting.contains(&def) {
+            // A cycle of initializers is a malformed tree; the local keeps
+            // its own opaque variable.
+            return Coordinate::variable(def);
+        }
+        let Some(init) = self.inits.get(&def) else {
+            return Coordinate::variable(def);
+        };
+        self.visiting.push(def);
+        let resolved = self.expr(init);
+        self.visiting.pop();
+        let resolved = resolved.unwrap_or_else(|| Coordinate::variable(def));
+        self.memo.insert(def, resolved.clone());
+        resolved
+    }
+
+    fn expr(&mut self, expr: &HirExpression) -> Option<Coordinate> {
+        work::count(1);
+        if self.budget == 0 {
+            return None;
+        }
+        self.budget -= 1;
+        if let Some(offset) = super::const_int_value(expr) {
+            return Some(Coordinate::constant(offset));
+        }
+        match &expr.kind {
+            HirExpressionKind::Path(def) => {
+                if self.unstable.contains(def) {
+                    // A mutable or call-poisoned source changes after the
+                    // snapshot; the local is not its live alias.
+                    return None;
+                }
+                Some(self.of(*def))
+            }
+            HirExpressionKind::Widen { operand, .. } => self.expr(operand),
+            HirExpressionKind::Conversio {
+                source,
+                implicit: Some(_),
+                ..
+            } => self.expr(source),
+            HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+                self.expr(lhs)?.plus(&self.expr(rhs)?)
+            }
+            HirExpressionKind::Binary(HirBinOp::Sub, lhs, rhs) => {
+                self.expr(lhs)?.minus(&self.expr(rhs)?)
+            }
+            HirExpressionKind::Binary(HirBinOp::Mul, lhs, rhs) => {
+                let lhs = self.expr(lhs)?;
+                let rhs = self.expr(rhs)?;
+                // A product of two variables is not affine: no coefficient.
+                if lhs.terms.is_empty() {
+                    rhs.scaled(lhs.offset)
+                } else if rhs.terms.is_empty() {
+                    lhs.scaled(rhs.offset)
+                } else {
+                    None
+                }
+            }
+            HirExpressionKind::Unary(HirUnOp::Neg, operand) => self.expr(operand)?.scaled(-1),
+            _ => None,
+        }
+    }
+}
+
+/// Operation counter of the coordinate walk, so tests assert expansion work
+/// as a count of visited nodes instead of a timing.
+pub(crate) mod work {
+    use std::cell::Cell;
+
+    thread_local! {
+        static NODES: Cell<u64> = const { Cell::new(0) };
+    }
+
+    /// Record `nodes` visited expression nodes.
+    pub(crate) fn count(nodes: u64) {
+        NODES.with(|counter| counter.set(counter.get() + nodes));
+    }
+
+    /// Take the recorded node count, resetting the counter.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn take() -> u64 {
+        NODES.with(|counter| counter.replace(0))
+    }
+}
+
+fn coordinates(aliases: &Aliases, expr: &HirExpression) -> Option<Vec<Coordinate>> {
     match &expr.kind {
         HirExpressionKind::Array(elements) => elements
             .iter()
             .map(|element| match element {
-                HirArrayElement::Expr(expr) => coordinate(expr),
+                HirArrayElement::Expr(expr) => coordinate(aliases, expr),
                 _ => None,
             })
             .collect(),
-        HirExpressionKind::Tuple(elements, _) => elements.iter().map(coordinate).collect(),
-        _ => Some(vec![coordinate(expr)?]),
+        HirExpressionKind::Tuple(elements, _) => elements
+            .iter()
+            .map(|expr| coordinate(aliases, expr))
+            .collect(),
+        _ => Some(vec![coordinate(aliases, expr)?]),
     }
 }
 
-fn coordinate(expr: &HirExpression) -> Option<Coordinate> {
+/// The affine address of one index expression: a constant, a variable, or a
+/// sum, difference or constant product of those. An immutable local
+/// resolves to the coordinate its initializer proved at alias-build time
+/// ([`InitCoords`]): its own opaque variable when the initializer is not an
+/// address or its dependencies are not value-stable. Anything else is not
+/// an address the proof can name.
+fn coordinate(aliases: &Aliases, expr: &HirExpression) -> Option<Coordinate> {
+    coordinate_at(aliases, expr, 0)
+}
+
+/// `depth` bounds the syntactic walk. Initializer chains resolve through the
+/// memoized map, so the bound only guards the walk of one expression tree
+/// against a malformed nest.
+fn coordinate_at(aliases: &Aliases, expr: &HirExpression, depth: usize) -> Option<Coordinate> {
+    if depth > 64 {
+        return None;
+    }
+    work::count(1);
     if let Some(offset) = super::const_int_value(expr) {
-        return Some(Coordinate {
-            variable: None,
-            scale: 0,
-            offset,
-        });
+        return Some(Coordinate::constant(offset));
     }
     match &expr.kind {
-        HirExpressionKind::Path(def) => Some(Coordinate {
-            variable: Some(*def),
-            scale: 1,
-            offset: 0,
-        }),
-        HirExpressionKind::Widen { operand, .. } => coordinate(operand),
+        HirExpressionKind::Path(def) => Some(
+            aliases
+                .init_coords
+                .get(def)
+                .cloned()
+                .unwrap_or_else(|| Coordinate::variable(*def)),
+        ),
+        HirExpressionKind::Widen { operand, .. } => coordinate_at(aliases, operand, depth),
         HirExpressionKind::Conversio {
             source,
             implicit: Some(_),
             ..
-        } => coordinate(source),
+        } => coordinate_at(aliases, source, depth),
+        HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+            coordinate_at(aliases, lhs, depth)?.plus(&coordinate_at(aliases, rhs, depth)?)
+        }
+        HirExpressionKind::Binary(HirBinOp::Sub, lhs, rhs) => {
+            coordinate_at(aliases, lhs, depth)?.minus(&coordinate_at(aliases, rhs, depth)?)
+        }
+        HirExpressionKind::Binary(HirBinOp::Mul, lhs, rhs) => {
+            let lhs = coordinate_at(aliases, lhs, depth)?;
+            let rhs = coordinate_at(aliases, rhs, depth)?;
+            // A product of two variables is not affine: no coefficient.
+            if lhs.terms.is_empty() {
+                rhs.scaled(lhs.offset)
+            } else if rhs.terms.is_empty() {
+                lhs.scaled(rhs.offset)
+            } else {
+                None
+            }
+        }
+        HirExpressionKind::Unary(HirUnOp::Neg, operand) => {
+            coordinate_at(aliases, operand, depth)?.scaled(-1)
+        }
         _ => None,
     }
+}
+
+/// A constant integer through immutable locals: the shared folding of
+/// [`super::const_int_value`] plus resolution of a path to an immutable
+/// local's constant initializer.
+fn const_int_through(aliases: &Aliases, expr: &HirExpression) -> Option<i128> {
+    if let Some(value) = super::const_int_value(expr) {
+        return Some(value);
+    }
+    match &expr.kind {
+        HirExpressionKind::Path(def) => aliases
+            .inits
+            .get(def)
+            .and_then(|init| const_int_through(aliases, init)),
+        HirExpressionKind::Widen { operand, .. } => const_int_through(aliases, operand),
+        HirExpressionKind::Conversio {
+            source,
+            implicit: Some(_),
+            ..
+        } => const_int_through(aliases, source),
+        _ => None,
+    }
+}
+
+/// The proven value range `[lo, hi]` (inclusive) of an immutable counted-loop
+/// binder, when both bounds and the step are constants through immutable
+/// locals and the step is positive. The loop yields `lo, lo + step, ..` up to
+/// its end (excluded or included), so every value lies in that interval. A
+/// mutable binder may be reassigned inside the body, and a negative step or a
+/// non-constant bound proves nothing.
+fn counted_range(
+    aliases: &Aliases,
+    binding: DefId,
+    mutable: bool,
+    start: &HirExpression,
+    end: &HirExpression,
+    step: Option<&HirExpression>,
+    kind: HirRangeKind,
+) -> Option<(DefId, (i128, i128))> {
+    if mutable {
+        return None;
+    }
+    let lo = const_int_through(aliases, start)?;
+    let end = const_int_through(aliases, end)?;
+    let step = step.map_or(Some(1), |step| const_int_through(aliases, step))?;
+    if step < 1 {
+        return None;
+    }
+    let hi = match kind {
+        // The last yielded value is below an excluded end.
+        HirRangeKind::Exclusive => end.checked_sub(1)?,
+        HirRangeKind::Inclusive => end,
+    };
+    if lo > hi {
+        return None;
+    }
+    Some((binding, (lo, hi)))
 }
 
 fn mapped(storage: &Storage, mut coords: Vec<Coordinate>) -> Option<Vec<Coordinate>> {
@@ -679,8 +1072,10 @@ fn mapped(storage: &Storage, mut coords: Vec<Coordinate>) -> Option<Vec<Coordina
                 coords.swap(n - 2, n - 1);
             }
             Transform::Slice(start, step) if !coords.is_empty() => {
-                coords[0].scale = coords[0].scale.checked_mul(*step)?;
-                coords[0].offset = coords[0].offset.checked_mul(*step)?.checked_add(*start)?;
+                coords[0] = coords[0]
+                    .clone()
+                    .scaled(*step)?
+                    .plus(&Coordinate::constant(*start))?;
             }
             _ => return None,
         }
@@ -712,6 +1107,9 @@ struct Access {
     /// Read inside a range-loop bound: a bound is evaluated once per lane
     /// and must read nothing the lanes write, at any coordinate.
     bound: bool,
+    /// The counted-loop binder ranges in scope at the access: they bound the
+    /// residual of a flattened lane row.
+    ranges: Vec<(DefId, (i128, i128))>,
 }
 
 struct BodyProof<'a> {
@@ -722,6 +1120,9 @@ struct BodyProof<'a> {
     /// Every `filum` loop met so far; `stack` is the chain around the cursor.
     loops: Vec<LoopCtx>,
     stack: Vec<usize>,
+    /// Proven constant value ranges of the immutable binders of counted
+    /// loops around the cursor, innermost last.
+    range_stack: Vec<(DefId, (i128, i128))>,
     /// Helper calls being analysed as inlined, innermost last. Empty while the
     /// cursor is in the body that owns the loop.
     frames: Vec<Frame<'a>>,
@@ -739,11 +1140,7 @@ struct BodyProof<'a> {
 
 fn coordinates_of(defs: &[(DefId, Symbol)]) -> Vec<Coordinate> {
     defs.iter()
-        .map(|(def, _)| Coordinate {
-            variable: Some(*def),
-            scale: 1,
-            offset: 0,
-        })
+        .map(|(def, _)| Coordinate::variable(*def))
         .collect()
 }
 
@@ -784,6 +1181,7 @@ impl BodyProof<'_> {
                 .iter()
                 .all(|&index| !self.loops[index].coords.is_empty()),
             bound: self.bound_depth > 0,
+            ranges: self.range_stack.clone(),
         });
     }
 
@@ -802,6 +1200,7 @@ impl BodyProof<'_> {
         filum: bool,
         coordinates: &[(DefId, Symbol)],
         binding: DefId,
+        mutable: bool,
         source: &HirExpression,
         body: &HirBlock,
     ) {
@@ -809,7 +1208,10 @@ impl BodyProof<'_> {
         if let (
             false,
             HirExpressionKind::Intervallum {
-                start, end, step, ..
+                start,
+                end,
+                step,
+                kind,
             },
         ) = (filum, &source.kind)
         {
@@ -820,7 +1222,24 @@ impl BodyProof<'_> {
                     .chain(std::iter::once(&**end))
                     .chain(step.as_deref()),
             );
-            self.visit_block(body);
+            // An immutable binder with constant bounds keeps its proven
+            // value range for the whole body: a flattened lane row's
+            // residual is bounded by it.
+            if let Some(range) = counted_range(
+                self.current(),
+                binding,
+                mutable,
+                start,
+                end,
+                step.as_deref(),
+                *kind,
+            ) {
+                self.range_stack.push(range);
+                self.visit_block(body);
+                self.range_stack.pop();
+            } else {
+                self.visit_block(body);
+            }
             return;
         }
         self.fetch(source, coords.clone());
@@ -881,7 +1300,8 @@ impl BodyProof<'_> {
         span: Span,
     ) {
         let facts = self.facts_of(object);
-        self.push_access(facts, index.and_then(coordinates), write, span);
+        let coords = index.and_then(|index| coordinates(self.current(), index));
+        self.push_access(facts, coords, write, span);
     }
 
     fn receiver(&mut self, object: &HirExpression) {
@@ -1065,6 +1485,7 @@ impl HirVisitor for BodyProof<'_> {
                 filum,
                 coordinates,
                 binding,
+                mutable,
                 iter,
                 body,
                 ..
@@ -1076,10 +1497,11 @@ impl HirVisitor for BodyProof<'_> {
                 filum,
                 coordinates,
                 binding,
+                mutable,
                 iter,
                 body,
                 ..
-            } => self.nested_loop(filum.is_some(), coordinates, *binding, iter, body),
+            } => self.nested_loop(filum.is_some(), coordinates, *binding, *mutable, iter, body),
             // A reduction folds inside the iteration: its accumulator is not
             // loop-carried state, and its pure term reads the source at the
             // reduction's own coordinates, so a written source still fails.
@@ -1150,13 +1572,44 @@ impl HirVisitor for Owned {
 /// body declares differ per lane; rule 10 refuses a body write to any outer
 /// local, so an outer def keeps one value for the whole loop.
 fn lane_invariant(loops: &[LoopCtx], coord: &Coordinate) -> bool {
-    let Some(variable) = coord.variable else {
-        return true;
+    coord.terms.iter().all(|(variable, _)| {
+        !loops[0].owned.contains(variable)
+            && !loops
+                .iter()
+                .any(|ctx| ctx.coords.iter().any(|c| c.names(*variable)))
+    })
+}
+
+/// Whether `leading`, the leading storage coordinate of a write of a
+/// one-coordinate lane loop, is that lane's own flattened row: `lane * pitch`
+/// plus a residual whose value interval, over the counted-loop binder ranges
+/// in scope at the write, stays inside `[0, pitch)`. The lane variable must
+/// not be named again by the rest of the address. A stride that does not
+/// cover the residual (`h[[k + j]]` with a wide `j`), an unbounded residual
+/// and a reused lane coordinate all keep the decline.
+fn flattened_row_leads(
+    lane_coord: &Coordinate,
+    leading: &Coordinate,
+    rest: &[Coordinate],
+    ranges: &[(DefId, (i128, i128))],
+) -> bool {
+    let Some(lane) = lane_coord.plain_variable() else {
+        return false;
     };
-    !loops[0].owned.contains(&variable)
-        && !loops
-            .iter()
-            .any(|ctx| ctx.coords.iter().any(|c| c.variable == Some(variable)))
+    if !rest.iter().all(|coord| !coord.names(lane)) {
+        return false;
+    }
+    let Some(pitch) = leading.coefficient(lane) else {
+        return false;
+    };
+    if pitch < 1 {
+        return false;
+    }
+    leading
+        .clone()
+        .without(lane)
+        .interval(ranges)
+        .is_some_and(|(lo, hi)| lo >= 0 && hi < pitch)
 }
 
 fn prove(
@@ -1199,6 +1652,45 @@ fn prove(
                     .cloned()
                     .collect::<Vec<_>>()
             });
+            // A single-coordinate lane loop may keep a whole private row in
+            // scratch: once the leading storage coordinate is exactly the
+            // lane coordinate — unchanged, and named by no other coordinate
+            // of the address — inner coordinates only select cells within
+            // that lane's disjoint row. A lane coordinate reused inside the
+            // address (`scratch[[lane, lane]]`) is not row ownership, and
+            // keeps the composed-coordinate proof, as do nests and
+            // multidimensional lane domains, where the leading coordinate
+            // alone may not distinguish every concurrent lane.
+            let lane_variable = access.composed.first().and_then(Coordinate::plain_variable);
+            let leading_lane_coordinate = access.depth == 1
+                && access.composed.len() == 1
+                && physical.as_ref().and_then(|coords| coords.first()) == access.composed.first()
+                && physical.as_ref().is_some_and(|coords| {
+                    coords
+                        .iter()
+                        .skip(1)
+                        .all(|coord| lane_variable.is_none_or(|lane| !coord.names(lane)))
+                });
+            // The same one-coordinate lane loop may keep that row flattened
+            // into one dimension: the leading storage coordinate is then
+            // `lane * pitch + residual`, and once the counted-loop bounds in
+            // scope at the write prove the residual inside `[0, pitch)`, the
+            // lanes address disjoint index runs (row `k` is
+            // `[k * pitch, (k + 1) * pitch)`), exactly as the unchanged
+            // leading coordinate of a 2-D row does. Like the unchanged
+            // leading coordinate, this is a one-coordinate lane loop's rule:
+            // a multidimensional lane domain has concurrent lanes that share
+            // the leading lane coordinate, so its writes must name every
+            // lane coordinate and keep the composed-coordinate proof.
+            let flattened_lane_row = access.depth == 1
+                && access.composed.len() == 1
+                && access
+                    .composed
+                    .first()
+                    .zip(physical.as_ref().and_then(|coords| coords.split_first()))
+                    .is_some_and(|(lane_coord, (leading, rest))| {
+                        flattened_row_leads(lane_coord, leading, rest, &access.ranges)
+                    });
             // One loop keeps its element fetch as the expected address (a write
             // into the storage the loop reads takes no invariant components).
             // In a nest the address must be the whole chain's composed
@@ -1214,12 +1706,14 @@ fn prove(
                     .collect();
                 !access.composed.is_empty()
                     && lane_part.is_some()
-                    && if expected.is_empty() {
-                        lane_part.as_ref() == Some(&access.composed)
-                    } else {
-                        !source_facts.unknown
-                            && expected.iter().all(|e| e.is_some() && *e == physical)
-                    }
+                    && (leading_lane_coordinate
+                        || flattened_lane_row
+                        || if expected.is_empty() {
+                            lane_part.as_ref() == Some(&access.composed)
+                        } else {
+                            !source_facts.unknown
+                                && expected.iter().all(|e| e.is_some() && *e == physical)
+                        })
             } else {
                 access.every_loop_has_coordinates && lane_part.as_ref() == Some(&access.composed)
             };

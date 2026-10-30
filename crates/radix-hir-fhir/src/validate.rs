@@ -657,10 +657,7 @@ fn validate_named_form(
                 radix_hir::HirTypeFormArg::Name(_) => {
                     return Err(type_presentation_issue("named_name_argument_witness", site));
                 }
-                radix_hir::HirTypeFormArg::Size(_) => {
-                    return Err(type_presentation_issue("named_argument_kind", site));
-                }
-                radix_hir::HirTypeFormArg::Range(_) => {
+                radix_hir::HirTypeFormArg::Size(_) | radix_hir::HirTypeFormArg::Range(_) => {
                     return Err(type_presentation_issue("named_argument_kind", site));
                 }
             },
@@ -4720,7 +4717,7 @@ pub(crate) fn validate_referential_integrity(
                 radix_types::IndexExpr::Param(symbol) => checks.check_symbol(*symbol)?,
                 radix_types::IndexExpr::Affine { base, .. } => checks.check_index(*base)?,
                 radix_types::IndexExpr::Divide { numerator, .. } => {
-                    checks.check_index(*numerator)?
+                    checks.check_index(*numerator)?;
                 }
                 radix_types::IndexExpr::Runtime(source) => match source {
                     radix_types::RuntimeExtentId::ScalarBinding(binding)

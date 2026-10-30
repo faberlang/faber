@@ -1157,13 +1157,13 @@ fn analyze_limes_callbacks_inner(
         let callback_defs = std::iter::once(*remap).chain(transform.iter().copied());
         for callback_def in callback_defs {
             if !active_callbacks.insert(callback_def) {
-                add_callback_failure(owner, KernelRequirementFailure::RecursiveCall);
+                add_callback_failure(owner, &KernelRequirementFailure::RecursiveCall);
                 continue;
             }
             let Some((callback, _)) = callables.get(&callback_def).copied() else {
                 add_callback_failure(
                     owner,
-                    KernelRequirementFailure::CalleeNotAdmitted {
+                    &KernelRequirementFailure::CalleeNotAdmitted {
                         callee: callback_def,
                     },
                 );
@@ -1195,7 +1195,7 @@ fn analyze_limes_callbacks_inner(
             } else {
                 add_callback_failure(
                     &mut callback_report,
-                    KernelRequirementFailure::UnsupportedIntegerRange {
+                    &KernelRequirementFailure::UnsupportedIntegerRange {
                         span: call_expr.span,
                     },
                 );
@@ -1252,7 +1252,7 @@ fn analyze_limes_callbacks_inner(
     }
 }
 
-fn add_callback_failure(report: &mut KernelRequirement, failure: KernelRequirementFailure) {
+fn add_callback_failure(report: &mut KernelRequirement, failure: &KernelRequirementFailure) {
     for target in &mut report.target_reports {
         target.failures.push(failure.clone());
         target.failures = dedupe(std::mem::take(&mut target.failures));
@@ -1671,7 +1671,7 @@ impl BodyFacts<'_> {
                     self.refine_condition(&clause.cond, true);
                     self.visit_block_stateful(&clause.body);
                     let entered = self.ranges.clone();
-                    self.ranges = merge_ranges(before, entered);
+                    self.ranges = merge_ranges(&before, entered);
                 }
             }
             HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
@@ -2061,7 +2061,7 @@ impl BodyFacts<'_> {
                     self.visit_block_stateful(else_block);
                 }
                 let else_ranges = self.ranges.clone();
-                self.ranges = merge_ranges(then_ranges, else_ranges);
+                self.ranges = merge_ranges(&then_ranges, else_ranges);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2072,7 +2072,7 @@ impl BodyFacts<'_> {
                 self.refine_condition(cond, true);
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
-                self.ranges = merge_loop_ranges(before, after);
+                self.ranges = merge_loop_ranges(before, &after);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2081,7 +2081,7 @@ impl BodyFacts<'_> {
                 let before = self.ranges.clone();
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
-                self.ranges = merge_loop_ranges(before, after);
+                self.ranges = merge_loop_ranges(before, &after);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2137,7 +2137,7 @@ impl BodyFacts<'_> {
                 }
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
-                self.ranges = merge_loop_ranges(before, after);
+                self.ranges = merge_loop_ranges(before, &after);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2554,7 +2554,7 @@ impl BodyFacts<'_> {
             self.range_only_bindings.insert(binding);
             self.visit_block_stateful(body);
             let after = self.ranges.clone();
-            self.ranges = merge_loop_ranges(before, after);
+            self.ranges = merge_loop_ranges(before, &after);
             return;
         }
         self.bind_tensor_coordinates(iter, coordinates, body.span);
@@ -2570,7 +2570,7 @@ impl BodyFacts<'_> {
         }
         self.visit_block_stateful(body);
         let after = self.ranges.clone();
-        self.ranges = merge_loop_ranges(before, after);
+        self.ranges = merge_loop_ranges(before, &after);
     }
 
     fn visit_tensor_loop_many(
@@ -2610,7 +2610,7 @@ impl BodyFacts<'_> {
         }
         self.visit_block_stateful(body);
         let after = self.ranges.clone();
-        self.ranges = merge_loop_ranges(before, after);
+        self.ranges = merge_loop_ranges(before, &after);
     }
 
     fn refine_condition(&mut self, cond: &HirExpression, truth: bool) {
@@ -2730,7 +2730,7 @@ impl BodyFacts<'_> {
         let Some(bound) = bound.0 else {
             return;
         };
-        let Some(next) = refine_interval(normalized_op, current, bound, truth) else {
+        let Some(next) = refine_interval(normalized_op, current, &bound, truth) else {
             return;
         };
         self.ranges.insert(def_id, AbstractRange(Some(next)));
@@ -2941,7 +2941,6 @@ impl BodyFacts<'_> {
                 };
                 Some(D64Constant::Value(scaled, D64_STORE_SCALE))
             }
-            HirExpressionKind::Literal(radix_hir::HirLiteral::Float(_)) => None,
             HirExpressionKind::Unary(HirUnOp::Neg, operand) => match self.constant_d64(operand)? {
                 D64Constant::Value(value, scale) => value
                     .checked_neg()
@@ -3664,7 +3663,10 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
                 if constant(&rhs.maximum) != Some(shift) {
                     return AbstractRange::unknown();
                 }
-                let factor = KernelRangeExpr::Constant(1_i128 << shift as u32);
+                let Ok(shift) = u32::try_from(shift) else {
+                    return AbstractRange::unknown();
+                };
+                let factor = KernelRangeExpr::Constant(1_i128 << shift);
                 [factor.clone(), factor.clone()]
             } else {
                 let (Some(divisor_min), Some(divisor_max)) =
@@ -3757,7 +3759,10 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
             if constant(&rhs.maximum) != Some(shift) {
                 return AbstractRange::unknown();
             }
-            let factor = KernelRangeExpr::Constant(1_i128 << shift as u32);
+            let Ok(shift) = u32::try_from(shift) else {
+                return AbstractRange::unknown();
+            };
+            let factor = KernelRangeExpr::Constant(1_i128 << shift);
             let values = [
                 multiply(lhs.minimum.clone(), factor.clone()),
                 multiply(lhs.maximum.clone(), factor),
@@ -3832,12 +3837,19 @@ fn multiply(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
 
 fn floor_divide(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> Option<KernelRangeExpr> {
     if let (Some(lhs), Some(rhs)) = (constant(&lhs), constant(&rhs)) {
-        if rhs == 0 {
-            return None;
-        }
-        return lhs.checked_div_euclid(rhs).map(KernelRangeExpr::Constant);
+        return checked_floor_quotient(lhs, rhs).map(KernelRangeExpr::Constant);
     }
     Some(KernelRangeExpr::FloorDivide(Box::new(lhs), Box::new(rhs)))
+}
+
+fn checked_floor_quotient(lhs: i128, rhs: i128) -> Option<i128> {
+    let quotient = lhs.checked_div(rhs)?;
+    let remainder = lhs.checked_rem(rhs)?;
+    if remainder != 0 && (lhs < 0) != (rhs < 0) {
+        quotient.checked_sub(1)
+    } else {
+        Some(quotient)
+    }
 }
 
 fn minimum(lhs: KernelRangeExpr, rhs: KernelRangeExpr) -> KernelRangeExpr {
@@ -3864,10 +3876,7 @@ fn constant(expr: &KernelRangeExpr) -> Option<i128> {
         KernelRangeExpr::Subtract(lhs, rhs) => constant(lhs)?.checked_sub(constant(rhs)?),
         KernelRangeExpr::Multiply(lhs, rhs) => constant(lhs)?.checked_mul(constant(rhs)?),
         KernelRangeExpr::FloorDivide(lhs, rhs) => {
-            let rhs = constant(rhs)?;
-            (rhs != 0)
-                .then(|| constant(lhs)?.checked_div_euclid(rhs))
-                .flatten()
+            checked_floor_quotient(constant(lhs)?, constant(rhs)?)
         }
         KernelRangeExpr::Minimum(lhs, rhs) => Some(constant(lhs)?.min(constant(rhs)?)),
         KernelRangeExpr::Maximum(lhs, rhs) => Some(constant(lhs)?.max(constant(rhs)?)),
@@ -3891,7 +3900,7 @@ fn contains_shape(range: &KernelValueRange) -> bool {
 }
 
 fn merge_ranges(
-    before: FxHashMap<DefId, AbstractRange>,
+    before: &FxHashMap<DefId, AbstractRange>,
     after: FxHashMap<DefId, AbstractRange>,
 ) -> FxHashMap<DefId, AbstractRange> {
     let mut merged = before.clone();
@@ -3938,7 +3947,7 @@ fn merge_abstract_ranges(ranges: &[AbstractRange]) -> AbstractRange {
 /// a backedge.
 fn merge_loop_ranges(
     before: FxHashMap<DefId, AbstractRange>,
-    after: FxHashMap<DefId, AbstractRange>,
+    after: &FxHashMap<DefId, AbstractRange>,
 ) -> FxHashMap<DefId, AbstractRange> {
     before
         .into_iter()
@@ -4035,19 +4044,19 @@ fn symbolic_bounds(expr: &KernelRangeExpr) -> SymbolicBounds {
                 SymbolicBounds {
                     minimum: numerator
                         .minimum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                     maximum: numerator
                         .maximum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                 }
             } else {
                 SymbolicBounds {
                     minimum: numerator
                         .maximum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                     maximum: numerator
                         .minimum
-                        .and_then(|value| value.checked_div_euclid(divisor)),
+                        .and_then(|value| checked_floor_quotient(value, divisor)),
                 }
             }
         }
@@ -4176,7 +4185,7 @@ fn reverse_comparison(op: HirBinOp) -> HirBinOp {
 fn refine_interval(
     op: HirBinOp,
     current: KernelValueRange,
-    bound: KernelValueRange,
+    bound: &KernelValueRange,
     truth: bool,
 ) -> Option<KernelValueRange> {
     let (Some(bound_min), Some(bound_max)) = (constant(&bound.minimum), constant(&bound.maximum))

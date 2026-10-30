@@ -671,13 +671,13 @@ impl From<FmirBinaryImageFile> for FmirImagePayload {
 pub(super) fn load_fmir_image_with<D>(
     path: &Path,
     format: FmirPackageImageFormat,
-    style: FmirImageErrorStyle,
+    style: &FmirImageErrorStyle,
     decode: D,
 ) -> Result<FmirPackageImage, Vec<Diagnostic>>
 where
     D: FnOnce() -> Result<FmirImagePayload, FmirImageError>,
 {
-    let payload = decode().map_err(|error| fmir_image_decode_error(error, path, &style))?;
+    let payload = decode().map_err(|error| fmir_image_decode_error(error, path, style))?;
     let FmirImagePayload {
         entry_function,
         runtime_requirement,
@@ -1024,7 +1024,7 @@ pub fn load_fmir_text_image(
     load_fmir_image_with(
         path,
         FmirPackageImageFormat::FmirText,
-        FmirImageErrorStyle {
+        &FmirImageErrorStyle {
             label: "fmir-text",
             parse_verb: "parse",
             parse_issue: Some("fmir_text_image_parse_failed"),
@@ -1044,7 +1044,7 @@ pub fn load_fmir_image(
     load_fmir_image_with(
         path,
         FmirPackageImageFormat::Fmir,
-        FmirImageErrorStyle {
+        &FmirImageErrorStyle {
             label: "fmir",
             parse_verb: "decode",
             parse_issue: None,

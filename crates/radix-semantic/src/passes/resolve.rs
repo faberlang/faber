@@ -3341,7 +3341,7 @@ fn register_named_generic_descriptors(
                     match lower_type_expr(ty, resolver, interner, types) {
                         Ok(default) => Some(SemanticGenericParamDefault::Typus(default)),
                         Err(error) => {
-                            record_type_lowering_error(error, ty.span, errors);
+                            record_type_lowering_error(&error, ty.span, errors);
                             None
                         }
                     }
@@ -3367,7 +3367,7 @@ fn register_named_generic_descriptors(
 }
 
 fn record_type_lowering_error(
-    error: TypeLowerError,
+    error: &TypeLowerError,
     span: radix_lexer::Span,
     errors: &mut Vec<SemanticError>,
 ) {
@@ -3376,11 +3376,11 @@ fn record_type_lowering_error(
         TypeLowerError::Issue(issue) => errors.push(lowering_error(issue, span)),
         TypeLowerError::IssueWithArg { issue, name, value } => errors.push(
             SemanticError::structured(SemanticErrorKind::LoweringError, span)
-                .with_arg("issue", issue)
-                .with_arg(name, value),
+                .with_arg("issue", *issue)
+                .with_arg(name, *value),
         ),
         TypeLowerError::CollectionArity(collection) => {
-            errors.push(lowering_collection_arity_error(collection, span));
+            errors.push(lowering_collection_arity_error(*collection, span));
         }
     }
 }

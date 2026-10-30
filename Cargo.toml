@@ -66,6 +66,9 @@ default-members = [
 # (if any) layer on top and are kept local to that crate.
 [workspace.lints.clippy]
 pedantic = { level = "deny", priority = -1 }
+# Operator ruling 2026-10-30: implicit_hasher and must_use_candidate are off workspace-wide.
+implicit_hasher = "allow"
+must_use_candidate = "allow"
 
 # Faster debug builds for test cycles. Line-table-only debuginfo is enough
 # for stack traces and basic debugging; full debuginfo (default) is expensive

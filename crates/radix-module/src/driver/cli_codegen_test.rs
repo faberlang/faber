@@ -101,6 +101,30 @@ incipit argumenta args {
     assert!(run.status.success(), "fixed exitus must succeed: {run:?}");
 }
 
+#[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
+#[test]
+fn rust_cli_dynamic_exit_uses_the_hygienic_entry_args_binding() {
+    let session = test_session_la(Target::HirRust);
+    let source = r#"
+@ cli "tool"
+@ operandus numerus status
+incipit argumenta argv exitus (argv.status) {
+}
+"#;
+    let result = compile(&session, "cli-dynamic-exitus.fab", source, ModuleCompileRequest::default());
+
+    assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
+    let output = super::rust_output(result);
+    let binary = super::compile_rust_source_with_rustc(&output.code, "cli-dynamic-exitus");
+    assert!(binary.exists(), "binary must exist after successful compilation");
+
+    let run = std::process::Command::new(binary)
+        .arg("23")
+        .output()
+        .expect("launch dynamic-exitus cli");
+    assert_eq!(run.status.code(), Some(23), "dynamic CLI exit must use the parsed operand");
+}
+
 #[test]
 fn cli_codegen_gates_non_rust_targets() {
     let source = r#"@ cli "tool"

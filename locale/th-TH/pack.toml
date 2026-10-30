@@ -728,6 +728,14 @@ help = "เขียนระดับที่การประกาศฟั
 message = "fragment `@ nucleum` ขัดแย้งกับ graphics fragment annotation"
 help = "ลบ fragment annotation รายการใดรายการหนึ่ง"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "การประกาศมีทั้งหมายเหตุ `@ {nucleum}` และส่วนหัวการประกาศ `{nucleum}`"
+help = "เก็บส่วนหัวไว้เพียงหนึ่งเดียว: หมายเหตุ `@ {nucleum}` หรือส่วนหัวการประกาศ `{nucleum}`"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` ระบุการแปลงบนโฮสต์ ส่วนหัว `{nucleum}` ระบุเคอร์เนลบนอุปกรณ์"
+help = "ลบ `@ {conversio}` หรือส่วนหัว `{nucleum}` ออก แถวการแปลงเป็นฟังก์ชันบนโฮสต์"
+
 [diagnostics.PARSE019]
 message = "modifier ซ้ำ"
 help = "ลบ modifier ที่ซ้ำ"
@@ -3580,6 +3588,14 @@ help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อไ
 message = "`{name}` จะแชร์ `{binding}` ซึ่งเป็นค่าแบบอ่านอย่างเดียว เป็นชื่อที่เขียนได้ (`{fixum}` ลึก)"
 help = "เขียน `{varia} {name} ← {copy} {binding}` เพื่อได้ค่าอิสระ หรือ `{varia} {name} ← {own} {binding}` เพื่อรับช่วงต่อ"
 
+[diagnostics.SEM066]
+message = "`copy` ถูกปฏิเสธ: {head} ทำสำเนาไม่ได้{?path| — พาธของสมาชิกคือ `|`}"
+help = "{head} เป็นทรัพยากรที่มีเอกลักษณ์: ใช้ค่าร่วมกันโดยไม่ใช้ `{copy}` หรือรับทรัพยากรต่อด้วย `{own}` เมื่อผู้รับเป็นเจ้าของได้"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` ถูกปฏิเสธ: {head} ทำสำเนาไม่ได้{?path| — พาธของสมาชิกคือ `|`}"
+help = "{head} เป็นทรัพยากรที่มีเอกลักษณ์: ใช้ค่าร่วมกันโดยไม่ใช้ `{copy}` หรือรับทรัพยากรต่อด้วย `{own}` เมื่อผู้รับเป็นเจ้าของได้"
+
 [diagnostics.WARN001]
 message = "ตัวแปรไม่ได้ใช้"
 help = "ลบตัวแปรหรือเติม '_' นำหน้า"
@@ -4366,6 +4382,18 @@ help = "ตอนนี้ '⇇' คัดลอกค่าด้านขว�
 message = "sinking contract ต้องประกาศ `sink(T) → vacuum ⇥ E` และ `flush() → vacuum ⇥ E` อย่างละหนึ่งเมธอด โดยมี type parameter เดียว"
 help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink(T res) → vacuum ⇥ E` และ `{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "annotation ของ contract คอมไพเลอร์ไม่ถูกต้อง: {reason}"
+help = 'เขียน `@ contract { target = "evm" }` บนชนิดเดียว'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "รูปแบบ contract EVM เชิงทดลองไม่รองรับ: {reason}"
+help = "ใช้ชนิดเดียวที่ไม่มีฟิลด์ พร้อมเมธอดสเกลาร์และรายการสาธารณะแบบชัดแจ้ง"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contract ต้องการเป้าหมาย `{required}` แต่เป้าหมายที่เลือกคือ `{target}`"
+help = "เลือกเป้าหมายการทำงานที่ contract ต้องการ; การจัดรูปแบบซอร์สและการทำให้เป็นอนุกรมของ HIR รักษา annotation ไว้"
+
 [diagnostics.INFO001]
 message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
 
@@ -4392,3 +4420,11 @@ help = "ตรวจสอบเหตุผลและใช้รูปแบ
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "เคอร์เนล `{kernel}`: {kind} ข้าม {partitions} พาร์ติชันสามารถหลีกเลี่ยงได้: {avoidable} ({reason})"
 help = "ทำตามเหตุผลจากการตรวจสอบเพื่อค้นหาการพึ่งพา ให้การอ่านและเขียนแบบแบ่งพาร์ทิชันอยู่ภายในเลน และใช้เลย์เอาต์บัฟเฟอร์ที่ตรงกันเมื่อทำได้"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "ข้อเท็จจริงของขอบเขตการยืมยังสร้างไม่ได้สำหรับ '{construct}' ตัวตรวจการยืมปิดตัวแทนที่จะประมาณ"
+help = "รูปแบบนี้ต้องอาศัยการอนุมานขอบเขตในการตัดสินการยืม รายงานเพื่อให้เอนจินขอบเขตรองรับมัน"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "สไปก์ EVM ปฏิเสธ {shape} ({reason})"
+help = "ใช้เฉพาะส่วนย่อยสเกลาร์ evm_entry; เป้าหมายเชิงทดลองนี้ไม่มีพื้นผิวแพ็กเกจหรือการทำงาน"

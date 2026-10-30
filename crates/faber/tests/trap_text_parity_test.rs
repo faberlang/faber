@@ -3,9 +3,9 @@
 //!
 //! The words come from `radix_runtime_contract::trap::text`, shared by both
 //! lanes. Each program here traps through a different collection check; the
-//! test runs it on the runner (`faber run`) and as a clif native binary
-//! (`faber build -t clif`, which builds the `runtime/clif` archive on first
-//! use) and compares the two.
+//! test runs it on the runner (`faber run --target runner`) and as a clif
+//! native binary (`faber build -t clif`, which builds the `runtime/clif`
+//! archive on first use) and compares the two.
 
 use std::fs;
 use std::path::Path;
@@ -83,7 +83,7 @@ fn first_stderr_line(stderr: &[u8]) -> String {
 
 fn run_on_runner(source: &Path) -> (Option<i32>, String) {
     let output = Command::new(env!("CARGO_BIN_EXE_faber"))
-        .arg("run")
+        .args(["run", "--target", "runner"])
         .arg(source)
         .stdin(Stdio::null())
         .output()

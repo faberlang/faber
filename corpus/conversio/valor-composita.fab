@@ -33,9 +33,11 @@ locale = "en"
 # (valor-scalaria), the byte row (valor-boxing) and the deeper rows — nested
 # genus, widening, recovery and tag tests (valor-composita-deep).
 
+# The fields are declared y then x; the boxed object prints declaration order,
+# not the order the literal below writes them.
 class Punctum {
-    mut int x
     mut int y
+    mut int x
 }
 
 main {

@@ -11,7 +11,8 @@
 //!
 //! The emit-target row set is **derived** (defect-audit S09-3 / B3-2), never
 //! hand-typed: the universe is the CLI grammar's own enumeration
-//! ([`FaberCliTarget::value_variants`], minus the hidden `scena` spelling),
+//! ([`FaberCliTarget::value_variants`], minus the hidden `scena`, `clif-jit`
+//! and `runner` spellings),
 //! row names come from [`Target`]'s `Display` (the CLI spellings), and each
 //! row's feature gate from [`Target::required_feature`] with the documented
 //! faber-specific overrides below. A target added to the CLI joins this
@@ -46,10 +47,15 @@ struct FaberTargetRowSpec {
 fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
     let mut rows = Vec::new();
     for variant in FaberCliTarget::value_variants() {
-        if matches!(variant, FaberCliTarget::MirScena | FaberCliTarget::ClifJit) {
+        if matches!(
+            variant,
+            FaberCliTarget::MirScena | FaberCliTarget::ClifJit | FaberCliTarget::Runner
+        ) {
             // Hidden CLI spellings — not discoverable `faber targets` rows:
-            // the legacy source-backed scena runtime, and the `clif-jit`
-            // engine, which is the `clif` row's in-memory run route.
+            // the legacy source-backed scena runtime; the `clif-jit` engine,
+            // which is the `clif` row's in-memory run route and the default
+            // engine of a plain `faber run`; and the `runner` interpreter,
+            // which is that route's fallback and the `--target runner` route.
             continue;
         }
         let target = variant.to_radix();
@@ -103,12 +109,13 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[(
 
 /// Whether `faber run` reaches `target`.
 ///
-/// `faber run` interprets source by default; the targets it reaches are the
-/// device routes selected by `--device` ([`DeviceChoice::run_target_spelling`],
-/// the same match that maps a device choice to its route) and the compiled
-/// targets `--target` builds and runs ([`RunTarget`]). A built FMIR image, a
-/// FHIR envelope, a native host executable and a Rust package are build
-/// outputs, never `faber run` inputs.
+/// A plain `faber run` compiles through the clif-jit lane by default and
+/// falls back to the interpreter on a compile-time decline; the targets it
+/// reaches are the device routes selected by `--device`
+/// ([`DeviceChoice::run_target_spelling`], the same match that maps a device
+/// choice to its route) and the compiled targets `--target` builds and runs
+/// ([`RunTarget`]). A built FMIR image, a FHIR envelope, a native host
+/// executable and a Rust package are build outputs, never `faber run` inputs.
 fn faber_run_reaches(target: Target) -> bool {
     let name = target.to_string();
     DeviceChoice::value_variants()
@@ -285,6 +292,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     }
     if cfg!(feature = "mir-llvm") {
         compiled.insert("mir-llvm");
+    }
+    if cfg!(feature = "mir-evm") {
+        compiled.insert("mir-evm");
     }
     if cfg!(feature = "mir-clif") {
         compiled.insert("mir-clif");

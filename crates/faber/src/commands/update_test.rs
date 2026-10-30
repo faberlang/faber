@@ -214,6 +214,24 @@ fn uninstall_one_version_keeps_the_other() {
 
 #[cfg(unix)]
 #[test]
+fn uninstall_all_removes_a_dangling_link_without_installed_versions() {
+    let temp = tempfile::tempdir().expect("tmp");
+    let bin_dir = temp.path().join("bin");
+    fs::create_dir_all(&bin_dir).expect("bin dir");
+    std::os::unix::fs::symlink("faber-1.0.0", bin_dir.join("faber")).expect("dangling link");
+
+    run_uninstall(&UninstallArgs {
+        version: None,
+        all: true,
+        prefix: Some(temp.path().to_path_buf()),
+    })
+    .expect("uninstall all");
+
+    assert!(fs::symlink_metadata(bin_dir.join("faber")).is_err());
+}
+
+#[cfg(unix)]
+#[test]
 fn uninstall_all_removes_every_version_and_link() {
     let temp = tempfile::tempdir().expect("tmp");
     let bin_dir = temp.path().join("bin");

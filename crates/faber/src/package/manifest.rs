@@ -686,7 +686,13 @@ pub(crate) fn manifest_device_inputs(
         .map(|(name, values)| {
             (
                 name.clone(),
-                values.iter().map(|value| *value as f32).collect(),
+                values
+                    .iter()
+                    .map(|value| {
+                        // cast: manifest inputs are intentionally rounded to the campaign's f32 dtype.
+                        *value as f32
+                    })
+                    .collect(),
             )
         })
         .collect()

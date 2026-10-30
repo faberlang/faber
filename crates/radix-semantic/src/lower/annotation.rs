@@ -116,7 +116,7 @@ impl Lowerer<'_> {
             .annotation_contracts
             .and_then(|meta| meta.application_at(annotation.span))
         {
-            return self.lower_resolved_contract(resolved, annotation.span);
+            return Self::lower_resolved_contract(resolved, annotation.span);
         }
 
         match &annotation.kind {
@@ -175,7 +175,6 @@ impl Lowerer<'_> {
     }
 
     fn lower_resolved_contract(
-        &self,
         resolved: &ResolvedContractApplication,
         span: Span,
     ) -> HirAnnotation {
@@ -202,6 +201,32 @@ impl Lowerer<'_> {
     fn lower_braced_annotation(&mut self, braced: &BracedAnnotation, span: Span) -> HirAnnotation {
         let family_owned = self.interner.resolve(braced.name.name).to_owned();
 
+        if family_owned == "contract" {
+            // The compiler-owned marker was validated before HIR lowering.
+            // Keep its environment a constant metadata value, not an ordinary
+            // executable expression in the annotation payload.
+            let fields = braced
+                .fields
+                .iter()
+                .filter_map(|field| {
+                    let AnnotationFieldValue::Expr(expr) = &field.value else {
+                        return None;
+                    };
+                    let radix_syntax::ExprKind::Literal(radix_syntax::Literal::String(value)) =
+                        expr.kind
+                    else {
+                        return None;
+                    };
+                    Some(HirAnnotationField {
+                        name: field.name.name,
+                        value: HirAnnotationValue::String(value),
+                        span: field.span,
+                    })
+                })
+                .collect();
+            return HirAnnotation::with_fields(braced.name.name, fields, span);
+        }
+
         // Both families lower to the same `nomen` record, so one shared
         // builder covers `@ cli` and `@ imperium`; the family check inside
         // each view helper keeps them mutually exclusive.
@@ -223,11 +248,11 @@ impl Lowerer<'_> {
         }
 
         if let Some(view) = braced_optio_view(braced, self.interner) {
-            return self.lower_braced_optio(braced.name.name, view, span);
+            return self.lower_braced_optio(braced.name.name, &view, span);
         }
 
         if let Some(view) = braced_operandus_view(braced, self.interner) {
-            return self.lower_braced_operandus(braced.name.name, view, span);
+            return self.lower_braced_operandus(braced.name.name, &view, span);
         }
 
         if let Some(view) = braced_nondum_view(braced, self.interner) {
@@ -275,7 +300,7 @@ impl Lowerer<'_> {
             fields: braced
                 .fields
                 .iter()
-                .filter_map(|field| self.lower_braced_field(field))
+                .map(|field| self.lower_braced_field(field))
                 .collect(),
             raw_args: Vec::new(),
             brace_authored: true,
@@ -287,7 +312,7 @@ impl Lowerer<'_> {
     fn lower_braced_optio(
         &mut self,
         family: Symbol,
-        view: radix_syntax::BracedOptioView<'_>,
+        view: &radix_syntax::BracedOptioView<'_>,
         span: Span,
     ) -> HirAnnotation {
         let mut fields = vec![HirAnnotationField {
@@ -345,7 +370,7 @@ impl Lowerer<'_> {
     fn lower_braced_operandus(
         &mut self,
         family: Symbol,
-        view: radix_syntax::BracedOperandusView<'_>,
+        view: &radix_syntax::BracedOperandusView<'_>,
         span: Span,
     ) -> HirAnnotation {
         let mut fields = Vec::new();
@@ -391,7 +416,7 @@ impl Lowerer<'_> {
         HirAnnotation::with_fields(family, fields, span)
     }
 
-    fn lower_braced_field(&mut self, field: &AnnotationField) -> Option<HirAnnotationField> {
+    fn lower_braced_field(&mut self, field: &AnnotationField) -> HirAnnotationField {
         let name = field.name.name;
         let value = match &field.value {
             AnnotationFieldValue::Expr(expr) => {
@@ -401,11 +426,11 @@ impl Lowerer<'_> {
                 HirAnnotationValue::Type(self.lower_annotation_type(ty))
             }
         };
-        Some(HirAnnotationField {
+        HirAnnotationField {
             name,
             value,
             span: field.span,
-        })
+        }
     }
 
     fn unit_annotation(&mut self, family: &str, span: Span) -> HirAnnotation {
@@ -578,9 +603,14 @@ impl Lowerer<'_> {
             });
         }
         // Authored brace shape: `@ nucleum { … }` keeps braces; the sugar
-        // markers (`@ kernel`, `@ kernel fragment`) stay bare.
+        // markers (`@ kernel`, `@ kernel laxus`) stay bare. A fragment rides
+        // a field, and the canonical emitter writes fields as one braced
+        // record — the only fragment round trip — so every fragment-bearing
+        // nucleum (sugar, braced record, or the declaration head's mode
+        // word) lowers to the braced record.
+        let braced = nucleum.braced || nucleum.is_fragment;
         let mut annotation = HirAnnotation::with_fields(family, fields, span);
-        annotation.brace_authored = nucleum.braced;
+        annotation.brace_authored = braced;
         annotation
     }
 

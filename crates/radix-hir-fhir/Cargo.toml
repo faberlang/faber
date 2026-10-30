@@ -22,6 +22,9 @@ radix-hygiene = { path = "../radix-hygiene" }
 [lints.clippy]
 # Group first at lower priority so per-lint allows below win package-wide.
 pedantic = { level = "deny", priority = -1 }
+# Operator ruling 2026-10-30: implicit_hasher and must_use_candidate are off workspace-wide.
+implicit_hasher = "allow"
+must_use_candidate = "allow"
 # Structural: validate.rs is a single giant referential-integrity walker with
 # nested helper fns and deliberately-enumerated match arms sharing traversal.
 too_many_lines = "allow"

@@ -728,6 +728,14 @@ help = "اكتب المستوى على إعلان دالة `@ {nucleum}`، أو 
 message = "جزء `@ nucleum` يتعارض مع تعليمة جزء رسومي"
 help = "أزل إحدى تعليمتي الجزء"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "يحمل التصريح كلًا من الوسم `@ {nucleum}` ورأس التصريح `{nucleum}`"
+help = "أبقِ رأسًا واحدًا: الوسم `@ {nucleum}` أو رأس التصريح `{nucleum}`"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` يسمّي تحويلًا على المضيف، ورأس `{nucleum}` يسمّي نواة على الجهاز"
+help = "أزل `@ {conversio}` أو رأس `{nucleum}`؛ صف التحويل دالة على المضيف"
+
 [diagnostics.PARSE019]
 message = "معدل مكرر"
 help = "أزل المعدل المكرر"
@@ -3568,6 +3576,14 @@ help = "اكتب `{varia} {name} ← {copy} {binding}` لقيمة مستقلة،
 message = "`{name}` سيشارك `{binding}`، وهو قيمة للقراءة فقط، كاسم قابل للكتابة (`{fixum}` عميق)"
 help = "اكتب `{varia} {name} ← {copy} {binding}` لقيمة مستقلة، أو `{varia} {name} ← {own} {binding}` لتولّي ملكيتها"
 
+[diagnostics.SEM066]
+message = "يُرفض `copy`: لا يمكن مضاعفة {head}{?path| — مسار العضو هو `|`}"
+help = "{head} مورد له هوية: شارك القيمة دون `{copy}`، أو تولَّ ملكية المورد بـ `{own}` حيث يمكن للمستهلك امتلاكه"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "يُرفض `copy`: لا يمكن مضاعفة {head}{?path| — مسار العضو هو `|`}"
+help = "{head} مورد له هوية: شارك القيمة دون `{copy}`، أو تولَّ ملكية المورد بـ `{own}` حيث يمكن للمستهلك امتلاكه"
+
 [diagnostics.WARN001]
 message = "متغير غير مستخدم"
 help = "أزل المتغير أو ابدأه بـ '_'"
@@ -4498,6 +4514,18 @@ help = "ينسخ '⇇' الآن قيم الطرف الأيمن إلى تخزين
 message = "يجب أن يعرّف عقد الإرسال بالضبط `sink(T) → vacuum ⇥ E` و`flush() → vacuum ⇥ E` باستخدام معامل نوع واحد"
 help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum ⇥ E` و`{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "تعليق عقد المترجم غير صالح: {reason}"
+help = 'اكتب `@ contract { target = "evm" }` على صنف واحد'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "صيغة عقد EVM التجريبية غير مدعومة: {reason}"
+help = "استخدم صنفًا واحدًا بدون حقول مع دوال عددية ومداخل عامة صريحة"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "العقد يتطلب الهدف `{required}`، لكن الهدف المحدد هو `{target}`"
+help = "اختر هدف التنفيذ الذي يتطلبه العقد؛ تنسيق المصدر وتسلسل HIR يحفظان التعليق"
+
 [diagnostics.INFO001]
 message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
 
@@ -4524,3 +4552,11 @@ help = "تحقق من السبب واستخدم صيغة نواة يدعمها �
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "النواة `{kernel}`: يمكن تجنّب {kind} عبر الأقسام الـ {partitions}: {avoidable} ({reason})"
 help = "اتبع سبب التدقيق للعثور على الاعتمادية. أبقِ القراءات والكتابات المقسمة محلية للخيط، واستخدم تخطيطات مخازن متطابقة حيث أمكن."
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "حقائق مناطق الاستعارة لم تُبنَ بعد لـ '{construct}'؛ مدقق الاستعارة يُغلق بدل التقريب"
+help = "هذه الصيغة تحتاج استنتاج المناطق لقرارات الاستعارة؛ أبلغ عنها لتغطيها محرك المناطق"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "تجربة EVM ترفض {shape} ({reason})"
+help = "استخدم فقط المجموعة الجزئية العددية evm_entry؛ هذا الهدف التجريبي بلا حزمة أو سطح تنفيذ."

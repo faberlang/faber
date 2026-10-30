@@ -772,6 +772,14 @@ help = "把层级写在 `@ {nucleum}` 函数声明上，或删除它"
 message = "`@ nucleum` fragment 与图形 fragment annotation 冲突"
 help = "移除其中一个 fragment annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "该声明同时带有 `@ {nucleum}` 注解和 `{nucleum}` 声明头"
+help = "只保留一个声明头：`@ {nucleum}` 注解或 `{nucleum}` 声明头"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` 表示主机端转换；`{nucleum}` 声明头表示设备内核"
+help = "删除 `@ {conversio}` 或 `{nucleum}` 声明头；转换行是主机函数"
+
 [diagnostics.PARSE019]
 message = "重复修饰符"
 help = "删除重复的修饰符"
@@ -3612,6 +3620,14 @@ help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{
 message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
 help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
 
+[diagnostics.SEM066]
+message = "拒绝 `copy`：{head} 不可复制{?path|——成员路径为 `|`}"
+help = "{head} 是有身份的资源：请不带 `{copy}` 地共享该值，或在使用者可拥有它时用 `{own}` 接管"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "拒绝 `copy`：{head} 不可复制{?path|——成员路径为 `|`}"
+help = "{head} 是有身份的资源：请不带 `{copy}` 地共享该值，或在使用者可拥有它时用 `{own}` 接管"
+
 [diagnostics.WARN001]
 message = "未使用变量"
 help = "删除该变量，或加 '_' 前缀"
@@ -4354,6 +4370,18 @@ help = "'⇇' 现在会将右侧的值复制到左侧现有的 tensor 存储中�
 message = "sinking 合约必须在一个类型参数上准确声明 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "声明 `{implendum} Sink<T>`，并包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "编译器 contract 标注无效：{reason}"
+help = '在一个类上写 `@ contract { target = "evm" }`'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "不支持的实验性 EVM 合约形状：{reason}"
+help = "使用一个无字段的类，带标量方法和显式的公开条目"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "合约需要目标 `{required}`，但选定的目标是 `{target}`"
+help = "选择合约要求的执行目标；源码格式化与 HIR 序列化会保留该标注"
+
 [diagnostics.INFO001]
 message = "内核 `{kernel}` 在 {device} 设备上串行运行"
 
@@ -4380,3 +4408,11 @@ help = "检查原因，并使用所选设备支持的内核形式。"
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "内核 `{kernel}`：其跨 {partitions} 个分区的 {kind} 是可以避免的：{avoidable}（{reason}）"
 help = "根据审计原因查找依赖。尽可能让分区读写保持在各自车道内，并使用匹配的缓冲区布局。"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "尚不能为 '{construct}' 构建借用区域事实；借用检查器直接报错而不做近似"
+help = "该构造的借用判定需要区域推断；请报告以便区域引擎覆盖它"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM 试验拒绝 {shape}（{reason}）"
+help = "只使用有界的标量 evm_entry 子集；这个实验性目标没有包或执行面。"

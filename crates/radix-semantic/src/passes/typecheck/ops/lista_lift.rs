@@ -17,7 +17,12 @@
 //! runs the form or fails closed (`lista_lift_gate`).
 
 use super::tensor_lift::{ISSUE_TENSOR_APPROX_COMPARISON_DEFERRED, approx_glyph};
-use super::*;
+use super::{
+    BOOLEAN_OPERAND_REQUIRED, BOOLEAN_OPERANDS_REQUIRED, GLYPH_ELEMENT_TYPE_MISMATCH,
+    GLYPH_OP_NUMERIC_ELEMENT_REQUIRED, HirBinOp, HirExpression, IndexExpr,
+    NUMERIC_LISTA_OPERATOR_LAW, NUMERIC_OPERAND_REQUIRED, Type, TypeChecker, TypeId,
+    lista_operator_spelling,
+};
 use crate::passes::typecheck::integer_range::const_int_value;
 
 /// `list * list` is not elementwise; the glyph says which product is meant.

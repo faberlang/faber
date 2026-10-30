@@ -136,6 +136,9 @@ impl CompileResult {
 /// The enum keeps callers honest about backend-specific output while avoiding
 /// stringly typed target dispatch at the public API boundary.
 pub enum Output {
+    /// Experimental EVM deployment and runtime bytecode.
+    #[cfg(feature = "mir-evm")]
+    Evm(EvmOutput),
     /// Rust backend output, currently the primary executable target.
     Rust(RustOutput),
 
@@ -212,6 +215,15 @@ pub enum Output {
     /// Novelty classic line-numbered BASIC listing emitted from validated MIR.
     #[cfg(feature = "mir-basic")]
     Basic(BasicOutput),
+}
+
+/// Experimental Shanghai deployment and runtime bytecode for admitted entry shapes.
+#[cfg(feature = "mir-evm")]
+pub struct EvmOutput {
+    /// Deployment bytecode that returns the runtime.
+    pub init: Vec<u8>,
+    /// Runtime bytecode for inspection and independent host verification.
+    pub runtime: Vec<u8>,
 }
 
 /// Rust backend output.

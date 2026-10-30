@@ -1,33 +1,13 @@
-//! Canonical Faber expression emission.
+//! Canonical Faber expression emission from analyzed HIR.
 //!
-//! This module is the expression half of the source-preserving Faber backend.
-//! It prints HIR back into canonical Faber expression text so the compiler can
-//! expose a normalized view of code after parsing, lowering, name resolution,
-//! and type analysis. The goal is not byte-for-byte reconstruction: comments,
-//! original whitespace, alternate spellings, and some syntactic sugar are
-//! already gone by the time this writer sees HIR.
+//! Presentation sidecars recover authored forms erased by lowering or checking;
+//! output is normalized Faber, not a byte-for-byte source reconstruction.
+//! Postfix chains and control forms use Faber syntax, with grouping governed by
+//! the precedence contract in `ops.rs`. Object and collection entries share the
+//! literal field writers.
 //!
-//! INVARIANTS
-//! ==========
-//! - Calls, method calls, fields, indexes, optional chains, and non-null chains
-//!   use the canonical postfix spellings accepted by the parser.
-//! - Blocks and control forms are emitted as Faber constructs, not translated
-//!   through another target backend.
-//! - Object and collection entries are delegated to the literal field writer so
-//!   literal and conversion forms share one field spelling policy.
-//! - Parentheses are a precedence handoff with `ops.rs`; this file asks for the
-//!   expression precedence and only adds grouping needed to keep reparsing valid.
-//!
-//! LIMITS
-//! ======
-//! Structured `cape` handlers are not reconstructed here yet, and diagnostic
-//! placeholder expressions lower to grammar-valid fallback text. Template and
-//! string payloads are written from interned text without claiming source escape
-//! preservation.
-//!
-//! Adfirma optional message particles emit `surface.keyword(TokenKind::Mori)`
-//! (`panic`). Leftover Secus is PARSE001 `adfirma_else_rejected` (`7805f8e1a`);
-//! hardcoded `secus` (`e0fbae339`) is not a valid particle.
+//! Diagnostic placeholder expressions emit fallback text. String and template
+//! payloads come from interned text without preserving source escapes.
 
 use crate::surface::{FrameFamily, KeywordSurface, TypeBindingKind};
 use handroll::FxHashMap;
@@ -262,27 +242,23 @@ impl super::FaberCodegen<'_> {
             HirExpressionKind::Assign(..)
             | HirExpressionKind::Binary(..)
             | HirExpressionKind::Unary(..)
-                if self.numeric_twin_call(expr).is_some() =>
+                if let Some((receiver, canonical, argument)) = self.numeric_twin_call(expr) =>
             {
                 // Authored numeric twin (`a.add(2)`, `x.added(y)`,
                 // `x.negated()`): typecheck desugared the call to the
                 // assignment or operator and kept the node id; restore the
                 // method spelling in the reader locale.
-                if let Some((receiver, canonical, argument)) = self.numeric_twin_call(expr) {
-                    self.write_twin_call(receiver, canonical, argument, names, surface, writer);
-                }
+                self.write_twin_call(receiver, canonical, argument, names, surface, writer);
             }
             HirExpressionKind::Binary(..)
             | HirExpressionKind::Reduction { .. }
             | HirExpressionKind::Scan { .. }
-                if self.axis_sugar_call(expr).is_some() =>
+                if let Some((source, sugar)) = self.axis_sugar_call(expr) =>
             {
                 // Authored axis reduction (`t.summa(axis n)` /
                 // `t.media(axis n)`): typecheck kept the authored call's id on
                 // the expansion node; print the call, not the reduction.
-                if let Some((source, sugar)) = self.axis_sugar_call(expr) {
-                    self.write_axis_sugar_call(source, &sugar, names, surface, writer);
-                }
+                self.write_axis_sugar_call(source, &sugar, names, surface, writer);
             }
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 let op_prec = self.binop_precedence(*op);
@@ -323,38 +299,34 @@ impl super::FaberCodegen<'_> {
                 if type_args.is_empty()
                     && args.is_empty()
                     && self.glyph_ids.contains(&expr.id)
-                    && self.rounding_delimiters(*name, surface).is_some() =>
+                    && let Some((open, close)) = self.rounding_delimiters(*name, surface) =>
             {
                 // Authored `⌊x⌋` / `⌈x⌉` / `⌊x⌉`: lowering recorded the node
                 // id, typecheck rewrote the marker to the rounding twin and
                 // kept the id; the delimiters are the authored surface.
-                if let Some((open, close)) = self.rounding_delimiters(*name, surface) {
-                    writer.write(open);
-                    self.write_expr(receiver, names, surface, writer);
-                    writer.write(close);
-                }
+                writer.write(open);
+                self.write_expr(receiver, names, surface, writer);
+                writer.write(close);
             }
             HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
                     && self.radical_quarta_ids.contains(&expr.id)
-                    && Self::radical_quarta_operand(receiver).is_some() =>
+                    && let Some(operand) = Self::radical_quarta_operand(receiver) =>
             {
                 // Authored `∜ x`: lowering nested two `radix` calls and
                 // recorded only the outer id. The operand sits under the
                 // inner call, and the glyph is the authored surface. A
                 // radical binds like unary `-`.
-                if let Some(operand) = Self::radical_quarta_operand(receiver) {
-                    writer.write("∜ ");
-                    self.write_expr_prec(operand, 12, names, surface, writer);
-                }
+                writer.write("∜ ");
+                self.write_expr_prec(operand, 12, names, surface, writer);
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
                 if type_args.is_empty()
                     && args.is_empty()
                     && self.glyph_ids.contains(&expr.id)
                     && !self.radical_quarta_ids.contains(&expr.id)
-                    && self.radical_prefix(*name, surface).is_some() =>
+                    && let Some(prefix) = self.radical_prefix(*name, surface) =>
             {
                 // Authored `√ x` / `∛ x`: lowering recorded the node id and
                 // typecheck rewrote the marker to the radical twin; the prefix
@@ -363,11 +335,9 @@ impl super::FaberCodegen<'_> {
                 // under the same `radix` name) out of this arm so it never
                 // prints as `√ √`. A radical binds like unary `-`, so a looser
                 // operand keeps its parentheses.
-                if let Some(prefix) = self.radical_prefix(*name, surface) {
-                    writer.write(prefix);
-                    writer.write(" ");
-                    self.write_expr_prec(receiver, 12, names, surface, writer);
-                }
+                writer.write(prefix);
+                writer.write(" ");
+                self.write_expr_prec(receiver, 12, names, surface, writer);
             }
             HirExpressionKind::MethodCall(receiver, _, type_args, args, _)
                 if type_args.is_empty() && args.is_empty() && self.glyph_ids.contains(&expr.id) =>
@@ -379,16 +349,12 @@ impl super::FaberCodegen<'_> {
                 writer.write("ᵀ");
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _)
-                if self
-                    .typed_zero_tensor(receiver, *name, type_args, args)
-                    .is_some() =>
+                if let Some(ty) = self.typed_zero_tensor(receiver, *name, type_args, args) =>
             {
                 // The typed zero `Type {}`: lowering synthesizes a `crea`
                 // call on a pre-typed `vacua` receiver; restore the authored
                 // empty-braces spelling.
-                if let Some(ty) = self.typed_zero_tensor(receiver, *name, type_args, args) {
-                    self.write_typed_zero(expr.id, ty, names, surface, writer);
-                }
+                self.write_typed_zero(expr.id, ty, names, surface, writer);
             }
             HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 // `base!.method(..)`: the receiver is the bare assertion, so
@@ -491,20 +457,20 @@ impl super::FaberCodegen<'_> {
                     );
                 }
             }
-            HirExpressionKind::Block(..) if self.hoisted_numeric_twin(expr).is_some() => {
+            HirExpressionKind::Block(..)
+                if let Some((receiver, canonical, argument)) = self.hoisted_numeric_twin(expr) =>
+            {
                 // Authored effect-hoisted in-place twin (`xs[f()].add(2)`):
                 // typecheck pinned the place's effects to temporaries inside
                 // a block; inline them back and restore the method spelling.
-                if let Some((receiver, canonical, argument)) = self.hoisted_numeric_twin(expr) {
-                    self.write_twin_call(
-                        &receiver,
-                        canonical,
-                        argument.as_ref(),
-                        names,
-                        surface,
-                        writer,
-                    );
-                }
+                self.write_twin_call(
+                    &receiver,
+                    canonical,
+                    argument.as_ref(),
+                    names,
+                    surface,
+                    writer,
+                );
             }
             HirExpressionKind::Block(block) => {
                 // A plain `fac { }` body is a breakable scope: `rumpe` exits
@@ -1043,6 +1009,7 @@ impl super::FaberCodegen<'_> {
                 writer.write(" ");
                 self.write_expr(cond, names, surface, writer);
                 if let Some(message) = message {
+                    // The message particle is `mori` (`panic`), not `secus`.
                     writer.write(" ");
                     writer.write(surface.keyword(TokenKind::Mori));
                     writer.write(" ");
@@ -1572,47 +1539,59 @@ impl super::FaberCodegen<'_> {
                 return;
             }
 
-            match self.types.get(target) {
-                Type::Struct(def_id) => {
-                    let name = self
-                        .imported_type_spellings
+            let struct_def = match self.types.get(target) {
+                Type::Struct(def_id) => Some(*def_id),
+                Type::Applied(base, _) => match self.types.get(*base) {
+                    Type::Struct(def_id) => Some(*def_id),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(def_id) = struct_def {
+                let name = if matches!(self.types.get(target), Type::Applied(..)) {
+                    rendered_target
+                } else {
+                    self.imported_type_spellings
                         .get(&target)
                         .cloned()
-                        .unwrap_or_else(|| self.name_for_def(*def_id, names));
-                    // The copy-with-changes source (D15.1) is the `Spread`
-                    // entry; it re-emits after the braces as `ex source`.
-                    let (sources, fields): (Vec<_>, Vec<_>) = entries
-                        .iter()
-                        .partition(|field| matches!(field.key, HirObjectKey::Spread(_)));
-                    if self.inferred_constructor_ids.contains(&owner) {
-                        writer.write("_");
-                    } else {
-                        writer.write(&name);
-                    }
-                    writer.write(" {");
-                    if !fields.is_empty() {
-                        writer.write(" ");
-                    }
-                    for (idx, field) in fields.iter().enumerate() {
-                        if idx > 0 {
-                            writer.write(", ");
-                        }
-                        self.write_genus_field(field, names, surface, writer);
-                    }
-                    if !fields.is_empty() {
-                        writer.write(" ");
-                    }
-                    writer.write("}");
-                    for source in sources {
-                        if let HirObjectKey::Spread(expr) = &source.key {
-                            writer.write(" ");
-                            writer.write(surface.keyword(TokenKind::Ex));
-                            writer.write(" ");
-                            self.write_expr_prec(expr, 12, names, surface, writer);
-                        }
-                    }
-                    return;
+                        .unwrap_or_else(|| self.name_for_def(def_id, names))
+                };
+                // The copy-with-changes source (D15.1) is the `Spread`
+                // entry; it re-emits after the braces as `ex source`.
+                let (sources, fields): (Vec<_>, Vec<_>) = entries
+                    .iter()
+                    .partition(|field| matches!(field.key, HirObjectKey::Spread(_)));
+                if self.inferred_constructor_ids.contains(&owner) {
+                    writer.write("_");
+                } else {
+                    writer.write(&name);
                 }
+                writer.write(" {");
+                if !fields.is_empty() {
+                    writer.write(" ");
+                }
+                for (idx, field) in fields.iter().enumerate() {
+                    if idx > 0 {
+                        writer.write(", ");
+                    }
+                    self.write_genus_field(field, names, surface, writer);
+                }
+                if !fields.is_empty() {
+                    writer.write(" ");
+                }
+                writer.write("}");
+                for source in sources {
+                    if let HirObjectKey::Spread(expr) = &source.key {
+                        writer.write(" ");
+                        writer.write(surface.keyword(TokenKind::Ex));
+                        writer.write(" ");
+                        self.write_expr_prec(expr, 12, names, surface, writer);
+                    }
+                }
+                return;
+            }
+
+            match self.types.get(target) {
                 Type::Record(_) => {
                     if self.inferred_constructor_ids.contains(&owner) {
                         writer.write("_");

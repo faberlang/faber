@@ -772,6 +772,14 @@ help = "把層級寫在 `@ {nucleum}` 函式宣告上，或刪除它"
 message = "`@ nucleum` fragment 與圖形 fragment annotation 衝突"
 help = "移除其中一個 fragment annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "此宣告同時帶有 `@ {nucleum}` 註解與 `{nucleum}` 宣告頭"
+help = "只保留一個宣告頭：`@ {nucleum}` 註解或 `{nucleum}` 宣告頭"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` 表示主機端轉換；`{nucleum}` 宣告頭表示裝置核心"
+help = "刪除 `@ {conversio}` 或 `{nucleum}` 宣告頭；轉換列是主機函式"
+
 [diagnostics.PARSE019]
 message = "重複修飾符"
 help = "刪除重複的修飾符"
@@ -3608,6 +3616,14 @@ help = "寫 `{varia} {name} ← {copy} {binding}` 取得獨立的值，或寫 `{
 message = "`{name}` 會把唯讀值 `{binding}` 共享為可寫名稱（`{fixum}` 是深層的）"
 help = "寫 `{varia} {name} ← {copy} {binding}` 取得獨立的值，或寫 `{varia} {name} ← {own} {binding}` 接管它"
 
+[diagnostics.SEM066]
+message = "拒絕 `copy`：{head} 無法複製{?path|——成員路徑為 `|`}"
+help = "{head} 是有身分的資源：請不帶 `{copy}` 地共享該值，或在使用者可擁有它時用 `{own}` 接管"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "拒絕 `copy`：{head} 無法複製{?path|——成員路徑為 `|`}"
+help = "{head} 是有身分的資源：請不帶 `{copy}` 地共享該值，或在使用者可擁有它時用 `{own}` 接管"
+
 [diagnostics.WARN001]
 message = "未使用的變數"
 help = "移除變數，或在其前面加上 '_'"
@@ -4351,6 +4367,18 @@ help = "'⇇' 現在會將右側的值複製到左側現有的 tensor 儲存區�
 message = "sinking 合約必須在一個型別參數上準確宣告 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "編譯器 contract 標註無效：{reason}"
+help = '在一個類型上寫 `@ contract { target = "evm" }`'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "不支援的實驗性 EVM 契約形狀：{reason}"
+help = "使用一個無欄位的類型，帶純量方法與明確的公開條目"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "契約需要目標 `{required}`，但選定的目標是 `{target}`"
+help = "選擇契約要求的執行目標；原始碼格式化與 HIR 序列化會保留該標註"
+
 [diagnostics.INFO001]
 message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
 
@@ -4377,3 +4405,11 @@ help = "檢查原因，並使用所選裝置支援的核心形式。"
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "核心 `{kernel}`：其跨 {partitions} 個分區的 {kind} 是可以避免的：{avoidable}（{reason}）"
 help = "依照稽核原因找出相依性。讓分區讀寫留在各通道本地，並盡可能使用相符的緩衝區配置。"
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "尚不能為 '{construct}' 建構借用區域事實；借用檢查器直接報錯而不做近似"
+help = "該構造的借用判定需要區域推斷；請回報以便區域引擎涵蓋它"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM 試驗拒絕 {shape}（{reason}）"
+help = "只使用有界的純量 evm_entry 子集；這個實驗性目標沒有套件或執行面。"

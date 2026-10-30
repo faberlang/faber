@@ -18,7 +18,8 @@
 //! - `host_encode_ns`: launch-encode wall time with `host_blocked_ns` taken
 //!   out. This is the host's own encode cost and is disjoint from
 //!   `host_blocked_ns`.
-//! - `gpu_busy_ns`: the GPU's own clock over completed command buffers.
+//! - `gpu_busy_ns`: the GPU's own clock over completed device work; CUDA sums
+//!   per-launch event durations and reports per-batch idle as `wall_ns - gpu_busy_ns`.
 //!
 //! Versioning: `host_blocked_ns` was added at `format_version` 1 as an
 //! optional field, the way `gpu_timer_available` was. An artifact without it
@@ -82,8 +83,8 @@ pub(crate) struct DeviceMetadata {
     /// not GPU time; read `gpu_busy_ns` for that. See the module docs for
     /// which device timers overlap.
     pub(crate) execution_ns: u64,
-    /// GPU nanoseconds of completed command buffers (device time only). 0
-    /// when the driver cannot read a device clock.
+    /// GPU nanoseconds of completed device work (CUDA launch durations or
+    /// Metal command-buffer intervals). 0 when the driver cannot read a device clock.
     pub(crate) gpu_busy_ns: u64,
     pub(crate) gpu_timing: String,
     pub(crate) timed_launches: u64,
@@ -106,6 +107,13 @@ pub(crate) struct DeviceMetadata {
     /// (CPU, CUDA).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) host_blocked_ns: Option<u64>,
+    /// Cumulative host bytes fresh kernel-output twins materialized during
+    /// the run: a launch allocates no host array for its output (the twin is
+    /// deferred zeros) and the first host read that needs real bytes
+    /// materializes it once. A steady launch loop that reads one element
+    /// reports the same figure regardless of its iteration count.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub(crate) host_fresh_output_bytes: u64,
     pub(crate) uploads: u64,
     pub(crate) downloads: u64,
     pub(crate) uploaded_bytes: u64,
@@ -125,11 +133,122 @@ pub(crate) struct DeviceRuntimeMetadata {
     pub(crate) live_buffers: u64,
     pub(crate) allocated_bytes: u64,
     pub(crate) peak_allocated_bytes: u64,
+    /// Device buffer allocation calls that reached the driver, counted by the
+    /// runtime adapters (never from logical receipts); a pooled reuse is not
+    /// one. With `buffer_release_count` this is the steady-loop allocation
+    /// promise's evidence: a steady loop (same kernels, same shapes) leaves
+    /// both unchanged once it has warmed up. Absent in artifacts from before
+    /// the counters; read as 0 there. See the promise in
+    /// `docs/design/allocation-and-memory-lifecycle.md`.
+    #[serde(default)]
+    pub(crate) buffer_alloc_count: u64,
+    /// Device buffer release calls that reached the driver; parking a
+    /// released buffer for reuse is not one, while evicting a parked buffer
+    /// under budget pressure is.
+    #[serde(default)]
+    pub(crate) buffer_release_count: u64,
+    /// Allocations served from the runtime's buffer pool: no driver call.
+    #[serde(default)]
+    pub(crate) buffer_pool_hits: u64,
+    /// Buffers parked in the runtime's buffer pool at the end of the run.
+    #[serde(default)]
+    pub(crate) buffer_pool_buffers: u64,
+    /// Bytes parked in the pool at the end of the run: real device memory
+    /// (it counts against the budget) backing no live buffer.
+    #[serde(default)]
+    pub(crate) buffer_pool_bytes: u64,
     pub(crate) host_to_device_bytes: u64,
     pub(crate) device_to_host_bytes: u64,
     /// A logical device spanning several partitions (rule 18) only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) span: Option<DeviceSpanMetadata>,
+    /// The CPU runtime's completed-launch partition coverage (the CPU's own
+    /// one-shared-store model); absent on every other runtime and in
+    /// artifacts from before the block existed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) cpu_partitions: Option<DeviceCpuPartitionMetadata>,
+    /// Per-retired-batch GPU work/idle accounting, when provided by the device.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) gpu_steps: Vec<DeviceGpuStepMetadata>,
+}
+
+/// The CPU runtime's partition coverage (`device.runtime.cpu_partitions`):
+/// how its launches split workgroups over the one shared buffer store's
+/// partitions, and how much of each split actually completed. Local
+/// shared-memory execution coverage only — not particle-state slab readiness,
+/// per-partition buffer ownership (the store is shared) or physical-cluster
+/// and GPU launch-mode evidence.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuPartitionMetadata {
+    pub(crate) partitions: u64,
+    /// Total workers of the one shared worker pool.
+    pub(crate) workers: u64,
+    /// The memory model; the CPU runtime spells it `shared-store`.
+    pub(crate) memory_model: String,
+    /// The per-launch log's bound; launches past it are per-entry totals only.
+    pub(crate) launch_log_bound: u64,
+    pub(crate) logged_launches: u64,
+    /// Launches dropped by the bound: their coverage cannot be certified
+    /// per-launch.
+    pub(crate) unlogged_launches: u64,
+    pub(crate) entries: Vec<DeviceCpuEntryCoverage>,
+    pub(crate) launches: Vec<DeviceCpuLaunchCoverage>,
+}
+
+/// Per-entry CPU coverage totals over a whole run.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuEntryCoverage {
+    pub(crate) entry: String,
+    pub(crate) launches: u64,
+    pub(crate) logged_launches: u64,
+    pub(crate) scheduled_workgroups: u64,
+    pub(crate) completed_workgroups: u64,
+    pub(crate) complete_launches: u64,
+    pub(crate) faulted_launches: u64,
+}
+
+/// One CPU launch's coverage: the scheduled per-partition workgroup ranges
+/// and the completed prefixes that actually ran and committed. Scheduled and
+/// completed are reported distinctly, so a planned range alone can never
+/// certify execution.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuLaunchCoverage {
+    pub(crate) launch: u64,
+    pub(crate) entry: String,
+    pub(crate) workgroups: u64,
+    /// Every partition the plan gave work to, in partition order; a
+    /// partition with no workgroups has no row.
+    pub(crate) partitions: Vec<DeviceCpuLaunchPartitionCoverage>,
+    /// Every scheduled workgroup completed and committed.
+    pub(crate) complete: bool,
+    /// A chunk faulted, stopped at a recoverable site, or the launch was
+    /// refused before its writes landed.
+    pub(crate) faulted: bool,
+}
+
+/// One partition's share of one CPU launch: `[start, end)` workgroup ranges.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceCpuLaunchPartitionCoverage {
+    pub(crate) partition: u64,
+    pub(crate) scheduled: [u64; 2],
+    pub(crate) completed: [u64; 2],
+}
+
+/// GPU busy and idle accounting for one retired launch batch.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceGpuStepMetadata {
+    pub(crate) launches: u64,
+    pub(crate) timed_launches: u64,
+    pub(crate) gpu_busy_ns: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) wall_ns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) idle_ns: Option<u64>,
 }
 
 /// Partition traffic and launch modes of a spanned logical device.
@@ -471,6 +590,7 @@ impl DeviceMetadata {
             gpu_sample_launch_capacity: runtime.gpu_sample_launch_capacity,
             host_encode_ns: receipt.host_encode_ns,
             host_blocked_ns: Some(receipt.host_blocked_ns),
+            host_fresh_output_bytes: receipt.host_fresh_output_bytes,
             uploads: receipt.uploads,
             downloads: receipt.downloads,
             uploaded_bytes: receipt.uploaded_bytes,
@@ -484,11 +604,72 @@ impl DeviceMetadata {
                 live_buffers: runtime.live_buffers,
                 allocated_bytes: runtime.allocated_bytes,
                 peak_allocated_bytes: runtime.peak_allocated_bytes,
+                buffer_alloc_count: runtime.buffer_alloc_count,
+                buffer_release_count: runtime.buffer_release_count,
+                buffer_pool_hits: runtime.buffer_pool_hits,
+                buffer_pool_buffers: runtime.buffer_pool_buffers,
+                buffer_pool_bytes: runtime.buffer_pool_bytes,
                 host_to_device_bytes: runtime.host_to_device_bytes,
                 device_to_host_bytes: runtime.device_to_host_bytes,
                 span: runtime.span.as_ref().map(|span| {
                     DeviceSpanMetadata::from_stats(span).with_avoidable(&receipt.span_avoidable)
                 }),
+                // Mapped by field access: the open-core ratchet counts
+                // every private-crate path mention, even in comments.
+                cpu_partitions: runtime.cpu_partitions.as_ref().map(|coverage| {
+                    DeviceCpuPartitionMetadata {
+                        partitions: coverage.partitions,
+                        workers: coverage.workers,
+                        memory_model: coverage.memory_model.as_str().to_owned(),
+                        launch_log_bound: coverage.launch_log_bound,
+                        logged_launches: coverage.logged_launches,
+                        unlogged_launches: coverage.unlogged_launches,
+                        entries: coverage
+                            .entries
+                            .iter()
+                            .map(|entry| DeviceCpuEntryCoverage {
+                                entry: entry.entry.clone(),
+                                launches: entry.launches,
+                                logged_launches: entry.logged_launches,
+                                scheduled_workgroups: entry.scheduled_workgroups,
+                                completed_workgroups: entry.completed_workgroups,
+                                complete_launches: entry.complete_launches,
+                                faulted_launches: entry.faulted_launches,
+                            })
+                            .collect(),
+                        launches: coverage
+                            .launches
+                            .iter()
+                            .map(|launch| DeviceCpuLaunchCoverage {
+                                launch: launch.launch,
+                                entry: launch.entry.clone(),
+                                workgroups: launch.workgroups,
+                                partitions: launch
+                                    .partitions
+                                    .iter()
+                                    .map(|row| DeviceCpuLaunchPartitionCoverage {
+                                        partition: row.partition,
+                                        scheduled: [row.scheduled.start, row.scheduled.end],
+                                        completed: [row.completed.start, row.completed.end],
+                                    })
+                                    .collect(),
+                                complete: launch.complete,
+                                faulted: launch.faulted,
+                            })
+                            .collect(),
+                    }
+                }),
+                gpu_steps: runtime
+                    .gpu_steps
+                    .iter()
+                    .map(|step| DeviceGpuStepMetadata {
+                        launches: step.launches,
+                        timed_launches: step.timed_launches,
+                        gpu_busy_ns: step.gpu_busy_ns,
+                        wall_ns: step.wall_ns,
+                        idle_ns: step.idle_ns,
+                    })
+                    .collect(),
             },
             entries: runtime
                 .entry_gpu

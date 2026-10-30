@@ -130,6 +130,14 @@ impl TypeChecker<'_> {
             }
         };
         let rank = dims.len();
+        let Ok(rank_u32) = u32::try_from(rank) else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED,
+                span,
+            );
+            return AxisReduction::Refused;
+        };
         // Every axis is numbered in the source tensor. Order does not matter
         // and a repeated number is a named error; the removed set is kept in
         // source order only for the extent product.
@@ -157,7 +165,14 @@ impl TypeChecker<'_> {
                 );
                 return AxisReduction::Refused;
             }
-            let index = position as usize;
+            let Ok(index) = usize::try_from(position) else {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_AXIS_REDUCTION_OUT_OF_RANGE,
+                    arg.span,
+                );
+                return AxisReduction::Refused;
+            };
             if axes.contains(&index) {
                 self.error_issue(
                     SemanticErrorKind::TypeMismatch,
@@ -178,6 +193,20 @@ impl TypeChecker<'_> {
             );
             return AxisReduction::Refused;
         }
+        let Some(axes_u32) = axes
+            .iter()
+            .copied()
+            .map(u32::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .ok()
+        else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_AXIS_REDUCTION_RANK_UNSUPPORTED,
+                span,
+            );
+            return AxisReduction::Refused;
+        };
         let mut divisor = None;
         // An integer-element `mean` converts after the exact integer sum; a
         // float element keeps its own type.
@@ -224,10 +253,10 @@ impl TypeChecker<'_> {
         };
         let result_element = mean_float_element.unwrap_or(element);
         let result = self.types.tensor_with_shape(result_element, result_shape);
-        let coordinate_ids: Vec<DefId> = (0..rank)
-            .map(|offset| DefId(self.next_synthetic_def + offset as u32))
+        let coordinate_ids: Vec<DefId> = (0..rank_u32)
+            .map(|offset| DefId(self.next_synthetic_def + offset))
             .collect();
-        self.next_synthetic_def += rank as u32;
+        self.next_synthetic_def += rank_u32;
         let key_paths: Vec<HirExpression> = kept
             .iter()
             .map(|&index| self.synthesized(HirExpressionKind::Path(coordinate_ids[index]), span))
@@ -267,10 +296,10 @@ impl TypeChecker<'_> {
         // expanded node id (the `Reduction` for `sum`, the outer `Div` for
         // `mean`) so presentation emission prints `t.summa(axis n)` again. A
         // rest-form call records one entry per removed axis, in source order.
-        for &axis in &axes {
+        for axis in axes_u32 {
             self.axis_sugar.push(HirAxisSugar {
                 id: expr.id,
-                axis: axis as u32,
+                axis,
                 method: if mean {
                     HirAxisMethod::Mean
                 } else {
@@ -307,7 +336,9 @@ impl TypeChecker<'_> {
                     }
                 };
                 let count = self.synthesized(
-                    HirExpressionKind::Literal(radix_hir::HirLiteral::Float(count as f64)),
+                    HirExpressionKind::Literal(radix_hir::HirLiteral::Float(
+                        radix_types::Magnus::from_u64(count).to_f64(),
+                    )),
                     span,
                 );
                 HirExpressionKind::Binary(
@@ -445,8 +476,20 @@ pub(super) fn check_reduction_expr(
     };
     let element = checker.resolve_inferred_type(element);
     let dimensions = crate::i64s_from_literal_index(shape, checker.types);
-    let rank = super::expr::tensor_shape_rank(checker.types, shape)
-        .map_or(coordinates.len().max(1), |n| n as usize);
+    let rank = match super::expr::tensor_shape_rank(checker.types, shape) {
+        Some(n) => match usize::try_from(n) {
+            Ok(rank) => rank,
+            Err(_) => {
+                checker.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_REDUCTA_REQUIRES_SHAPED_ITERABLE,
+                    span,
+                );
+                return checker.error_type;
+            }
+        },
+        None => coordinates.len().max(1),
+    };
     match apud_arity(
         checker.types,
         dispatch,
@@ -1148,7 +1191,7 @@ impl ReductionBodyState {
         span: Span,
     ) {
         match &callee.kind {
-            HirExpressionKind::Path(def_id) => self.classify_callee(checker, *def_id, span),
+            HirExpressionKind::Path(def_id) => Self::classify_callee(checker, *def_id, span),
             other => {
                 if !matches!(other, HirExpressionKind::Error) {
                     effect(checker, span, "dynamic_function");
@@ -1192,7 +1235,7 @@ impl ReductionBodyState {
     /// device intrinsics, `@ nucleum fragment` calls and inlinable kernels
     /// (public or private) are admitted; async or fallible kernels, graphics
     /// stages, and ordinary host callables are not.
-    fn classify_callee(&mut self, checker: &mut TypeChecker<'_>, def_id: DefId, span: Span) {
+    fn classify_callee(checker: &mut TypeChecker<'_>, def_id: DefId, span: Span) {
         if checker.resolver.gpu_builtin(def_id).is_some() {
             return;
         }

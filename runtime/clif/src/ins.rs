@@ -3,6 +3,7 @@
 //! two precisions, as the oracle compares.
 
 use super::text_new;
+use crate::arena::ArenaPointer;
 use radix_runtime_contract::instans::{Instans, InstansPraecisio};
 use std::cmp::Ordering;
 
@@ -15,15 +16,15 @@ fn precision(code: i32) -> InstansPraecisio {
     }
 }
 
-fn make(value: Instans) -> *const u8 {
-    std::ptr::from_ref(Box::leak(Box::new(value))).cast::<u8>()
+fn make(arena: *const super::Arena, value: Instans) -> *const u8 {
+    arena.put(value).cast::<u8>()
 }
 
 /// # Safety
 ///
 /// `handle` came from this module.
 unsafe fn get(handle: *const u8) -> Instans {
-    unsafe { *handle.cast::<Instans>() }
+    unsafe { handle.cast::<Instans>().read_unaligned() }
 }
 
 /// Order of two instant handles, for the element comparisons of the runtime.
@@ -50,15 +51,24 @@ pub(crate) unsafe fn text(handle: *const u8) -> String {
 ///
 /// `text` is a well-formed text handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_ins_parse(text: *const u8, code: i32) -> *const u8 {
+pub unsafe extern "C" fn __faber_clif_v1_ins_parse(
+    arena: *const super::Arena,
+    text: *const u8,
+    code: i32,
+) -> *const u8 {
     let source = super::text_str(unsafe { super::text_bytes(text) });
-    Instans::from_rfc3339(&source, precision(code)).map_or(std::ptr::null(), make)
+    Instans::from_rfc3339(&source, precision(code))
+        .map_or(std::ptr::null(), |value| make(arena, value))
 }
 
 /// An instant from an epoch integer in the precision's native units.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_ins_from_epoch(epoch: i64, code: i32) -> *const u8 {
-    make(Instans::from_epoch_integer(epoch, precision(code)))
+pub extern "C" fn __faber_clif_v1_ins_from_epoch(
+    arena: *const super::Arena,
+    epoch: i64,
+    code: i32,
+) -> *const u8 {
+    make(arena, Instans::from_epoch_integer(epoch, precision(code)))
 }
 
 /// An instant at another precision.
@@ -67,8 +77,15 @@ pub extern "C" fn __faber_clif_v1_ins_from_epoch(epoch: i64, code: i32) -> *cons
 ///
 /// `value` came from this module.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_ins_retag(value: *const u8, code: i32) -> *const u8 {
-    make(unsafe { get(value) }.ad_praecisionem(precision(code)))
+pub unsafe extern "C" fn __faber_clif_v1_ins_retag(
+    arena: *const super::Arena,
+    value: *const u8,
+    code: i32,
+) -> *const u8 {
+    make(
+        arena,
+        unsafe { get(value) }.ad_praecisionem(precision(code)),
+    )
 }
 
 /// RFC 3339 text of an instant.
@@ -77,8 +94,11 @@ pub unsafe extern "C" fn __faber_clif_v1_ins_retag(value: *const u8, code: i32) 
 ///
 /// `value` came from this module.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_ins_text(value: *const u8) -> *const u8 {
-    text_new(unsafe { text(value) }.as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_ins_text(
+    arena: *const super::Arena,
+    value: *const u8,
+) -> *const u8 {
+    text_new(arena, unsafe { text(value) }.as_bytes())
 }
 
 /// Three-way comparison at the coarser precision: -1, 0, 1.
@@ -87,7 +107,11 @@ pub unsafe extern "C" fn __faber_clif_v1_ins_text(value: *const u8) -> *const u8
 ///
 /// Both handles came from this module.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_ins_compare(left: *const u8, right: *const u8) -> i32 {
+pub unsafe extern "C" fn __faber_clif_v1_ins_compare(
+    _arena: *const super::Arena,
+    left: *const u8,
+    right: *const u8,
+) -> i32 {
     match unsafe { order(left, right) } {
         Ordering::Less => -1,
         Ordering::Equal => 0,
@@ -97,8 +121,11 @@ pub unsafe extern "C" fn __faber_clif_v1_ins_compare(left: *const u8, right: *co
 
 /// An instant as open data.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_ins_box(value: *const u8) -> *const super::Present {
-    super::__faber_clif_v1_opt_some(super::TAG_INS, value as i64)
+pub extern "C" fn __faber_clif_v1_ins_box(
+    arena: *const super::Arena,
+    value: *const u8,
+) -> *const super::Present {
+    super::__faber_clif_v1_opt_some(arena, super::TAG_INS, value as i64)
 }
 
 /// The instant an open-data box holds at `precision` (an instant, RFC 3339
@@ -109,6 +136,7 @@ pub extern "C" fn __faber_clif_v1_ins_box(value: *const u8) -> *const super::Pre
 /// `value` is null or a live boxed payload.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_ins_unbox(
+    arena: *const super::Arena,
     value: *const super::Present,
     code: i32,
 ) -> *const u8 {
@@ -117,12 +145,16 @@ pub unsafe extern "C" fn __faber_clif_v1_ins_unbox(
     };
     let wanted = precision(code);
     match present.tag {
-        super::TAG_INS => make(unsafe { get(present.bits as *const u8) }.ad_praecisionem(wanted)),
+        super::TAG_INS => make(
+            arena,
+            unsafe { get(present.bits as *const u8) }.ad_praecisionem(wanted),
+        ),
         super::TAG_TEXT => {
             let source = super::text_str(unsafe { super::text_bytes(present.bits as *const u8) });
-            Instans::from_rfc3339(&source, wanted).map_or(std::ptr::null(), make)
+            Instans::from_rfc3339(&source, wanted)
+                .map_or(std::ptr::null(), |value| make(arena, value))
         }
-        super::TAG_INT => make(Instans::from_epoch_integer(present.bits, wanted)),
+        super::TAG_INT => make(arena, Instans::from_epoch_integer(present.bits, wanted)),
         _ => std::ptr::null(),
     }
 }
