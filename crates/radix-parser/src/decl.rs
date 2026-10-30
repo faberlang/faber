@@ -56,6 +56,17 @@ fn is_top_level_only_declaration(kind: &StmtKind) -> bool {
 
 // STATEMENT DISPATCH
 
+/// The kernel mode parsed from a kernel head's signature slot (operator
+/// ruling 2026-10-30): the fragment flag and tier the `@ nucleum` form
+/// writes as annotation words, plus the span of those words (none when the
+/// default mode is unwritten — the default tier has no word).
+#[derive(Default)]
+struct ParsedKernelMode {
+    is_fragment: bool,
+    tier: KernelTier,
+    mode_span: Option<Span>,
+}
+
 /// Former spellings of the writable-local word, now ordinary identifiers: en
 /// `var` and the six translated packs' old `varia` rows.
 const RETIRED_VAR_WORDS: &[&str] = &["var", "متغير", "चर", "แปร", "biến", "变量", "變值"];
@@ -74,6 +85,10 @@ impl Parser {
         let leading_trivia = self.parse_leading_trivia();
         let start = self.current_span();
         let id = self.next_id();
+        // The kernel declaration head synthesizes its nucleum annotation
+        // during the dispatch below; the statement carries it where the
+        // annotation form's marker rides.
+        let mut head_annotation: Option<Annotation> = None;
 
         let kind = match self.peek().kind {
             TokenKind::LBrace => StmtKind::Block(self.parse_block()?),
@@ -111,6 +126,15 @@ impl Parser {
                     self.parse_retired_static_decl()?
                 }
                 Some(TokenKind::Functio) => self.parse_func_decl()?,
+                // The kernel declaration head (operator ruling 2026-10-30):
+                // `nucleum name<T>(params) [mode] …`. Claimed only when a
+                // declaration name follows, so an ordinary `kernel(…)` call
+                // or identifier use stays expression material.
+                Some(TokenKind::Nucleum) if self.at_kernel_decl_head() => {
+                    let (func, head) = self.parse_kernel_decl()?;
+                    head_annotation = Some(head);
+                    StmtKind::Func(func)
+                }
                 Some(TokenKind::Genus) => self.parse_class_decl()?,
                 Some(TokenKind::Implendum) => self.parse_interface_decl()?,
                 Some(TokenKind::Ordo) => self.parse_enum_decl()?,
@@ -177,27 +201,36 @@ impl Parser {
             id,
             kind,
             span,
-            annotations: Vec::new(),
+            annotations: head_annotation.into_iter().collect(),
             leading_trivia,
         })
     }
 
     fn parse_annotated_stmt(&mut self, leading_trivia: Vec<Trivia>) -> Result<Stmt, ParseError> {
         let annotations = self.parse_annotations()?;
-        self.nondum_function_pending = self.check_keyword_ident(TokenKind::Functio)
-            && annotations
-                .iter()
-                .any(|annotation| self.is_nondum_annotation(annotation));
+        self.nondum_function_pending =
+            (self.check_keyword_ident(TokenKind::Functio) || self.at_kernel_decl_head())
+                && annotations
+                    .iter()
+                    .any(|annotation| self.is_nondum_annotation(annotation));
         let parsed = self.parse_stmt();
         self.nondum_function_pending = false;
         let mut stmt = parsed?;
         if !matches!(stmt.kind, StmtKind::Func(_)) {
             self.check_nucleum_tier_target(&annotations);
         }
+        // A kernel head under a stack of authored annotations reconciles
+        // with them here: both heads on one declaration is refused by name,
+        // and the head synthesizes its marker at the front of the stack so
+        // both spellings lower to the same annotation sequence.
+        let head_annotation = std::mem::take(&mut stmt.annotations);
+        stmt.annotations = match head_annotation.into_iter().next() {
+            Some(head) => self.merge_kernel_head_annotation(annotations, head),
+            None => annotations,
+        };
         let mut combined = leading_trivia;
         combined.append(&mut stmt.leading_trivia);
         stmt.leading_trivia = combined;
-        stmt.annotations = annotations;
         Ok(stmt)
     }
 
@@ -982,6 +1015,59 @@ impl Parser {
         let nondum_declared = std::mem::take(&mut self.nondum_function_pending);
         self.expect_keyword_ident(TokenKind::Functio)?;
 
+        let (decl, _) = self.parse_func_decl_after_head(nondum_declared, false)?;
+        Ok(StmtKind::Func(decl))
+    }
+
+    /// Parse a kernel declaration head (operator ruling 2026-10-30).
+    ///
+    /// GRAMMAR:
+    ///   kernel-decl := `nucleum` ident generic-params? `(` params `)`
+    ///                  func-modifier* kernel-mode? return-clause?
+    ///                  alternate-exit-clause? block
+    ///   kernel-mode := `laxus` | `intutus` | `fragment`
+    ///
+    /// The head reuses the kernel keyword identity, so every reader pack
+    /// spells it with its own `nucleum` row (`kernel` in English). It lowers
+    /// to the same function declaration the `@ nucleum` annotation form
+    /// marks: the parsed mode synthesizes the nucleum annotation, and the
+    /// caller attaches it where the authored marker would ride.
+    fn parse_kernel_decl(&mut self) -> Result<(FuncDecl, Annotation), ParseError> {
+        let nondum_declared = std::mem::take(&mut self.nondum_function_pending);
+        let head_span = self.current_span();
+        self.expect_keyword_ident(TokenKind::Nucleum)?;
+
+        let (decl, mode) = self.parse_func_decl_after_head(nondum_declared, true)?;
+        // The synthesized marker covers the head word and, when written, the
+        // mode words — the same span shape `@ nucleum laxus` owns.
+        let span = mode
+            .mode_span
+            .map_or(head_span, |mode_span| head_span.merge(mode_span));
+        let annotation = Annotation {
+            kind: AnnotationKind::Nucleum(NucleumAnnotation {
+                is_fragment: mode.is_fragment,
+                tier: mode.tier,
+                braced: false,
+            }),
+            span,
+        };
+        Ok((decl, annotation))
+    }
+
+    /// Parse the declaration body shared by both heads (`functio` and the
+    /// kernel head): name, generic parameters, parameter list, modifiers,
+    /// [kernel mode], posture, return clause, alternate exit, block.
+    ///
+    /// `kernel_head` selects the kernel mode slot between the modifier run and
+    /// the posture; the parsed mode is returned so the head can synthesize the
+    /// nucleum annotation. A `functio` head leaves the slot unparsed and gets
+    /// the default (no fragment, default tier, no written words) back, unused
+    /// by its caller.
+    fn parse_func_decl_after_head(
+        &mut self,
+        nondum_declared: bool,
+        kernel_head: bool,
+    ) -> Result<(FuncDecl, ParsedKernelMode), ParseError> {
         let name = self.parse_function_name()?;
         let type_params = self.parse_generic_params()?;
 
@@ -990,6 +1076,12 @@ impl Parser {
         self.expect_issue(&TokenKind::RParen, "function_declaration_parameters_end")?;
 
         let modifiers = self.parse_func_modifiers()?;
+
+        let kernel_mode = if kernel_head {
+            self.parse_kernel_mode()?
+        } else {
+            ParsedKernelMode::default()
+        };
 
         let posture = self.parse_callable_posture();
 
@@ -1016,18 +1108,133 @@ impl Parser {
             .with_arg("block", "{ ... }"));
         };
 
-        Ok(StmtKind::Func(FuncDecl {
-            name,
-            type_params,
-            params,
-            modifiers,
-            posture,
-            ret,
-            err,
-            body,
-            annotations: Vec::new(),
-            leading_trivia: Vec::new(),
-        }))
+        Ok((
+            FuncDecl {
+                name,
+                type_params,
+                params,
+                modifiers,
+                posture,
+                ret,
+                err,
+                body,
+                annotations: Vec::new(),
+                leading_trivia: Vec::new(),
+            },
+            kernel_mode,
+        ))
+    }
+
+    /// GRAMMAR (operator ruling 2026-10-30):
+    ///   kernel_mode := `laxus` | `intutus` | `fragment`
+    ///
+    /// One optional mode word in the kernel head's signature slot, after the
+    /// modifier run. Mirrors the annotation form's refusal set so both heads
+    /// teach one vocabulary: a second tier word (`duplicate_nucleum_tier`),
+    /// a tier beside `fragment` (`nucleum_tier_on_fragment`), and a word that
+    /// is no tier (`unknown_nucleum_tier`) are all refused by name.
+    fn parse_kernel_mode(&mut self) -> Result<ParsedKernelMode, ParseError> {
+        let start = self.current_span();
+        let is_fragment = self.eat_keyword_ident(TokenKind::Fragment);
+        let tier = self.parse_kernel_mode_tier(is_fragment)?;
+        let mode_span = (is_fragment || tier != KernelTier::Default)
+            .then(|| start.merge(self.previous_span()));
+        Ok(ParsedKernelMode {
+            is_fragment,
+            tier,
+            mode_span,
+        })
+    }
+
+    /// The tier word of the kernel mode slot, mirroring the annotation
+    /// form's `parse_nucleum_tier` refusals over the signature slot's words.
+    ///
+    /// A callable-posture word is grammar structure of the shared signature
+    /// tail, not a mode: it ends the slot and reaches the posture parse (and
+    /// the semantic `nucleum_async` refusal) exactly as the annotation form
+    /// does. Any other word in the slot names an unknown tier, because after
+    /// the modifier run only a mode, a posture word, or the return and block
+    /// clauses may follow.
+    fn parse_kernel_mode_tier(&mut self, fragment: bool) -> Result<KernelTier, ParseError> {
+        let mut tier = KernelTier::Default;
+        let mut written = false;
+        loop {
+            let TokenKind::Ident(symbol) = self.peek().kind else {
+                break;
+            };
+            let next = match self.current_keyword_ident() {
+                Some(TokenKind::Laxus) => KernelTier::Relaxed,
+                Some(TokenKind::Intutus) => KernelTier::Unsafe,
+                Some(TokenKind::Fragment) if written => {
+                    return Err(self.invalid_annotation_error("nucleum_tier_on_fragment"));
+                }
+                Some(TokenKind::Fragment) => break,
+                Some(TokenKind::Fiet | TokenKind::Fiunt | TokenKind::Fient) => break,
+                _ => {
+                    return Err(self
+                        .invalid_annotation_error("unknown_nucleum_tier")
+                        .with_arg("name", self.interner.resolve(symbol).to_owned()));
+                }
+            };
+            if written {
+                return Err(self.invalid_annotation_error("duplicate_nucleum_tier"));
+            }
+            if fragment {
+                return Err(self.invalid_annotation_error("nucleum_tier_on_fragment"));
+            }
+            self.advance();
+            tier = next;
+            written = true;
+        }
+        Ok(tier)
+    }
+
+    /// Whether the current `nucleum` word is claimed as a kernel declaration
+    /// head: a declaration-name shape must follow, so an ordinary identifier
+    /// use, a `kernel(…)` call, or a member access stays expression material.
+    fn at_kernel_decl_head(&self) -> bool {
+        if self.current_keyword_ident() != Some(TokenKind::Nucleum) {
+            return false;
+        }
+        matches!(
+            self.peek_at(1).kind,
+            TokenKind::Ident(_) | TokenKind::Underscore(_) | TokenKind::Tag
+        )
+    }
+
+    /// Fold a kernel declaration head's synthesized marker into the
+    /// annotation stack of the same declaration (operator ruling 2026-10-30).
+    ///
+    /// Both heads on one declaration are refused by name — no silent merge —
+    /// and a fragment mode conflicts with a graphics fragment annotation
+    /// exactly as the annotation form's modifier does. The synthesized marker
+    /// takes the front of the stack, the canonical position the annotation
+    /// form writes it in, so both spellings lower to one annotation sequence.
+    fn merge_kernel_head_annotation(
+        &mut self,
+        mut annotations: Vec<Annotation>,
+        head: Annotation,
+    ) -> Vec<Annotation> {
+        if annotations
+            .iter()
+            .any(|annotation| matches!(annotation.kind, AnnotationKind::Nucleum(_)))
+        {
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::AnnotationInvalid, head.span)
+                    .with_arg("issue", "nucleum_double_head"),
+            );
+        } else if matches!(&head.kind, AnnotationKind::Nucleum(nucleum) if nucleum.is_fragment)
+            && let Some(graphics) = annotations
+                .iter()
+                .find(|annotation| self.is_graphics_fragment_annotation(&annotation.kind))
+        {
+            self.errors.push(
+                ParseError::structured(ParseErrorKind::AnnotationInvalid, graphics.span)
+                    .with_arg("issue", "nucleum_fragment_conflicts_with_fragment"),
+            );
+        }
+        annotations.insert(0, head);
+        annotations
     }
 
     /// Whether `annotation` is the `@ nondum` availability marker, in either
@@ -1440,7 +1647,7 @@ impl Parser {
         let leading_trivia = self.parse_leading_trivia();
         let start = self.current_span();
 
-        let annotations = self.parse_annotations()?;
+        let mut annotations = self.parse_annotations()?;
 
         let kind = if self.check_keyword_ident(TokenKind::Functio) {
             // An `@ nondum` method may omit its block, like a free function.
@@ -1455,6 +1662,15 @@ impl Parser {
                     &["functio"],
                 ));
             };
+            ClassMemberKind::Method(func)
+        } else if self.at_kernel_decl_head() {
+            // A kernel method head: same rule as a `functio` method, with the
+            // head's marker folded into the member's annotation stack.
+            self.nondum_function_pending = annotations
+                .iter()
+                .any(|annotation| self.is_nondum_annotation(annotation));
+            let (func, head) = self.parse_kernel_decl()?;
+            annotations = self.merge_kernel_head_annotation(annotations, head);
             ClassMemberKind::Method(func)
         } else {
             self.check_nucleum_tier_target(&annotations);
@@ -2801,7 +3017,13 @@ impl Parser {
         // `@ conversio` is a bare marker on the function declaration prefix.
         // The ordered concrete pair is derived from the function signature by
         // semantic enrollment; the old typed union-arm payload is retracted.
+        // A kernel head names a device kernel, a different contract from a
+        // host conversion row, so the pair is refused by name here (operator
+        // ruling 2026-10-30) rather than enrolled from a kernel signature.
         if matches!(annotation_identity, Some(TokenKind::Conversio)) {
+            if self.at_kernel_decl_head() {
+                return Err(self.invalid_annotation_error("conversio_kernel_head"));
+            }
             if self.current_keyword_ident() != Some(TokenKind::Functio) {
                 return Err(self
                     .invalid_annotation_error("unexpected_annotation_token")

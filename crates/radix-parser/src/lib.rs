@@ -1944,6 +1944,10 @@ mod schema_test;
 mod nucleum_annotation_test;
 
 #[cfg(test)]
+#[path = "nucleum_head_test.rs"]
+mod nucleum_head_test;
+
+#[cfg(test)]
 #[path = "annotation_locale_test.rs"]
 mod annotation_locale_test;
 

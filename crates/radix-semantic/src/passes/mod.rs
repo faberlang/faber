@@ -270,6 +270,10 @@ mod kernel_requirements_test;
 mod kernel_tier_test;
 
 #[cfg(test)]
+#[path = "nucleum_head_test.rs"]
+mod nucleum_head_test;
+
+#[cfg(test)]
 #[path = "kernel_namespace_test.rs"]
 mod kernel_namespace_test;
 
