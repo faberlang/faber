@@ -125,6 +125,30 @@ pub(crate) struct DeviceRuntimeMetadata {
     pub(crate) live_buffers: u64,
     pub(crate) allocated_bytes: u64,
     pub(crate) peak_allocated_bytes: u64,
+    /// Device buffer allocation calls that reached the driver, counted by the
+    /// runtime adapters (never from logical receipts); a pooled reuse is not
+    /// one. With `buffer_release_count` this is the steady-loop allocation
+    /// promise's evidence: a steady loop (same kernels, same shapes) leaves
+    /// both unchanged after its first iteration. Absent in artifacts from
+    /// before the counters; read as 0 there. See
+    /// `docs/design/device-allocation-promise.md`.
+    #[serde(default)]
+    pub(crate) buffer_alloc_count: u64,
+    /// Device buffer release calls that reached the driver; parking a
+    /// released buffer for reuse is not one, while evicting a parked buffer
+    /// under budget pressure is.
+    #[serde(default)]
+    pub(crate) buffer_release_count: u64,
+    /// Allocations served from the runtime's buffer pool: no driver call.
+    #[serde(default)]
+    pub(crate) buffer_pool_hits: u64,
+    /// Buffers parked in the runtime's buffer pool at the end of the run.
+    #[serde(default)]
+    pub(crate) buffer_pool_buffers: u64,
+    /// Bytes parked in the pool at the end of the run: real device memory
+    /// (it counts against the budget) backing no live buffer.
+    #[serde(default)]
+    pub(crate) buffer_pool_bytes: u64,
     pub(crate) host_to_device_bytes: u64,
     pub(crate) device_to_host_bytes: u64,
     /// A logical device spanning several partitions (rule 18) only.
@@ -484,6 +508,11 @@ impl DeviceMetadata {
                 live_buffers: runtime.live_buffers,
                 allocated_bytes: runtime.allocated_bytes,
                 peak_allocated_bytes: runtime.peak_allocated_bytes,
+                buffer_alloc_count: runtime.buffer_alloc_count,
+                buffer_release_count: runtime.buffer_release_count,
+                buffer_pool_hits: runtime.buffer_pool_hits,
+                buffer_pool_buffers: runtime.buffer_pool_buffers,
+                buffer_pool_bytes: runtime.buffer_pool_bytes,
                 host_to_device_bytes: runtime.host_to_device_bytes,
                 device_to_host_bytes: runtime.device_to_host_bytes,
                 span: runtime.span.as_ref().map(|span| {

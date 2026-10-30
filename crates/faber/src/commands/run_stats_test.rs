@@ -243,6 +243,11 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
             live_buffers: 8,
             allocated_bytes: 128,
             peak_allocated_bytes: 256,
+            buffer_alloc_count: 3,
+            buffer_release_count: 1,
+            buffer_pool_hits: 9,
+            buffer_pool_buffers: 1,
+            buffer_pool_bytes: 64,
             host_to_device_bytes: 64,
             device_to_host_bytes: 32,
             span: None,
@@ -270,6 +275,10 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     assert_eq!(value["device"]["host_blocked_ns"], 20);
     assert_eq!(value["device"]["gpu_timer_available"], true);
     assert_eq!(value["device"]["gpu_sample_launch_capacity"], 1_024);
+    assert_eq!(value["device"]["runtime"]["buffer_alloc_count"], 3);
+    assert_eq!(value["device"]["runtime"]["buffer_release_count"], 1);
+    assert_eq!(value["device"]["runtime"]["buffer_pool_hits"], 9);
+    assert_eq!(value["device"]["runtime"]["buffer_pool_bytes"], 64);
     let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("device schema");
     assert_eq!(decoded, artifact);
 
@@ -277,6 +286,15 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     device.remove("gpu_timer_available");
     device.remove("gpu_sample_launch_capacity");
     device.remove("host_blocked_ns");
+    let runtime = device
+        .get_mut("runtime")
+        .and_then(|runtime| runtime.as_object_mut())
+        .expect("runtime object");
+    runtime.remove("buffer_alloc_count");
+    runtime.remove("buffer_release_count");
+    runtime.remove("buffer_pool_hits");
+    runtime.remove("buffer_pool_buffers");
+    runtime.remove("buffer_pool_bytes");
     let old_decoded: RunStatsArtifact =
         serde_json::from_value(value).expect("old device artifact without sampling metadata");
     let old_device = old_decoded.device.expect("old device metadata");
@@ -286,6 +304,10 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     // `host_encode_ns` still includes the waits.
     assert_eq!(old_device.host_blocked_ns, None);
     assert_eq!(old_device.host_encode_ns, 16);
+    // An artifact from before the allocation counters reads them as zero.
+    assert_eq!(old_device.runtime.buffer_alloc_count, 0);
+    assert_eq!(old_device.runtime.buffer_release_count, 0);
+    assert_eq!(old_device.runtime.buffer_pool_hits, 0);
 }
 
 #[test]
@@ -682,6 +704,11 @@ fn device_span_stats_appear_only_for_a_spanned_device() {
         live_buffers: 2,
         allocated_bytes: 0,
         peak_allocated_bytes: 0,
+        buffer_alloc_count: 0,
+        buffer_release_count: 0,
+        buffer_pool_hits: 0,
+        buffer_pool_buffers: 0,
+        buffer_pool_bytes: 0,
         host_to_device_bytes: 16,
         device_to_host_bytes: 8,
         span,
