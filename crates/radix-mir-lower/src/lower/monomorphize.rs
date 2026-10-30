@@ -634,7 +634,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             shape_check: shape_check.as_ref(),
         };
         let parent_shape_bindings = self.instance_shape_bindings(function);
-        let key = self.key_for_call(&template, explicit_type_args, witness, &parent_shape_bindings)?;
+        let key = self.key_for_call(&template, explicit_type_args, &witness, &parent_shape_bindings)?;
         let (target, fresh_instance) = self.ensure_instance(&template, &key, span)?;
         Some(Rewrite { function, block_index, location, target, fresh_instance })
     }
@@ -662,10 +662,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         &mut self,
         template: &MirFunction,
         explicit_type_args: &[MirType],
-        witness: CallWitness<'_>,
+        witness: &CallWitness<'_>,
         parent_shape_bindings: &MirShapeBindings,
     ) -> Option<MirMonomorphizationKey> {
-        let CallWitness { caller_source, args, destination, error_place, span, scope, shape_check } = witness;
+        let CallWitness { caller_source, args, destination, error_place, span, scope, shape_check } = *witness;
         let (source, params, mut bindings, mut shape_bindings) =
             self.prepare_call_bindings(template, explicit_type_args, caller_source, span)?;
         for (index, arg) in args.iter().enumerate() {
