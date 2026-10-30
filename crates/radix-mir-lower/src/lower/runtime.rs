@@ -226,7 +226,7 @@ impl FunctionBuilder<'_> {
             &[],
             ShapeRelationBoundary::Store,
             &[],
-            Some((expression.0, value)),
+            Some(&(expression.0, value)),
             0,
             span,
         )
@@ -244,12 +244,13 @@ impl FunctionBuilder<'_> {
         span: Span,
     ) -> Option<()> {
         let relations = self.function_shape_relations.clone();
+        let expression_value = (expression, value);
         self.emit_shape_check(
             &relations,
             &[],
             ShapeRelationBoundary::FunctionReturn,
             &[],
-            Some((expression, value)),
+            Some(&expression_value),
             0,
             span,
         )
@@ -261,7 +262,7 @@ impl FunctionBuilder<'_> {
         size_bindings: &[RuntimeSizeBinding],
         boundary: ShapeRelationBoundary,
         arguments: &[MirOperand],
-        expression_value: Option<(u32, MirOperand)>,
+        expression_value: Option<&(u32, MirOperand)>,
         callee_parameter_offset: u32,
         span: Span,
     ) -> Option<()> {
@@ -270,7 +271,7 @@ impl FunctionBuilder<'_> {
             .filter(|relation| relation.boundary == boundary)
             .filter(|relation| {
                 boundary != ShapeRelationBoundary::FunctionReturn
-                    || expression_value.as_ref().is_none_or(|(expression, _)| {
+                    || expression_value.is_none_or(|(expression, _)| {
                         shape_relation_applies_to_return(self.types, relation, *expression)
                     })
             })
@@ -286,7 +287,7 @@ impl FunctionBuilder<'_> {
             let witness = match self.lower_shape_expr(
                 binding.witness,
                 &mut check_arguments,
-                expression_value.as_ref(),
+                expression_value,
                 boundary,
                 callee_parameter_offset,
             ) {
@@ -303,7 +304,7 @@ impl FunctionBuilder<'_> {
             let left = match self.lower_shape_expr(
                 relation.left,
                 &mut check_arguments,
-                expression_value.as_ref(),
+                expression_value,
                 boundary,
                 callee_parameter_offset,
             ) {
@@ -317,7 +318,7 @@ impl FunctionBuilder<'_> {
             let right = match self.lower_shape_expr(
                 relation.right,
                 &mut check_arguments,
-                expression_value.as_ref(),
+                expression_value,
                 boundary,
                 callee_parameter_offset,
             ) {
@@ -1558,9 +1559,9 @@ impl FunctionBuilder<'_> {
             return None;
         }
         let lhs_operand = self.lower_expr_value(lhs)?;
-        let lhs_place = self.value_base_place(lhs_operand, MirType::semantic(lhs.ty?), lhs.span)?;
+        let lhs_place = self.value_base_place(lhs_operand, MirType::semantic(lhs.ty?), lhs.span);
         let rhs_operand = self.lower_expr_value(rhs)?;
-        let rhs_place = self.value_base_place(rhs_operand, MirType::semantic(rhs.ty?), rhs.span)?;
+        let rhs_place = self.value_base_place(rhs_operand, MirType::semantic(rhs.ty?), rhs.span);
         let elem_ty = MirType::semantic(lhs_elem);
         let matrix_ty = self.expr_ty(expr)?;
         let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
@@ -2049,7 +2050,7 @@ impl FunctionBuilder<'_> {
         }
         let lhs = self.lower_expr_value(receiver)?;
         let matrix_ty = MirType::semantic(receiver_ty);
-        let lhs = self.value_base_place(lhs, matrix_ty, receiver.span)?;
+        let lhs = self.value_base_place(lhs, matrix_ty, receiver.span);
         let elem_ty = MirType::semantic(element_ty);
 
         if method_name == "inversa" {
@@ -2057,14 +2058,14 @@ impl FunctionBuilder<'_> {
                 return None;
             }
             let result_ty = self.expr_ty(expr)?;
-            return Some(self.lower_matrix_inversa(lhs, rows, columns, elem_ty, matrix_ty, result_ty, expr));
+            return Some(self.lower_matrix_inversa(&lhs, rows, columns, elem_ty, matrix_ty, result_ty, expr));
         }
         if method_name == "transpone" {
             if !args.is_empty() {
                 return None;
             }
             let result_ty = self.expr_ty(expr)?;
-            return Some(self.lower_matrix_transpone(lhs, rows, columns, result_ty, expr));
+            return Some(self.lower_matrix_transpone(&lhs, rows, columns, result_ty, expr));
         }
 
         let [arg] = args else {
@@ -2072,7 +2073,7 @@ impl FunctionBuilder<'_> {
         };
         let rhs = self.lower_expr_value(&arg.expr)?;
         let rhs_ty = arg.expr.ty.map_or(matrix_ty, MirType::semantic);
-        let rhs = self.value_base_place(rhs, rhs_ty, arg.expr.span)?;
+        let rhs = self.value_base_place(rhs, rhs_ty, arg.expr.span);
         if method_name == "matmul" {
             // Full matmul needs the peer's literal [K,N] shape: the result is
             // [M,N], never the receiver's own [M,K] (which would silently drop
@@ -2098,7 +2099,7 @@ impl FunctionBuilder<'_> {
                 ));
                 return None;
             };
-            return Some(self.lower_matrix_matmul(lhs, rhs, rows, columns, rhs_rows, rhs_columns, elem_ty, expr));
+            return Some(self.lower_matrix_matmul(&lhs, &rhs, rows, columns, rhs_rows, rhs_columns, elem_ty, expr));
         }
         if method_name == "applica" {
             // Peer is vector width = columns; result is vector width = rows.
@@ -2131,7 +2132,7 @@ impl FunctionBuilder<'_> {
                 return None;
             }
             let result_ty = self.expr_ty(expr)?;
-            return Some(self.lower_matrix_applica(lhs, rhs, rows, columns, elem_ty, result_ty, expr));
+            return Some(self.lower_matrix_applica(&lhs, &rhs, rows, columns, elem_ty, result_ty, expr));
         }
         let op = matrix_method_kind(method_name)?;
         Some(self.lower_matrix_elementwise_op(lhs, rhs, (rows, columns), op, (elem_ty, matrix_ty), expr))
@@ -2243,9 +2244,9 @@ impl FunctionBuilder<'_> {
             return None;
         }
         let vector = self.lower_expr_value(lhs)?;
-        let vector = self.value_base_place(vector, MirType::semantic(lhs_ty_id), lhs.span)?;
+        let vector = self.value_base_place(vector, MirType::semantic(lhs_ty_id), lhs.span);
         let matrix = self.lower_expr_value(rhs)?;
-        let matrix = self.value_base_place(matrix, MirType::semantic(rhs_ty_id), rhs.span)?;
+        let matrix = self.value_base_place(matrix, MirType::semantic(rhs_ty_id), rhs.span);
         let elem_ty = MirType::semantic(element_ty);
         let result_ty = self.expr_ty(expr)?;
         let mut fields = Vec::with_capacity(usize::from(columns));
@@ -2288,8 +2289,8 @@ impl FunctionBuilder<'_> {
     /// Expand matrix×vector product into cell×lane mul/add and a vector construct.
     fn lower_matrix_applica(
         &mut self,
-        matrix: MirPlace,
-        vector: MirPlace,
+        matrix: &MirPlace,
+        vector: &MirPlace,
         rows: u8,
         columns: u8,
         elem_ty: MirType,
@@ -2301,8 +2302,8 @@ impl FunctionBuilder<'_> {
             let mut acc = self.assign_temp(
                 MirValueKind::Binary {
                     op: MirBinOp::Mul,
-                    lhs: matrix_cell_operand(&matrix, row, 0),
-                    rhs: vector_lane_operand(&vector, 0),
+                    lhs: matrix_cell_operand(matrix, row, 0),
+                    rhs: vector_lane_operand(vector, 0),
                 },
                 elem_ty,
                 expr.span,
@@ -2311,8 +2312,8 @@ impl FunctionBuilder<'_> {
                 let product = self.assign_temp(
                     MirValueKind::Binary {
                         op: MirBinOp::Mul,
-                        lhs: matrix_cell_operand(&matrix, row, column),
-                        rhs: vector_lane_operand(&vector, column),
+                        lhs: matrix_cell_operand(matrix, row, column),
+                        rhs: vector_lane_operand(vector, column),
                     },
                     elem_ty,
                     expr.span,
@@ -2337,7 +2338,7 @@ impl FunctionBuilder<'_> {
     /// receiver cell `(r, c)` — a pure operand permutation, no arithmetic.
     fn lower_matrix_transpone(
         &mut self,
-        matrix: MirPlace,
+        matrix: &MirPlace,
         rows: u8,
         columns: u8,
         result_ty: MirType,
@@ -2346,7 +2347,7 @@ impl FunctionBuilder<'_> {
         let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
         for column in 0..columns {
             for row in 0..rows {
-                fields.push(MirAggregateItem::Operand(matrix_cell_operand(&matrix, row, column)));
+                fields.push(MirAggregateItem::Operand(matrix_cell_operand(matrix, row, column)));
             }
         }
         self.construct_temp(
@@ -2365,7 +2366,7 @@ impl FunctionBuilder<'_> {
     /// Other ranks reject before emission.
     fn lower_matrix_inversa(
         &mut self,
-        matrix: MirPlace,
+        matrix: &MirPlace,
         rows: u8,
         columns: u8,
         elem_ty: MirType,
@@ -2393,16 +2394,16 @@ impl FunctionBuilder<'_> {
 
     fn lower_matrix_inversa_2x2(
         &mut self,
-        matrix: MirPlace,
+        matrix: &MirPlace,
         elem_ty: MirType,
         matrix_ty: MirType,
         option_ty: MirType,
         expr: &HirExpression,
     ) -> MirOperand {
-        let a = matrix_cell_operand(&matrix, 0, 0);
-        let b = matrix_cell_operand(&matrix, 0, 1);
-        let c = matrix_cell_operand(&matrix, 1, 0);
-        let d = matrix_cell_operand(&matrix, 1, 1);
+        let a = matrix_cell_operand(matrix, 0, 0);
+        let b = matrix_cell_operand(matrix, 0, 1);
+        let c = matrix_cell_operand(matrix, 1, 0);
+        let d = matrix_cell_operand(matrix, 1, 1);
         let ad = self.assign_temp(
             MirValueKind::Binary { op: MirBinOp::Mul, lhs: a.clone(), rhs: d.clone() },
             elem_ty,
@@ -2423,25 +2424,25 @@ impl FunctionBuilder<'_> {
     /// expressed with row-major language cells.
     fn lower_matrix_inversa_affine_4x4(
         &mut self,
-        matrix: MirPlace,
+        matrix: &MirPlace,
         elem_ty: MirType,
         matrix_ty: MirType,
         option_ty: MirType,
         expr: &HirExpression,
     ) -> MirOperand {
         // Upper-left 3×3 cells (row-major language matrix).
-        let a00 = matrix_cell_operand(&matrix, 0, 0);
-        let a01 = matrix_cell_operand(&matrix, 0, 1);
-        let a02 = matrix_cell_operand(&matrix, 0, 2);
-        let a10 = matrix_cell_operand(&matrix, 1, 0);
-        let a11 = matrix_cell_operand(&matrix, 1, 1);
-        let a12 = matrix_cell_operand(&matrix, 1, 2);
-        let a20 = matrix_cell_operand(&matrix, 2, 0);
-        let a21 = matrix_cell_operand(&matrix, 2, 1);
-        let a22 = matrix_cell_operand(&matrix, 2, 2);
-        let tx = matrix_cell_operand(&matrix, 0, 3);
-        let ty = matrix_cell_operand(&matrix, 1, 3);
-        let tz = matrix_cell_operand(&matrix, 2, 3);
+        let a00 = matrix_cell_operand(matrix, 0, 0);
+        let a01 = matrix_cell_operand(matrix, 0, 1);
+        let a02 = matrix_cell_operand(matrix, 0, 2);
+        let a10 = matrix_cell_operand(matrix, 1, 0);
+        let a11 = matrix_cell_operand(matrix, 1, 1);
+        let a12 = matrix_cell_operand(matrix, 1, 2);
+        let a20 = matrix_cell_operand(matrix, 2, 0);
+        let a21 = matrix_cell_operand(matrix, 2, 1);
+        let a22 = matrix_cell_operand(matrix, 2, 2);
+        let tx = matrix_cell_operand(matrix, 0, 3);
+        let ty = matrix_cell_operand(matrix, 1, 3);
+        let tz = matrix_cell_operand(matrix, 2, 3);
 
         // det = a00*(a11*a22-a12*a21) - a01*(a10*a22-a12*a20) + a02*(a10*a21-a11*a20)
         let t0 = self.mul_sub_mul(&a11, &a22, &a12, &a21, elem_ty, expr.span);
@@ -2471,7 +2472,7 @@ impl FunctionBuilder<'_> {
 
         self.lower_matrix_inversa_with_det(det, elem_ty, option_ty, expr, |this, inv_det| {
             this.lower_matrix_3x3_inverse_with_det(
-                a00, a01, a02, a10, a11, a12, a20, a21, a22, tx, ty, tz, inv_det, elem_ty, matrix_ty, expr,
+                &a00, &a01, &a02, &a10, &a11, &a12, &a20, &a21, &a22, &tx, &ty, &tz, &inv_det, elem_ty, matrix_ty, expr,
             )
         })
     }
@@ -2604,37 +2605,37 @@ impl FunctionBuilder<'_> {
     /// (ntx–ntz), and assembles a 4×4 matrix in Triga column-vector layout.
     fn lower_matrix_3x3_inverse_with_det(
         &mut self,
-        a00: MirOperand,
-        a01: MirOperand,
-        a02: MirOperand,
-        a10: MirOperand,
-        a11: MirOperand,
-        a12: MirOperand,
-        a20: MirOperand,
-        a21: MirOperand,
-        a22: MirOperand,
-        tx: MirOperand,
-        ty: MirOperand,
-        tz: MirOperand,
-        inv_det: MirOperand,
+        a00: &MirOperand,
+        a01: &MirOperand,
+        a02: &MirOperand,
+        a10: &MirOperand,
+        a11: &MirOperand,
+        a12: &MirOperand,
+        a20: &MirOperand,
+        a21: &MirOperand,
+        a22: &MirOperand,
+        tx: &MirOperand,
+        ty: &MirOperand,
+        tz: &MirOperand,
+        inv_det: &MirOperand,
         elem_ty: MirType,
         matrix_ty: MirType,
         expr: &HirExpression,
     ) -> MirOperand {
-        let i00 = self.scaled_mul_sub_mul(&a11, &a22, &a12, &a21, &inv_det, elem_ty, expr.span);
-        let i01 = self.scaled_mul_sub_mul(&a02, &a21, &a01, &a22, &inv_det, elem_ty, expr.span);
-        let i02 = self.scaled_mul_sub_mul(&a01, &a12, &a02, &a11, &inv_det, elem_ty, expr.span);
-        let i10 = self.scaled_mul_sub_mul(&a12, &a20, &a10, &a22, &inv_det, elem_ty, expr.span);
-        let i11 = self.scaled_mul_sub_mul(&a00, &a22, &a02, &a20, &inv_det, elem_ty, expr.span);
-        let i12 = self.scaled_mul_sub_mul(&a02, &a10, &a00, &a12, &inv_det, elem_ty, expr.span);
-        let i20 = self.scaled_mul_sub_mul(&a10, &a21, &a11, &a20, &inv_det, elem_ty, expr.span);
-        let i21 = self.scaled_mul_sub_mul(&a01, &a20, &a00, &a21, &inv_det, elem_ty, expr.span);
-        let i22 = self.scaled_mul_sub_mul(&a00, &a11, &a01, &a10, &inv_det, elem_ty, expr.span);
+        let i00 = self.scaled_mul_sub_mul(a11, a22, a12, a21, inv_det, elem_ty, expr.span);
+        let i01 = self.scaled_mul_sub_mul(a02, a21, a01, a22, inv_det, elem_ty, expr.span);
+        let i02 = self.scaled_mul_sub_mul(a01, a12, a02, a11, inv_det, elem_ty, expr.span);
+        let i10 = self.scaled_mul_sub_mul(a12, a20, a10, a22, inv_det, elem_ty, expr.span);
+        let i11 = self.scaled_mul_sub_mul(a00, a22, a02, a20, inv_det, elem_ty, expr.span);
+        let i12 = self.scaled_mul_sub_mul(a02, a10, a00, a12, inv_det, elem_ty, expr.span);
+        let i20 = self.scaled_mul_sub_mul(a10, a21, a11, a20, inv_det, elem_ty, expr.span);
+        let i21 = self.scaled_mul_sub_mul(a01, a20, a00, a21, inv_det, elem_ty, expr.span);
+        let i22 = self.scaled_mul_sub_mul(a00, a11, a01, a10, inv_det, elem_ty, expr.span);
 
         // translation' = -R^{-1} * t
-        let ntx = self.neg_dot3(&i00, &i01, &i02, &tx, &ty, &tz, elem_ty, expr.span);
-        let nty = self.neg_dot3(&i10, &i11, &i12, &tx, &ty, &tz, elem_ty, expr.span);
-        let ntz = self.neg_dot3(&i20, &i21, &i22, &tx, &ty, &tz, elem_ty, expr.span);
+        let ntx = self.neg_dot3(&i00, &i01, &i02, tx, ty, tz, elem_ty, expr.span);
+        let nty = self.neg_dot3(&i10, &i11, &i12, tx, ty, tz, elem_ty, expr.span);
+        let ntz = self.neg_dot3(&i20, &i21, &i22, tx, ty, tz, elem_ty, expr.span);
         let zero = self.assign_temp(
             MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(0.0))),
             elem_ty,
@@ -2748,8 +2749,8 @@ impl FunctionBuilder<'_> {
     /// receiver's K fails closed — columns are never truncated.
     fn lower_matrix_matmul(
         &mut self,
-        lhs: MirPlace,
-        rhs: MirPlace,
+        lhs: &MirPlace,
+        rhs: &MirPlace,
         rows: u8,
         columns: u8,
         rhs_rows: u8,
@@ -2810,8 +2811,8 @@ impl FunctionBuilder<'_> {
                 let mut acc = self.assign_temp(
                     MirValueKind::Binary {
                         op: MirBinOp::Mul,
-                        lhs: matrix_cell_operand(&lhs, row, 0),
-                        rhs: matrix_cell_operand(&rhs, 0, column),
+                        lhs: matrix_cell_operand(lhs, row, 0),
+                        rhs: matrix_cell_operand(rhs, 0, column),
                     },
                     elem_ty,
                     expr.span,
@@ -2820,8 +2821,8 @@ impl FunctionBuilder<'_> {
                     let product = self.assign_temp(
                         MirValueKind::Binary {
                             op: MirBinOp::Mul,
-                            lhs: matrix_cell_operand(&lhs, row, k),
-                            rhs: matrix_cell_operand(&rhs, k, column),
+                            lhs: matrix_cell_operand(lhs, row, k),
+                            rhs: matrix_cell_operand(rhs, k, column),
                         },
                         elem_ty,
                         expr.span,
@@ -2871,14 +2872,14 @@ impl FunctionBuilder<'_> {
         )
     }
 
-    pub(super) fn value_base_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> Option<MirPlace> {
+    pub(super) fn value_base_place(&mut self, operand: MirOperand, ty: MirType, span: Span) -> MirPlace {
         match operand {
-            MirOperand::Place(place) => Some(place),
-            MirOperand::Temp(id) => Some(MirPlace::temp(id)),
+            MirOperand::Place(place) => place,
+            MirOperand::Temp(id) => MirPlace::temp(id),
             MirOperand::Value(_) | MirOperand::Constant(_) => {
                 let temp = self.push_temp(ty, span);
                 self.assign(MirPlace::temp(temp), operand, ty, span);
-                Some(MirPlace::temp(temp))
+                MirPlace::temp(temp)
             }
         }
     }
@@ -3891,7 +3892,7 @@ impl FunctionBuilder<'_> {
             return Some(MirOperand::Temp(destination));
         }
 
-        self.lower_failable_call_declared(callee, lowered_args, ty, err_ty, conversion, span)
+        Some(self.lower_failable_call_declared(callee, lowered_args, ty, err_ty, conversion, span))
     }
 
     /// Lower a failable call that reaches the declared `⇥` error channel (no
@@ -3905,7 +3906,7 @@ impl FunctionBuilder<'_> {
         err_ty: MirType,
         conversion: Option<DefId>,
         span: Span,
-    ) -> Option<MirOperand> {
+    ) -> MirOperand {
         let Some(destination_ty) = self.error_ty else {
             return self.lower_unhandled_call_panic(callee, lowered_args, ty, err_ty, span);
         };
@@ -3930,7 +3931,7 @@ impl FunctionBuilder<'_> {
             let propagated = self.lower_propagated_error(error_temp, destination_ty, conversion, span);
             self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
             self.switch_to(ok_block);
-            return Some(MirOperand::Constant(MirConstant::Unit));
+            return MirOperand::Constant(MirConstant::Unit);
         }
 
         let destination = self.push_temp(ty, span);
@@ -3949,7 +3950,7 @@ impl FunctionBuilder<'_> {
         let propagated = self.lower_propagated_error(error_temp, destination_ty, conversion, span);
         self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
         self.switch_to(ok_block);
-        Some(MirOperand::Temp(destination))
+        MirOperand::Temp(destination)
     }
 
     /// D17.8: a failable call with no trap, `cape` handler or declared `⇥`
@@ -3963,7 +3964,7 @@ impl FunctionBuilder<'_> {
         ty: MirType,
         err_ty: MirType,
         span: Span,
-    ) -> Option<MirOperand> {
+    ) -> MirOperand {
         let ok_block = self.fresh_block(span);
         let error_block = self.fresh_block(span);
         let error_temp = self.push_temp(err_ty, span);
@@ -3994,7 +3995,7 @@ impl FunctionBuilder<'_> {
         });
         self.terminate_current(MirTerminatorKind::Unreachable, span);
         self.switch_to(ok_block);
-        Some(destination.map_or(MirOperand::Constant(MirConstant::Unit), MirOperand::Temp))
+        destination.map_or(MirOperand::Constant(MirConstant::Unit), MirOperand::Temp)
     }
 
     /// Select the strict read carrier for a declared literal-bound receiver.
@@ -4666,14 +4667,7 @@ impl FunctionBuilder<'_> {
                     .push(MirError::unsupported(span, "conversio recovery after a sealed MIR block"));
                 return;
             };
-            self.wire_conversio_recovery_block(
-                conversion_block,
-                *tail_block,
-                recovery_value.clone(),
-                result.clone(),
-                ty,
-                span,
-            );
+            self.wire_conversio_recovery_block(conversion_block, *tail_block, recovery_value.clone(), result, ty, span);
         }
     }
 
@@ -4856,7 +4850,7 @@ impl FunctionBuilder<'_> {
         conversion_block: MirBlockId,
         tail_block: MirBlockId,
         recovery_value: MirOperand,
-        destination: MirOperand,
+        destination: &MirOperand,
         ty: MirType,
         span: Span,
     ) {
@@ -4865,7 +4859,7 @@ impl FunctionBuilder<'_> {
         if let MirOperand::Temp(temp) = destination {
             let value = self.new_value(MirValueKind::Operand(recovery_value), ty, span);
             self.append_stmt(MirStatement {
-                kind: MirStatementKind::Assign { place: MirPlace::temp(temp), value },
+                kind: MirStatementKind::Assign { place: MirPlace::temp(*temp), value },
                 span,
             });
         }
@@ -5141,7 +5135,7 @@ impl FunctionBuilder<'_> {
             flat_ty,
             span,
         );
-        let flat = self.value_base_place(flat, flat_ty, span)?;
+        let flat = self.value_base_place(flat, flat_ty, span);
         let fields = (0..lanes)
             .map(|lane| {
                 MirAggregateItem::Operand(projected_operand(
@@ -5185,7 +5179,7 @@ impl FunctionBuilder<'_> {
             flat_ty,
             span,
         );
-        let flat = self.value_base_place(flat, flat_ty, span)?;
+        let flat = self.value_base_place(flat, flat_ty, span);
         let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
         for row in 0..rows {
             for column in 0..columns {
