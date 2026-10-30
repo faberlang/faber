@@ -141,6 +141,46 @@ fn emit_wgsl_text_on_single_fab_file_succeeds() {
     );
 }
 
+/// Run the installed binary against `args` with `dir` as its working
+/// directory: the input lives outside the checkout, so nothing in the
+/// workspace beside the binary serves the compile.
+fn run_faber_in(dir: &Path, args: &[&str]) -> (String, String, bool) {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(args)
+        .current_dir(dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn faber");
+
+    let mut stdout = String::new();
+    child
+        .stdout
+        .take()
+        .expect("stdout")
+        .read_to_string(&mut stdout)
+        .expect("read stdout");
+
+    let mut stderr = String::new();
+    if let Some(mut err) = child.stderr.take() {
+        let _ = err.read_to_string(&mut stderr);
+    }
+    let status = child.wait().expect("wait");
+
+    (stdout, stderr, status.success())
+}
+
+/// A single-file Latin source declaring its reader locale in frontmatter
+/// (`functio`/`redde`/`bivalens` read only under the `la` pack).
+#[cfg(feature = "mir-llvm")]
+const LA_FRONTMATTER_IDENTITY: &str = "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio identitas(bivalens valor) → bivalens {\n    redde valor\n}\n";
+
+/// A single-file Latin WGSL kernel declaring its reader locale in frontmatter
+/// (`@ nucleum` device entry).
+#[cfg(feature = "mir-wgsl")]
+const LA_FRONTMATTER_HADAMARD: &str = "+++\nlocale = \"la\"\n+++\n\n@ nucleum\n@ publica\nfunctio hadamard(tf32[256] sinistra, tf32[256] dextera) → tf32[256] {\n    redde sinistra ⊙ dextera\n}\n";
+
 #[cfg(feature = "mir-llvm")]
 #[test]
 fn emit_llvm_text_on_single_fab_file_succeeds() {
@@ -155,6 +195,73 @@ fn emit_llvm_text_on_single_fab_file_succeeds() {
     assert!(
         stdout.contains("define"),
         "expected LLVM IR in output:\n{stdout}"
+    );
+}
+
+/// The single-file emit lane reads `+++ locale = "la" +++` through the
+/// command's own locale base (`cmd_emit_with_locale` installs the product's
+/// embedded reader packs there), so the Latin source compiles as Latin —
+/// read as English it fails `PARSE001` on `functio` and emits nothing. The
+/// input lives outside the checkout and the child runs with that directory
+/// as its working directory; the root-cleared companion on the exact base
+/// the command installs is
+/// `emit_single_file_honours_frontmatter_locale_without_pack_root`
+/// (`src/commands/emit_test.rs`), the installed-binary condition where only
+/// the embedded packs remain.
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn emit_llvm_text_single_file_reads_frontmatter_locale() {
+    let dir = temp_dir("emit-llvm-text-locale");
+    let entry = dir.join("main.fab");
+    fs::write(&entry, LA_FRONTMATTER_IDENTITY).expect("write Latin source");
+
+    let (stdout, stderr, ok) = run_faber_in(
+        &dir,
+        &[
+            "emit",
+            "-t",
+            "llvm-text",
+            entry.to_str().expect("entry path"),
+        ],
+    );
+
+    assert!(
+        ok,
+        "faber emit -t llvm-text must read the Latin frontmatter file: {stderr}"
+    );
+    assert!(
+        stdout.contains("identitas"),
+        "the emitted IR must name the Latin function:\n{stdout}"
+    );
+}
+
+/// The WGSL emit route passes the same frontmatter-locale test: it forwards
+/// the locale base through `compile_wgsl_with_library_bindings`, and a Latin
+/// kernel source emits its Latin entry name instead of failing the parse.
+#[cfg(feature = "mir-wgsl")]
+#[test]
+fn emit_wgsl_text_single_file_reads_frontmatter_locale() {
+    let dir = temp_dir("emit-wgsl-text-locale");
+    let kernel = dir.join("kernel.fab");
+    fs::write(&kernel, LA_FRONTMATTER_HADAMARD).expect("write Latin kernel");
+
+    let (stdout, stderr, ok) = run_faber_in(
+        &dir,
+        &[
+            "emit",
+            "-t",
+            "wgsl-text",
+            kernel.to_str().expect("kernel path"),
+        ],
+    );
+
+    assert!(
+        ok,
+        "faber emit -t wgsl-text must read the Latin frontmatter file: {stderr}"
+    );
+    assert!(
+        stdout.contains("hadamard"),
+        "the emitted WGSL must name the Latin kernel:\n{stdout}"
     );
 }
 
