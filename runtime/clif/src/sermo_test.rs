@@ -148,8 +148,12 @@ fn monotonic_materializes_through_the_exports() {
 
     let handle = open(ROUTE);
     assert!(handle > 0, "open returned {handle}");
+    // The clock is process-relative: its origin is set by the first read in the
+    // process, so a first reading is 0 and only a later one must not go back.
     let nanos = __faber_clif_v1_sermo_materialize_i64(crate::test_arena_ptr(), handle, 0);
-    assert!(nanos > 0, "{ROUTE} materialized {nanos}");
+    assert!(nanos >= 0, "{ROUTE} materialized {nanos}");
+    let again = __faber_clif_v1_sermo_materialize_i64(crate::test_arena_ptr(), open(ROUTE), 0);
+    assert!(again >= nanos, "{ROUTE} went back: {nanos} then {again}");
     assert_eq!(
         __faber_clif_v1_sermo_failed(crate::test_arena_ptr(), handle),
         0
