@@ -903,7 +903,10 @@ impl TypeTable {
                 .is_some_and(|inner| self.is_aliasing_container_through_option(inner))
     }
 
-    /// Scalar numerics and `bivalens` reject `ref`/`mut`/`own`/`copy` markers.
+    /// Silent values reject `ref`/`mut`/`own`/`copy` markers: the widthless
+    /// scalars, and the register-class `vector`/`matrix` (operator ruling
+    /// 7b25889f R1 — silent values, `b ← a` copies, `ref` refused as for
+    /// scalars).
     ///
     /// Referential types (collections, buffers, `textus`/`octeti`, tensors,
     /// genus instances) keep the marker. Aliases peel. Inference holes do not
@@ -922,7 +925,9 @@ impl TypeTable {
                     | Primitive::Numquam
                     | Primitive::Instans
             ),
-            Type::SizedNumeric(_, _)
+            Type::Vector(_, _)
+            | Type::Matrix(_, _)
+            | Type::SizedNumeric(_, _)
             | Type::Bits(_)
             | Type::ModularWord(_)
             | Type::SaturatingWord(_)
