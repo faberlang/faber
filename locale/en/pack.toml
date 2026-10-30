@@ -5595,6 +5595,15 @@ help = "number every hole (`§0`, `§1`, …) so each reads the argument you mea
 message = "this template mixes plain and numbered holes; the plain holes read {reads}"
 help = "number every hole (`§0`, `§1`, …) so each reads the argument you mean"
 
+
+[diagnostics.WARN036]
+message = "nothing inside this {capta} boundary can fail: its error channel is empty"
+help = "drop the boundary, or call something failable inside it"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "nothing inside this {capta} boundary can fail: its error channel is empty"
+help = "drop the boundary, or call something failable inside it"
+
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern alternatives must bind the same names and types"
 help = "make every `{aut}` alternative bind the same names with the same types"

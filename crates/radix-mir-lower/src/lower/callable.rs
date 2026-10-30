@@ -491,6 +491,7 @@ impl FunctionBuilder<'_> {
             struct_field_types: Arc::clone(&context.struct_field_types),
             variant_parents: Arc::clone(&context.variant_parents),
             enum_variants: Arc::clone(&context.enum_variants),
+            enum_variant_by_name: Arc::clone(&context.enum_variant_by_name),
             enum_type_params: Arc::clone(&context.enum_type_params),
             variant_fields: Arc::clone(&context.variant_fields),
             variant_field_tys: Arc::clone(&context.variant_field_tys),

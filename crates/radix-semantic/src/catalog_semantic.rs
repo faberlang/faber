@@ -93,6 +93,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnprovenKernelIndex,
     WarningKind::PreferGuillemetQuote,
     WarningKind::MixedTemplateHoles,
+    WarningKind::TrapErrorChannelEmpty,
 ];
 
 // STABLE CODES
@@ -1529,6 +1530,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::MixedTemplateHoles => DiagnosticSpec {
             code: "WARN035",
             help: Some("number every hole (`§0`, `§1`, …) so each reads the argument you mean"),
+        },
+        WarningKind::TrapErrorChannelEmpty => DiagnosticSpec {
+            code: "WARN036",
+            help: Some("drop the boundary, or call something failable inside it"),
         },
     }
 }

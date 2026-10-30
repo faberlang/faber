@@ -5137,6 +5137,15 @@ help = "omnia foramina numera (`§0`, `§1`, …), ut quodque argumentum quod vi
 message = "hoc exemplar miscet foramina simplicia et numerata; simplicia legunt {reads}"
 help = "omnia foramina numera (`§0`, `§1`, …), ut quodque argumentum quod vis legat"
 
+
+[diagnostics.WARN036]
+message = "nihil intra hunc {capta} terminum falli potest: canalis erroris vacuus est"
+help = "terminum omitte, aut aliquid fallibile intus voca"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "nihil intra hunc {capta} terminum falli potest: canalis erroris vacuus est"
+help = "terminum omitte, aut aliquid fallibile intus voca"
+
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax. Cum textus signum citationis (\" aut ') continet, eum «…» scribe: guillemetae nullis effugiis egent."
 exemplars = ["./exemplars/salve-munde.la.fab"]

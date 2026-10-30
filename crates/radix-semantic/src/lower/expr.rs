@@ -333,8 +333,12 @@ fn lower_sort(lowerer: &mut Lowerer, sort: &radix_syntax::SortExpr) -> HirExpres
 /// The body is an ordinary block with its own scope; its trailing expression
 /// statement is lifted into the block's tail slot as the success value. No
 /// `cape` clause attaches and there is no early-success exit (open row 1).
+/// The boundary's result is the builtin genus `trapped<R, T>` (f9d8a611), so
+/// lowering marks the genus applied — the injected HIR enum item then ships
+/// with the module exactly as a written `trapped<...>` type position would.
 fn lower_trap(lowerer: &mut Lowerer, trap: &radix_syntax::TrapExpr) -> HirExpressionKind {
     lowerer.current_span = trap.span;
+    lowerer.resolver.mark_builtin_trapped_applied();
     let mut body = lowerer.lower_block(&trap.body);
     lift_trailing_expression_stmt(lowerer, &mut body);
     HirExpressionKind::Trap(Box::new(body))

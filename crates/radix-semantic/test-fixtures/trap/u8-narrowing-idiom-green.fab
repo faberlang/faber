@@ -2,8 +2,10 @@
 locale = "en"
 +++
 
-# u8 — the adopted two-line idiom over a trap: explicit `T ∪ E`
-# annotation, then `is` narrowing (U1R is the recovery path).
+# u8 — the ruled idiom over a trap: annotate the tagged result and read it
+# with the variant arms. (The retired form spelled its annotation
+# `T ∪ E` and narrowed with `is`; the tagged result is not a union, so that
+# spelling now mismatches.)
 
 fn failable(bool fail) → int ⇥ string {
     if fail {
@@ -13,10 +15,13 @@ fn failable(bool fail) → int ⇥ string {
 }
 
 main {
-    let int ∪ string r ← trap { failable(false) }
-    if r is int {
-        print r
-    } else {
-        print r.length()
+    let trapped<int, string> r ← trap { failable(false) }
+    match r {
+        case returned let value {
+            print value
+        }
+        case thrown let error {
+            print error.length()
+        }
     }
 }

@@ -3696,6 +3696,15 @@ help = "رقّم كل موضع (`§0` و`§1` …) ليقرأ كلٌّ منها 
 message = "يخلط هذا القالب بين المواضع العادية والمرقّمة؛ والمواضع العادية تقرأ {reads}"
 help = "رقّم كل موضع (`§0` و`§1` …) ليقرأ كلٌّ منها الوسيط الذي تقصده"
 
+
+[diagnostics.WARN036]
+message = "لا شيء داخل حدّ {capta} هذا يمكن أن يفشل: قناة الخطأ فارغة"
+help = "احذف الحدّ، أو نادِ شيئًا قابلًا للفشل داخله"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "لا شيء داخل حدّ {capta} هذا يمكن أن يفشل: قناة الخطأ فارغة"
+help = "احذف الحدّ، أو نادِ شيئًا قابلًا للفشل داخله"
+
 [diagnostics.LOCALE003]
 message = "reader locale `{locale_id}` في frontmatter غير معروف أو غير صالح"
 help = "تحقق من أن locale id اسم دليل reader locale صالح ضمن مسار standard library reader"
