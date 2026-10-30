@@ -4330,7 +4330,10 @@ fn resolvable_norma_import_is_not_unknown_library_module() {
 // compile with its LOCALE003 diagnostic: the program layer
 // used to swallow the resolver error, substitute the session pack, install it
 // as an explicit override, and the driver then short-circuited past the
-// malformed declaration — the source silently compiled as English.
+// malformed declaration — the source silently compiled as English. The
+// discriminators below install that exact regression condition: a
+// non-explicit session English pack over an English body that would compile
+// cleanly if the error were swallowed again.
 
 /// A config with no language-pack root and a loader serving only `en` and
 /// `la`: the installed-binary condition, where only the embedded packs remain.
@@ -4346,6 +4349,32 @@ fn loader_only_config() -> crate::driver::Config {
     }))
 }
 
+/// The discriminator condition of the swallowed-error bug: the loader-only
+/// config plus a **non-explicit** session English pack. A declaration that
+/// still resolves must win over it; a declaration that fails must stop the
+/// compile instead of reading an English body under this fallback.
+fn english_session_fallback() -> crate::driver::Config {
+    loader_only_config().with_locale_pack(en_locale_pack())
+}
+
+/// Assert the compile stopped with no output on an error-severity `LOCALE003`
+/// carrying the named issue: the previously swallowed resolver error, now the
+/// leading failure.
+fn assert_locale003_error(result: &crate::CompileResult, issue: &str, label: &str) {
+    assert!(result.output.is_none(), "{label}: a failing declaration must not emit");
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.is_error() && diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some(issue)
+        }),
+        "{label}: expected error-severity LOCALE003/{issue}, got {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue(), diagnostic.severity))
+            .collect::<Vec<_>>()
+    );
+}
+
 fn compile_with_config(config: crate::driver::Config, source: &str) -> crate::CompileResult {
     let (_td, home) = temp_dir("locale-fail");
     let app = home.join("main.fab");
@@ -4355,16 +4384,11 @@ fn compile_with_config(config: crate::driver::Config, source: &str) -> crate::Co
 
 #[test]
 fn program_compile_fails_closed_on_non_string_frontmatter_locale() {
-    let result = compile_with_config(loader_only_config(), "+++\nlocale = 7\n+++\n\n@ publica\nfunctio salve() { }\n");
-    assert!(result.output.is_none(), "a non-string locale must not emit");
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some("not_a_string")),
-        "expected LOCALE003 not_a_string, got {:?}",
-        result.diagnostics
-    );
+    // With a non-explicit English session pack installed, the pre-fix
+    // swallow read the English body under the session pack and compiled
+    // silently; the fix must surface the LOCALE003 not_a_string error.
+    let result = compile_with_config(english_session_fallback(), "+++\nlocale = 7\n+++\n\n@ public\nfn salve() { }\n");
+    assert_locale003_error(&result, "not_a_string", "non-string locale");
 }
 
 #[test]
@@ -4374,89 +4398,77 @@ fn program_compile_fails_closed_on_invalid_frontmatter_locale_ids() {
         ("path shaped", "\"../escape\""),
         ("absolute", "\"/etc\""),
     ] {
-        let source = format!("+++\nlocale = {locale}\n+++\n\n@ publica\nfunctio salve() {{ }}\n");
-        let result = compile_with_config(loader_only_config(), &source);
-        assert!(result.output.is_none(), "{label}: an invalid locale id must not emit");
-        assert!(
-            result
-                .diagnostics
-                .iter()
-                .any(|diagnostic| diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some("invalid_id")),
-            "{label}: expected LOCALE003 invalid_id, got {:?}",
-            result.diagnostics
-        );
+        let source = format!("+++\nlocale = {locale}\n+++\n\n@ public\nfn salve() {{ }}\n");
+        let result = compile_with_config(english_session_fallback(), &source);
+        assert_locale003_error(&result, "invalid_id", label);
     }
 }
 
 #[test]
 fn program_compile_fails_closed_on_unloadable_frontmatter_locale() {
     let result = compile_with_config(
-        loader_only_config(),
-        "+++\nlocale = \"zh-Hant\"\n+++\n\n@ publica\nfunctio salve() { }\n",
+        english_session_fallback(),
+        "+++\nlocale = \"zh-Hant\"\n+++\n\n@ public\nfn salve() { }\n",
     );
-    assert!(result.output.is_none(), "an unloadable locale must not emit");
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some("load_failed")),
-        "expected LOCALE003 load_failed, got {:?}",
-        result.diagnostics
-    );
+    assert_locale003_error(&result, "load_failed", "unloadable locale");
 }
 
 #[test]
 fn program_compile_fails_closed_without_any_pack_source() {
-    // No root, no loader: the declared locale has no source at all. The
-    // resolver's own `no_root` diagnostic is the failure, never a silent
-    // English read.
+    // No root, no loader: the declared locale has no source at all — only a
+    // non-explicit session English pack remains. The resolver's own
+    // `no_root` diagnostic is the failure, never a silent English read.
     let mut config = crate::driver::Config::default();
     config.locale_root = None;
-    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio salve() { }\n");
-    assert!(result.output.is_none(), "a locale with no pack source must not emit");
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some("no_root")),
-        "expected LOCALE003 no_root, got {:?}",
-        result.diagnostics
-    );
+    let config = config.with_locale_pack(en_locale_pack());
+    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ public\nfn salve() { }\n");
+    assert_locale003_error(&result, "no_root", "no pack source");
 }
 
 #[test]
 fn program_compile_fails_closed_on_malformed_root_pack() {
-    // A present but malformed root pack fails loud: the root serves the id
-    // (its pack.toml exists), the load itself errors, and the diagnostic is
-    // the LOCALE003 load_failed one.
+    // A present but malformed root pack fails loud over every later chain
+    // step that could mask it: the configured loader loads `la` fine (the
+    // root serves the id first, so the loader is never reached) and a
+    // non-explicit session English pack sits over an English body.
     let (_td, home) = temp_dir("malformed-pack");
-    let broken = home.join("malus");
+    let broken = home.join("la");
     fs::create_dir_all(&broken).expect("pack dir");
     fs::write(broken.join("pack.toml"), "not [ a valid pack").expect("malformed pack");
-    let config = crate::driver::Config::default().with_locale_root(home);
-    let result = compile_with_config(config, "+++\nlocale = \"malus\"\n+++\n\n@ publica\nfunctio salve() { }\n");
-    assert!(result.output.is_none(), "a malformed root pack must not emit");
-    assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == Some("LOCALE003") && diagnostic.issue() == Some("load_failed")),
-        "expected LOCALE003 load_failed for the malformed root pack, got {:?}",
-        result.diagnostics
-    );
+    let config = english_session_fallback().with_locale_root(home);
+    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ public\nfn salve() { }\n");
+    assert_locale003_error(&result, "load_failed", "malformed root pack");
 }
 
 #[test]
 fn program_compile_still_honours_a_resolvable_frontmatter_locale() {
-    let result = compile_with_config(
-        loader_only_config().with_target(crate::codegen::Target::HirRust),
-        "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio salve() { }\n",
-    );
+    // Declaration-over-session precedence: the loadable `la` declaration
+    // wins against a non-explicit session English pack, so the Latin body
+    // parses as Latin and the compile still emits.
+    let config = english_session_fallback().with_target(crate::codegen::Target::HirRust);
+    let result = compile_with_config(config, "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio salve() { }\n");
     assert!(
         result.success(),
-        "a loadable declared locale must still compile: {:?}",
+        "a loadable declared locale must still compile over a session fallback: {:?}",
         result.diagnostics
     );
+    assert!(result.output.is_some(), "a loadable declared locale must emit output");
+}
+
+#[test]
+fn program_compile_explicit_session_pack_overrides_frontmatter_declaration() {
+    // Control for driver policy: an explicitly resolved session pack (CLI
+    // `--locale en` semantics) is authoritative, so even an unloadable
+    // declaration never reaches the resolver and the English body compiles.
+    // The fail-closed tests above must not change this precedence.
+    let config = loader_only_config().with_resolved_locale_pack(en_locale_pack());
+    let result = compile_with_config(config, "+++\nlocale = \"zh-Hant\"\n+++\n\n@ public\nfn salve() { }\n");
+    assert!(
+        result.success(),
+        "an explicit session pack must stay authoritative over the declaration: {:?}",
+        result.diagnostics
+    );
+    assert!(result.output.is_some(), "an explicit session pack must emit output");
 }
 
 // ── provider analysis derives its locale policy from the session ──
