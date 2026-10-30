@@ -425,6 +425,9 @@ pub(crate) fn reflect_kernel_resource(
     };
     let element_byte_width = match record_byte_width {
         Some(width) => width,
+        // A by-value vector resource can carry packed i8 register lanes even
+        // though i8 is not an ordinary scalar storage-buffer element.
+        None if lanes_per_cell > 1 && element_layout == MirScalarLayout::I8 => lanes_per_cell,
         None => kernel_element_byte_width(element_layout)? * lanes_per_cell,
     };
     // A runtime-shaped resource has no static byte length: reflection records 0
@@ -667,7 +670,11 @@ pub(crate) fn vector_param_layout(
     let MirLayoutKind::DeviceVector(vector) = layout.kind else {
         return Ok(None);
     };
-    if matches!(vector.width, 2 | 4) && crate::tensor_type::is_kernel_element_layout(vector.element)
+    if matches!(vector.width, 2 | 4)
+        && (crate::tensor_type::is_kernel_element_layout(vector.element)
+            // Signed i8 is not an ordinary storage-buffer element today, but
+            // it is a legal packed register-vector lane for by-value params.
+            || vector.element == crate::MirScalarLayout::I8)
     {
         Ok(Some(vector))
     } else {
