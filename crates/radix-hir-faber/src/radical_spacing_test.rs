@@ -1,4 +1,4 @@
-//! Spacing law for glyph-marked square-root method calls.
+//! Regression coverage for radical glyph restoration, spacing, and operand grouping.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use handroll::FxHashMap;
@@ -131,4 +131,27 @@ fn radical_sqrt_prints_spaced() {
     let call = ctx.method_call(x, "radix", radix_hir::HirId(1));
 
     assert_eq!(ctx.render(&call, &[radix_hir::HirId(1)], &[]), "√ x");
+}
+
+#[test]
+fn radical_fourth_root_restores_outer_glyph() {
+    let mut ctx = Ctx::new();
+    let x = ctx.path("x");
+    let inner = ctx.method_call(x, "radix", radix_hir::HirId(5));
+    let outer = ctx.method_call(inner, "radix", radix_hir::HirId(1));
+
+    assert_eq!(ctx.render(&outer, &[], &[radix_hir::HirId(1)]), "∜ x");
+}
+
+#[test]
+fn radical_fourth_root_parenthesizes_compound_operand() {
+    let mut ctx = Ctx::new();
+    let mut a = ctx.path("a");
+    a.id = radix_hir::HirId(2);
+    let mut b = ctx.path("b");
+    b.id = radix_hir::HirId(3);
+    let inner = ctx.method_call(and(a, b), "radix", radix_hir::HirId(5));
+    let outer = ctx.method_call(inner, "radix", radix_hir::HirId(1));
+
+    assert_eq!(ctx.render(&outer, &[], &[radix_hir::HirId(1)]), "∜ (a ∧ b)");
 }

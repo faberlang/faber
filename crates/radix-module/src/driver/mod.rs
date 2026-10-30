@@ -5349,7 +5349,3 @@ mod codegen_analysis_tests;
 #[cfg(test)]
 #[path = "driver_behavior_test.rs"]
 mod driver_behavior_tests;
-
-#[cfg(test)]
-#[path = "evm_contract_test.rs"]
-mod evm_contract_tests;

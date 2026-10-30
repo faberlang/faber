@@ -728,6 +728,14 @@ help = "स्तर को `@ {nucleum}` फ़ंक्शन घोषणा 
 message = "`@ nucleum` fragment ग्राफ़िक्स fragment annotation से टकराता है"
 help = "fragment annotation में से एक हटाएं"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "एक घोषणा में `@ {nucleum}` एनोटेशन और `{nucleum}` घोषणा-शीर्ष दोनों हैं"
+help = "एक ही शीर्ष रखें: `@ {nucleum}` एनोटेशन या `{nucleum}` घोषणा-शीर्ष"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` होस्ट रूपांतरण का नाम देता है; `{nucleum}` शीर्ष डिवाइस कर्नेल का नाम देता है"
+help = "`@ {conversio}` या `{nucleum}` शीर्ष हटाएँ; रूपांतरण पंक्ति एक होस्ट फ़ंक्शन है"
+
 [diagnostics.PARSE019]
 message = "दोहराया गया modifier"
 help = "duplicate modifier हटाएं"

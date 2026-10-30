@@ -873,6 +873,14 @@ help = "use `target = {functio}` in v1"
 message = "a declaration carries more than one `@ nucleum` annotation"
 help = "keep a single nucleum annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "declarationes utrumque caput habet: adnotationem `@ {nucleum}` et caput declarationis `{nucleum}`"
+help = "unum caput serva: adnotationem `@ {nucleum}` aut caput declarationis `{nucleum}`"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` conversionem hospitalis nominat; caput `{nucleum}` nucleum machinalis nominat"
+help = "remove `@ {conversio}` aut caput `{nucleum}`; conversio functio hospitalis est"
+
 [diagnostics.PARSE018.issues.duplicate_nucleum_tier]
 message = "adnotatio `@ {nucleum}` plus quam unum gradum nominat"
 help = "scribe `{laxus}` aut `{intutus}`, aut neutrum pro gradu communi"

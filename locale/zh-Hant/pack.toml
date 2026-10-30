@@ -772,6 +772,14 @@ help = "把層級寫在 `@ {nucleum}` 函式宣告上，或刪除它"
 message = "`@ nucleum` fragment 與圖形 fragment annotation 衝突"
 help = "移除其中一個 fragment annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "此宣告同時帶有 `@ {nucleum}` 註解與 `{nucleum}` 宣告頭"
+help = "只保留一個宣告頭：`@ {nucleum}` 註解或 `{nucleum}` 宣告頭"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` 表示主機端轉換；`{nucleum}` 宣告頭表示裝置核心"
+help = "刪除 `@ {conversio}` 或 `{nucleum}` 宣告頭；轉換列是主機函式"
+
 [diagnostics.PARSE019]
 message = "重複修飾符"
 help = "刪除重複的修飾符"

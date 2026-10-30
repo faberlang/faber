@@ -728,6 +728,14 @@ help = "viết mức trên khai báo hàm `@ {nucleum}`, hoặc xóa nó"
 message = "fragment `@ nucleum` xung đột với graphics fragment annotation"
 help = "xóa một trong các fragment annotation"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "một khai báo mang cả chú thích `@ {nucleum}` lẫn đầu khai báo `{nucleum}`"
+help = "chỉ giữ một đầu: chú thích `@ {nucleum}` hoặc đầu khai báo `{nucleum}`"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` gọi tên một phép chuyển đổi trên máy chủ; đầu `{nucleum}` gọi tên một nhân trên thiết bị"
+help = "bỏ `@ {conversio}` hoặc đầu `{nucleum}`; một dòng chuyển đổi là một hàm trên máy chủ"
+
 [diagnostics.PARSE019]
 message = "modifier bị lặp"
 help = "xóa modifier bị lặp"

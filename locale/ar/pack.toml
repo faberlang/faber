@@ -728,6 +728,14 @@ help = "اكتب المستوى على إعلان دالة `@ {nucleum}`، أو 
 message = "جزء `@ nucleum` يتعارض مع تعليمة جزء رسومي"
 help = "أزل إحدى تعليمتي الجزء"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "يحمل التصريح كلًا من الوسم `@ {nucleum}` ورأس التصريح `{nucleum}`"
+help = "أبقِ رأسًا واحدًا: الوسم `@ {nucleum}` أو رأس التصريح `{nucleum}`"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` يسمّي تحويلًا على المضيف، ورأس `{nucleum}` يسمّي نواة على الجهاز"
+help = "أزل `@ {conversio}` أو رأس `{nucleum}`؛ صف التحويل دالة على المضيف"
+
 [diagnostics.PARSE019]
 message = "معدل مكرر"
 help = "أزل المعدل المكرر"

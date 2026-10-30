@@ -252,6 +252,7 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
             host_to_device_bytes: 64,
             device_to_host_bytes: 32,
             span: None,
+            cpu_partitions: None,
             gpu_steps: vec![run_stats::DeviceGpuStepMetadata {
                 launches: 4,
                 timed_launches: 3,
@@ -682,6 +683,171 @@ device = "metal"
     );
 }
 
+/// The CPU runtime's partition coverage schema: scheduled and completed
+/// per-partition workgroup ranges, distinct, with the shared-store memory
+/// model and the worker total named; an artifact from before the block has
+/// no `cpu_partitions` key and decodes as `None`.
+#[cfg(feature = "device-runtime")]
+#[test]
+fn device_cpu_partition_stats_carry_scheduled_and_completed_coverage() {
+    use radix_device_core::runtime::{
+        CpuEntryCoverage, CpuLaunchCoverage, CpuLaunchPartitionCoverage, CpuMemoryModel,
+        CpuPartitionStats,
+    };
+    let stats = CpuPartitionStats {
+        partitions: 2,
+        workers: 4,
+        memory_model: CpuMemoryModel::SharedStore,
+        launch_log_bound: 64,
+        logged_launches: 1,
+        unlogged_launches: 0,
+        entries: vec![CpuEntryCoverage {
+            entry: "k17".to_owned(),
+            launches: 1,
+            logged_launches: 1,
+            scheduled_workgroups: 100,
+            completed_workgroups: 100,
+            complete_launches: 1,
+            faulted_launches: 0,
+        }],
+        launches: vec![CpuLaunchCoverage {
+            launch: 3,
+            entry: "k17".to_owned(),
+            workgroups: 100,
+            partitions: vec![
+                CpuLaunchPartitionCoverage {
+                    partition: 0,
+                    scheduled: 0..50,
+                    completed: 0..50,
+                },
+                CpuLaunchPartitionCoverage {
+                    partition: 1,
+                    scheduled: 50..100,
+                    completed: 50..100,
+                },
+            ],
+            complete: true,
+            faulted: false,
+        }],
+    };
+    // The schema mapping itself is field access inside `from_receipt`; this
+    // local twin pins the same field names the artifact prints.
+    let runtime = run_stats::DeviceCpuPartitionMetadata {
+        partitions: stats.partitions,
+        workers: stats.workers,
+        memory_model: stats.memory_model.as_str().to_owned(),
+        launch_log_bound: stats.launch_log_bound,
+        logged_launches: stats.logged_launches,
+        unlogged_launches: stats.unlogged_launches,
+        entries: stats
+            .entries
+            .iter()
+            .map(|entry| run_stats::DeviceCpuEntryCoverage {
+                entry: entry.entry.clone(),
+                launches: entry.launches,
+                logged_launches: entry.logged_launches,
+                scheduled_workgroups: entry.scheduled_workgroups,
+                completed_workgroups: entry.completed_workgroups,
+                complete_launches: entry.complete_launches,
+                faulted_launches: entry.faulted_launches,
+            })
+            .collect(),
+        launches: stats
+            .launches
+            .iter()
+            .map(|launch| run_stats::DeviceCpuLaunchCoverage {
+                launch: launch.launch,
+                entry: launch.entry.clone(),
+                workgroups: launch.workgroups,
+                partitions: launch
+                    .partitions
+                    .iter()
+                    .map(|row| run_stats::DeviceCpuLaunchPartitionCoverage {
+                        partition: row.partition,
+                        scheduled: [row.scheduled.start, row.scheduled.end],
+                        completed: [row.completed.start, row.completed.end],
+                    })
+                    .collect(),
+                complete: launch.complete,
+                faulted: launch.faulted,
+            })
+            .collect(),
+    };
+    let value = serde_json::to_value(&runtime).expect("cpu partitions JSON");
+    assert_eq!(value["partitions"], 2);
+    assert_eq!(value["workers"], 4);
+    assert_eq!(value["memory_model"], "shared-store");
+    assert_eq!(value["launch_log_bound"], 64);
+    assert_eq!(value["unlogged_launches"], 0);
+    assert_eq!(value["launches"][0]["launch"], 3);
+    assert_eq!(value["launches"][0]["complete"], true);
+    assert_eq!(
+        value["launches"][0]["partitions"][0]["scheduled"],
+        serde_json::json!([0, 50])
+    );
+    assert_eq!(
+        value["launches"][0]["partitions"][1]["completed"],
+        serde_json::json!([50, 100])
+    );
+    assert_eq!(value["entries"][0]["scheduled_workgroups"], 100);
+    let decoded: run_stats::DeviceCpuPartitionMetadata =
+        serde_json::from_value(value).expect("cpu partitions schema");
+    assert_eq!(decoded, runtime);
+    let mut artifact = fixture_artifact();
+    artifact.device = Some(run_stats::DeviceMetadata {
+        admit_ns: 1,
+        prepare_ns: 1,
+        image_build_ns: 1,
+        module_compile_ns: 1,
+        execution_ns: 1,
+        gpu_busy_ns: 0,
+        gpu_timing: "unavailable".to_owned(),
+        timed_launches: 0,
+        untimed_launches: 1,
+        gpu_timer_available: Some(false),
+        gpu_sample_launch_capacity: None,
+        host_encode_ns: 1,
+        host_blocked_ns: Some(0),
+        host_fresh_output_bytes: 0,
+        uploads: 1,
+        downloads: 1,
+        uploaded_bytes: 4,
+        downloaded_bytes: 4,
+        runtime: run_stats::DeviceRuntimeMetadata {
+            launch_count: 1,
+            command_submit_count: 1,
+            blocking_wait_count: 1,
+            blocking_wait_ns: 0,
+            live_modules: 1,
+            live_buffers: 1,
+            allocated_bytes: 4,
+            peak_allocated_bytes: 4,
+            buffer_alloc_count: 1,
+            buffer_release_count: 0,
+            buffer_pool_hits: 0,
+            buffer_pool_buffers: 0,
+            buffer_pool_bytes: 0,
+            host_to_device_bytes: 4,
+            device_to_host_bytes: 4,
+            span: None,
+            cpu_partitions: Some(runtime),
+            gpu_steps: Vec::new(),
+        },
+        entries: Vec::new(),
+    });
+    let encoded = run_stats::encode(&artifact).expect("encode");
+    let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("round trip");
+    assert_eq!(decoded, artifact);
+    // An artifact from before the block reads as absent.
+    let mut value: Value = serde_json::from_str(&encoded).expect("JSON");
+    value["device"]["runtime"]
+        .as_object_mut()
+        .expect("runtime")
+        .remove("cpu_partitions");
+    let old: RunStatsArtifact = serde_json::from_value(value).expect("old artifact decodes");
+    assert_eq!(old.device.expect("device").runtime.cpu_partitions, None);
+}
+
 /// A spanned logical device (rule 18) reports its partition traffic and
 /// launch modes under `device.runtime.span`, with each fallback named; an
 /// unspanned device's artifact has no `span` key at all.
@@ -732,6 +898,7 @@ fn device_span_stats_appear_only_for_a_spanned_device() {
         host_to_device_bytes: 16,
         device_to_host_bytes: 8,
         span,
+        cpu_partitions: None,
         gpu_steps: Vec::new(),
     };
     let spanned = runtime(Some(run_stats::DeviceSpanMetadata::from_stats(&span)));

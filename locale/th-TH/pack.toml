@@ -728,6 +728,14 @@ help = "เขียนระดับที่การประกาศฟั
 message = "fragment `@ nucleum` ขัดแย้งกับ graphics fragment annotation"
 help = "ลบ fragment annotation รายการใดรายการหนึ่ง"
 
+[diagnostics.PARSE018.issues.nucleum_double_head]
+message = "การประกาศมีทั้งหมายเหตุ `@ {nucleum}` และส่วนหัวการประกาศ `{nucleum}`"
+help = "เก็บส่วนหัวไว้เพียงหนึ่งเดียว: หมายเหตุ `@ {nucleum}` หรือส่วนหัวการประกาศ `{nucleum}`"
+
+[diagnostics.PARSE018.issues.conversio_kernel_head]
+message = "`@ {conversio}` ระบุการแปลงบนโฮสต์ ส่วนหัว `{nucleum}` ระบุเคอร์เนลบนอุปกรณ์"
+help = "ลบ `@ {conversio}` หรือส่วนหัว `{nucleum}` ออก แถวการแปลงเป็นฟังก์ชันบนโฮสต์"
+
 [diagnostics.PARSE019]
 message = "modifier ซ้ำ"
 help = "ลบ modifier ที่ซ้ำ"
