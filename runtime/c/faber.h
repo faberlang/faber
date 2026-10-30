@@ -1942,6 +1942,8 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
  * drift: a list is a pointer to an arena-allocated `faber_list_<name>`, so
  * every bind aliases (semantics R1); growth doubles into a fresh arena
  * buffer. */
+/* Generated families may be only partially used by a translation unit. */
+#define FABER_LIST_INLINE static inline __attribute__((unused))
 #define FABER_LIST_FAMILY(NAME, TYPE, ZERO)                                              \
     typedef struct faber_list_##NAME {                                                  \
         TYPE *items;                                                                    \
@@ -1956,7 +1958,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         size_t set_mask;                                                                \
     } faber_list_##NAME;                                                                \
                                                                                         \
-    static inline faber_list_##NAME *faber_list_##NAME##_new(faber_arena *arena,        \
+    FABER_LIST_INLINE faber_list_##NAME *faber_list_##NAME##_new(faber_arena *arena,        \
                                                             int64_t capacity) {         \
         size_t bytes = faber_collection_allocation_size(capacity, sizeof(TYPE));         \
         faber_list_##NAME *list = faber_alloc(arena, sizeof *list);                     \
@@ -1969,7 +1971,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
-    static inline faber_list_##NAME *faber_list_##NAME##_new_fixed(faber_arena *arena,  \
+    FABER_LIST_INLINE faber_list_##NAME *faber_list_##NAME##_new_fixed(faber_arena *arena,  \
                                                                   int64_t capacity) {   \
         faber_list_##NAME *list = faber_list_##NAME##_new(arena, capacity);             \
         int64_t at;                                                                     \
@@ -1980,7 +1982,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
-    static inline void faber_list_##NAME##_clear(faber_list_##NAME *list) {             \
+    FABER_LIST_INLINE void faber_list_##NAME##_clear(faber_list_##NAME *list) {             \
         int64_t at;                                                                     \
         if (list->fixed) {                                                              \
             for (at = 0; at < list->cap; at++) {                                        \
@@ -1992,7 +1994,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         list->set_mask = 0;                                                             \
     }                                                                                   \
                                                                                         \
-    static inline faber_list_##NAME *faber_list_##NAME##_of(                            \
+    FABER_LIST_INLINE faber_list_##NAME *faber_list_##NAME##_of(                            \
         faber_arena *arena, int64_t count, const TYPE *items) {                         \
         size_t bytes = faber_collection_allocation_size(count, sizeof *items);          \
         faber_list_##NAME *list = faber_list_##NAME##_new(arena, count);                \
@@ -2003,7 +2005,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
-    static inline faber_list_##NAME *faber_list_##NAME##_of_fixed(                      \
+    FABER_LIST_INLINE faber_list_##NAME *faber_list_##NAME##_of_fixed(                      \
         faber_arena *arena, int64_t count, const TYPE *items) {                         \
         faber_list_##NAME *list = faber_list_##NAME##_of(arena, count, items);          \
         list->fixed = true;                                                             \
@@ -2014,7 +2016,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
      * its whole declared capacity and every spare cell holds the typed zero        \
      * before the live prefix is copied in, so a later push has the capacity the    \
      * type names. */                                                               \
-    static inline faber_list_##NAME *faber_list_##NAME##_of_fixed_capacity(             \
+    FABER_LIST_INLINE faber_list_##NAME *faber_list_##NAME##_of_fixed_capacity(             \
         faber_arena *arena, int64_t count, const TYPE *items, int64_t capacity) {       \
         faber_list_##NAME *list = faber_list_##NAME##_new_fixed(arena, capacity);       \
         if (count > 0) {                                                                \
@@ -2027,7 +2029,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                                                                                         \
     /* `xs ↦ list<T, size N>`: a copy that carries capacity N, or false when the      \
      * source is longer. The copy is fixed, so a later push at capacity traps. */ \
-    static inline bool faber_list_##NAME##_bounded(faber_arena *arena,                 \
+    FABER_LIST_INLINE bool faber_list_##NAME##_bounded(faber_arena *arena,                 \
                                                    const faber_list_##NAME *list,       \
                                                    int64_t capacity,                    \
                                                    faber_list_##NAME **out) {           \
@@ -2047,12 +2049,12 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
                                                                                         \
     /* The `copy` marker (R7): a fresh array, never the source's. An element   \
      * that is itself a pointer (text) is immutable, so sharing it is a copy. */\
-    static inline faber_list_##NAME *faber_list_##NAME##_copy(                          \
+    FABER_LIST_INLINE faber_list_##NAME *faber_list_##NAME##_copy(                          \
         faber_arena *arena, const faber_list_##NAME *list) {                            \
         return faber_list_##NAME##_of(arena, list->len, list->items);                   \
     }                                                                                   \
                                                                                         \
-    static inline void faber_list_##NAME##_push(faber_arena *arena,                     \
+    FABER_LIST_INLINE void faber_list_##NAME##_push(faber_arena *arena,                     \
                                                 faber_list_##NAME *list, TYPE item) {   \
         if (list->len == list->cap) {                                                   \
             int64_t capacity;                                                           \
@@ -2079,7 +2081,7 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
      * always did. Reading `other`'s items before any growth makes a spread            \
      * of a list into itself duplicate the elements (the per-element form              \
      * could walk a growing list forever). */                                          \
-    static inline void faber_list_##NAME##_push_all(faber_arena *arena,                 \
+    FABER_LIST_INLINE void faber_list_##NAME##_push_all(faber_arena *arena,                 \
                                                     faber_list_##NAME *list,            \
                                                     const faber_list_##NAME *other) {   \
         int64_t count = other->len;                                                     \
@@ -2115,12 +2117,12 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         }                                                                               \
     }                                                                                   \
                                                                                         \
-    static inline TYPE faber_list_##NAME##_at(const faber_list_##NAME *list,            \
+    FABER_LIST_INLINE TYPE faber_list_##NAME##_at(const faber_list_##NAME *list,            \
                                               faber_i128 index) {                       \
         return list->items[faber_list_index(index, list->len)];                         \
     }                                                                                   \
                                                                                         \
-    static inline void faber_list_##NAME##_set(faber_list_##NAME *list, faber_i128 index, \
+    FABER_LIST_INLINE void faber_list_##NAME##_set(faber_list_##NAME *list, faber_i128 index, \
                                                TYPE item) {                             \
         list->items[faber_list_index(index, list->len)] = item;                         \
     }

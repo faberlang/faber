@@ -10,7 +10,7 @@ fn genus_lists_use_pointer_families_and_preserve_object_identity() {
 
     for expected in [
         "typedef g_Point *faber_elem_g_Point;",
-        "FABER_LIST_FAMILY(g_Point, faber_elem_g_Point)",
+        "FABER_LIST_FAMILY(g_Point, faber_elem_g_Point, NULL)",
         "faber_list_g_Point_of(faber_a, 1, (faber_elem_g_Point[])",
         "faber_list_g_Point_at(l_points,",
         "faber_list_g_Point_set(l_points,",
@@ -31,7 +31,7 @@ fn an_entry_local_genus_list_requests_its_family_before_declarations() {
     );
 
     assert!(
-        code.contains("FABER_LIST_FAMILY(g_Point, faber_elem_g_Point)"),
+        code.contains("FABER_LIST_FAMILY(g_Point, faber_elem_g_Point, NULL)"),
         "{code}"
     );
     assert!(code.contains("faber_list_g_Point_of(faber_a, 1"), "{code}");

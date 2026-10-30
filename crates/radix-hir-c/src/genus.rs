@@ -308,7 +308,10 @@ impl Emitter<'_> {
                     ListOp::Struct,
                 ));
                 writeln!(out, "typedef {0} *faber_elem_{0};", genus.c_name).ok();
-                writeln!(out, "FABER_LIST_FAMILY({0}, faber_elem_{0})", genus.c_name).ok();
+                // The element is a pointer, so its typed zero is NULL: a
+                // bounded genus list's spare cells hold a null element.
+                writeln!(out, "FABER_LIST_FAMILY({0}, faber_elem_{0}, NULL)", genus.c_name)
+                    .ok();
             }
         }
         if !out.is_empty() {
