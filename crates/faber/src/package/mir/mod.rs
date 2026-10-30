@@ -1046,6 +1046,7 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         errors
             .into_iter()
             .map(|error| {
+                let exit_status = error.exit_status().to_string();
                 // A device error keeps its stable `E_DEVICE_*` code as the
                 // diagnostic issue, so the terminal prints `error: <code>: ..`.
                 let issue = if error.issue.starts_with("E_DEVICE_") {
@@ -1056,6 +1057,7 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
                 mir_diag(input, error.message)
                     .with_arg("issue", issue)
                     .with_arg("code", error.issue)
+                    .with_arg("exit_status", exit_status)
             })
             .collect::<Vec<_>>()
     };

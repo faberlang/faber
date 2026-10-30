@@ -3528,7 +3528,7 @@ fn run_cpu_device_kernel_fault_prints_one_coded_error() {
         "0",
         "0",
     ]);
-    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert_eq!(status.code(), Some(70), "{stderr}");
     assert!(
         stderr
             .lines()
@@ -3566,7 +3566,7 @@ fn run_cpu_device_region_fault_ends_the_run_once() {
         "0",
         "3",
     ]);
-    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert_eq!(status.code(), Some(70), "{stderr}");
     assert!(
         stderr
             .lines()
@@ -3597,39 +3597,105 @@ fn run_cpu_device_region_fault_ends_the_run_once() {
     assert!(stdout.ends_with("done\n"), "{stdout}");
 }
 
-/// [`run_cpu_device_kernel_fault_prints_one_coded_error`] on the Metal device.
-/// Skips without a Metal device.
-#[test]
-fn run_metal_device_kernel_fault_prints_one_coded_error() {
+const SINGLE_LANE_INDEX_FAULT: &str = "acceptance/c4-single-lane-index-fault";
+/// Fault cases from the studio report, including read and all three write modes.
+const SINGLE_LANE_KERNEL_FAULT_CASES: [(&str, &str, &str); 4] = [
+    ("1", "0", "0"),
+    ("0", "5", "0"),
+    ("0", "5", "1"),
+    ("0", "5", "2"),
+];
+
+/// Run each acceptance fault on a device and reference, pinning the shared
+/// kernel-fault class to EX_SOFTWARE (70). Returns false if the first device
+/// run could not be admitted.
+fn assert_single_lane_device_fault_classes_match_reference(
+    device: &str,
+    receipt_prefix: &str,
+) -> bool {
     let path = repo_root()
-        .join("acceptance/c4-single-lane-index-fault")
+        .join(SINGLE_LANE_INDEX_FAULT)
         .display()
         .to_string();
-    let (_stdout, stderr, status) =
-        run_faber_status(&["run", "--device", "metal", &path, "--", "1", "0", "0"]);
-    if !cfg!(target_os = "macos")
-        || !stderr
-            .lines()
-            .any(|line| line.starts_with(METAL_DEVICE_RECEIPT_PREFIX))
-    {
-        eprintln!("no Metal device: skipped");
-        return;
+    for (index, &(read, write, mode)) in SINGLE_LANE_KERNEL_FAULT_CASES.iter().enumerate() {
+        let args = ["run", "--device", device, &path, "--", read, write, mode];
+        let (stdout, stderr, status) = run_faber_status(&args);
+        if !stderr.lines().any(|line| line.starts_with(receipt_prefix)) {
+            assert_eq!(
+                index, 0,
+                "{device} disappeared between fault cases:\n{stdout}\n{stderr}"
+            );
+            return false;
+        }
+        assert_eq!(
+            status.code(),
+            Some(70),
+            "{device} {read} {write} {mode}: {stderr}"
+        );
+        let errors = error_lines(&stderr);
+        assert_eq!(errors.len(), 1, "one {device} error line:\n{stderr}");
+        assert!(
+            errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
+            "{device}: {stderr}"
+        );
+        assert!(errors[0].contains("(lane 0)"), "{device}: {stderr}");
+
+        let reference_args = [
+            "run",
+            "--device",
+            "reference",
+            &path,
+            "--",
+            read,
+            write,
+            mode,
+        ];
+        let (_reference_stdout, reference_stderr, reference_status) =
+            run_faber_status(&reference_args);
+        assert_eq!(
+            reference_status.code(),
+            Some(70),
+            "reference {read} {write} {mode}: {reference_stderr}"
+        );
+        assert_eq!(
+            status.code(),
+            reference_status.code(),
+            "{device} vs reference"
+        );
     }
-    assert_eq!(status.code(), Some(1), "{stderr}");
-    let errors = error_lines(&stderr);
-    assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
-    assert!(
-        errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
-        "{stderr}"
-    );
-    assert!(errors[0].contains("(lane 0)"), "{stderr}");
+    true
 }
 
-const SINGLE_LANE_INDEX_FAULT: &str = "acceptance/c4-single-lane-index-fault";
+/// [`run_cpu_device_kernel_fault_prints_one_coded_error`] on Metal. The fault
+/// cases must match reference's sysexits class; this test skips without Metal.
+#[test]
+fn run_metal_device_kernel_fault_prints_one_coded_error() {
+    if !cfg!(target_os = "macos")
+        || !assert_single_lane_device_fault_classes_match_reference(
+            "metal",
+            METAL_DEVICE_RECEIPT_PREFIX,
+        )
+    {
+        eprintln!("no Metal device: skipped");
+    }
+}
+
+/// CUDA gets the same fault-class proof on hosts with an admitted device.
+#[test]
+fn run_cuda_device_kernel_fault_exits_with_the_reference_class() {
+    if !assert_single_lane_device_fault_classes_match_reference("cuda", CUDA_DEVICE_RECEIPT_PREFIX)
+    {
+        assert!(
+            std::env::var_os("FABER_REQUIRE_CUDA").is_none(),
+            "FABER_REQUIRE_CUDA is set but the fault package did not run on CUDA"
+        );
+        eprintln!("no CUDA device: skipped");
+    }
+}
 
 /// A device run that faults after it started executing still writes its
-/// `--stats-file`, as a failing run does on the reference route: exit 1 in the
-/// artifact, the device section present, and the one coded error on stderr.
+/// `--stats-file`, with exit 70 in the artifact, the device section present,
+/// and the one coded error on stderr.
 fn assert_faulting_device_run_writes_stats(device: &str, receipt_prefix: &str) {
     let path = repo_root()
         .join(SINGLE_LANE_INDEX_FAULT)
@@ -3654,7 +3720,7 @@ fn assert_faulting_device_run_writes_stats(device: &str, receipt_prefix: &str) {
         eprintln!("no {device} device: skipped");
         return;
     }
-    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert_eq!(status.code(), Some(70), "{stderr}");
     let errors = error_lines(&stderr);
     assert_eq!(errors.len(), 1, "one error line:\n{stderr}");
     assert!(
@@ -3664,7 +3730,7 @@ fn assert_faulting_device_run_writes_stats(device: &str, receipt_prefix: &str) {
     let artifact: serde_json::Value =
         serde_json::from_slice(&fs::read(&stats).expect("a failed device run writes its stats"))
             .expect("stats file is JSON");
-    assert_eq!(artifact["run"]["exit"], 1, "{artifact}");
+    assert_eq!(artifact["run"]["exit"], 70, "{artifact}");
     assert!(artifact["device"].is_object(), "{artifact}");
     assert!(artifact["device"]["runtime"].is_object(), "{artifact}");
 }
@@ -3702,7 +3768,7 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
         eprintln!("no Metal device: skipped");
         return;
     }
-    assert_eq!(status.code(), Some(1), "{stderr}");
+    assert_eq!(status.code(), Some(70), "{stderr}");
     assert_eq!(
         stdout.lines().filter(|l| *l == "completed").count(),
         1,

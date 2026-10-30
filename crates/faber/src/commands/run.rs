@@ -900,9 +900,9 @@ fn run_on_device_session_shaped_with<H: radix_mir_runner::Host + ?Sized>(
 }
 
 /// A device run that failed after it started executing still emits its stats
-/// artifact (exit 1, the host meter and device receipt up to the failure), as
-/// a failing run does on the reference route; the caller then reports the
-/// returned diagnostics. A failure before launch has nothing to report.
+/// artifact with the run's sysexits class, the host meter and device receipt
+/// up to the failure; the caller then reports the returned diagnostics. A
+/// failure before launch has nothing to report.
 #[cfg(feature = "device-runtime")]
 fn finish_failed_device_run(
     failure: package::mir::DeviceSessionFailure,
@@ -917,8 +917,15 @@ fn finish_failed_device_run(
         // The run's own failure is the one reported: `finish_device_run`
         // exits the process itself when the artifact cannot be written, so
         // anything it does return is added to that failure.
-        if let Err(artifact) = finish_device_run(run, metadata, started, stats, stats_file, out, 1)
-        {
+        if let Err(artifact) = finish_device_run(
+            run,
+            metadata,
+            started,
+            stats,
+            stats_file,
+            out,
+            exit_status::status_for_run_diagnostics(&diagnostics),
+        ) {
             return diagnostics.into_iter().chain(artifact).collect();
         }
     }
@@ -927,7 +934,7 @@ fn finish_failed_device_run(
 
 /// Emit the host stats and device receipt in [`DEVICE_STATS_MARKER`] format
 /// for a finished device run that was asked to collect stats; `exit` is the
-/// run's recorded exit code (1 for a run that failed).
+/// run's process exit code, including the sysexits class of a failed run.
 #[cfg(feature = "device-runtime")]
 fn finish_device_run(
     run: package::mir::DeviceSessionRun,
