@@ -23,10 +23,10 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::{
     MirAggregate, MirAggregateKind, MirBinOp, MirCallee, MirCollectionOp, MirConstant,
-    MirConversion, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirOperand,
-    MirOptionChainLink, MirOptionOp, MirParam, MirParamMode, MirPlace, MirProgram, MirProjection,
-    MirRuntimeCall, MirSermoOp, MirStatementKind, MirTemp, MirTerminator, MirTerminatorKind,
-    MirType, MirUnOp, MirValue, MirValueKind, ValidatedMir,
+    MirConversion, MirFunction, MirFunctionId, MirFunctionSignature, MirIntrinsic, MirLocal,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirParam, MirParamMode, MirPlace, MirProgram,
+    MirProjection, MirRuntimeCall, MirSermoOp, MirStatementKind, MirTemp, MirTerminator,
+    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueKind, ValidatedMir,
 };
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 use radix_types::{Primitive, SemanticMutability, Type, TypeId, TypeTable};
@@ -71,6 +71,11 @@ impl Gap {
 /// order; the first gap drives the diagnostic shape substring.
 pub struct ClifCapability<'a> {
     types: &'a TypeTable,
+    /// Callable signatures the validation context carries (keyed by source
+    /// `DefId`): the only place an `optional` parameter is still visible, since
+    /// lowering inlines defaults at call sites and types bare-optionals as the
+    /// plain parameter.
+    signatures: &'a FxHashMap<DefId, MirFunctionSignature>,
     function_sources: FxHashSet<DefId>,
     /// When set, only these functions are classified (the entry's call
     /// closure); unreachable library code is never lowered, so it is never a gap.
@@ -228,9 +233,10 @@ pub(crate) fn has_i64_edge_loop(function: &MirFunction) -> bool {
 }
 
 impl<'a> ClifCapability<'a> {
-    fn new(types: &'a TypeTable) -> Self {
+    fn new(types: &'a TypeTable, signatures: &'a FxHashMap<DefId, MirFunctionSignature>) -> Self {
         Self {
             types,
+            signatures,
             function_sources: FxHashSet::default(),
             reachable: None,
             sermo_handles: FxHashSet::default(),
@@ -791,6 +797,16 @@ impl MirVisitor for ClifCapability<'_> {
                 "inclusive loop with i64-max operand".to_owned(),
             ));
         }
+        // An `optional` parameter is lowered as a plain one whose omitted
+        // calls either inline a default (coalesce) or pass none under the
+        // parameter's own type (bare `optional`); the callee's none-tolerant
+        // reads have no native lowering, so the function declines by name.
+        if let Some(source) = function.source
+            && let Some(signature) = self.signatures.get(&source)
+            && signature.params.iter().any(|param| param.optional)
+        {
+            self.record(Gap::Subset("optional parameter omission".to_owned()));
+        }
         if function.is_generator && function.error_ty.is_some() {
             self.record(Gap::Subset("failable generator function".to_owned()));
         }
@@ -992,8 +1008,11 @@ impl MirVisitor for ClifCapability<'_> {
 /// Classify a validated program against the CLIF target before emission.
 #[must_use]
 pub fn classify_clif_lowerability(validated: &ValidatedMir<'_>) -> Lowerability {
-    ClifCapability::new(validated.validation().types.as_table())
-        .classify_program(validated.program())
+    ClifCapability::new(
+        validated.validation().types.as_table(),
+        &validated.validation().functions,
+    )
+    .classify_program(validated.program())
 }
 
 /// Classify only the functions reachable from `entry` (what the lowering will
@@ -1004,13 +1023,17 @@ pub fn classify_clif_reachable(
     entry: Option<MirFunctionId>,
 ) -> Lowerability {
     let program = validated.program();
-    let mut classifier = ClifCapability::new(validated.validation().types.as_table());
+    let mut classifier = ClifCapability::new(
+        validated.validation().types.as_table(),
+        &validated.validation().functions,
+    );
     classifier.reachable = Some(reachable_from(program, entry));
     classifier.classify_program(program)
 }
 
-/// Classify with an explicit type table (fixture entry; same walk).
+/// Classify with an explicit type table (fixture entry; same walk). A fixture
+/// carries no callable signatures, so no parameter is optional here.
 #[must_use]
 pub fn classify_with_types(program: &MirProgram, types: &TypeTable) -> Lowerability {
-    ClifCapability::new(types).classify_program(program)
+    ClifCapability::new(types, &FxHashMap::default()).classify_program(program)
 }

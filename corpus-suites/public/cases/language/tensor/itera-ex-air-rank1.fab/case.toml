@@ -12,7 +12,7 @@ check_only = true
 
 [targets.clif-jit]
 outcome = "known-fail"
-phase = "emit"
+phase = "run"
 diagnostic_contains = "unsupported MIR lowering: path that does not resolve to a local value"
 known_fail_why = "The shared MIR lowering already refuses the AIR tensor path by name before an image is created. This is a compile-time lowering gap, not the runner's run-phase lane restriction."
 
