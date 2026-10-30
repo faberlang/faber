@@ -35,6 +35,38 @@ fn test_seams() -> EmissionSeams {
     }
 }
 
+#[test]
+fn package_emission_cannot_ignore_an_evm_contract_requirement() {
+    let dir = crate::test_support::test_temp_dir("package-contract-environment");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"
+@ contract { target = "evm" }
+class Arithmetic {
+    @ public
+    fn add(int a, int b) → int { return a + b }
+}
+main { print 7 }
+"#,
+    )
+    .expect("write source");
+    let result = compile_package(
+        &Config::default().with_target(Target::HirRust),
+        &entry,
+        &test_seams(),
+    );
+    assert!(result.output.is_none());
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some("PKG001")
+                && diagnostic.issue() == Some("contract_target_mismatch")
+        }),
+        "{:?}",
+        result.diagnostics
+    );
+}
+
 #[cfg(feature = "hir-go")]
 fn never_exercised_go_emission(_package: &AnalyzedProgram, _input: &Path) -> PackageCompileResult {
     unreachable!("go emission is a faber-side seam; radix-program tests only run the Rust path")

@@ -196,6 +196,12 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
     if !super::target_gate::target_compiled_in(target) {
         super::target_gate::exit_target_not_in_this_build(target);
     }
+    if target == Target::MirEvm {
+        eprintln!(
+            "error: evm is an experimental single-file emit target; use faber emit --target evm, not build"
+        );
+        crate::exit_status::exit_usage();
+    }
     let is_package = use_package_compiler(target, &raw_input_path, command.package);
     let input_path = if is_package {
         super::absolutize_path(&raw_input_path)
@@ -1353,6 +1359,12 @@ fn lowering_units(config: &radix::module::Config, input_path: &Path) -> Vec<Path
 /// Unlike `cmd_build`, this command does not materialize the generated Cargo
 /// crate. It is a compiler-inspection surface for the assembled backend output.
 pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, linter: bool) {
+    if command.target == Target::MirEvm {
+        eprintln!(
+            "error: evm supports experimental single-file emit only; package emit is unsupported"
+        );
+        crate::exit_status::exit_usage();
+    }
     // SGR-U2: `.fab` metal-text emits take the package lane's merged
     // consumer, mirroring the build branch — radix-program::emit has no
     // MirMetal artifact plan and reports the input as unsupported.

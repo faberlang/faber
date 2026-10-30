@@ -293,6 +293,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     if cfg!(feature = "mir-llvm") {
         compiled.insert("mir-llvm");
     }
+    if cfg!(feature = "mir-evm") {
+        compiled.insert("mir-evm");
+    }
     if cfg!(feature = "mir-clif") {
         compiled.insert("mir-clif");
     }

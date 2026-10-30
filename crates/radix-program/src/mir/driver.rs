@@ -165,6 +165,11 @@ pub fn with_linked_test_package_lowered_mir<R>(
         return Err(package.diagnostics);
     }
 
+    crate::qualify::require_contract_execution_targets(
+        &package,
+        radix_module::codegen::Target::MirStepper,
+    )?;
+
     let mut library_cache = (seams.library_cache_for_config)(config);
     link_package_lowered_functions(package, scope, config, &mut library_cache, run)
 }
@@ -371,6 +376,15 @@ fn prepare_package_mir<R>(
         .any(radix_module::Diagnostic::is_error)
     {
         return Err(package.diagnostics);
+    }
+    if cli_mode != CliPlanningMode::Check && consumer == PackageMirConsumer::Interpreted {
+        // The external-target route lends MIR to inspection probes. Actual
+        // external artifact builders enforce their target at the owning emit
+        // seam; inspection retains the caller's existing CLI-planning rules.
+        crate::qualify::require_contract_execution_targets(
+            &package,
+            radix_module::codegen::Target::MirStepper,
+        )?;
     }
     // The package may arrive in the neutral FHIR form: analyzed under the
     // implicit portable target of a manifest, or loaded from artifacts. MIR

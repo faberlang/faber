@@ -122,6 +122,10 @@ pub enum FaberCliTarget {
     #[value(name = "basic", alias = "bas")]
     MirBasic,
 
+    /// Experimental EVM deployment bytecode (default-off mir-evm feature).
+    #[value(name = "evm")]
+    MirEvm,
+
     /// Swift backend.
     #[value(name = "swift")]
     HirSwift,
@@ -196,6 +200,7 @@ impl FaberCliTarget {
             FaberCliTarget::MirWgsl => Target::MirWgsl,
             FaberCliTarget::MirSexp => Target::MirSexp,
             FaberCliTarget::MirBasic => Target::MirBasic,
+            FaberCliTarget::MirEvm => Target::MirEvm,
             FaberCliTarget::HirSwift => Target::HirSwift,
             FaberCliTarget::HirFhir => Target::HirFhir,
             FaberCliTarget::MirLlvmHost => Target::MirLlvmHost,

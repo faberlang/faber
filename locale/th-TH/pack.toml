@@ -4374,6 +4374,18 @@ help = "ตอนนี้ '⇇' คัดลอกค่าด้านขว�
 message = "sinking contract ต้องประกาศ `sink(T) → vacuum ⇥ E` และ `flush() → vacuum ⇥ E` อย่างละหนึ่งเมธอด โดยมี type parameter เดียว"
 help = "ประกาศ `{implendum} Sink<T>` พร้อม `{functio} sink(T res) → vacuum ⇥ E` และ `{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "annotation ของ contract คอมไพเลอร์ไม่ถูกต้อง: {reason}"
+help = 'เขียน `@ contract { target = "evm" }` บนชนิดเดียว'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "รูปแบบ contract EVM เชิงทดลองไม่รองรับ: {reason}"
+help = "ใช้ชนิดเดียวที่ไม่มีฟิลด์ พร้อมเมธอดสเกลาร์และรายการสาธารณะแบบชัดแจ้ง"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contract ต้องการเป้าหมาย `{required}` แต่เป้าหมายที่เลือกคือ `{target}`"
+help = "เลือกเป้าหมายการทำงานที่ contract ต้องการ; การจัดรูปแบบซอร์สและการทำให้เป็นอนุกรมของ HIR รักษา annotation ไว้"
+
 [diagnostics.INFO001]
 message = "เคอร์เนล `{kernel}` ทำงานแบบอนุกรมบนอุปกรณ์ {device}"
 
@@ -4404,3 +4416,7 @@ help = "ทำตามเหตุผลจากการตรวจสอบ
 [diagnostics.SEM008.issues.region_facts_not_built]
 message = "ข้อเท็จจริงของขอบเขตการยืมยังสร้างไม่ได้สำหรับ '{construct}' ตัวตรวจการยืมปิดตัวแทนที่จะประมาณ"
 help = "รูปแบบนี้ต้องอาศัยการอนุมานขอบเขตในการตัดสินการยืม รายงานเพื่อให้เอนจินขอบเขตรองรับมัน"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "สไปก์ EVM ปฏิเสธ {shape} ({reason})"
+help = "ใช้เฉพาะส่วนย่อยสเกลาร์ evm_entry; เป้าหมายเชิงทดลองนี้ไม่มีพื้นผิวแพ็กเกจหรือการทำงาน"

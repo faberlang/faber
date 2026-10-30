@@ -2534,6 +2534,77 @@ fn check_declared_locale_source_draws_no_locales002_note() {
     assert!(notes.is_empty(), "diagnostics: {:?}", result.diagnostics);
 }
 
+#[test]
+fn evm_capabilities_do_not_claim_product_execution_or_build() {
+    let target = crate::Target::MirEvm;
+    assert!(discoverable_targets().contains(&target));
+    assert_eq!(target_extension(target), "evm");
+    for surface in [TargetCommandSurface::Radix, TargetCommandSurface::Faber] {
+        let row = target_capabilities_for_surface(surface, target);
+        assert!(row.check);
+        assert!(!row.build);
+        assert!(!row.run);
+        assert!(!row.package);
+    }
+}
+
+#[cfg(not(feature = "mir-evm"))]
+#[test]
+fn evm_emit_without_feature_fails_with_target_identity() {
+    let session = crate::Session::new(crate::Config::default().with_target(crate::Target::MirEvm));
+    let result = crate::driver::compile(
+        &session,
+        "evm-gate.fab",
+        "fn evm_entry(int x) → int { return x }",
+        crate::driver::ModuleCompileRequest::default(),
+    );
+    assert!(result.output.is_none());
+    assert!(result.diagnostics.iter().any(|diagnostic| {
+        diagnostic.issue() == Some("target_unavailable")
+            && diagnostic
+                .args
+                .iter()
+                .any(|arg| arg.name == "feature" && arg.value == "mir-evm")
+    }));
+}
+
+#[cfg(feature = "mir-evm")]
+#[test]
+fn evm_leaf_refusal_keeps_structured_reason_and_shape() {
+    let session = crate::Session::new(crate::Config::default().with_target(crate::Target::MirEvm));
+    let result = crate::driver::compile(
+        &session,
+        "evm-refusal.fab",
+        "fn evm_entry(f64 x) → f64 { return x }",
+        crate::driver::ModuleCompileRequest::default(),
+    );
+    assert!(result.output.is_none());
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.issue() == Some("evm_unsupported"))
+        .expect("driver preserves the EVM refusal envelope");
+    assert_eq!(diagnostic.code, Some("PKG001"));
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "reason" && arg.value == "unsupported_type")
+    );
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "shape" && !arg.value.is_empty())
+    );
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "target" && arg.value == "evm")
+    );
+}
+
 // ── single-file check/verify resolve frontmatter locales through the config ──
 //
 // `faber check` / `lex` / `parse` / `hir` / `cli-ir` / `verify` resolved a

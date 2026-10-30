@@ -22,7 +22,7 @@
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 23] = [
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 24] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
@@ -45,6 +45,7 @@ const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 23] = [
     crate::codegen::Target::MirWgsl,
     crate::codegen::Target::MirSexp,
     crate::codegen::Target::MirBasic,
+    crate::codegen::Target::MirEvm,
     crate::codegen::Target::HirTypeScript,
 ];
 
@@ -102,6 +103,7 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
         crate::codegen::Target::MirWgsl => "wgsl",
         crate::codegen::Target::MirSexp => "rkt",
         crate::codegen::Target::MirBasic => "bas",
+        crate::codegen::Target::MirEvm => "evm",
         crate::codegen::Target::MirScena => "scena",
         crate::codegen::Target::MirFmir => "fmir.txt",
         crate::codegen::Target::MirFmirBinary => "fmir",
@@ -294,6 +296,13 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             run: false,
             package: false,
             note: "supported MIR-backed Racket validation target (fail-closed subset); run via external racket; not a package runtime",
+        },
+        crate::codegen::Target::MirEvm => TargetCapabilities {
+            check: true,
+            build: false,
+            run: false,
+            package: false,
+            note: "experimental Shanghai contracts with static scalar ABI; emit only; no storage or external calls; default-off mir-evm",
         },
         crate::codegen::Target::MirBasic => TargetCapabilities {
             check: true,

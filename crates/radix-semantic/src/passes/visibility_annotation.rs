@@ -149,8 +149,14 @@ fn check_genus_member_annotations(
     annotations: &[Annotation],
     interner: &Interner,
     errors: &mut Vec<SemanticError>,
+    public_is_abi_entry: bool,
 ) {
     check_declaration_visibility(annotations, interner, errors);
+    // In the opt-in compiler contract profile, explicit public methods select
+    // ABI entries. Their marker carries meaning beyond ordinary visibility.
+    if public_is_abi_entry {
+        return;
+    }
     for annotation in annotations {
         if visibility_tier(annotation, interner) == Some(VisibilityTier::Publica) {
             errors.push(
@@ -212,10 +218,25 @@ fn check_stmt(stmt: &Stmt, interner: &Interner, errors: &mut Vec<SemanticError>)
     match &stmt.kind {
         StmtKind::Func(func) => check_declaration_visibility(&func.annotations, interner, errors),
         StmtKind::Class(class) => {
+            let is_contract = stmt.annotations.iter().any(|annotation| {
+                crate::evm_contract::is_contract_annotation(annotation, interner)
+            });
             for member in &class.members {
-                check_genus_member_annotations(&member.annotations, interner, errors);
+                let public_is_abi_entry =
+                    is_contract && matches!(member.kind, ClassMemberKind::Method(_));
+                check_genus_member_annotations(
+                    &member.annotations,
+                    interner,
+                    errors,
+                    public_is_abi_entry,
+                );
                 if let ClassMemberKind::Method(method) = &member.kind {
-                    check_genus_member_annotations(&method.annotations, interner, errors);
+                    check_genus_member_annotations(
+                        &method.annotations,
+                        interner,
+                        errors,
+                        public_is_abi_entry,
+                    );
                 }
             }
         }
