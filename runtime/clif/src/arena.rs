@@ -87,6 +87,19 @@ impl Arena {
         self.allocations.get()
     }
 
+    /// Test-only: how many chunks the arena has allocated.
+    #[cfg(test)]
+    pub(crate) fn chunk_count(&self) -> usize {
+        let mut count = 0;
+        // SAFETY: single-threaded test; walk the live chunk chain.
+        let mut chunk = unsafe { *self.current.get() };
+        while let Some(found) = (unsafe { chunk.as_ref() }) {
+            count += 1;
+            chunk = found.previous;
+        }
+        count
+    }
+
     /// Bump-allocate `size` bytes at `align`; a new chunk when the current one
     /// cannot serve the request.
     pub(crate) fn alloc_raw(&self, size: usize, align: usize) -> *mut u8 {

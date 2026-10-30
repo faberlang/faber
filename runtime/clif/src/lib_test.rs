@@ -457,3 +457,74 @@ fn chunk_layout_refuses_an_overflowing_header_addition() {
     assert_eq!(layout.size(), HEADER + CHUNK_DATA);
     assert_eq!(layout.align(), CHUNK_ALIGN);
 }
+
+#[test]
+fn allocations_span_chunks_and_straddle_chunk_boundaries() {
+    use crate::arena::{ArenaPointer, CHUNK_DATA};
+
+    // An allocation larger than one fresh chunk gets a chunk of its own and
+    // reads back whole.
+    let arena = Arena::new();
+    let arena = std::ptr::from_ref(&arena);
+    let oversized = vec![0xA5u8; CHUNK_DATA + 1];
+    let big = ArenaPointer::put_slice(arena, &oversized);
+    // SAFETY: `big` is a live slice of this test's arena.
+    let read_back = unsafe { &*big };
+    assert_eq!(read_back.len(), CHUNK_DATA + 1);
+    assert!(read_back.iter().all(|&byte| byte == 0xA5));
+    assert_eq!(
+        // SAFETY: see above.
+        unsafe { (*arena).chunk_count() },
+        1,
+        "an oversized allocation lives in a single chunk"
+    );
+
+    // A pair straddling the chunk boundary: the first allocation ends on the
+    // chunk's last byte, the second must open the next chunk.
+    let arena = Arena::new();
+    let arena = std::ptr::from_ref(&arena);
+    let almost_all = vec![0x11u8; CHUNK_DATA - 1];
+    let a = ArenaPointer::put_slice(arena, &almost_all);
+    let last = ArenaPointer::put_slice(arena, &[0x22u8]);
+    assert_eq!(
+        // SAFETY: `arena` is live for the whole test.
+        unsafe { (*arena).chunk_count() },
+        1,
+        "an allocation filling the chunk's last byte stays in the first chunk"
+    );
+    let first = ArenaPointer::put_slice(arena, &[0x33u8]);
+    assert_eq!(
+        // SAFETY: `arena` is live for the whole test.
+        unsafe { (*arena).chunk_count() },
+        2,
+        "the byte after a full chunk opens the next chunk"
+    );
+
+    // SAFETY: all three slices are live in this test's arena.
+    unsafe {
+        assert!((*a).iter().all(|&byte| byte == 0x11));
+        assert_eq!((*last)[0], 0x22);
+        assert_eq!((*first)[0], 0x33);
+    }
+
+    // Addresses stay stable as the arena grows past the boundary.
+    let addresses = [
+        a.cast::<u8>() as usize,
+        last.cast::<u8>() as usize,
+        first.cast::<u8>() as usize,
+    ];
+    let trailing = ArenaPointer::put_slice(arena, &[0x44u8; 128]);
+    assert_eq!(
+        [
+            a.cast::<u8>() as usize,
+            last.cast::<u8>() as usize,
+            first.cast::<u8>() as usize
+        ],
+        addresses,
+        "arena addresses are stable for the program's life"
+    );
+    // SAFETY: `trailing` is a live slice of this test's arena.
+    unsafe {
+        assert!((*trailing).iter().all(|&byte| byte == 0x44));
+    }
+}
