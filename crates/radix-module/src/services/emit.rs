@@ -27,6 +27,8 @@ pub fn build_output_path(
 #[must_use]
 pub fn output_code(output: crate::Output) -> String {
     match output {
+        #[cfg(feature = "mir-evm")]
+        crate::Output::Evm(out) => out.init.iter().map(|byte| format!("{byte:02x}")).collect(),
         crate::Output::Rust(out) => out.code,
         crate::Output::TypeScript(out) => out.code,
         crate::Output::Go(out) => out.code,

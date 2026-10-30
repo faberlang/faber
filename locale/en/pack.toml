@@ -6220,3 +6220,7 @@ help = "Check the reason and use a kernel form supported by the selected device.
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
 help = "Follow the audit reason to find the dependency. Keep partitioned reads and writes lane-local and use matching buffer layouts where possible."
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM spike refuses {shape} ({reason})"
+help = "Use only the bounded scalar evm_entry subset; this experimental target has no package or execution surface."

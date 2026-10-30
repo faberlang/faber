@@ -5624,3 +5624,7 @@ help = "Causam inspice et forma nuclei utere quam machina electa sustinet."
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
 help = "Sequere causam inspectionis ut dependentiam invenias. Lectiones et scripturas per partitiones divisas intra singulas vias contine, et dispositionibus bufferorum congruentibus utere ubi fieri potest."
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "Experimentum EVM recusat {shape} ({reason})"
+help = "Utere tantum parte scalari evm_entry; hoc experimentum nec fasciculos nec exsecutionem sustinet."

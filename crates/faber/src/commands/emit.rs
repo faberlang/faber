@@ -160,6 +160,10 @@ fn compile_wgsl_with_library_bindings(
 /// non-Latin reader surface. Keeping this seam in Faber avoids asking Radix
 /// to rediscover Faber's install and package layout.
 pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
+    if command.target == radix::Target::MirEvm && (format || linter) {
+        eprintln!("error: evm emits binary bytecode; format and linter options are unsupported");
+        faber_cli::exit_status::exit_usage();
+    }
     if command.package {
         eprintln!("error: package emit must use the package compiler route");
         faber_cli::exit_status::exit_usage();
@@ -246,6 +250,16 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
             format,
             linter,
         );
+        return;
+    }
+
+    #[cfg(feature = "mir-evm")]
+    if let radix::Output::Evm(out) = output {
+        use std::io::Write;
+        if let Err(error) = std::io::stdout().lock().write_all(&out.init) {
+            eprintln!("error: failed to write EVM deployment bytecode: {error}");
+            faber_cli::exit_status::exit_cant_create();
+        }
         return;
     }
 

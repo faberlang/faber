@@ -724,7 +724,17 @@ fn compile_codegen_error(
     source: &str,
     err: SpannedCodegenError,
 ) -> CompileResult {
+    let is_evm_refusal = err
+        .args
+        .iter()
+        .any(|arg| arg.name == "issue" && arg.value == "evm_unsupported");
     let mut diagnostic = Diagnostic::codegen_error(&err.message).with_args(err.args);
+    // CODEGEN001 is an uncatalogued backend envelope. The experimental EVM
+    // refusal uses the existing catalogued lowering/package family so packs
+    // can render its structured reason and shape.
+    if is_evm_refusal {
+        diagnostic = diagnostic.with_code("PKG001");
+    }
     if let Some(span) = err.span {
         diagnostic = diagnostic.with_source_context(name, source, span);
     } else {
@@ -759,6 +769,10 @@ fn generate_output(
     // other target refuses it by one named issue until its emission lands.
     radix_codegen_shared::reject_list_window(&analysis.hir, &analysis.types, target)?;
     match target {
+        #[cfg(feature = "mir-evm")]
+        Target::MirEvm => generate_evm_output(analysis, no_fuse),
+        #[cfg(not(feature = "mir-evm"))]
+        Target::MirEvm => Err(unavailable_target_spanned(Target::MirEvm)),
         Target::MirStepper => Err(codegen::CodegenError {
             message: "stepper is the core interpreter target; run through the MIR stepper, not codegen emit".to_owned(),
             args: vec![
@@ -1097,6 +1111,25 @@ fn generate_llvm_text_output(
         .map_err(llvm_text_codegen_error)?
     };
     Ok(crate::Output::LlvmText(crate::LlvmTextOutput { code }))
+}
+
+#[cfg(feature = "mir-evm")]
+fn generate_evm_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
+    prepare_mir_lowering_interner(analysis);
+    let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
+    let artifact = radix_mir_evm::emit_evm(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
+        message: error.to_string(),
+        args: vec![
+            DiagnosticArg::new("issue", "evm_unsupported"),
+            DiagnosticArg::new("target", "evm"),
+            DiagnosticArg::new("reason", error.issue),
+            DiagnosticArg::new("shape", error.shape),
+        ],
+    })?;
+    Ok(crate::Output::Evm(crate::EvmOutput {
+        init: artifact.init,
+        runtime: artifact.runtime,
+    }))
 }
 
 /// Lower one unit with the Cranelift backend (public `clif` target): a native
@@ -4401,6 +4434,7 @@ fn collect_target_policy_diagnostics(
         | Target::MirMetal
         | Target::MirScena
         | Target::MirSexp
+        | Target::MirEvm
         | Target::MirBasic
         | Target::HirSwift
         | Target::HirPython
