@@ -199,9 +199,21 @@ impl HirCfg {
 ///
 /// # Errors
 /// Returns `CfgError` when a control-flow shape is unsupported.
+
+/// Build a deterministic HIR CFG for functions, the optional module entry,
+/// every closure or lane body nested inside them, and module constants.
+///
+/// Malformed HIR (a loop transfer outside a loop) returns [`CfgError`] rather
+/// than being approximated.  This keeps the semantic region consumer fail
+/// closed: its caller may reject loudly instead of silently keeping the old
+/// block-scope approximation.
+///
+/// # Errors
+/// Returns `CfgError` when a control-flow shape is unsupported.
 pub fn build_cfg(hir: &HirModule) -> Result<HirCfg, CfgError> {
     let mut builder = Builder {
         cfg: HirCfg::default(),
+        scopes: Vec::new(),
     };
 
     for item in &hir.items {
@@ -212,12 +224,25 @@ pub fn build_cfg(hir: &HirModule) -> Result<HirCfg, CfgError> {
                 }
             }
             HirItemKind::Struct(strukt) => {
+                for field in &strukt.fields {
+                    // A field initializer (a class `fixum` constant's
+                    // `praefixum { … }` body is the statement-bearing case)
+                    // evaluates in its own context like a module constant.
+                    if let Some(init) = &field.init {
+                        builder.add_expr_component(init)?;
+                    }
+                }
                 for method in &strukt.methods {
                     if let Some(body) = &method.func.body {
                         builder.add_block_component(body)?;
                     }
                 }
             }
+            // A module constant's initializer (a `praefixum { … }` block is
+            // the statement-bearing case) evaluates in its own compile-time
+            // context; it becomes one more disconnected component so its
+            // statements keep real locations.
+            HirItemKind::Constant(constant) => builder.add_expr_component(&constant.value)?,
             _ => {}
         }
     }
@@ -228,11 +253,22 @@ pub fn build_cfg(hir: &HirModule) -> Result<HirCfg, CfgError> {
     Ok(builder.cfg)
 }
 
+/// One entry of the active break/continue scope stack.
+///
+/// Mirrors the MIR `BreakableContext`: a loop owns both its break exit and
+/// its continue point; a breakable `fac` block (ruling R3: "a breakable
+/// block is not a loop") owns only its exit and passes `perge` through to
+/// the enclosing loop. `rumpe` targets the innermost scope; `perge` targets
+/// the innermost scope that still carries a continue point.
+#[derive(Clone, Copy)]
+struct Scope {
+    break_to: CfgNodeId,
+    continue_to: Option<CfgNodeId>,
+}
+
 struct Fragment {
     entry: Option<CfgNodeId>,
     normal: Vec<CfgNodeId>,
-    breaks: Vec<CfgNodeId>,
-    continues: Vec<CfgNodeId>,
 }
 
 impl Fragment {
@@ -240,8 +276,6 @@ impl Fragment {
         Self {
             entry: None,
             normal: Vec::new(),
-            breaks: Vec::new(),
-            continues: Vec::new(),
         }
     }
 
@@ -249,35 +283,42 @@ impl Fragment {
         Self {
             entry: Some(entry),
             normal: vec![entry],
-            breaks: Vec::new(),
-            continues: Vec::new(),
+        }
+    }
+
+    fn terminal_with_entry(entry: CfgNodeId, exit: CfgNodeId) -> Self {
+        Self {
+            entry: Some(entry),
+            normal: vec![exit],
         }
     }
 }
 
-#[derive(Clone, Copy)]
-struct LoopContext;
-
 struct Builder {
     cfg: HirCfg,
+    /// Active break/continue scopes; empty inside a fresh component (a
+    /// function, closure or lane body owns no ambient loop), exactly as the
+    /// resolver's scope chain stops at `ScopeKind::Function`.
+    scopes: Vec<Scope>,
 }
 
 impl Builder {
     /// One disconnected component whose body is a block (a function, a
     /// method, the module entry).
     fn add_block_component(&mut self, block: &HirBlock) -> Result<(), CfgError> {
-        self.isolated_component(block.span, |builder| builder.build_block(block, None))
+        self.isolated_component(block.span, |builder| builder.build_block(block))
     }
 
     /// One disconnected component whose body is a single expression (a
-    /// closure body or a reduction lane body that is not a block).
+    /// closure body, a reduction lane body that is not a block, a module
+    /// constant initializer).
     fn add_expr_component(&mut self, body: &HirExpression) -> Result<(), CfgError> {
         let span = body.span;
-        self.isolated_component(span, |builder| builder.build_expression(body, None))
+        self.isolated_component(span, |builder| builder.build_expression(body))
     }
 
     /// Build a fresh entry/exit pair around `build`, wire the fragment in,
-    /// and reject loop transfers that escape the component.
+    /// and build with no ambient break/continue scopes.
     fn isolated_component(
         &mut self,
         span: Span,
@@ -292,7 +333,13 @@ impl Builder {
         self.cfg.entries.push(entry);
         self.cfg.exits.push(exit);
 
-        let fragment = build(self)?;
+        // A component owns no ambient loop: transfers inside it must resolve
+        // within it or fail closed, never silently borrow the caller's flow.
+        let outer = std::mem::take(&mut self.scopes);
+        let fragment = build(self);
+        self.scopes = outer;
+
+        let fragment = fragment?;
         if let Some(fragment_entry) = fragment.entry {
             self.cfg.add_edge(entry, fragment_entry, CfgEdgeKind::Next);
         } else {
@@ -301,65 +348,81 @@ impl Builder {
         for normal in fragment.normal {
             self.cfg.add_edge(normal, exit, CfgEdgeKind::Next);
         }
-        for transfer in fragment.breaks {
-            self.cfg.add_edge(transfer, exit, CfgEdgeKind::Break);
-        }
-        if !fragment.continues.is_empty() {
-            return Err(CfgError::TransferOutsideLoop {
-                transfer: "perge",
-                span,
-            });
-        }
         Ok(())
     }
 
-    fn build_block(
-        &mut self,
-        block: &HirBlock,
-        loop_context: Option<LoopContext>,
-    ) -> Result<Fragment, CfgError> {
+    fn build_block(&mut self, block: &HirBlock) -> Result<Fragment, CfgError> {
+        // Ruling R3: a breakable block (`fac { … }`, the try body of
+        // `fac … cape`) is not a loop. Body fall-through and every `rumpe`
+        // land on one after-join; `perge` passes through to the enclosing
+        // loop. Both exits share the node, exactly as the MIR lowering gives
+        // them the same exit block, so a `rumpe` skips the rest of the body
+        // without entering a `cape` handler.
+        if block
+            .breakable
+            .is_some_and(radix_hir::HirBreakableKind::is_scope)
+        {
+            let after = self
+                .cfg
+                .add_node(CfgNodeKind::Join, location(None, None, block.span));
+            self.scopes.push(Scope {
+                break_to: after,
+                continue_to: self.scopes.last().and_then(|scope| scope.continue_to),
+            });
+            let fragment = self.build_block_inner(block);
+            self.scopes.pop();
+            let fragment = fragment?;
+            self.connect_normals(&fragment, after, CfgEdgeKind::Next);
+            return Ok(Fragment {
+                entry: fragment.entry.or(Some(after)),
+                normal: vec![after],
+            });
+        }
+        self.build_block_inner(block)
+    }
+
+    fn build_block_inner(&mut self, block: &HirBlock) -> Result<Fragment, CfgError> {
         let mut result = Fragment::empty();
         for statement in &block.statements {
-            let next = self.build_statement(statement, loop_context)?;
+            let next = self.build_statement(statement)?;
             self.sequence(&mut result, next);
         }
         if let Some(expr) = &block.expr {
-            let next = self.build_expression(expr, loop_context)?;
+            let next = self.build_expression(expr)?;
             self.sequence(&mut result, next);
         }
         Ok(result)
     }
 
-    fn build_statement(
-        &mut self,
-        statement: &HirStatement,
-        loop_context: Option<LoopContext>,
-    ) -> Result<Fragment, CfgError> {
-        if (20..=30).contains(&statement.id.0) {
-            eprintln!("DBG build_statement id={}", statement.id.0);
-        }
+    fn build_statement(&mut self, statement: &HirStatement) -> Result<Fragment, CfgError> {
         match &statement.kind {
             HirStatementKind::Local(local) => {
-                if let Some(init) = &local.init
-                    && is_control_expression(init)
-                {
-                    let mut fragment = self.build_expression(init, loop_context)?;
-                    let binding = self.cfg.add_node(
-                        CfgNodeKind::Statement,
-                        location(Some(statement.id), Some(local.def_id), statement.span),
-                    );
-                    self.connect_normals(&fragment, binding, CfgEdgeKind::Next);
-                    fragment.entry.get_or_insert(binding);
-                    fragment.normal = vec![binding];
-                    return Ok(fragment);
-                }
-                Ok(Fragment::terminal(self.cfg.add_node(
+                let binding = self.cfg.add_node(
                     CfgNodeKind::Statement,
                     location(Some(statement.id), Some(local.def_id), statement.span),
-                )))
+                );
+                let mut fragment = Fragment::empty();
+                if let Some(init) = &local.init {
+                    if is_control_expression(init) {
+                        // The initializer decides control flow; build it into
+                        // the flow before the binding's own node.
+                        let next = self.build_expression(init)?;
+                        self.sequence(&mut fragment, next);
+                    } else {
+                        // A plain initializer has no control flow of its own,
+                        // but it may still host separate components (a
+                        // reduction or closure value) whose statements need
+                        // locations and whose operands run before the bind.
+                        self.build_nested_components(init, &mut fragment)?;
+                    }
+                }
+                self.connect_normals(&fragment, binding, CfgEdgeKind::Next);
+                fragment.entry.get_or_insert(binding);
+                fragment.normal = vec![binding];
+                Ok(fragment)
             }
             HirStatementKind::Expr(expr) => {
-                let mut fragment = self.build_expression(expr, loop_context)?;
+                let mut fragment = self.build_expression(expr)?;
                 let statement_node = self.cfg.add_node(
                     CfgNodeKind::Statement,
                     location(Some(statement.id), None, statement.span),
@@ -374,11 +437,8 @@ impl Builder {
                 // borrow decision keyed at the `redde` site (a returned view)
                 // needs a location, and the value's nodes alone would leave
                 // none.
-                if statement.id.0 == 24 {
-                    eprintln!("DBG redde 24 value_some={} value_id={:?}", value.is_some(), value.as_ref().map(|v| v.id.0));
-                }
                 let mut fragment = if let Some(value) = value {
-                    self.build_expression(value, loop_context)?
+                    self.build_expression(value)?
                 } else {
                     Fragment::empty()
                 };
@@ -397,17 +457,16 @@ impl Builder {
                     CfgNodeKind::Statement,
                     location(Some(statement.id), None, statement.span),
                 );
-                if loop_context.is_none() {
+                let Some(scope) = self.scopes.last().copied() else {
                     return Err(CfgError::TransferOutsideLoop {
                         transfer: "rumpe",
                         span: statement.span,
                     });
-                }
+                };
+                self.cfg.add_edge(node, scope.break_to, CfgEdgeKind::Break);
                 Ok(Fragment {
                     entry: Some(node),
                     normal: Vec::new(),
-                    breaks: vec![node],
-                    continues: Vec::new(),
                 })
             }
             HirStatementKind::Perge => {
@@ -415,17 +474,17 @@ impl Builder {
                     CfgNodeKind::Statement,
                     location(Some(statement.id), None, statement.span),
                 );
-                if loop_context.is_none() {
+                let Some(continue_to) = self.scopes.last().and_then(|scope| scope.continue_to)
+                else {
                     return Err(CfgError::TransferOutsideLoop {
                         transfer: "perge",
                         span: statement.span,
                     });
-                }
+                };
+                self.cfg.add_edge(node, continue_to, CfgEdgeKind::Continue);
                 Ok(Fragment {
                     entry: Some(node),
                     normal: Vec::new(),
-                    breaks: Vec::new(),
-                    continues: vec![node],
                 })
             }
             HirStatementKind::Tacet | HirStatementKind::IncDec(_) => {
@@ -434,9 +493,7 @@ impl Builder {
                     location(Some(statement.id), None, statement.span),
                 )))
             }
-            HirStatementKind::Custodi(custodi) => {
-                self.build_custodi(statement, custodi, loop_context)
-            }
+            HirStatementKind::Custodi(custodi) => self.build_custodi(statement, custodi),
         }
     }
 
@@ -449,7 +506,6 @@ impl Builder {
         &mut self,
         statement: &HirStatement,
         custodi: &radix_hir::HirCustodi,
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
         let mut clauses = Vec::new();
         for clause in &custodi.clauses {
@@ -457,7 +513,7 @@ impl Builder {
                 CfgNodeKind::Condition,
                 location(Some(clause.cond.id), None, clause.cond.span),
             );
-            let body = self.build_block(&clause.body, loop_context)?;
+            let body = self.build_block(&clause.body)?;
             clauses.push((condition, body));
         }
         let join = self.cfg.add_node(
@@ -465,9 +521,7 @@ impl Builder {
             location(Some(statement.id), None, statement.span),
         );
         for (index, (condition, body)) in clauses.iter().enumerate() {
-            let successor = clauses
-                .get(index + 1)
-                .map_or(join, |(next, _)| *next);
+            let successor = clauses.get(index + 1).map_or(join, |(next, _)| *next);
             self.cfg
                 .add_edge(*condition, successor, CfgEdgeKind::BranchFalse);
             if let Some(body_entry) = body.entry {
@@ -477,24 +531,12 @@ impl Builder {
             self.connect_normals(body, successor, CfgEdgeKind::Next);
         }
         let entry = clauses.first().map_or(join, |(condition, _)| *condition);
-        let mut fragment = Fragment::terminal_with_entry(entry, join);
-        for (_, body) in &clauses {
-            fragment.breaks.extend(body.breaks.iter().copied());
-            fragment.continues.extend(body.continues.iter().copied());
-        }
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(entry, join))
     }
 
-    fn build_expression(
-        &mut self,
-        expression: &HirExpression,
-        loop_context: Option<LoopContext>,
-    ) -> Result<Fragment, CfgError> {
-        if expression.id.0 == 25 {
-            eprintln!("DBG build_expression id=25 loop_ctx={:?}", loop_context.is_some());
-        }
+    fn build_expression(&mut self, expression: &HirExpression) -> Result<Fragment, CfgError> {
         match &expression.kind {
-            HirExpressionKind::Block(block) => self.build_block(block, loop_context),
+            HirExpressionKind::Block(block) => self.build_block(block),
             HirExpressionKind::Si {
                 cond,
                 then_block,
@@ -506,38 +548,39 @@ impl Builder {
                 then_block,
                 then_catch.as_deref(),
                 else_block.as_ref(),
-                loop_context,
             ),
             HirExpressionKind::Dum(cond, body) => self.build_dum(expression, cond, body),
             HirExpressionKind::Loop(body) => self.build_loop(expression, body),
             HirExpressionKind::Itera {
                 iter: source, body, ..
-            } => self.build_source_loop(
-                expression,
-                std::slice::from_ref(&**source),
-                body,
-                loop_context,
-            ),
+            } => self.build_source_loop(expression, std::slice::from_ref(&**source), body),
             HirExpressionKind::IteraLockstep { sources, body, .. } => {
-                self.build_source_loop(expression, sources, body, loop_context)
+                self.build_source_loop(expression, sources, body)
             }
             HirExpressionKind::IteraRange { ranges, body, .. } => {
-                self.build_source_loop(expression, ranges, body, loop_context)
+                self.build_source_loop(expression, ranges, body)
             }
-            HirExpressionKind::Discerne { scrutinees, arms, .. } => {
-                self.build_discerne(expression, scrutinees, arms, loop_context)
-            }
+            HirExpressionKind::Discerne {
+                scrutinees, arms, ..
+            } => self.build_discerne(expression, scrutinees, arms),
             HirExpressionKind::Handled { body, catch } => {
-                self.build_handled(expression, body, catch, loop_context)
+                self.build_handled(expression, body, catch)
             }
-            HirExpressionKind::Trap(body) => self.build_trap(expression, body, loop_context),
+            HirExpressionKind::Trap(body) => self.build_trap(expression, body),
             HirExpressionKind::CallDefault { body, default, .. } => {
-                self.build_call_default(expression, body, default, loop_context)
+                self.build_call_default(expression, body, default)
             }
             // A closure value is created at this site; its body executes
             // later, on call, so the body is its own component with real
             // locations and no invented call-site edges.
             HirExpressionKind::Clausura(_, _, _, body) => {
+                self.add_expr_component(body)?;
+                Ok(self.leaf_fragment(expression))
+            }
+            // A `praefixum` block evaluates at build time in its own
+            // context: one more disconnected component, like a closure body,
+            // so its statements keep real locations.
+            HirExpressionKind::Praefixum(body) => {
                 self.add_expr_component(body)?;
                 Ok(self.leaf_fragment(expression))
             }
@@ -551,9 +594,8 @@ impl Builder {
                 identity,
                 ..
             } => {
-                eprintln!("DBG reduction arm hit id={}", expression.id.0);
                 let operands = [Some(&**source), group.as_deref(), identity.as_deref()];
-                let mut fragment = self.build_operand_chain(&operands, loop_context)?;
+                let mut fragment = self.build_operand_chain(&operands)?;
                 self.add_block_component(body)?;
                 let node = self.leaf_node(expression);
                 self.connect_normals(&fragment, node, CfgEdgeKind::Next);
@@ -568,7 +610,7 @@ impl Builder {
                 ..
             } => {
                 let operands = [Some(&**source), group.as_deref()];
-                let mut fragment = self.build_operand_chain(&operands, loop_context)?;
+                let mut fragment = self.build_operand_chain(&operands)?;
                 self.add_block_component(body)?;
                 let node = self.leaf_node(expression);
                 self.connect_normals(&fragment, node, CfgEdgeKind::Next);
@@ -582,7 +624,7 @@ impl Builder {
                 ..
             } => {
                 let operands = [Some(&**source)];
-                let mut fragment = self.build_operand_chain(&operands, loop_context)?;
+                let mut fragment = self.build_operand_chain(&operands)?;
                 self.add_block_component(body)?;
                 let node = self.leaf_node(expression);
                 self.connect_normals(&fragment, node, CfgEdgeKind::Next);
@@ -591,57 +633,54 @@ impl Builder {
                 Ok(fragment)
             }
             // VALUE EXPRESSIONS (named domain invariant): none of these kinds
-            // hosts statements or control-flow edges of its own, so one node
-            // carries the whole expression and inner uses key to it through
-            // the ambient location.  A diverging `mori`/`iace` still falls
-            // through here: the extra edge can only lengthen regions.  A new
+            // hosts control-flow edges of its own, so one node carries the
+            // whole expression and inner uses key to it through the ambient
+            // location. But a value expression may still *contain* a
+            // statement-bearing construct (a closure or lane body nested in
+            // a call argument, a conversion, an initializer): those become
+            // their own components and their operand chains join this flow,
+            // in evaluation order, before the value's own node. A new
             // expression kind with interior control flow must be matched
             // above — folding it here would silently approximate.
-            HirExpressionKind::Path(_)
-            | HirExpressionKind::Literal(_)
-            | HirExpressionKind::Vacua
-            | HirExpressionKind::Binary(..)
-            | HirExpressionKind::Unary(..)
-            | HirExpressionKind::Call(..)
-            | HirExpressionKind::Gradient { .. }
-            | HirExpressionKind::MethodCall(..)
-            | HirExpressionKind::Field(..)
-            | HirExpressionKind::Index(..)
-            | HirExpressionKind::OptionalChain(..)
-            | HirExpressionKind::NonNull(..)
-            | HirExpressionKind::Intervallum { .. }
-            | HirExpressionKind::Assign(..)
-            | HirExpressionKind::Marked { .. }
-            | HirExpressionKind::ConversioAssign { .. }
-            | HirExpressionKind::Array(_)
-            | HirExpressionKind::Struct(..)
-            | HirExpressionKind::Tuple(..)
-            | HirExpressionKind::Scribe(..)
-            | HirExpressionKind::Scriptum(..)
-            | HirExpressionKind::ReadLine(_)
-            | HirExpressionKind::Praefixum(_)
-            | HirExpressionKind::Insere(_)
-            | HirExpressionKind::Adfirma(..)
-            | HirExpressionKind::Panic(_)
-            | HirExpressionKind::Throw(_)
-            | HirExpressionKind::Cede(_)
-            | HirExpressionKind::Reddet(_)
-            | HirExpressionKind::Tacebit(_)
-            | HirExpressionKind::Yield(_)
-            | HirExpressionKind::Verte { .. }
-            | HirExpressionKind::Conversio { .. }
-            | HirExpressionKind::Widen { .. }
-            | HirExpressionKind::Ad { .. }
-            | HirExpressionKind::Ref(..)
-            | HirExpressionKind::Deref(_)
-            | HirExpressionKind::TypeCheck { .. }
-            | HirExpressionKind::CopyInto { .. }
-            | HirExpressionKind::SinkInto { .. }
-            | HirExpressionKind::Format { .. }
-            | HirExpressionKind::Error
-            | HirExpressionKind::Reduction { body: None, .. }
-            | HirExpressionKind::Sort { body: None, .. } => Ok(self.leaf_fragment(expression)),
+            _ => {
+                let mut fragment = Fragment::empty();
+                self.build_nested_components(expression, &mut fragment)?;
+                let node = self.leaf_node(expression);
+                self.connect_normals(&fragment, node, CfgEdgeKind::Next);
+                fragment.entry.get_or_insert(node);
+                fragment.normal = vec![node];
+                Ok(fragment)
+            }
         }
+    }
+
+    /// Walk a value expression and give every statement-bearing construct
+    /// in it its components: the expression itself when it is one (a local
+    /// initializer may be a whole closure or reduction value), otherwise its
+    /// value children in evaluation order. Plain value children recurse
+    /// without nodes (their uses key to the ambient location); component
+    /// constructs are built through [`Self::build_expression`] so their
+    /// operand chains, component bodies and site nodes all exist and
+    /// sequence into `fragment`.
+    fn build_nested_components(
+        &mut self,
+        expression: &HirExpression,
+        fragment: &mut Fragment,
+    ) -> Result<(), CfgError> {
+        if is_separate_component(&expression.kind) {
+            let next = self.build_expression(expression)?;
+            self.sequence(fragment, next);
+            return Ok(());
+        }
+        for child in value_children(&expression.kind) {
+            if is_separate_component(&child.kind) {
+                let next = self.build_expression(child)?;
+                self.sequence(fragment, next);
+            } else {
+                self.build_nested_components(child, fragment)?;
+            }
+        }
+        Ok(())
     }
 
     fn build_si(
@@ -651,36 +690,43 @@ impl Builder {
         then_block: &HirBlock,
         then_catch: Option<&HirCape>,
         else_block: Option<&HirBlock>,
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
-        let condition = self
-            .cfg
-            .add_node(CfgNodeKind::Condition, location(Some(cond.id), None, cond.span));
+        let condition = self.cfg.add_node(
+            CfgNodeKind::Condition,
+            location(Some(cond.id), None, cond.span),
+        );
         let then_watermark = self.cfg.nodes.len();
-        let then_fragment = self.build_block(then_block, loop_context)?;
+        let then_fragment = self.build_block(then_block)?;
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
         if let Some(catch) = then_catch {
-            // `si cond { … } cape e { … }`: errors inside the then-arm
-            // transfer to the catch from any point, exactly like a handled
-            // body; the false edge skips the arm and its handler entirely.
+            // `si cond { … } cape e { … } [secus { … }]`: errors inside the
+            // then-arm transfer to the catch from any point; the false edge
+            // runs the else arm when present (leaving the handled region —
+            // it never enters the catch) and otherwise skips straight to the
+            // join, mirroring MIR `lower_handled_si_stmt`.
             self.connect_branch(condition, &then_fragment, CfgEdgeKind::BranchTrue);
             self.connect_normals(&then_fragment, join, CfgEdgeKind::Next);
-            let catch_fragment = self.build_block(&catch.body, loop_context)?;
+            let catch_fragment = self.build_block(&catch.body)?;
             self.connect_error_edges(then_watermark, catch_fragment.entry.unwrap_or(join));
             self.connect_normals(&catch_fragment, join, CfgEdgeKind::Next);
-            self.cfg.add_edge(condition, join, CfgEdgeKind::BranchFalse);
-            let mut fragment = Fragment::terminal_with_entry(condition, join);
-            fragment.breaks.extend(then_fragment.breaks);
-            fragment.breaks.extend(catch_fragment.breaks);
-            fragment.continues.extend(then_fragment.continues);
-            fragment.continues.extend(catch_fragment.continues);
-            return Ok(fragment);
+            let else_fragment = if let Some(else_block) = else_block {
+                self.build_block(else_block)?
+            } else {
+                Fragment::empty()
+            };
+            if else_fragment.entry.is_some() {
+                self.connect_branch(condition, &else_fragment, CfgEdgeKind::BranchFalse);
+            } else {
+                self.cfg.add_edge(condition, join, CfgEdgeKind::BranchFalse);
+            }
+            self.connect_normals(&else_fragment, join, CfgEdgeKind::Next);
+            return Ok(Fragment::terminal_with_entry(condition, join));
         }
         let else_fragment = if let Some(else_block) = else_block {
-            self.build_block(else_block, loop_context)?
+            self.build_block(else_block)?
         } else {
             Fragment::empty()
         };
@@ -692,12 +738,7 @@ impl Builder {
         }
         self.connect_normals(&then_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&else_fragment, join, CfgEdgeKind::Next);
-        let mut fragment = Fragment::terminal_with_entry(condition, join);
-        fragment.breaks.extend(then_fragment.breaks);
-        fragment.breaks.extend(else_fragment.breaks);
-        fragment.continues.extend(then_fragment.continues);
-        fragment.continues.extend(else_fragment.continues);
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(condition, join))
     }
 
     fn build_dum(
@@ -706,26 +747,37 @@ impl Builder {
         cond: &HirExpression,
         body: &HirBlock,
     ) -> Result<Fragment, CfgError> {
-        let header = self
-            .cfg
-            .add_node(CfgNodeKind::Condition, location(Some(cond.id), None, cond.span));
+        let header = self.cfg.add_node(
+            CfgNodeKind::Condition,
+            location(Some(cond.id), None, cond.span),
+        );
         let exit = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
-        let body_fragment = self.build_block(body, Some(LoopContext))?;
+        self.scopes.push(Scope {
+            break_to: exit,
+            continue_to: Some(header),
+        });
+        let body_fragment = self.build_block(body);
+        self.scopes.pop();
+        let body_fragment = body_fragment?;
         if let Some(body_entry) = body_fragment.entry {
-            self.cfg.add_edge(header, body_entry, CfgEdgeKind::BranchTrue);
+            self.cfg
+                .add_edge(header, body_entry, CfgEdgeKind::BranchTrue);
         } else {
             self.cfg.add_edge(header, header, CfgEdgeKind::LoopBack);
         }
         self.cfg.add_edge(header, exit, CfgEdgeKind::BranchFalse);
         self.connect_normals(&body_fragment, header, CfgEdgeKind::LoopBack);
-        self.connect_transfers(&body_fragment, header, exit);
         Ok(Fragment::terminal_with_entry(header, exit))
     }
 
-    fn build_loop(&mut self, expression: &HirExpression, body: &HirBlock) -> Result<Fragment, CfgError> {
+    fn build_loop(
+        &mut self,
+        expression: &HirExpression,
+        body: &HirBlock,
+    ) -> Result<Fragment, CfgError> {
         let header = self.cfg.add_node(
             CfgNodeKind::LoopHeader,
             location(Some(expression.id), None, expression.span),
@@ -737,7 +789,13 @@ impl Builder {
         if let Some((statements, test, _)) = body.fac_dum_parts() {
             return self.build_fac_dum(header, exit, statements, test);
         }
-        let body_fragment = self.build_block(body, Some(LoopContext))?;
+        self.scopes.push(Scope {
+            break_to: exit,
+            continue_to: Some(header),
+        });
+        let body_fragment = self.build_block(body);
+        self.scopes.pop();
+        let body_fragment = body_fragment?;
         if let Some(body_entry) = body_fragment.entry {
             self.cfg.add_edge(header, body_entry, CfgEdgeKind::Next);
         } else {
@@ -748,7 +806,6 @@ impl Builder {
         } else {
             self.connect_normals(&body_fragment, header, CfgEdgeKind::LoopBack);
         }
-        self.connect_transfers(&body_fragment, header, exit);
         Ok(Fragment::terminal_with_entry(header, exit))
     }
 
@@ -760,11 +817,10 @@ impl Builder {
         expression: &HirExpression,
         sources: &[HirExpression],
         body: &HirBlock,
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
         let mut source_fragment = Fragment::empty();
         for source in sources {
-            let next = self.build_expression(source, loop_context)?;
+            let next = self.build_expression(source)?;
             self.sequence(&mut source_fragment, next);
         }
         let header = self.cfg.add_node(
@@ -775,21 +831,26 @@ impl Builder {
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
-        let body_fragment = self.build_block(body, Some(LoopContext))?;
+        self.scopes.push(Scope {
+            break_to: exit,
+            continue_to: Some(header),
+        });
+        let body_fragment = self.build_block(body);
+        self.scopes.pop();
+        let body_fragment = body_fragment?;
         self.connect_normals(&source_fragment, header, CfgEdgeKind::Next);
         if let Some(body_entry) = body_fragment.entry {
-            self.cfg.add_edge(header, body_entry, CfgEdgeKind::BranchTrue);
+            self.cfg
+                .add_edge(header, body_entry, CfgEdgeKind::BranchTrue);
         } else {
             self.cfg.add_edge(header, header, CfgEdgeKind::LoopBack);
         }
         self.cfg.add_edge(header, exit, CfgEdgeKind::LoopExit);
         self.connect_normals(&body_fragment, header, CfgEdgeKind::LoopBack);
-        self.connect_transfers(&body_fragment, header, exit);
-        let mut fragment =
-            Fragment::terminal_with_entry(source_fragment.entry.unwrap_or(header), exit);
-        fragment.breaks = source_fragment.breaks;
-        fragment.continues = source_fragment.continues;
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(
+            source_fragment.entry.unwrap_or(header),
+            exit,
+        ))
     }
 
     /// A `discerne` evaluates its scrutinees in order, then dispatches to one
@@ -801,11 +862,10 @@ impl Builder {
         expression: &HirExpression,
         scrutinees: &[HirExpression],
         arms: &[radix_hir::HirCasuArm],
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
         let mut scrutinee_fragment = Fragment::empty();
         for scrutinee in scrutinees {
-            let next = self.build_expression(scrutinee, loop_context)?;
+            let next = self.build_expression(scrutinee)?;
             self.sequence(&mut scrutinee_fragment, next);
         }
         let dispatch = self.cfg.add_node(
@@ -815,7 +875,7 @@ impl Builder {
         self.connect_normals(&scrutinee_fragment, dispatch, CfgEdgeKind::Next);
         let mut arm_fragments = Vec::with_capacity(arms.len());
         for arm in arms {
-            arm_fragments.push(self.build_expression(&arm.body, loop_context)?);
+            arm_fragments.push(self.build_expression(&arm.body)?);
         }
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
@@ -828,15 +888,10 @@ impl Builder {
             }
             self.connect_normals(fragment, join, CfgEdgeKind::Next);
         }
-        let mut fragment =
-            Fragment::terminal_with_entry(scrutinee_fragment.entry.unwrap_or(dispatch), join);
-        for built in &arm_fragments {
-            fragment.breaks.extend(built.breaks.iter().copied());
-            fragment.continues.extend(built.continues.iter().copied());
-        }
-        fragment.breaks.extend(scrutinee_fragment.breaks);
-        fragment.continues.extend(scrutinee_fragment.continues);
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(
+            scrutinee_fragment.entry.unwrap_or(dispatch),
+            join,
+        ))
     }
 
     /// A `cape`-handled body: the body runs; any failable point inside it may
@@ -847,25 +902,21 @@ impl Builder {
         expression: &HirExpression,
         body: &HirBlock,
         catch: &HirCape,
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
         let watermark = self.cfg.nodes.len();
-        let body_fragment = self.build_block(body, loop_context)?;
+        let body_fragment = self.build_block(body)?;
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
-        let catch_fragment = self.build_block(&catch.body, loop_context)?;
+        let catch_fragment = self.build_block(&catch.body)?;
         self.connect_error_edges(watermark, catch_fragment.entry.unwrap_or(join));
         self.connect_normals(&body_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&catch_fragment, join, CfgEdgeKind::Next);
-        let mut fragment =
-            Fragment::terminal_with_entry(body_fragment.entry.unwrap_or(join), join);
-        fragment.breaks.extend(body_fragment.breaks);
-        fragment.breaks.extend(catch_fragment.breaks);
-        fragment.continues.extend(body_fragment.continues);
-        fragment.continues.extend(catch_fragment.continues);
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(
+            body_fragment.entry.unwrap_or(join),
+            join,
+        ))
     }
 
     /// A `capta` capture boundary: the body's trailing expression is the
@@ -877,19 +928,17 @@ impl Builder {
         &mut self,
         expression: &HirExpression,
         body: &HirBlock,
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
-        let body_fragment = self.build_block(body, loop_context)?;
+        let body_fragment = self.build_block(body)?;
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
         self.connect_normals(&body_fragment, join, CfgEdgeKind::Next);
-        let mut fragment =
-            Fragment::terminal_with_entry(body_fragment.entry.unwrap_or(join), join);
-        fragment.breaks.extend(body_fragment.breaks);
-        fragment.continues.extend(body_fragment.continues);
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(
+            body_fragment.entry.unwrap_or(join),
+            join,
+        ))
     }
 
     /// `call ⊥ default`: the default is evaluated only on failure, and
@@ -900,11 +949,10 @@ impl Builder {
         expression: &HirExpression,
         body: &HirBlock,
         default: &HirExpression,
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
         let watermark = self.cfg.nodes.len();
-        let body_fragment = self.build_block(body, loop_context)?;
-        let default_fragment = self.build_expression(default, loop_context)?;
+        let body_fragment = self.build_block(body)?;
+        let default_fragment = self.build_expression(default)?;
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
@@ -912,33 +960,31 @@ impl Builder {
         self.connect_error_edges(watermark, default_fragment.entry.unwrap_or(join));
         self.connect_normals(&body_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&default_fragment, join, CfgEdgeKind::Next);
-        let mut fragment =
-            Fragment::terminal_with_entry(body_fragment.entry.unwrap_or(join), join);
-        fragment.breaks.extend(body_fragment.breaks);
-        fragment.breaks.extend(default_fragment.breaks);
-        fragment.continues.extend(body_fragment.continues);
-        fragment.continues.extend(default_fragment.continues);
-        Ok(fragment)
+        Ok(Fragment::terminal_with_entry(
+            body_fragment.entry.unwrap_or(join),
+            join,
+        ))
     }
 
     /// Sequence the non-`None` operand expressions of a lane operator.
     fn build_operand_chain(
         &mut self,
         operands: &[Option<&HirExpression>],
-        loop_context: Option<LoopContext>,
     ) -> Result<Fragment, CfgError> {
         let mut fragment = Fragment::empty();
         for operand in operands.iter().flatten() {
-            let next = self.build_expression(operand, loop_context)?;
+            let next = self.build_expression(operand)?;
             self.sequence(&mut fragment, next);
         }
         Ok(fragment)
     }
 
     /// Ruling R3: `perge` lands at the end of a `fac … dum` body, so the
-    /// synthesized `si non c { rumpe }` test runs next. Body fallthrough and
-    /// every `perge` edge into the test; the test's `rumpe` leaves the loop and
-    /// its fallthrough returns to the header. Mirrors MIR `lower_loop_expr`.
+    /// synthesized `si non c { rumpe }` test runs next. The test is built
+    /// first so a user `perge` in the body can name its entry; body
+    /// fallthrough and every `perge` edge into the test; the test's own
+    /// `rumpe` leaves the loop and its fallthrough returns to the header.
+    /// Mirrors MIR `lower_loop_expr`.
     fn build_fac_dum(
         &mut self,
         header: CfgNodeId,
@@ -946,22 +992,40 @@ impl Builder {
         statements: &[HirStatement],
         test: &HirStatement,
     ) -> Result<Fragment, CfgError> {
-        let mut body_fragment = Fragment::empty();
-        for statement in statements {
-            let next = self.build_statement(statement, Some(LoopContext))?;
-            self.sequence(&mut body_fragment, next);
-        }
-        let test_fragment = self.build_statement(test, Some(LoopContext))?;
+        self.scopes.push(Scope {
+            break_to: exit,
+            continue_to: None,
+        });
+        let built = self.build_fac_dum_inner(header, exit, statements, test);
+        self.scopes.pop();
+        built
+    }
+
+    fn build_fac_dum_inner(
+        &mut self,
+        header: CfgNodeId,
+        exit: CfgNodeId,
+        statements: &[HirStatement],
+        test: &HirStatement,
+    ) -> Result<Fragment, CfgError> {
+        let test_fragment = self.build_statement(test)?;
         let test_entry = test_fragment.entry.ok_or(CfgError::UnsupportedShape {
             construct: "fac dum test without a condition entry",
             span: test.span,
         })?;
+        // With the test's entry known, a `perge` in the body names it.
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.continue_to = Some(test_entry);
+        }
+        let mut body_fragment = Fragment::empty();
+        for statement in statements {
+            let next = self.build_statement(statement)?;
+            self.sequence(&mut body_fragment, next);
+        }
         let body_entry = body_fragment.entry.unwrap_or(test_entry);
         self.cfg.add_edge(header, body_entry, CfgEdgeKind::Next);
         self.connect_normals(&body_fragment, test_entry, CfgEdgeKind::Next);
-        self.connect_transfers(&body_fragment, test_entry, exit);
         self.connect_normals(&test_fragment, header, CfgEdgeKind::LoopBack);
-        self.connect_transfers(&test_fragment, header, exit);
         Ok(Fragment::terminal_with_entry(header, exit))
     }
 
@@ -980,7 +1044,8 @@ impl Builder {
     /// [`CfgEdgeKind::Error`]).
     fn connect_error_edges(&mut self, watermark: usize, handler: CfgNodeId) {
         for index in watermark..self.cfg.nodes.len() {
-            self.cfg.add_edge(CfgNodeId(index), handler, CfgEdgeKind::Error);
+            self.cfg
+                .add_edge(CfgNodeId(index), handler, CfgEdgeKind::Error);
         }
     }
 
@@ -999,8 +1064,6 @@ impl Builder {
         };
         self.connect_normals(previous, next_entry, CfgEdgeKind::Next);
         previous.normal = next.normal;
-        previous.breaks.extend(next.breaks);
-        previous.continues.extend(next.continues);
     }
 
     fn connect_normals(&mut self, fragment: &Fragment, target: CfgNodeId, kind: CfgEdgeKind) {
@@ -1014,26 +1077,149 @@ impl Builder {
             self.cfg.add_edge(from, entry, kind);
         }
     }
-
-    fn connect_transfers(&mut self, fragment: &Fragment, header: CfgNodeId, exit: CfgNodeId) {
-        for from in &fragment.continues {
-            self.cfg.add_edge(*from, header, CfgEdgeKind::Continue);
-        }
-        for from in &fragment.breaks {
-            self.cfg.add_edge(*from, exit, CfgEdgeKind::Break);
-        }
-    }
 }
 
-impl Fragment {
-    fn terminal_with_entry(entry: CfgNodeId, exit: CfgNodeId) -> Self {
-        Self {
-            entry: Some(entry),
-            normal: vec![exit],
-            breaks: Vec::new(),
-            continues: Vec::new(),
+/// Whether an expression kind is a statement-bearing construct that runs as
+/// its own CFG component (its body in a disconnected part of the graph, its
+/// operand expressions in the enclosing flow).
+fn is_separate_component(kind: &HirExpressionKind) -> bool {
+    matches!(
+        kind,
+        HirExpressionKind::Clausura(..)
+            | HirExpressionKind::Praefixum(_)
+            | HirExpressionKind::Reduction { body: Some(_), .. }
+            | HirExpressionKind::Scan { .. }
+            | HirExpressionKind::Sort { body: Some(_), .. }
+    )
+}
+
+/// The direct value-position children of a value expression, in evaluation
+/// order. Control-flow and component kinds return only the operands that
+/// still evaluate in the enclosing flow (a body-less reduction or sort names
+/// its source, group and identity); their statement-bearing parts are owned
+/// by the dedicated builder arms.
+fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
+    use HirExpressionKind as K;
+    let mut children: Vec<&HirExpression> = Vec::new();
+
+    match kind {
+        K::Binary(_, left, right) => children.extend([left.as_ref(), right.as_ref()]),
+        K::Unary(_, operand) => children.push(operand),
+        K::Call(callee, _, args, _) => {
+            children.push(callee);
+            children.extend(args.iter().map(|arg| &arg.expr));
         }
+        K::Gradient {
+            call,
+            selected_arguments,
+        } => {
+            children.push(call);
+            children.extend(selected_arguments.iter());
+        }
+        K::MethodCall(receiver, _, _, args, _) => {
+            children.push(receiver);
+            children.extend(args.iter().map(|arg| &arg.expr));
+        }
+        K::Field(object, _) => children.push(object),
+        K::Index(object, index) => children.extend([object.as_ref(), index.as_ref()]),
+        K::OptionalChain(object, _) | K::NonNull(object, _) => children.push(object),
+        K::Intervallum {
+            start, end, step, ..
+        } => {
+            children.extend([start.as_ref(), end.as_ref()]);
+            if let Some(step) = step {
+                children.push(step);
+            }
+        }
+        K::Assign(target, value) => children.extend([target.as_ref(), value.as_ref()]),
+        K::Marked { expr, .. } => children.push(expr),
+        K::ConversioAssign {
+            target,
+            source,
+            recovery,
+            ..
+        } => {
+            children.extend([target.as_ref(), source.as_ref()]);
+            if let Some(recovery) = recovery {
+                children.push(recovery);
+            }
+        }
+        K::Array(elements) => {
+            for element in elements {
+                match element {
+                    radix_hir::HirArrayElement::Expr(expr)
+                    | radix_hir::HirArrayElement::Spread(expr) => children.push(expr),
+                    radix_hir::HirArrayElement::Infer(_) => {}
+                }
+            }
+        }
+        K::Struct(_, fields) => children.extend(fields.iter().map(|(_, value)| value)),
+        K::Tuple(elements, _) => children.extend(elements.iter()),
+        K::Scribe(_, args) => children.extend(args.iter()),
+        K::Scriptum(_, parts) => children.extend(parts.iter()),
+        K::Adfirma(condition, message) => {
+            children.push(condition);
+            if let Some(message) = message {
+                children.push(message);
+            }
+        }
+        K::Panic(value) | K::Throw(value) => children.push(value),
+        K::Cede(value) | K::Reddet(value) | K::Tacebit(value) | K::Yield(value) => {
+            children.push(value);
+        }
+        K::Verte {
+            source, entries, ..
+        } => {
+            children.push(source);
+            if let Some(entries) = entries {
+                children.extend(entries.iter().filter_map(|field| field.value.as_ref()));
+            }
+        }
+        K::Conversio {
+            source, recovery, ..
+        } => {
+            children.push(source);
+            if let Some(recovery) = recovery {
+                children.push(recovery);
+            }
+        }
+        K::Widen { operand, .. } => children.push(operand),
+        K::Ad { opener, .. } => {
+            if let Some(opener) = opener {
+                children.push(opener);
+            }
+        }
+        K::Ref(_, object) | K::Deref(object) => children.push(object),
+        K::TypeCheck { expr, .. } => children.push(expr),
+        K::CopyInto { target, value }
+        | K::SinkInto {
+            sink: target,
+            item: value,
+        } => {
+            children.extend([target.as_ref(), value.as_ref()]);
+        }
+        K::Format { value, .. } => children.push(value),
+        K::Reduction {
+            source,
+            group,
+            identity,
+            body: None,
+            ..
+        } => {
+            children.push(source);
+            if let Some(group) = group {
+                children.push(group);
+            }
+            if let Some(identity) = identity {
+                children.push(identity);
+            }
+        }
+        K::Sort {
+            source, body: None, ..
+        } => children.push(source),
+        _ => {}
     }
+    children
 }
 
 /// Whether a local binding's initializer determines control flow and so must

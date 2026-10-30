@@ -637,6 +637,13 @@ fn separate_component(kind: &HirExpressionKind) -> Option<SeparateComponent<'_>>
             operands: Vec::new(),
             body: ComponentBody::Expr(body),
         }),
+        // A `praefixum` block evaluates at build time: like a closure body,
+        // it runs outside the flow around its definition, so the names it
+        // reads count as used at the definition site.
+        HirExpressionKind::Praefixum(body) => Some(SeparateComponent {
+            operands: Vec::new(),
+            body: ComponentBody::Expr(body),
+        }),
         HirExpressionKind::Reduction {
             source,
             group,
@@ -657,7 +664,10 @@ fn separate_component(kind: &HirExpressionKind) -> Option<SeparateComponent<'_>>
             })
         }
         HirExpressionKind::Scan {
-            source, group, body, ..
+            source,
+            group,
+            body,
+            ..
         } => {
             let mut operands = vec![&**source];
             if let Some(group) = group {
@@ -734,7 +744,11 @@ impl<'a> EventCollector<'a> {
     /// between its bind and this site.  Anchoring one use at the site where
     /// the value escapes keeps the region live up to the creation point —
     /// exactly the reach the block-scope approximation decided for captures.
-    fn visit_separate_component(&mut self, component: SeparateComponent<'_>, site: Option<CfgNodeId>) {
+    fn visit_separate_component(
+        &mut self,
+        component: SeparateComponent<'_>,
+        site: Option<CfgNodeId>,
+    ) {
         for operand in component.operands {
             self.visit_expr(operand);
         }

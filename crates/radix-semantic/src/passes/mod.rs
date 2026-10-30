@@ -192,10 +192,6 @@ mod borrow_region_parity_test;
 mod borrow_region_coverage_test;
 
 #[cfg(test)]
-#[path = "zz_dbg_test.rs"]
-mod zz_dbg_test;
-
-#[cfg(test)]
 #[path = "collect_test.rs"]
 mod collect_test;
 

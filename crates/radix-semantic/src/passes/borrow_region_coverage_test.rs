@@ -215,4 +215,7 @@ fn region_facts_cover_corpus_product_and_norma() {
         failures == 0,
         "region facts must cover every measured shape (or fail closed by name):\n{report}"
     );
+    // The receipt stays observable on success: the measurement is the
+    // deliverable, not only the failure detail.
+    print!("{report}");
 }
