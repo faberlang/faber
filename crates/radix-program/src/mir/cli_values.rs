@@ -187,11 +187,11 @@ pub(super) fn cli_operand_placeholder_record_value(
             operand.operand.ty,
             CliType::ListaTextus | CliType::ListaNumerus | CliType::Octeti
         ) {
-        cli_record_type(
+        Some(cli_record_type(
             &mut unit.analysis.types,
             &operand.operand.ty,
             operand.operand.rest,
-        )
+        ))
     } else {
         None
     };
@@ -279,7 +279,7 @@ pub(super) fn cli_operand_list_value(
         &mut unit.analysis.types,
         &operand.operand.ty,
         operand.operand.rest,
-    )?;
+    );
     if matches!(operand.operand.ty, CliType::Octeti) {
         let rows = values
             .into_iter()
@@ -666,7 +666,7 @@ pub(super) fn cli_record_type(
     types: &mut radix_module::semantic::TypeTable,
     ty: &CliType,
     rest: bool,
-) -> Option<TypeId> {
+) -> TypeId {
     let base = match ty {
         CliType::Textus | CliType::Ignotum => Primitive::Textus,
         CliType::Numerus => Primitive::Numerus,
@@ -674,23 +674,19 @@ pub(super) fn cli_record_type(
         CliType::Bivalens => Primitive::Bivalens,
         CliType::Octeti => {
             let bytes = types.octeti_list();
-            return Some(if rest { types.array(bytes) } else { bytes });
+            return if rest { types.array(bytes) } else { bytes };
         }
         CliType::ListaTextus => {
             let textus = types.primitive(Primitive::Textus);
-            return Some(types.array(textus));
+            return types.array(textus);
         }
         CliType::ListaNumerus => {
             let numerus = types.primitive(Primitive::Numerus);
-            return Some(types.array(numerus));
+            return types.array(numerus);
         }
     };
     let base = types.primitive(base);
-    if rest {
-        Some(types.array(base))
-    } else {
-        Some(base)
-    }
+    if rest { types.array(base) } else { base }
 }
 
 pub(super) fn textus_literal_payload(text: &str) -> String {
@@ -723,7 +719,7 @@ pub(super) fn unsupported_cli_diagnostic(path: &Path, surface: &str) -> Diagnost
 /// Ruling Q-T8: `package_mir_cli_surface_unsupported` never fires for an exit
 /// expression on the runner. An expression this planner cannot fold to an
 /// `i32` constant — a binding, an arbitrary expression, or a fixed literal
-/// outside `i32` — returns `Some(None)`: the entry tail lowered by the MIR
+/// outside `i32` — returns `None`: the entry tail lowered by the MIR
 /// entry pass supplies the evaluated value, and an out-of-range literal wraps
 /// at the process boundary (no range diagnostic).
 ///
@@ -731,29 +727,28 @@ pub(super) fn unsupported_cli_diagnostic(path: &Path, surface: &str) -> Diagnost
 /// emitter keep their narrow constant surface; `Field` keeps the constant when
 /// the object is the args binding and the field resolved to a constant `i32`.
 pub(super) fn package_mir_cli_exit_code(
-    exit: &Option<CliExit>,
+    exit: Option<&CliExit>,
     args_name: Option<Symbol>,
     fields: &[MirRuntimeRecordField],
     unit: &AnalyzedProgramNode,
     _diagnostics: &mut Vec<Diagnostic>,
-) -> Option<Option<i32>> {
+) -> Option<i32> {
     let Some(exit) = exit else {
-        return Some(None);
+        return None;
     };
     match exit {
-        CliExit::Fixed(code) => Some(i32::try_from(*code).ok()),
+        CliExit::Fixed(code) => i32::try_from(*code).ok(),
         CliExit::Field { object, field } => {
             let args_name = args_name.map_or("", |symbol| unit.analysis.interner.resolve(symbol));
             if object != args_name {
-                return Some(None);
+                return None;
             }
-            let value = fields.iter().find_map(|record_field| {
+            fields.iter().find_map(|record_field| {
                 let name = unit.analysis.interner.resolve(record_field.name);
                 (name == field).then(|| package_mir_runtime_record_i32(&record_field.value))?
-            });
-            Some(value)
+            })
         }
-        CliExit::Binding(_) | CliExit::Unsupported => Some(None),
+        CliExit::Binding(_) | CliExit::Unsupported => None,
     }
 }
 

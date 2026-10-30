@@ -1098,8 +1098,8 @@ pub(super) fn lower_package_units<'a>(
             &validation,
             &unit_path,
         )?;
-        lowered = rewrite_lowered_variant_defs(lowered, &variant_remap, &unit_path)?;
-        lowered = rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &unit_path)?;
+        lowered = rewrite_lowered_variant_defs(lowered, &variant_remap, &unit_path);
+        lowered = rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &unit_path);
         lowered =
             rewrite_lowered_program_sources(lowered, &unit_path, &source_rewrites, &unit_path)?;
         lowered = rewrite_generic_identity(
@@ -1385,22 +1385,8 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
-                lowered = match rewrite_lowered_variant_defs(lowered, &variant_remap, &library.path)
-                {
-                    Ok(lowered) => lowered,
-                    Err(errors) => {
-                        diagnostics.extend(errors);
-                        return Ok(());
-                    }
-                };
-                lowered =
-                    match rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &library.path) {
-                        Ok(lowered) => lowered,
-                        Err(errors) => {
-                            diagnostics.extend(errors);
-                            return Ok(());
-                        }
-                    };
+                lowered = rewrite_lowered_variant_defs(lowered, &variant_remap, &library.path);
+                lowered = rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &library.path);
                 lowered = match rewrite_lowered_program_sources(
                     lowered,
                     &library.path,
@@ -1665,9 +1651,9 @@ pub(super) fn lower_package_units<'a>(
         generic_params,
         &entry_path,
         Some(&extra_validation),
-        imported_device_index,
-        consumer_device_roles,
-        consumer_launch_entries,
+        &imported_device_index,
+        &consumer_device_roles,
+        &consumer_launch_entries,
     )?;
     merged = rebuild_merged_validated(
         merged,
@@ -3248,9 +3234,9 @@ fn instantiate_package_generics<'a>(
     generic_params: Vec<(DefId, Vec<radix_mir_lower::lower::MirGenericParam>)>,
     diagnostic_path: &Path,
     extra_validation: Option<&RemappedValidation>,
-    imported_devices: radix_mir_lower::lower::ImportedDeviceIndex,
-    consumer_device_roles: HashMap<DefId, radix_mir::MirDeviceRole>,
-    consumer_launch_entries: HashSet<DefId>,
+    imported_devices: &radix_mir_lower::lower::ImportedDeviceIndex,
+    consumer_device_roles: &HashMap<DefId, radix_mir::MirDeviceRole>,
+    consumer_launch_entries: &HashSet<DefId>,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     if templates.is_empty() {
         merged.generic_templates = templates;
@@ -3281,9 +3267,9 @@ fn instantiate_package_generics<'a>(
                 .map(|validation| validation.struct_metadata())
                 .as_ref(),
             &mut merged.device_function_metadata,
-            &imported_devices,
-            &consumer_device_roles,
-            &consumer_launch_entries,
+            imported_devices,
+            consumer_device_roles,
+            consumer_launch_entries,
             &merged.tensor_edge_policy_metadata,
             true,
         )
@@ -3404,11 +3390,11 @@ pub(super) fn rewrite_lowered_variant_defs<'a>(
     lowered: LoweredMirUnit<'a>,
     _variant_remap: &HashMap<DefId, DefId>,
     _diagnostic_path: &Path,
-) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+) -> LoweredMirUnit<'a> {
     // Program and proof-context variant identities move atomically with the
     // preceding type-table transition. Keep this named owned step so callers
     // cannot reintroduce a mutable carrier endpoint.
-    Ok(lowered)
+    lowered
 }
 
 fn rewrite_function_variant_defs(
@@ -3449,9 +3435,9 @@ fn rewrite_lowered_struct_defs<'a>(
     lowered: LoweredMirUnit<'a>,
     _struct_remap: &HashMap<DefId, DefId>,
     _diagnostic_path: &Path,
-) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+) -> LoweredMirUnit<'a> {
     // Struct identities are likewise part of the atomic type-table rewrite.
-    Ok(lowered)
+    lowered
 }
 
 fn rewrite_function_struct_defs(function: &mut MirFunction, struct_remap: &HashMap<DefId, DefId>) {
