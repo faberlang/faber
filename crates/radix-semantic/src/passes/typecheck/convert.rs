@@ -500,12 +500,11 @@ fn integer_width_range(width: NumericWidth) -> Option<(i128, i128)> {
 }
 
 /// Whether a float rounded by the `via` mode lies in `lo..=hi`, decided in
-/// the exact `i128` domain: `hi as f64` rounds up for the 64-bit widths (2^63,
-/// 2^64), so comparing in float space would accept the first float past them.
-/// NaN and infinities never fit. `f64 -> i128` saturates beyond 2^127, far
-/// outside every integer width, so a huge magnitude still compares correctly.
-/// `mode` is the named rounding (`Floor`, `Ceil`, `HalfEven`, `Trunc`); no
-/// hint rounds toward zero, as the runner does.
+/// the exact `i128` domain: converting the bounds to `f64` rounds up for the
+/// 64-bit widths (2^63, 2^64), so compare the rounded value after checked
+/// integer conversion instead. NaN and infinities never fit. `mode` is the
+/// named rounding (`Floor`, `Ceil`, `HalfEven`, `Trunc`); no hint rounds toward
+/// zero, as the runner does.
 fn float_rounding_fits(value: f64, mode: Option<&str>, (lo, hi): (i128, i128)) -> bool {
     let rounded = match mode {
         Some("floor" | "Floor") => value.floor(),
@@ -513,7 +512,16 @@ fn float_rounding_fits(value: f64, mode: Option<&str>, (lo, hi): (i128, i128)) -
         Some("half_even" | "HalfEven") => value.round_ties_even(),
         _ => value.trunc(),
     };
-    rounded.is_finite() && (lo..=hi).contains(&(rounded as i128))
+    if !rounded.is_finite() {
+        return false;
+    }
+    let Some(integer) = radix_types::Magnus::from_f64(rounded)
+        .ok()
+        .and_then(|value| value.to_i128())
+    else {
+        return false;
+    };
+    (lo..=hi).contains(&integer)
 }
 
 /// Whether a float width can hold the value after rounding. `f16`/`bf16` have
@@ -521,7 +529,12 @@ fn float_rounding_fits(value: f64, mode: Option<&str>, (lo, hi): (i128, i128)) -
 fn float_width_holds(width: NumericWidth, value: f64) -> bool {
     match width {
         NumericWidth::F64 => true,
-        NumericWidth::F32 => (value as f32).is_finite(),
+        NumericWidth::F32 => {
+            // The exact overflow midpoint between the largest finite f32 and
+            // infinity; values below it round to a finite f32.
+            let overflow_midpoint = 2.0_f64.powi(128) - 2.0_f64.powi(103);
+            value.is_finite() && value.abs() < overflow_midpoint
+        }
         _ => false,
     }
 }
