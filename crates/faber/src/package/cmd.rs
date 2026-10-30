@@ -797,7 +797,7 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
         return true;
     }
     if path.extension().is_some_and(|ext| ext == "fab") {
-        return matches!(
+        if matches!(
             target,
             Target::HirRust
                 | Target::MirScena
@@ -807,7 +807,18 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::MirLlvmHost
                 | Target::MirWasm
                 | Target::MirMetal
-        );
+        ) {
+            return true;
+        }
+        // A lone file that imports a sibling module is package-shaped for the
+        // native `clif` lanes: a single-file object carries no linked sibling
+        // code, so the imported call would decline as CODEGEN001
+        // `external definition call`. The package-MIR emitter links the import
+        // graph, the same route `faber run` already interprets such files
+        // through. Files without such imports keep the single-file route.
+        if target == Target::MirClif && super::manifestless_file_declares_non_kernel_import(path) {
+            return true;
+        }
     }
     false
 }
@@ -1456,6 +1467,30 @@ pub(super) fn package_compile_result(
     radix::program::emit::compile_package(config, input_path, &super::faber_emission_seams())
 }
 
+/// Compile a lone `.fab` file that imports sibling modules through the
+/// package-MIR `clif` emitter — the route `faber build -t clif` gives it.
+/// A single-file object carries no linked sibling code, so the imported call
+/// would decline as CODEGEN001 `external definition call`; the package-MIR
+/// emitter links the import graph and lowers the call internally.
+///
+/// The corpus `clif` lane uses this seam so its file-mode rows exercise the
+/// same object the product builds for the same input.
+#[cfg(feature = "mir-clif")]
+pub fn compile_clif_package_input(input: &Path) -> CompileResult {
+    let path = super::absolutize_path(input);
+    let (config, _) = match config_with_locale(Target::MirClif, &path, None, None) {
+        Ok(selection) => selection,
+        Err(diagnostic) => {
+            let diagnostic = super::attach_path_diagnostic_context(diagnostic);
+            return CompileResult {
+                output: None,
+                diagnostics: vec![*diagnostic],
+            };
+        }
+    };
+    package_compile_result(&config, &path, Target::MirClif)
+}
+
 /// Compile a package `.fab` entry to metal-text through the interpreted
 /// merged consumer: the package-MIR driver links library imports into the
 /// merged program and registers their concrete device instances, and the
@@ -1543,6 +1578,13 @@ fn compile_package_input(
             fail_with_diagnostic(&diag)
         }
     };
+    // The `clif` package lane is the package-MIR object emitter
+    // (`package_compile_result`); the plan-driven package emitter has no
+    // `MirClif` artifact assembly.
+    #[cfg(feature = "mir-clif")]
+    if target == Target::MirClif {
+        return (package_compile_result(&config, &path, target), locale_pack);
+    }
     (
         radix::program::emit::compile_package(&config, &path, &super::faber_emission_seams()),
         locale_pack,

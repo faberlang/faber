@@ -107,6 +107,31 @@ fn clif_jit_matches_the_runner_on_stdout_stderr_and_status() {
     }
 }
 
+/// A lone `.fab` file that imports a sibling module runs on `clif-jit` with
+/// the runner's output. The file is package-shaped — a single-file object
+/// carries no linked sibling code, so the imported call would decline as
+/// CODEGEN001 `external definition call` — so both routes link the import
+/// graph through the package machinery.
+#[test]
+fn clif_jit_runs_an_importing_lone_file_like_the_runner() {
+    let dir = tempfile::tempdir().expect("scratch");
+    let source = write(
+        dir.path(),
+        "main",
+        "import from \"./auxilium\" auxilium\n\nmain {\n    print auxilium.saluta(\"Marcus\")\n}\n",
+    );
+    write(
+        dir.path(),
+        "auxilium",
+        "@ public\nfn saluta(string nomen) → string {\n    return \"Salve, §!\"(nomen)\n}\n\nmain {}\n",
+    );
+    let runner = outcome(faber().arg("run").arg(&source));
+    let jit = outcome(faber().args(["run", "--target", "clif-jit"]).arg(&source));
+    assert_eq!(runner.stdout, "Salve, Marcus!\n");
+    assert_eq!(jit.stdout, runner.stdout, "stdout");
+    assert_eq!(jit.status, runner.status, "exit status");
+}
+
 #[test]
 fn clif_jit_refuses_what_clif_refuses_with_the_same_diagnostics() {
     let declined = Path::new(env!("CARGO_MANIFEST_DIR"))

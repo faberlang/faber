@@ -106,9 +106,11 @@ pub(crate) use cargo::{
 pub use cargo::emit_generated_crate;
 #[cfg(all(feature = "mir-clif", feature = "runner"))]
 pub use clif_jit::cmd_run_clif_jit;
+#[cfg(feature = "mir-clif")]
+pub use cmd::compile_clif_package_input;
 pub use cmd::{
     CHECKS_BUT_DOES_NOT_LOWER, DeviceAdviceRequest, cmd_build, cmd_check_package, cmd_emit_package,
-    should_treat_as_package_from_args, use_package_compiler_from_args,
+    should_treat_as_package_from_args, use_package_compiler, use_package_compiler_from_args,
 };
 #[cfg(feature = "hir-go")]
 pub use go_build::go_program::cmd_run_go;
@@ -426,6 +428,47 @@ pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     radix::program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(
         input,
     ))
+}
+
+/// Whether a manifestless `.fab` file declares an import outside the kernel
+/// (`faber:`) and outside `norma:`. Such a file is package-shaped: a lone-file
+/// compile keeps the imported definitions external (the `clif` object emitter
+/// declines them as CODEGEN001 `external definition call`; the text targets
+/// emit unlinked namespaces), so the routes that must produce runnable output
+/// take the package machinery instead — `faber run` interprets it through the
+/// package-MIR runner, and the `clif` product lanes compile it through the
+/// package-MIR emitter.
+pub fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
+    if !path.is_file() || path.extension().and_then(|ext| ext.to_str()) != Some("fab") {
+        return false;
+    }
+    let Ok(raw_source) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let display_name = path.display().to_string();
+    let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
+        return false;
+    };
+    // The no-locale default is `en`; a default pack that fails to load is a
+    // failed read, not a Latin fallback.
+    let Some(code_pack) = default_config_with_locale(Target::HirTypeScript)
+        .ok()
+        .and_then(|config| config.locale_pack)
+    else {
+        return false;
+    };
+    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
+    let parse = radix::module::parser::parse(lex);
+    let Some(program) = parse.program else {
+        return false;
+    };
+    program.statements.iter().any(|statement| {
+        let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
+            return false;
+        };
+        let path = parse.interner.resolve(import.path);
+        !radix::module::kernel::is_kernel_import_path(path) && !path.starts_with("norma:")
+    })
 }
 
 // Test probe: how many times this thread built the package-preparation
