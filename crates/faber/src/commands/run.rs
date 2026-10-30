@@ -593,42 +593,7 @@ fn script_package_config(
 /// `norma:` imports are linked by `script::run_with_session`.
 pub(super) fn is_package_interpret_input(path: &Path) -> bool {
     package::is_manifest_backed_or_directory_package_input(path)
-        || manifestless_file_declares_non_kernel_import(path)
-}
-
-/// Whether a manifestless `.fab` file declares an import outside the kernel
-/// and outside `norma:`, which `script::run_with_session` links itself.
-fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
-    if !is_single_fab_file(path) {
-        return false;
-    }
-    let Ok(raw_source) = fs::read_to_string(path) else {
-        return false;
-    };
-    let display_name = path.display().to_string();
-    let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
-        return false;
-    };
-    // The no-locale default is `en`; a default pack that fails to load is a
-    // failed read, not a Latin fallback.
-    let Some(code_pack) = package::default_config_with_locale(radix::module::Target::HirTypeScript)
-        .ok()
-        .and_then(|config| config.locale_pack)
-    else {
-        return false;
-    };
-    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
-    let parse = radix::module::parser::parse(lex);
-    let Some(program) = parse.program else {
-        return false;
-    };
-    program.statements.iter().any(|statement| {
-        let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
-            return false;
-        };
-        let path = parse.interner.resolve(import.path);
-        !radix::module::kernel::is_kernel_import_path(path) && !path.starts_with("norma:")
-    })
+        || package::manifestless_file_declares_non_kernel_import(path)
 }
 
 /// Whether `path` is a single `.fab` file (the single-source runner input).
