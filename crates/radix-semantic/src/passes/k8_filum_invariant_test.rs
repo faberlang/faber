@@ -81,6 +81,40 @@ fn flattened_lane_row_needs_a_proven_inner_range() {
 }
 
 #[test]
+fn flattened_lane_row_needs_a_one_coordinate_lane_domain() {
+    // Two lane coordinates name concurrent lanes that share a leading
+    // coordinate: `scratch[[k * pitch + j]]` does not distinguish lanes
+    // `(k, l1)` and `(k, l2)`, so the flattened-row admission is not theirs.
+    rejected(
+        r"incipit {
+    varia tensor<i32, [3, 3]> grid ← vacua
+    varia tensor<i32, [12]> scratch ← vacua
+    itera ex grid apud [k, l] filum lane sit value {
+        sit i32 hi ← 3
+        itera ab 0‥hi sit j {
+            scratch[[k * 3 + j]] ← value
+        }
+    }
+}",
+        "write_not_own_coordinate",
+    );
+    // The composed-coordinate proof still admits the same domain when the
+    // address names every lane coordinate unchanged.
+    accepted(
+        r"incipit {
+    varia tensor<i32, [3, 3]> grid ← vacua
+    varia tensor<i32, [3, 3]> cache ← vacua
+    itera ex grid apud [k, l] filum lane sit value {
+        sit i32 hi ← 3
+        itera ab 0‥hi sit j {
+            cache[[k, l]] ← value
+        }
+    }
+}",
+    );
+}
+
+#[test]
 fn flat_lane_offset_without_a_covering_stride_is_refused() {
     rejected(
         r"incipit {
