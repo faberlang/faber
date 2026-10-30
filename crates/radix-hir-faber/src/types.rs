@@ -975,14 +975,29 @@ impl super::FaberCodegen<'_> {
                 surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic)),
                 self.single_type_form_child(form, names, surface)?
             )),
-            Type::Intervallum(..) => match form.args.as_slice() {
-                [HirTypeFormArg::Type(child)] => Ok(format!(
-                    "{}<{}>",
+            Type::Intervallum(_, step) => match form.args.as_slice() {
+                [HirTypeFormArg::Type(child)]
+                    if matches!(self.types.get_index(*step), IndexExpr::Literal(1)) =>
+                {
+                    Ok(format!(
+                        "{}<{}>",
+                        surface.type_surface(TypeBindingKind::TensorFamily(
+                            TensorFamilyKind::Intervallum
+                        )),
+                        self.type_form_to_faber(child, names, surface)?
+                    ))
+                }
+                [
+                    HirTypeFormArg::Type(child),
+                    HirTypeFormArg::Size(authored_step),
+                ] if authored_step == step => Ok(format!(
+                    "{}<{}, {}>",
                     surface
                         .type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
-                    self.type_form_to_faber(child, names, surface)?
+                    self.type_form_to_faber(child, names, surface)?,
+                    self.format_figura(*step, surface)
                 )),
-                [HirTypeFormArg::Type(child), HirTypeFormArg::Size(step)] => Ok(format!(
+                [HirTypeFormArg::Type(child), ..] => Ok(format!(
                     "{}<{}, {}>",
                     surface
                         .type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
