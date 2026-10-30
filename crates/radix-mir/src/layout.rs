@@ -248,7 +248,7 @@ impl MirDeviceVectorLayout {
     /// # Errors
     /// Returns an error when validation or type resolution fails. See [`String`].
     pub fn metal_ty(self) -> Result<String, String> {
-        let elem = metal_element_ty(self.element)?;
+        let elem = metal_vector_element_ty(self.element)?;
         Ok(format!("{elem}{}", self.width))
     }
 
@@ -287,11 +287,18 @@ fn wgsl_matrix_element_ty(element: MirScalarLayout) -> Result<&'static str, Stri
     }
 }
 
-fn metal_element_ty(element: MirScalarLayout) -> Result<&'static str, String> {
+fn metal_vector_element_ty(element: MirScalarLayout) -> Result<&'static str, String> {
+    // MSL vector values use their actual lane storage width. `metal_element_ty`
+    // intentionally widens narrow scalar buffer elements to int/uint, which
+    // is not valid for a packed by-value vector ABI.
     match element {
         MirScalarLayout::Bool => Ok("bool"),
-        MirScalarLayout::I8 | MirScalarLayout::I16 | MirScalarLayout::I32 => Ok("int"),
-        MirScalarLayout::U8 | MirScalarLayout::U16 | MirScalarLayout::U32 => Ok("uint"),
+        MirScalarLayout::I8 => Ok("char"),
+        MirScalarLayout::U8 => Ok("uchar"),
+        MirScalarLayout::I16 => Ok("short"),
+        MirScalarLayout::U16 => Ok("ushort"),
+        MirScalarLayout::I32 => Ok("int"),
+        MirScalarLayout::U32 => Ok("uint"),
         MirScalarLayout::F32 => Ok("float"),
         other => Err(format!("kernel vector element {}", other.spelling())),
     }

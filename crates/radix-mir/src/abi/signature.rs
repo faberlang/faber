@@ -2278,12 +2278,12 @@ impl MirKernelSignature {
         interner: Option<&Interner>,
         allow_host_owned_tensor_entry: bool,
     ) -> Result<Self, MirAbiError> {
-        // The strict semantic-type match is the plain-elementwise law. A
-        // collection-op kernel remaps the shape by contract (Transpose
-        // `[M,N] → [N,M]`), so for those the flat element-count equality
-        // below carries the binding shape and
-        // `apply_collection_op_contract` supplies the dispatch facts.
-        if !kernel_has_collection_op(function, |_| true)
+        let vector = vector_param_layout(param.ty, validation)?;
+        // A by-value vector is a count-one input resource, not an elementwise
+        // buffer. As in the multi-input arm, its lanes are read together and
+        // the returned scalar or tensor owns the output extent independently.
+        if vector.is_none()
+            && !kernel_has_collection_op(function, |_| true)
             && !validation
                 .types
                 .equals(param.ty.semantic_id(), function.return_ty.semantic_id())
@@ -2291,24 +2291,31 @@ impl MirKernelSignature {
             return Err(MirAbiError::new(ERR_KERNEL_PARAM_RETURN_MISMATCH));
         }
 
-        let param_element_ty =
-            buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
+        let (param_element_ty, param_element_count) = if vector.is_some() {
+            (param.ty, 1)
+        } else {
+            (
+                buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?,
+                buffer_element_count(param.ty, validation)?,
+            )
+        };
         let return_element_ty = buffer_element_type(
             function.return_ty,
             validation,
             allow_host_owned_tensor_entry,
         )?;
-        require_same_element_type(param_element_ty, return_element_ty, validation)?;
-        let param_element_count = buffer_element_count(param.ty, validation)?;
         let return_element_count = buffer_element_count(function.return_ty, validation)?;
-        // The return-buffer equality law (shared with the multi-input arm):
-        // the input and output buffers are flat views of the same element
-        // count, so a host can assume one elementwise shape across bindings.
-        // A rectangular transpose's `[M,N]` and `[N,M]` shapes both hold the
-        // flat `M·N` count, so it passes here; genuinely size-changing
-        // kernels fail closed with the elementwise-only diagnostic.
-        if param_element_count != return_element_count {
-            return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+        if vector.is_none() {
+            require_same_element_type(param_element_ty, return_element_ty, validation)?;
+            // The return-buffer equality law (shared with the multi-input arm):
+            // the input and output buffers are flat views of the same element
+            // count, so a host can assume one elementwise shape across bindings.
+            // A rectangular transpose's `[M,N]` and `[N,M]` shapes both hold the
+            // flat `M·N` count, so it passes here; genuinely size-changing
+            // kernels fail closed with the elementwise-only diagnostic.
+            if param_element_count != return_element_count {
+                return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+            }
         }
 
         let mut signature = Self {
