@@ -230,6 +230,7 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
         gpu_sample_launch_capacity: Some(1_024),
         host_encode_ns: 16,
         host_blocked_ns: Some(20),
+        host_fresh_output_bytes: 96,
         uploads: 2,
         downloads: 1,
         uploaded_bytes: 64,
@@ -268,6 +269,7 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     assert_eq!(value["device"]["gpu_busy_ns"], 18);
     assert_eq!(value["device"]["host_encode_ns"], 16);
     assert_eq!(value["device"]["host_blocked_ns"], 20);
+    assert_eq!(value["device"]["host_fresh_output_bytes"], 96);
     assert_eq!(value["device"]["gpu_timer_available"], true);
     assert_eq!(value["device"]["gpu_sample_launch_capacity"], 1_024);
     let decoded: RunStatsArtifact = serde_json::from_str(&encoded).expect("device schema");
@@ -277,6 +279,7 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     device.remove("gpu_timer_available");
     device.remove("gpu_sample_launch_capacity");
     device.remove("host_blocked_ns");
+    device.remove("host_fresh_output_bytes");
     let old_decoded: RunStatsArtifact =
         serde_json::from_value(value).expect("old device artifact without sampling metadata");
     let old_device = old_decoded.device.expect("old device metadata");
@@ -286,6 +289,9 @@ fn device_stats_artifact_round_trips_counters_phases_and_entries() {
     // `host_encode_ns` still includes the waits.
     assert_eq!(old_device.host_blocked_ns, None);
     assert_eq!(old_device.host_encode_ns, 16);
+    // An artifact from before the fresh-twin deferral reads as zero: no host
+    // twin bytes were materialized (launches allocated them eagerly then).
+    assert_eq!(old_device.host_fresh_output_bytes, 0);
 }
 
 #[test]

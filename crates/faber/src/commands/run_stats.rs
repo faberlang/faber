@@ -106,6 +106,13 @@ pub(crate) struct DeviceMetadata {
     /// (CPU, CUDA).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) host_blocked_ns: Option<u64>,
+    /// Cumulative host bytes fresh kernel-output twins materialized during
+    /// the run: a launch allocates no host array for its output (the twin is
+    /// deferred zeros) and the first host read that needs real bytes
+    /// materializes it once. A steady launch loop that reads one element
+    /// reports the same figure regardless of its iteration count.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub(crate) host_fresh_output_bytes: u64,
     pub(crate) uploads: u64,
     pub(crate) downloads: u64,
     pub(crate) uploaded_bytes: u64,
@@ -471,6 +478,7 @@ impl DeviceMetadata {
             gpu_sample_launch_capacity: runtime.gpu_sample_launch_capacity,
             host_encode_ns: receipt.host_encode_ns,
             host_blocked_ns: Some(receipt.host_blocked_ns),
+            host_fresh_output_bytes: receipt.host_fresh_output_bytes,
             uploads: receipt.uploads,
             downloads: receipt.downloads,
             uploaded_bytes: receipt.uploaded_bytes,
