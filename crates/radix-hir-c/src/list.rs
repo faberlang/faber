@@ -113,17 +113,35 @@ impl Emitter<'_> {
             .collect::<Vec<_>>()
             .join(", ");
         self.support.need(Helper::List(elem, ListOp::Of));
-        let of = if self.is_fixed(expr) {
-            "of_fixed"
+        // WHY: a bounded literal reserves its declared capacity, not its
+        // length: the spare cells hold typed zero and a later push may grow to
+        // `N`. An inferred literal's capacity is its own length, and a list
+        // with no capacity is the growable carrier.
+        let capacity = if self.is_fixed(expr) {
+            expr.ty.and_then(|ty| self.list_capacity(ty))
         } else {
-            "of"
+            None
         };
-        let call = format!(
-            "faber_list_{n}_{of}(faber_a, {count}, ({t}[]){{{items}}})",
-            n = elem.suffix(),
-            count = operands.len(),
-            t = elem.c_type(),
-        );
+        let call = match capacity {
+            Some(capacity) => format!(
+                "faber_list_{n}_of_fixed_capacity(faber_a, {count}, ({t}[]){{{items}}}, {capacity})",
+                n = elem.suffix(),
+                count = operands.len(),
+                t = elem.c_type(),
+            ),
+            None if self.is_fixed(expr) => format!(
+                "faber_list_{n}_of_fixed(faber_a, {count}, ({t}[]){{{items}}})",
+                n = elem.suffix(),
+                count = operands.len(),
+                t = elem.c_type(),
+            ),
+            None => format!(
+                "faber_list_{n}_of(faber_a, {count}, ({t}[]){{{items}}})",
+                n = elem.suffix(),
+                count = operands.len(),
+                t = elem.c_type(),
+            ),
+        };
         let operand = self.list_operand(wrap(&prelude, &call), elem);
         Ok(operand.with_effect(effect))
     }

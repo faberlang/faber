@@ -111,6 +111,24 @@ int main(int argc, char **argv) {
         texts = faber_list_text_new_fixed(&arena, 2);
         check_int("fixed text empty typed zero", strcmp(texts->items[0], ""), 0);
     }
+    /* A bounded literal reserves its declared capacity: the spare cells hold
+       typed zero and a later push fills up to the capacity the type names. */
+    {
+        faber_list_i64 *literal = faber_list_i64_of_fixed_capacity(
+            &arena, 2, (int64_t[]){INT64_C(1), INT64_C(2)}, 4);
+        check_int("bounded literal length", literal->len, 2);
+        check_int("bounded literal capacity", literal->cap, 4);
+        check_int("bounded literal zero spare slot", literal->items[3], 0);
+        check_int("bounded literal typed zero text",
+                  strcmp(faber_list_text_of_fixed_capacity(&arena, 1, (faber_text[]){"a"}, 3)
+                             ->items[2],
+                         ""),
+                  0);
+        faber_list_i64_push(&arena, literal, 30);
+        faber_list_i64_push(&arena, literal, 40);
+        check_text("bounded literal after pushes", faber_list_i64_show(&arena, literal),
+                   "[1, 2, 30, 40]");
+    }
     bits = faber_list_b8_new(&arena, 0);
     faber_list_b8_push(&arena, bits, 0x00);
     faber_list_b8_push(&arena, bits, 0x0f);
