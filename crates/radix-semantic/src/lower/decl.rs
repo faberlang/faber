@@ -749,7 +749,7 @@ impl Lowerer<'_> {
                         .as_ref()
                         .map(|expr| self.lower_compile_time_initializer(expr));
                     let def_id = self.next_def_id();
-                    let member_trivia = self.hir_trivia(&member.leading_trivia);
+                    let member_trivia = Self::hir_trivia(&member.leading_trivia);
                     if !member_trivia.is_empty() {
                         self.register_attachment(
                             HirTriviaOwnerKind::Member,
@@ -879,8 +879,8 @@ impl Lowerer<'_> {
         let method_def_id = self.next_def_id();
         // `ClassMember` and the nested `FuncDecl` each own trivia; merge in
         // source order so no claimed comment is dropped.
-        let mut member_trivia = self.hir_trivia(&member.leading_trivia);
-        member_trivia.extend(self.hir_trivia(&method.leading_trivia));
+        let mut member_trivia = Self::hir_trivia(&member.leading_trivia);
+        member_trivia.extend(Self::hir_trivia(&method.leading_trivia));
         if !member_trivia.is_empty() {
             self.register_attachment(
                 HirTriviaOwnerKind::Member,
@@ -1086,7 +1086,7 @@ impl Lowerer<'_> {
             .map(|method| {
                 let hir_method = self.lower_interface_method(method);
                 // Interface signatures have no node or def id to back-reference.
-                let method_trivia = self.hir_trivia(&method.leading_trivia);
+                let method_trivia = Self::hir_trivia(&method.leading_trivia);
                 if !method_trivia.is_empty() {
                     self.register_attachment(HirTriviaOwnerKind::Member, None, method_trivia);
                 }

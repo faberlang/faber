@@ -18,6 +18,8 @@
 
 use radix_runtime_contract::trap::TrapKind;
 use std::alloc::{Layout, alloc, dealloc};
+#[cfg(test)]
+use std::cell::Cell;
 use std::cell::UnsafeCell;
 
 /// One arena chunk: a fixed header followed by `capacity` bump bytes.
@@ -29,10 +31,10 @@ struct Chunk {
 
 /// Header size rounded to the chunk alignment, so the bump base keeps the
 /// allocation alignment of the chunk itself.
-const HEADER: usize = size_of::<Chunk>().next_multiple_of(CHUNK_ALIGN);
-const CHUNK_ALIGN: usize = 16;
+pub(crate) const HEADER: usize = size_of::<Chunk>().next_multiple_of(CHUNK_ALIGN);
+pub(crate) const CHUNK_ALIGN: usize = 16;
 /// Fresh-chunk capacity (data bytes), the C route's 64 KiB.
-const CHUNK_DATA: usize = 1 << 16;
+pub(crate) const CHUNK_DATA: usize = 1 << 16;
 
 /// End the run when an allocation cannot be satisfied: the C route's trap
 /// text and the program-logic exit class.
@@ -41,11 +43,22 @@ fn out_of_memory() -> ! {
     crate::exit_trap("out of memory", TrapKind::ProgramLogic)
 }
 
+/// The layout of one chunk holding `capacity` data bytes: `None` when the
+/// header addition overflows, so an impossible arena request lands in the
+/// honest out-of-memory trap instead of a wrapped, undersized allocation.
+pub(crate) fn chunk_layout(capacity: usize) -> Option<Layout> {
+    Layout::from_size_align(HEADER.checked_add(capacity)?, CHUNK_ALIGN).ok()
+}
+
 /// One program-lifetime bump arena. `UnsafeCell` keeps the bump cursor behind
 /// a shared reference; Faber programs on this target are single-threaded
 /// (device steps are declined), so no locking is needed.
 pub struct Arena {
     current: UnsafeCell<*mut Chunk>,
+    /// Test-only count of `alloc_raw` calls, so tests can bound how many
+    /// fresh runs a sequence of operations allocates.
+    #[cfg(test)]
+    allocations: Cell<usize>,
 }
 
 #[cfg(test)]
@@ -62,12 +75,38 @@ impl Arena {
     pub(crate) fn new() -> Self {
         Self {
             current: UnsafeCell::new(std::ptr::null_mut()),
+            #[cfg(test)]
+            allocations: Cell::new(0),
         }
+    }
+
+    /// Test-only: how many `alloc_raw` calls this arena has served. A buffer
+    /// growth run is exactly one call, so the count bounds reallocations.
+    #[cfg(test)]
+    pub(crate) fn allocations(&self) -> usize {
+        self.allocations.get()
+    }
+
+    /// Test-only: how many chunks the arena has allocated.
+    #[cfg(test)]
+    pub(crate) fn chunk_count(&self) -> usize {
+        let mut count = 0;
+        // SAFETY: single-threaded test; walk the live chunk chain.
+        let mut chunk = unsafe { *self.current.get() };
+        while let Some(found) = unsafe { chunk.as_ref() } {
+            count += 1;
+            chunk = found.previous;
+        }
+        count
     }
 
     /// Bump-allocate `size` bytes at `align`; a new chunk when the current one
     /// cannot serve the request.
     pub(crate) fn alloc_raw(&self, size: usize, align: usize) -> *mut u8 {
+        #[cfg(test)]
+        {
+            self.allocations.set(self.allocations.get() + 1);
+        }
         debug_assert!(
             align.is_power_of_two(),
             "arena alignment must be a power of two"
@@ -79,8 +118,7 @@ impl Arena {
         }
         let wanted = size.checked_add(align).unwrap_or_else(|| out_of_memory());
         let capacity = CHUNK_DATA.max(wanted);
-        let layout = Layout::from_size_align(HEADER + capacity, CHUNK_ALIGN)
-            .unwrap_or_else(|_| out_of_memory());
+        let layout = chunk_layout(capacity).unwrap_or_else(|| out_of_memory());
         // SAFETY: `layout` has non-zero size. The cast is aligned: the
         // allocation is `CHUNK_ALIGN`, above `align_of::<Chunk>()`.
         #[allow(clippy::cast_ptr_alignment)]
@@ -253,6 +291,12 @@ impl<T: Copy> ArenaBuf<T> {
         self.length == 0
     }
 
+    /// The element capacity of the current run.
+    #[cfg(test)]
+    pub(crate) fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     pub(crate) fn clear(&mut self) {
         self.length = 0;
     }
@@ -303,7 +347,7 @@ impl<T: Copy> ArenaBuf<T> {
             return;
         }
         if length > self.capacity {
-            self.reserve_exact(arena, length);
+            self.reserve(arena, length);
         }
         // SAFETY: `items` covers `length` elements; the tail is filled here.
         unsafe {
@@ -324,7 +368,7 @@ impl<T: Copy> ArenaBuf<T> {
             .checked_add(items.len())
             .unwrap_or_else(|| out_of_memory());
         if wanted > self.capacity {
-            self.reserve_exact(arena, wanted);
+            self.reserve(arena, wanted);
         }
         // SAFETY: the buffer covers `wanted` elements after the reserve.
         unsafe {
@@ -346,6 +390,19 @@ impl<T: Copy> ArenaBuf<T> {
             capacity => capacity * 2,
         };
         self.reserve_exact(arena, next);
+    }
+
+    /// Ensure room for `wanted` elements: a fresh run of at least `wanted`,
+    /// and of twice the current capacity when that is larger, so repeated
+    /// small grows need only logarithmically many runs and copy each live
+    /// element a bounded number of times. Overflowed doubling falls back to
+    /// the exact demand; the run itself is still checked when allocated.
+    fn reserve(&mut self, arena: *const Arena, wanted: usize) {
+        let doubled = match self.capacity.checked_mul(2) {
+            Some(doubled) if doubled > wanted => doubled,
+            _ => wanted,
+        };
+        self.reserve_exact(arena, doubled);
     }
 
     /// Move the elements into a fresh run of at least `capacity`.

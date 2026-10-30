@@ -17,13 +17,13 @@ use radix_types::MirCollectionOp;
 
 impl Emitter<'_> {
     /// `empty`: a new set with no storage yet.
-    pub(crate) fn empty_set(&mut self, elem: Elem) -> Operand {
+    pub(crate) fn empty_set(&mut self, elem: Elem) -> Result<Operand, CodegenError> {
         self.need_class(Ty::Set(elem));
         self.support.need(Helper::List(elem, ListOp::New));
-        Operand::new(
-            format!("faber_list_{}_new(faber_a, 0)", elem.suffix()),
+        Ok(Operand::new(
+            format!("faber_list_{}_new(faber_a, 0)", self.elem_suffix(elem)?),
             Value::Set(elem),
-        )
+        ))
     }
 
     /// The methods this target has for a set: the count, `add`, `has`,
@@ -73,17 +73,17 @@ impl Emitter<'_> {
             .with_effect(set.effect)),
             IntrinsicMirKind::Collection(MirCollectionOp::Append) => {
                 let item = self.element(one_arg(args, "set add")?, elem)?;
-                let call = self.set_call("add", elem, set, item);
+                let call = self.set_call("add", elem, set, item)?;
                 Ok(Operand::new(call, Value::Void).with_effect(true))
             }
             IntrinsicMirKind::Collection(MirCollectionOp::Contains) => {
                 let item = self.element(one_arg(args, "set has")?, elem)?;
-                let call = self.set_call("contains", elem, set, item);
+                let call = self.set_call("contains", elem, set, item)?;
                 Ok(Operand::new(call, Value::Truth).with_effect(true))
             }
             IntrinsicMirKind::Collection(MirCollectionOp::Delete) => {
                 let item = self.element(one_arg(args, "set delete")?, elem)?;
-                let call = self.set_call("delete", elem, set, item);
+                let call = self.set_call("delete", elem, set, item)?;
                 Ok(Operand::new(call, Value::Truth).with_effect(true))
             }
             IntrinsicMirKind::Collection(op)
@@ -106,10 +106,16 @@ impl Emitter<'_> {
 
     /// A one-argument set operation: the receiver after the arena and a value
     /// already checked against the element class.
-    fn set_call(&mut self, name: &str, elem: Elem, set: Operand, item: Operand) -> String {
+    fn set_call(
+        &mut self,
+        name: &str,
+        elem: Elem,
+        set: Operand,
+        item: Operand,
+    ) -> Result<String, CodegenError> {
         self.support.need(Helper::List(elem, ListOp::New));
         let mut operands = [set, item];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [set, item] = operands;
         // `contains` is the set family's indexed read; `add` allocates and
         // takes the arena; `delete` fixes its index in place. A truth result
@@ -117,24 +123,24 @@ impl Emitter<'_> {
         let call = match name {
             "contains" => format!(
                 "(faber_set_{}_has({}, {}))",
-                elem.suffix(),
+                self.elem_suffix(elem)?,
                 set.text,
                 item.text
             ),
             "add" => format!(
                 "(faber_set_{}_add(faber_a, {}, {}))",
-                elem.suffix(),
+                self.elem_suffix(elem)?,
                 set.text,
                 item.text
             ),
             _ => format!(
                 "(faber_set_{}_delete({}, {}))",
-                elem.suffix(),
+                self.elem_suffix(elem)?,
                 set.text,
                 item.text
             ),
         };
-        wrap(&prelude, &call)
+        Ok(wrap(&prelude, &call))
     }
 
     /// `union`, `intersection`, `difference`, `difference_symmetric`: a value
@@ -153,14 +159,14 @@ impl Emitter<'_> {
             ));
         }
         let mut operands = [set, other];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [set, other] = operands;
         self.need_class(Ty::Set(elem));
         let name =
             set_algebra_name(op).ok_or_else(|| unsupported("set method outside the subset"))?;
         let call = format!(
             "faber_set_{}_{name}(faber_a, {}, {})",
-            elem.suffix(),
+            self.elem_suffix(elem)?,
             set.text,
             other.text
         );
@@ -182,7 +188,7 @@ impl Emitter<'_> {
             ));
         }
         let mut operands = [set, other];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [set, other] = operands;
         // `is_superset(a, b)` is `is_subset(b, a)`.
         let (left, right) = if op == MirCollectionOp::IsSubset {
@@ -190,7 +196,10 @@ impl Emitter<'_> {
         } else {
             (other.text, set.text)
         };
-        let call = format!("(faber_set_{}_is_subset({left}, {right}))", elem.suffix());
+        let call = format!(
+            "(faber_set_{}_is_subset({left}, {right}))",
+            self.elem_suffix(elem)?
+        );
         Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(true))
     }
 

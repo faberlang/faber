@@ -11246,7 +11246,10 @@ main {}
     );
     let (config, _) = config_with_locale(Target::MirMetal, &entry, None, None).expect("config");
     let code = compile_package_metal_text(&config, &entry).expect("an i64 kernel emits");
-    assert!(code.contains("constant long* b0 [[buffer(0)]]"), "{code}");
+    assert!(
+        code.contains("constant long* __restrict b0 [[buffer(0)]]"),
+        "{code}"
+    );
 }
 
 /// The `clif` package build emits a native object through the package-MIR

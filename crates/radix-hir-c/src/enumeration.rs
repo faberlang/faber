@@ -317,7 +317,7 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let equal = self.enum_equal(def_id, &l.text, &r.text)?;
         let negate = matches!(

@@ -529,7 +529,7 @@ impl<'a> Lowerer<'a> {
         stmt: &Stmt,
         entry_stmt: &IncipitStmt,
     ) -> (HirBlock, Vec<HirAnnotation>, Option<Symbol>, bool) {
-        let entry_trivia = self.hir_trivia(&stmt.leading_trivia);
+        let entry_trivia = Self::hir_trivia(&stmt.leading_trivia);
         if let Some(anchor) =
             self.register_attachment(HirTriviaOwnerKind::Entry, None, entry_trivia)
         {
@@ -587,7 +587,7 @@ impl<'a> Lowerer<'a> {
             id: program_end_id.clone(),
             span: program.span,
         };
-        let end_trivia = self.hir_trivia(&program.end_trivia);
+        let end_trivia = Self::hir_trivia(&program.end_trivia);
         self.register_attachment_at(
             program_end_id,
             HirTriviaOwnerKind::ProgramEnd,
@@ -635,7 +635,7 @@ impl<'a> Lowerer<'a> {
         let Some(region) = &program.region else {
             return;
         };
-        let trivia = self.hir_trivia(&region.leading_trivia);
+        let trivia = Self::hir_trivia(&region.leading_trivia);
         let anchor = self.register_attachment(HirTriviaOwnerKind::Region, None, trivia);
         self.presentation.region = Some(HirRegion {
             name: region.name.name,
@@ -646,7 +646,7 @@ impl<'a> Lowerer<'a> {
     }
 
     /// Convert syntax trivia into HIR presentation trivia, preserving order.
-    fn hir_trivia(&self, trivia: &[Trivia]) -> Vec<HirTrivia> {
+    fn hir_trivia(trivia: &[Trivia]) -> Vec<HirTrivia> {
         trivia
             .iter()
             .map(|item| match item {
@@ -716,7 +716,7 @@ impl<'a> Lowerer<'a> {
     /// comment, the comment has no owner: lowering diagnoses rather than
     /// silently dropping or guessing a fallback.
     fn attach_stmt_trivia(&mut self, stmt: &Stmt, lowered: &[HirStatement]) {
-        let trivia = self.hir_trivia(&stmt.leading_trivia);
+        let trivia = Self::hir_trivia(&stmt.leading_trivia);
         if trivia.is_empty() {
             return;
         }
@@ -741,9 +741,9 @@ impl<'a> Lowerer<'a> {
     /// when present it merges after the statement carrier in source order so no
     /// claimed comment is dropped by lowering.
     fn attach_item_trivia(&mut self, stmt: &Stmt, items: &[HirItem]) {
-        let mut trivia = self.hir_trivia(&stmt.leading_trivia);
+        let mut trivia = Self::hir_trivia(&stmt.leading_trivia);
         if let StmtKind::Func(decl) = &stmt.kind {
-            trivia.extend(self.hir_trivia(&decl.leading_trivia));
+            trivia.extend(Self::hir_trivia(&decl.leading_trivia));
         }
         if trivia.is_empty() {
             return;
@@ -767,16 +767,16 @@ impl<'a> Lowerer<'a> {
     /// Every authored `BlockStmt` boundary owns exactly one end; the end is
     /// recorded in the presentation `block_ends` list (count parity with
     /// `HirBlock::end`) and block-end trivia attaches at the same anchor.
-    fn block_end_for(&mut self, block: &BlockStmt) -> Option<HirBlockEnd> {
+    fn block_end_for(&mut self, block: &BlockStmt) -> HirBlockEnd {
         let id = self.next_anchor();
         let end = HirBlockEnd {
             id: id.clone(),
             span: block.span,
         };
         self.presentation.block_ends.push(end.clone());
-        let end_trivia = self.hir_trivia(&block.end_trivia);
+        let end_trivia = Self::hir_trivia(&block.end_trivia);
         self.register_attachment_at(id, HirTriviaOwnerKind::BlockEnd, None, end_trivia);
-        Some(end)
+        end
     }
 
     /// Resolve an item-level name, falling back to a synthetic id for recovery.
@@ -1163,7 +1163,7 @@ impl<'a> Lowerer<'a> {
         }
         self.pop_scope();
 
-        let end = self.block_end_for(block);
+        let end = Some(self.block_end_for(block));
         HirBlock {
             statements: stmts,
             expr: None,

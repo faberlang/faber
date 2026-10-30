@@ -98,7 +98,7 @@ impl Emitter<'_> {
             self.support.need(Helper::Approx);
             let (exact, float) = if integer(&l) { (l, r) } else { (r, l) };
             let mut operands = [exact, float];
-            let prelude = self.sequence(&mut operands);
+            let prelude = self.sequence(&mut operands)?;
             let [exact, float] = operands;
             let call = format!("faber_int_eq_float({}, {})", exact.text, float.text);
             let text = if op == HirBinOp::ApproxNotEq {
@@ -162,7 +162,7 @@ impl Emitter<'_> {
             _ => return Err(unsupported("float operation outside the subset")),
         };
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let text = call(&l.text, &r.text);
         // The binary32 floored `%` is the one helper whose name carries the
@@ -286,7 +286,7 @@ impl Emitter<'_> {
         self.support.need(Helper::Float);
         let effect = receiver.effect || other.effect || tolerance.effect;
         let mut operands = [receiver, other, tolerance];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [receiver, other, tolerance] = operands;
         let call = format!(
             "(fabs((double){} - (double){}) <= (double){})",
@@ -313,7 +313,7 @@ impl Emitter<'_> {
         self.support.need(Helper::Float);
         let effect = receiver.effect || exponent.effect;
         let mut operands = [receiver, exponent];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [base, exponent] = operands;
         let call = format!("faber_pow_{suffix}({}, {})", base.text, exponent.text);
         Ok(Operand::new(wrap(&prelude, &call), float_value).with_effect(effect))
@@ -352,7 +352,7 @@ impl Emitter<'_> {
                 if !matches!(operands[1].value, Value::Float | Value::Float32) {
                     return Err(unsupported("float method argument that is not a float"));
                 }
-                let prelude = self.sequence(&mut operands);
+                let prelude = self.sequence(&mut operands)?;
                 let [left, right] = operands;
                 let effect = effect || right.effect;
                 let call = format!("{helper}_{suffix}({}, {})", left.text, right.text);

@@ -93,7 +93,7 @@ impl Emitter<'_> {
             "faber_max_i128"
         };
         let mut operands = [receiver, argument];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [left, right] = operands;
         let effect = effect || right.effect;
         let call = format!("{helper}({}, {})", left.text, right.text);
@@ -119,7 +119,7 @@ impl Emitter<'_> {
         }
         self.support.need(Helper::IntMethod);
         let mut operands = [receiver, exponent];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [base, exponent] = operands;
         let effect = effect || exponent.effect;
         let call = format!("faber_pow({}, {})", base.text, exponent.text);

@@ -58,7 +58,7 @@ impl TypeChecker<'_> {
         (ret, err)
     }
 
-    fn param_types<'b>(&self, params: impl IntoIterator<Item = &'b HirParam>) -> Vec<ParamType> {
+    fn param_types<'b>(params: impl IntoIterator<Item = &'b HirParam>) -> Vec<ParamType> {
         params
             .into_iter()
             .map(|param| ParamType {
@@ -88,7 +88,7 @@ impl TypeChecker<'_> {
     /// boundary. Body checking may still synthesize return flow internally, but
     /// call sites need a concrete contract before any body is visited.
     pub fn function_signature(&mut self, func: &HirFunction) -> FuncSig {
-        let params = self.param_types(&func.params);
+        let params = Self::param_types(&func.params);
         let ret = func.ret_ty.unwrap_or_else(|| self.vacuum_type());
         let (ret, err) =
             self.callable_boundary_return(ret, func.err_ty, func.is_async, func.is_generator);
@@ -204,7 +204,7 @@ impl TypeChecker<'_> {
         let mut methods = FxHashMap::default();
 
         for method in &interface_item.methods {
-            let params = self.param_types(&method.params);
+            let params = Self::param_types(&method.params);
             let ret = method.ret_ty.unwrap_or_else(|| self.vacuum_type());
             let (ret, err) = self.callable_boundary_return(
                 ret,

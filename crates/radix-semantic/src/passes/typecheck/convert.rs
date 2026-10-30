@@ -2415,10 +2415,10 @@ impl TypeChecker<'_> {
             self.types.get(source_resolved),
             self.types.get(target_resolved),
         ) {
-            (Type::Tensor(_, _), target) if self.is_tensor_scalar_extract_target(target) => {
+            (Type::Tensor(_, _), target) if Self::is_tensor_scalar_extract_target(target) => {
                 Some(ISSUE_TENSOR_TO_SCALAR_UNSUPPORTED)
             }
-            (source, Type::Tensor(_, _)) if self.is_tensor_scalar_extract_target(source) => {
+            (source, Type::Tensor(_, _)) if Self::is_tensor_scalar_extract_target(source) => {
                 Some(ISSUE_SCALAR_TO_TENSOR_UNSUPPORTED)
             }
             (Type::Tensor(_, _), Type::Tensor(_, _)) if !shapes_unify => {
@@ -2555,7 +2555,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn is_tensor_scalar_extract_target(&self, ty: &Type) -> bool {
+    fn is_tensor_scalar_extract_target(ty: &Type) -> bool {
         matches!(
             ty,
             Type::Primitive(Primitive::Numerus | Primitive::Fractus)
@@ -2617,7 +2617,7 @@ impl TypeChecker<'_> {
             return None;
         }
 
-        let issue = self.collection_conversio_rejection_issue(&source_shape, &target_shape);
+        let issue = Self::collection_conversio_rejection_issue(&source_shape, &target_shape);
         self.invalid_conversion_with_args(
             issue,
             span,
@@ -3018,7 +3018,6 @@ impl TypeChecker<'_> {
     }
 
     fn collection_conversio_rejection_issue(
-        &self,
         source: &CollectionConversioShape,
         target: &CollectionConversioShape,
     ) -> &'static str {

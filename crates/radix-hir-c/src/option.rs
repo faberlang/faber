@@ -92,6 +92,9 @@ impl Emitter<'_> {
         if !matches!(at.value, Value::Int | Value::Exact) {
             return Err(unsupported("list position that is not an integer"));
         }
+        if matches!(elem, Elem::Genus(_)) {
+            return Err(unsupported("optional index on a list of genus"));
+        }
         let Some(inner) = Inner::from_ty(elem.ty()) else {
             return Err(unsupported(
                 "optional index over a list of this element class",
@@ -99,7 +102,7 @@ impl Emitter<'_> {
         };
         let effect = list.effect || at.effect;
         let mut operands = [list, at];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [list, at] = operands;
         self.support
             .need(Helper::List(elem, crate::helpers::ListOp::At));
@@ -107,11 +110,11 @@ impl Emitter<'_> {
         let slot = format!("faber_o{}", self.temps);
         let call = format!(
             "faber_list_{}_get({}, {}, &{slot})",
-            elem.suffix(),
+            self.elem_suffix(elem)?,
             list.text,
             at.text
         );
-        let operand = self.optional_call(elem, inner, &slot, &call);
+        let operand = self.optional_call(elem, inner, &slot, &call)?;
         Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect))
     }
 
@@ -128,20 +131,20 @@ impl Emitter<'_> {
         let key = self.element(index, k)?;
         let effect = base.effect || key.effect;
         let mut operands = [base, key];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [map, key] = operands;
         self.need_class(Ty::Map(k, v));
         let Some(inner) = Inner::from_ty(v.ty()) else {
             return Err(unsupported("optional map index of this value class"));
         };
         self.need_class(Ty::Opt(inner));
-        let suffix = Self::map_suffix(k, v);
+        let suffix = self.map_suffix(k, v)?;
         let slot = format!("faber_v{}", self.temps);
         let call = format!(
             "faber_map_{suffix}_get({}, {}, &{slot})",
             map.text, key.text
         );
-        let operand = self.optional_call(v, inner, &slot, &call);
+        let operand = self.optional_call(v, inner, &slot, &call)?;
         if !optional_map {
             return Ok(
                 Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(effect)
@@ -173,7 +176,7 @@ impl Emitter<'_> {
             if !matches!(position.value, Value::Int | Value::Exact) {
                 return Err(unsupported("list index that is not an integer"));
             }
-            return Ok(self.list_at_operands(base, position, elem));
+            return self.list_at_operands(base, position, elem);
         }
         Err(unsupported(
             "non-null assertion followed by an index on this class",
