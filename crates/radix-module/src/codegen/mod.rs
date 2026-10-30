@@ -473,6 +473,7 @@ pub fn generate_from_analyzed_with_options(
         | Target::MirMetal
         | Target::MirWgsl
         | Target::MirSexp
+        | Target::MirEvm
         | Target::MirBasic
         | Target::MirScena
         | Target::MirFmir

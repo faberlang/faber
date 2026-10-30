@@ -4359,6 +4359,18 @@ help = "'⇇' 現在會將右側的值複製到左側現有的 tensor 儲存區�
 message = "sinking 合約必須在一個型別參數上準確宣告 `sink(T) → vacuum ⇥ E` 和 `flush() → vacuum ⇥ E`"
 help = "宣告 `{implendum} Sink<T>`，並包含 `{functio} sink(T res) → vacuum ⇥ E` 和 `{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "編譯器 contract 標註無效：{reason}"
+help = '在一個類型上寫 `@ contract { target = "evm" }`'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "不支援的實驗性 EVM 契約形狀：{reason}"
+help = "使用一個無欄位的類型，帶純量方法與明確的公開條目"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "契約需要目標 `{required}`，但選定的目標是 `{target}`"
+help = "選擇契約要求的執行目標；原始碼格式化與 HIR 序列化會保留該標註"
+
 [diagnostics.INFO001]
 message = "核心 `{kernel}` 在 {device} 裝置上串行執行"
 
@@ -4389,3 +4401,7 @@ help = "依照稽核原因找出相依性。讓分區讀寫留在各通道本地
 [diagnostics.SEM008.issues.region_facts_not_built]
 message = "尚不能為 '{construct}' 建構借用區域事實；借用檢查器直接報錯而不做近似"
 help = "該構造的借用判定需要區域推斷；請回報以便區域引擎涵蓋它"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM 試驗拒絕 {shape}（{reason}）"
+help = "只使用有界的純量 evm_entry 子集；這個實驗性目標沒有套件或執行面。"

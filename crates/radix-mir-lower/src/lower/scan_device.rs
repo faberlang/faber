@@ -3,7 +3,13 @@
 //! distinct collective node consumed by device planners and emitters.
 
 use super::expr::HirExpressionLoweringVisitor;
-use super::*;
+use super::{
+    DefId, FunctionBuilder, FxHashSet, HirBlock, HirExpression, HirExpressionKind, HirParamMode, HirStatement,
+    HirStatementKind, HirVisitor, MirCaptureMode, MirClosureCapture, MirConstant, MirDeviceFunctionMetadata,
+    MirDeviceRole, MirError, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirIntrinsic,
+    MirKernelShaderStage, MirOperand, MirReduceOp, MirScanGroupAxis, MirScanGroupOp, MirScanOp, MirScanTotal,
+    MirSyntheticFunctionIdentity, MirTerminatorKind, MirType, Primitive, Span, Symbol, Type, TypeId,
+};
 use radix_hir::{HirReductionOp, HirScanKeyDomain, HirScanTotal};
 
 impl FunctionBuilder<'_> {

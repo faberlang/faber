@@ -1078,6 +1078,167 @@ fn empty_tail_block_keeps_the_arm_fall_through() {
     );
 }
 
+#[test]
+fn empty_branches_remain_reachable_from_their_conditions() {
+    let si = hand_expression(
+        30,
+        HirExpressionKind::Si {
+            cond: Box::new(hand_expression(
+                20,
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Int(1)),
+            )),
+            then_block: HirBlock::default(),
+            then_catch: None,
+            else_block: None,
+        },
+    );
+    let custodi = hand_statement(
+        41,
+        radix_hir::HirStatementKind::Custodi(radix_hir::HirCustodi {
+            clauses: vec![radix_hir::HirCustodiClause {
+                cond: hand_expression(
+                    40,
+                    HirExpressionKind::Literal(radix_hir::HirLiteral::Int(1)),
+                ),
+                body: HirBlock::default(),
+                span: radix_lexer::Span::default(),
+            }],
+        }),
+    );
+    let discerne = hand_expression(
+        60,
+        HirExpressionKind::Discerne {
+            scrutinees: Vec::new(),
+            arms: vec![radix_hir::HirCasuArm {
+                patterns: Vec::new(),
+                body: hand_expression(61, HirExpressionKind::Block(HirBlock::default())),
+                span: radix_lexer::Span::default(),
+            }],
+            exhaustive: false,
+        },
+    );
+    let module = module_with_entry(HirBlock {
+        statements: vec![
+            hand_statement(31, radix_hir::HirStatementKind::Expr(si)),
+            custodi,
+            hand_statement(62, radix_hir::HirStatementKind::Expr(discerne)),
+        ],
+        ..HirBlock::default()
+    });
+
+    let cfg = super::borrow_region_cfg::build_cfg(&module).expect("cfg");
+    let si_condition = cfg.node_for_hir_id(HirId(20)).expect("si condition");
+    let si_join = cfg.node_for_hir_id(HirId(30)).expect("si join");
+    assert!(
+        cfg.successors(si_condition)
+            .any(|edge| { edge.to == si_join && edge.kind == CfgEdgeKind::BranchTrue })
+    );
+
+    let guard_condition = cfg.node_for_hir_id(HirId(40)).expect("guard condition");
+    let guard_join = cfg.node_for_hir_id(HirId(41)).expect("guard join");
+    assert!(
+        cfg.successors(guard_condition)
+            .any(|edge| { edge.to == guard_join && edge.kind == CfgEdgeKind::BranchTrue })
+    );
+
+    let dispatch = cfg
+        .nodes()
+        .iter()
+        .find(|node| node.kind == CfgNodeKind::Condition && node.location.hir_id == Some(HirId(60)))
+        .expect("discerne dispatch")
+        .id;
+    let dispatch_join = cfg
+        .nodes()
+        .iter()
+        .find(|node| node.kind == CfgNodeKind::Join && node.location.hir_id == Some(HirId(60)))
+        .expect("discerne join")
+        .id;
+    assert!(
+        cfg.successors(dispatch)
+            .any(|edge| { edge.to == dispatch_join && edge.kind == CfgEdgeKind::BranchTrue })
+    );
+}
+
+#[test]
+fn error_edges_cover_only_the_protected_body() {
+    let block_with_statement = |id| HirBlock {
+        statements: vec![hand_statement(id, radix_hir::HirStatementKind::Tacet)],
+        ..HirBlock::default()
+    };
+    let catch = |binding, statement| radix_hir::HirCape {
+        binding_def_id: radix_hir::DefId(binding),
+        binding_name: radix_lexer::Symbol(binding),
+        binding_ty: None,
+        body: block_with_statement(statement),
+        span: radix_lexer::Span::default(),
+    };
+
+    let handled = hand_expression(
+        100,
+        HirExpressionKind::Handled {
+            body: block_with_statement(101),
+            catch: Box::new(catch(1, 102)),
+        },
+    );
+    let si = hand_expression(
+        200,
+        HirExpressionKind::Si {
+            cond: Box::new(hand_expression(
+                201,
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Int(1)),
+            )),
+            then_block: block_with_statement(202),
+            then_catch: Some(Box::new(catch(2, 203))),
+            else_block: None,
+        },
+    );
+    let call_default = hand_expression(
+        300,
+        HirExpressionKind::CallDefault {
+            body: Box::new(block_with_statement(301)),
+            default: Box::new(hand_expression(
+                302,
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Int(0)),
+            )),
+            err_ty: None,
+        },
+    );
+    let module = module_with_entry(HirBlock {
+        statements: vec![
+            hand_statement(110, radix_hir::HirStatementKind::Expr(handled)),
+            hand_statement(210, radix_hir::HirStatementKind::Expr(si)),
+            hand_statement(310, radix_hir::HirStatementKind::Expr(call_default)),
+        ],
+        ..HirBlock::default()
+    });
+
+    let cfg = super::borrow_region_cfg::build_cfg(&module).expect("cfg");
+    let error_edges: Vec<_> = cfg
+        .edges()
+        .iter()
+        .filter(|edge| edge.kind == CfgEdgeKind::Error)
+        .map(|edge| (edge.from, edge.to))
+        .collect();
+    assert_eq!(
+        error_edges,
+        vec![
+            (
+                cfg.node_for_hir_id(HirId(101)).expect("handled body"),
+                cfg.node_for_hir_id(HirId(102)).expect("handled catch"),
+            ),
+            (
+                cfg.node_for_hir_id(HirId(202)).expect("si body"),
+                cfg.node_for_hir_id(HirId(203)).expect("si catch"),
+            ),
+            (
+                cfg.node_for_hir_id(HirId(301)).expect("default body"),
+                cfg.node_for_hir_id(HirId(302)).expect("default handler"),
+            ),
+        ],
+        "handler nodes and joins must not gain edges back into their own handler"
+    );
+}
+
 // A-183: an expression statement over an empty block keeps its statement
 // node as the fragment entry, so the previous statement flows into it.
 #[test]

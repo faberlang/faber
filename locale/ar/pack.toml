@@ -4506,6 +4506,18 @@ help = "ينسخ '⇇' الآن قيم الطرف الأيمن إلى تخزين
 message = "يجب أن يعرّف عقد الإرسال بالضبط `sink(T) → vacuum ⇥ E` و`flush() → vacuum ⇥ E` باستخدام معامل نوع واحد"
 help = "عرّف `{implendum} Sink<T>` مع `{functio} sink(T res) → vacuum ⇥ E` و`{functio} flush() → vacuum ⇥ E`"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "تعليق عقد المترجم غير صالح: {reason}"
+help = 'اكتب `@ contract { target = "evm" }` على صنف واحد'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "صيغة عقد EVM التجريبية غير مدعومة: {reason}"
+help = "استخدم صنفًا واحدًا بدون حقول مع دوال عددية ومداخل عامة صريحة"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "العقد يتطلب الهدف `{required}`، لكن الهدف المحدد هو `{target}`"
+help = "اختر هدف التنفيذ الذي يتطلبه العقد؛ تنسيق المصدر وتسلسل HIR يحفظان التعليق"
+
 [diagnostics.INFO001]
 message = "النواة `{kernel}` تعمل بشكل متسلسل على جهاز {device}"
 
@@ -4536,3 +4548,7 @@ help = "اتبع سبب التدقيق للعثور على الاعتمادية.
 [diagnostics.SEM008.issues.region_facts_not_built]
 message = "حقائق مناطق الاستعارة لم تُبنَ بعد لـ '{construct}'؛ مدقق الاستعارة يُغلق بدل التقريب"
 help = "هذه الصيغة تحتاج استنتاج المناطق لقرارات الاستعارة؛ أبلغ عنها لتغطيها محرك المناطق"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "تجربة EVM ترفض {shape} ({reason})"
+help = "استخدم فقط المجموعة الجزئية العددية evm_entry؛ هذا الهدف التجريبي بلا حزمة أو سطح تنفيذ."

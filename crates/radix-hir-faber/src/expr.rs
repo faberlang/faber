@@ -1572,47 +1572,59 @@ impl super::FaberCodegen<'_> {
                 return;
             }
 
-            match self.types.get(target) {
-                Type::Struct(def_id) => {
-                    let name = self
-                        .imported_type_spellings
+            let struct_def = match self.types.get(target) {
+                Type::Struct(def_id) => Some(*def_id),
+                Type::Applied(base, _) => match self.types.get(*base) {
+                    Type::Struct(def_id) => Some(*def_id),
+                    _ => None,
+                },
+                _ => None,
+            };
+            if let Some(def_id) = struct_def {
+                let name = if matches!(self.types.get(target), Type::Applied(..)) {
+                    rendered_target
+                } else {
+                    self.imported_type_spellings
                         .get(&target)
                         .cloned()
-                        .unwrap_or_else(|| self.name_for_def(*def_id, names));
-                    // The copy-with-changes source (D15.1) is the `Spread`
-                    // entry; it re-emits after the braces as `ex source`.
-                    let (sources, fields): (Vec<_>, Vec<_>) = entries
-                        .iter()
-                        .partition(|field| matches!(field.key, HirObjectKey::Spread(_)));
-                    if self.inferred_constructor_ids.contains(&owner) {
-                        writer.write("_");
-                    } else {
-                        writer.write(&name);
-                    }
-                    writer.write(" {");
-                    if !fields.is_empty() {
-                        writer.write(" ");
-                    }
-                    for (idx, field) in fields.iter().enumerate() {
-                        if idx > 0 {
-                            writer.write(", ");
-                        }
-                        self.write_genus_field(field, names, surface, writer);
-                    }
-                    if !fields.is_empty() {
-                        writer.write(" ");
-                    }
-                    writer.write("}");
-                    for source in sources {
-                        if let HirObjectKey::Spread(expr) = &source.key {
-                            writer.write(" ");
-                            writer.write(surface.keyword(TokenKind::Ex));
-                            writer.write(" ");
-                            self.write_expr_prec(expr, 12, names, surface, writer);
-                        }
-                    }
-                    return;
+                        .unwrap_or_else(|| self.name_for_def(def_id, names))
+                };
+                // The copy-with-changes source (D15.1) is the `Spread`
+                // entry; it re-emits after the braces as `ex source`.
+                let (sources, fields): (Vec<_>, Vec<_>) = entries
+                    .iter()
+                    .partition(|field| matches!(field.key, HirObjectKey::Spread(_)));
+                if self.inferred_constructor_ids.contains(&owner) {
+                    writer.write("_");
+                } else {
+                    writer.write(&name);
                 }
+                writer.write(" {");
+                if !fields.is_empty() {
+                    writer.write(" ");
+                }
+                for (idx, field) in fields.iter().enumerate() {
+                    if idx > 0 {
+                        writer.write(", ");
+                    }
+                    self.write_genus_field(field, names, surface, writer);
+                }
+                if !fields.is_empty() {
+                    writer.write(" ");
+                }
+                writer.write("}");
+                for source in sources {
+                    if let HirObjectKey::Spread(expr) = &source.key {
+                        writer.write(" ");
+                        writer.write(surface.keyword(TokenKind::Ex));
+                        writer.write(" ");
+                        self.write_expr_prec(expr, 12, names, surface, writer);
+                    }
+                }
+                return;
+            }
+
+            match self.types.get(target) {
                 Type::Record(_) => {
                     if self.inferred_constructor_ids.contains(&owner) {
                         writer.write("_");

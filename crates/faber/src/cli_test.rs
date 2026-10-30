@@ -185,6 +185,7 @@ fn cli_parses_emit_external_target_names() {
         ("metal-text", FaberCliTarget::MirMetal),
         ("wgsl-text", FaberCliTarget::MirWgsl),
         ("sexp", FaberCliTarget::MirSexp),
+        ("evm", FaberCliTarget::MirEvm),
         ("basic", FaberCliTarget::MirBasic),
         ("bas", FaberCliTarget::MirBasic),
         ("pascal", FaberCliTarget::HirPascal),
