@@ -1093,9 +1093,20 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
     let mut children: Vec<&HirExpression> = Vec::new();
 
     match kind {
-        K::Binary(_, left, right) => children.extend([left.as_ref(), right.as_ref()]),
+        K::Binary(_, left, right)
+        | K::Assign(left, right)
+        | K::CopyInto {
+            target: left,
+            value: right,
+        }
+        | K::SinkInto {
+            sink: left,
+            item: right,
+        } => {
+            children.extend([left.as_ref(), right.as_ref()]);
+        }
         K::Unary(_, operand) => children.push(operand),
-        K::Call(callee, _, args, _) => {
+        K::Call(callee, _, args, _) | K::MethodCall(callee, _, _, args, _) => {
             children.push(callee);
             children.extend(args.iter().map(|arg| &arg.expr));
         }
@@ -1105,10 +1116,6 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
         } => {
             children.push(call);
             children.extend(selected_arguments.iter());
-        }
-        K::MethodCall(receiver, _, _, args, _) => {
-            children.push(receiver);
-            children.extend(args.iter().map(|arg| &arg.expr));
         }
         K::Field(object, _) => children.push(object),
         K::Index(object, index) => children.extend([object.as_ref(), index.as_ref()]),
@@ -1121,7 +1128,6 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
                 children.push(step);
             }
         }
-        K::Assign(target, value) => children.extend([target.as_ref(), value.as_ref()]),
         K::Marked { expr, .. } => children.push(expr),
         K::ConversioAssign {
             target,
@@ -1147,7 +1153,12 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
         K::Tuple(elements, _) => children.extend(elements.iter()),
         K::Scribe(_, args) => children.extend(args.iter()),
         K::Scriptum(_, parts) => children.extend(parts.iter()),
-        K::Adfirma(condition, message) => {
+        K::Adfirma(condition, message)
+        | K::Conversio {
+            source: condition,
+            recovery: message,
+            ..
+        } => {
             children.push(condition);
             if let Some(message) = message {
                 children.push(message);
@@ -1165,14 +1176,6 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
                 children.extend(entries.iter().filter_map(|field| field.value.as_ref()));
             }
         }
-        K::Conversio {
-            source, recovery, ..
-        } => {
-            children.push(source);
-            if let Some(recovery) = recovery {
-                children.push(recovery);
-            }
-        }
         K::Widen { operand, .. } => children.push(operand),
         K::Ad {
             opener: Some(opener),
@@ -1180,13 +1183,6 @@ fn value_children(kind: &HirExpressionKind) -> Vec<&HirExpression> {
         } => children.push(opener),
         K::Ref(_, object) | K::Deref(object) => children.push(object),
         K::TypeCheck { expr, .. } => children.push(expr),
-        K::CopyInto { target, value }
-        | K::SinkInto {
-            sink: target,
-            item: value,
-        } => {
-            children.extend([target.as_ref(), value.as_ref()]);
-        }
         K::Format { value, .. } => children.push(value),
         K::Reduction {
             source,
