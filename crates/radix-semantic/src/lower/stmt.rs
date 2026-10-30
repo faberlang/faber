@@ -1768,9 +1768,11 @@ impl Lowerer<'_> {
                 stmt.body.span,
             );
             loop_block.end = end;
-            // The authored `omnia` marker rides the synthesized loop block so
-            // the re-emitter prints it. `FacOmniaLoop` is a marker, not a
-            // scope: every backend and MIR lower the loop as plain `fac … dum`.
+            // The authored `omnia` modifier rides the synthesized loop block so
+            // emission preserves it and handled-block lowering retains runner
+            // delivery behavior. `FacOmniaLoop` is not a scope: host loop
+            // control remains ordinary `fac … dum`, with deferred delivery
+            // checks per iteration when an owning handled block is present.
             match stmt.modifier {
                 radix_syntax::FacModifier::Omnia => {
                     loop_block.breakable = Some(radix_hir::HirBreakableKind::FacOmniaLoop);

@@ -4,27 +4,31 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "error"
 canonical = false
-summary = "Marks a fac attempt as covering all cases: a surface marker that keeps plain fac semantics."
+summary = "Marks a handled fac block for deferred delivery of recoverable kernel errors to its handler."
 syntax = "fac omnia <block> cape <name> <block>"
 aliases = ["do all"]
 related = ["fac", "cape", "omnia"]
 locale = "la"
 +++
 # =============================================================================
-# fac omnia — marks the attempt as covering all cases.
+# fac omnia — marks a handled attempt for deferred kernel-error delivery.
 # =============================================================================
 #
 # What this teaches:
-#   • `omnia` between `fac` and the block is a surface marker (en `do all`):
-#     the construct keeps plain `fac` semantics on every backend
-#   • the marker round-trips the formatter — re-emission keeps `fac omnia`
-#   • `iace` inside the block still resolves through the `cape` handler
+#   • `omnia` between `fac` and the block marks a handled block to defer
+#     recoverable dispatched-kernel errors to its owning `cape` handler
+#   • delivery can be observed before block exit when a host read synchronizes
+#     device data; fatal device faults are not made catchable by this marker
+#   • the modifier round-trips the formatter — re-emission keeps `fac omnia`
+#   • this host-only example's synchronous `iace` still resolves through `cape`
 #
 # Common mistakes:
-#   • expecting `omnia` to change behavior — it never does; recovery works
-#     exactly as in plain `fac`
-#   • assuming `fac omnia { … } dum cond` is rejected — it is legal and lowers
-#     as a plain `fac … dum` loop (see fac-omnia-dum)
+#   • expecting the marker to alter ordinary host control flow or catch fatal
+#     device faults — it changes runner/device delivery of recoverable kernel
+#     errors in a handled block, not host `iace`/`throw` behavior
+#   • assuming `fac omnia { … } dum cond` is rejected — it is legal; deferred
+#     errors are delivered per iteration when an owning handled block exists
+#     (see fac-omnia-dum)
 #
 # See also: fac, cape, omnia
 # =============================================================================
@@ -38,7 +42,10 @@ locale = "la"
 #   1 / 0 / planum
 #
 # BACKEND:
-#   Runner+Rust: identical to plain fac.
+#   Runner/device: dispatched failable kernels defer recoverable errors to the
+#   owning handled block; fatal faults are not caught. Rust and host-only paths
+#   do not use this device-delivery mechanism. This example's `iace` is a
+#   synchronous host error and demonstrates ordinary `cape` handling only.
 
 functio conatus(bivalens malum) → numerus {
     fac omnia {
