@@ -406,8 +406,8 @@ fn is_void(ty: TypeId, types: &TypeTable) -> bool {
     matches!(types.get(ty), Type::Primitive(Primitive::Vacuum))
 }
 
-/// Forward taint over the block in statement order: loop bodies are walked
-/// twice so a late write reaches an early read.
+/// Forward taint over the block in statement order. Loop bodies are revisited
+/// until loop-carried writes stop adding tainted bindings.
 struct TaintScan<'a, 'e> {
     env: &'a Env<'e>,
     sink: &'a mut Sink,
@@ -456,8 +456,13 @@ impl TaintScan<'_, '_> {
     }
 
     fn loop_body(&mut self, body: &HirBlock) {
-        self.visit_block(body);
-        self.visit_block(body);
+        loop {
+            let tainted_before = self.tainted.len();
+            self.visit_block(body);
+            if self.tainted.len() == tainted_before {
+                break;
+            }
+        }
     }
 }
 
@@ -490,6 +495,10 @@ impl HirVisitor for TaintScan<'_, '_> {
                 self.check_scalar(cond, "condition");
                 self.visit_expr(cond);
                 self.loop_body(body);
+                // The condition is evaluated again after each iteration, so
+                // writes in the body can make a previously host-known value
+                // a device read on the next test.
+                self.check_scalar(cond, "condition");
             }
             HirExpressionKind::Loop(body) => self.loop_body(body),
             HirExpressionKind::Itera {
