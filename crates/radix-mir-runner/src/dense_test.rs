@@ -725,6 +725,70 @@ fn deferred_zeros_read_as_zeros_without_materializing() {
 }
 
 #[test]
+fn deferred_vector_zeros_keep_each_elements_lanes_independent() {
+    use std::mem::size_of;
+    use std::rc::Rc;
+
+    let cell = DenseCell::new(DenseStorage::fresh_zeros_vector(DenseKind::F32, 2, 3));
+    assert_eq!(cell.len(), 3);
+    assert_eq!(cell.kind(), None);
+    assert_eq!(cell.backing_bytes(), 0, "no outer or lane arrays yet");
+
+    let Value::Vector(first) = cell.get(0).expect("first zero vector") else {
+        panic!("expected vector")
+    };
+    let Value::Vector(second) = cell.get(1).expect("second zero vector") else {
+        panic!("expected vector")
+    };
+    assert!(
+        !Rc::ptr_eq(&first, &second),
+        "elements have independent lanes"
+    );
+    first.borrow_mut()[0] = Value::Float(9.0);
+    assert_eq!(
+        cell.get(0),
+        Some(Value::Vector(Rc::new(std::cell::RefCell::new(vec![
+            Value::Float(0.0),
+            Value::Float(0.0),
+        ])))),
+        "a synthesized value does not mutate deferred storage"
+    );
+    assert_eq!(cell.backing_bytes(), 0, "reads stay deferred");
+
+    let written = Value::Vector(Rc::new(std::cell::RefCell::new(vec![
+        Value::Float(4.0),
+        Value::Float(5.0),
+    ])));
+    assert!(
+        cell.set(0, &written),
+        "first write materializes vector zeros"
+    );
+    assert_eq!(
+        cell.backing_bytes(),
+        3 * (1 + 2) * size_of::<Value>(),
+        "outer and per-element lane arrays are counted"
+    );
+    let Value::Vector(unread) = cell.get(1).expect("unread neighbor") else {
+        panic!("expected vector")
+    };
+    let Value::Vector(other) = cell.get(2).expect("second unread neighbor") else {
+        panic!("expected vector")
+    };
+    assert!(
+        !Rc::ptr_eq(&unread, &other),
+        "materialized lanes are independent"
+    );
+    unread.borrow_mut()[0] = Value::Float(7.0);
+    let Value::Vector(untouched) = cell.get(2).expect("untouched neighbor") else {
+        panic!("expected vector")
+    };
+    assert_eq!(
+        *untouched.borrow(),
+        vec![Value::Float(0.0), Value::Float(0.0)]
+    );
+}
+
+#[test]
 fn deferred_zeros_materialize_on_the_first_write() {
     let cell = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 4));
     assert!(cell.set(1, &Value::Float(7.5)), "store into deferred zeros");
