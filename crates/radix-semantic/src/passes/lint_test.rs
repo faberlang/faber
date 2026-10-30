@@ -1132,6 +1132,51 @@ fn english_keyed_in_place_sort_counts_as_mutation_for_unnecessary_varia() {
     assert_eq!(en_unnecessary_varia_count(source), 0);
 }
 
+// A plain bind of a shareable value aliases its source (D-1), so a write
+// through the new name is a write to what the source binding names, and the
+// share itself needs the source's `varia`: following a WARN013 `let` advice
+// there would turn the bind into SEM065 (`const_shared_into_var`).
+const ALIAS_BOX: &str = "class Box {\n    mut int v = 0\n}\n";
+
+#[test]
+fn write_through_an_alias_counts_as_mutation_for_unnecessary_varia() {
+    // The probe: `mut Box b ← a` shares `a`'s object, so `b.v ← 2` writes
+    // what `a` names. WARN013 must not advise `let` on `a`.
+    let source = format!(
+        "{ALIAS_BOX}main {{\n    mut Box a ← Box {{ v = 1 }}\n    mut Box b ← a\n    b.v ← 2\n    print a.v\n}}"
+    );
+    assert_eq!(en_unnecessary_varia_count(&source), 0);
+}
+
+#[test]
+fn varia_source_shared_into_a_varia_cell_stays_unflagged() {
+    // No write anywhere, but the share itself needs `a`'s `varia` (`let a`
+    // makes `mut Box b ← a` SEM065). The cell's own warning stands: `b` is
+    // never written, so `let b` is genuinely legal.
+    let source = format!(
+        "{ALIAS_BOX}main {{\n    mut Box a ← Box {{ v = 1 }}\n    mut Box b ← a\n    print a.v\n    print b.v\n}}"
+    );
+    assert_eq!(en_unnecessary_varia_count(&source), 1);
+}
+
+#[test]
+fn copy_source_of_a_varia_cell_stays_flagged() {
+    // `copy` acquires an independent value: no alias, no share, so the
+    // never-written source keeps its warning (negative twin).
+    let source = format!(
+        "{ALIAS_BOX}main {{\n    mut Box a ← Box {{ v = 1 }}\n    mut Box b ← copy a\n    b.v ← 2\n    print a.v\n}}"
+    );
+    assert_eq!(en_unnecessary_varia_count(&source), 1);
+}
+
+#[test]
+fn scalar_source_of_a_varia_cell_stays_flagged() {
+    // Scalars copy by value: `let a` cannot trip SEM065, so the warning
+    // stands (negative twin).
+    let source = "main {\n    mut int a ← 1\n    mut int b ← a\n    b ← 2\n    print a\n}";
+    assert_eq!(en_unnecessary_varia_count(source), 1);
+}
+
 const ORDINA_CLAVIS_EXEMPLAR: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../corpus/lista/ordina-clavis.fab"
