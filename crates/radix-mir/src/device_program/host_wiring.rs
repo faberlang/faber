@@ -144,6 +144,34 @@ impl HostWiring {
         !a_sites.values.is_empty() && a_sites.values == b_sites.values
     }
 
+    /// Whether a kernel call's RETURN value is re-fed to a kernel parameter:
+    /// `result` is a result slot, and some call — of any kernel, including
+    /// the producer's own next iteration (a host loop's carry) — passes one
+    /// of the values that slot's calls produced into a parameter slot. A
+    /// recorded host value is a fact, so a PARTIAL overlap already proves the
+    /// consumption the strict buffer joins cannot express: a repeated
+    /// producer's value set strictly contains a chained consumer's, and a
+    /// kernel's own slots never value-join. Parameter and result slots of
+    /// one call can never share a value (a value is produced before it is
+    /// fed), so any shared value is a later call's read.
+    #[must_use]
+    pub(super) fn result_value_feeds_a_param(&self, result: Slot) -> bool {
+        if !matches!(result.key, SlotKey::Result) {
+            return false;
+        }
+        let Some(sites) = self.known(result) else {
+            return false;
+        };
+        !sites.values.is_empty()
+            && self.slots.iter().any(|(slot, slot_sites)| {
+                matches!(slot.key, SlotKey::Param(_))
+                    && slot_sites
+                        .values
+                        .iter()
+                        .any(|value| sites.values.contains(value))
+            })
+    }
+
     /// Whether data `producer` writes reaches `consumer` only through a host
     /// loop's carry: the host can run a call of `consumer` after a call of
     /// `producer`, and never calls `producer` ahead of `consumer` within one
@@ -196,6 +224,7 @@ pub(super) fn collect_host_wiring(
         selected: selected_kernels,
         by_source,
         function: None,
+        temp_homes: BTreeMap::new(),
         wiring: HostWiring::default(),
     };
     for function in program
@@ -204,6 +233,7 @@ pub(super) fn collect_host_wiring(
         .filter(|function| function.shader_stage.is_none())
     {
         collector.function = Some(function.id);
+        collector.temp_homes = temp_homes(function);
         collector.visit_function(function);
         let sites = collector.call_sites(function);
         let order = call_order(function, &sites);
@@ -218,19 +248,74 @@ struct Collector<'a> {
     /// Selected kernels by their source definition.
     by_source: Vec<(DefId, MirFunctionId)>,
     function: Option<MirFunctionId>,
+    /// The local each temp of the function being visited is moved into by a
+    /// plain operand assign (`Temp(k)` is the call destination, the local is
+    /// the `let` binding). A temp moved into more than one local has no
+    /// home. Canonicalizing the temp to its local's identity is what joins a
+    /// call's result slot to the later call sites that read the binding —
+    /// without it the lowering's temp-then-move shape would record the
+    /// producer and the consumer under different identities.
+    temp_homes: BTreeMap<MirTempId, MirLocalId>,
     wiring: HostWiring,
+}
+
+/// The local each temp lands in, from the function's plain operand assigns:
+/// `local ← Temp(k)` (the lowering's temp-then-move shape for a call whose
+/// result binds to a `let`). A temp assigned into two different locals is
+/// ambiguous and gets no home; a local reassigned from several temps is the
+/// loop-carry shape and keeps every temp's home.
+fn temp_homes(function: &MirFunction) -> BTreeMap<MirTempId, MirLocalId> {
+    let mut homes: BTreeMap<MirTempId, MirLocalId> = BTreeMap::new();
+    let mut ambiguous: BTreeSet<MirTempId> = BTreeSet::new();
+    let moved_temp = |value: &MirValue| -> Option<MirTempId> {
+        let MirValueKind::Operand(operand) = &value.kind else {
+            return None;
+        };
+        match operand {
+            MirOperand::Temp(temp) => Some(*temp),
+            MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+                MirPlaceBase::Temp(temp) => Some(temp),
+                _ => None,
+            },
+            _ => None,
+        }
+    };
+    for data in &function.blocks {
+        for statement in &data.statements {
+            let MirStatementKind::Assign { place, value } = &statement.kind else {
+                continue;
+            };
+            let Some(temp) = moved_temp(value) else {
+                continue;
+            };
+            if place.projections.is_empty()
+                && let MirPlaceBase::Local(local) = place.base
+                && homes.insert(temp, local).is_some_and(|home| home != local)
+            {
+                ambiguous.insert(temp);
+            }
+        }
+    }
+    homes.retain(|temp, _| !ambiguous.contains(temp));
+    homes
 }
 
 impl Collector<'_> {
     /// The value identity of `base` inside the host function being visited
-    /// (`None` outside any function).
+    /// (`None` outside any function). A temp with a home carries its local's
+    /// identity: the call result it holds is the binding the later call
+    /// sites read.
     fn host_value(&self, base: &MirPlaceBase) -> Option<HostValue> {
+        let base = match base {
+            MirPlaceBase::Local(local) => HostBase::Local(*local),
+            MirPlaceBase::Temp(temp) => self
+                .temp_homes
+                .get(temp)
+                .map_or(HostBase::Temp(*temp), |local| HostBase::Local(*local)),
+        };
         Some(HostValue {
             function: self.function?,
-            base: match base {
-                MirPlaceBase::Local(local) => HostBase::Local(*local),
-                MirPlaceBase::Temp(temp) => HostBase::Temp(*temp),
-            },
+            base,
         })
     }
 
