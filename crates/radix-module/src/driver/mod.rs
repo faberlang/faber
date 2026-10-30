@@ -43,7 +43,7 @@ mod target_bindings;
 mod target_policy;
 
 pub use crate::semantic::{AnalyzedModuleApplicationView, PackageImportIdentities};
-pub use evm_contract::require_contract_execution_target;
+pub use evm_contract::{forbid_contract_environment, require_contract_execution_target};
 #[cfg(feature = "hir-faber")]
 pub use faber_format::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};

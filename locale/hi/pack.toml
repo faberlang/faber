@@ -4374,6 +4374,18 @@ help = "'⇇' अब दाईं ओर के मानों को बाई
 message = "sinking contract में एक type parameter पर ठीक `sink(T) → vacuum ⇥ E` और `flush() → vacuum ⇥ E` घोषित होना चाहिए"
 help = "`{implendum} Sink<T>` में `{functio} sink(T res) → vacuum ⇥ E` और `{functio} flush() → vacuum ⇥ E` घोषित करें"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "कंपाइलर contract annotation अमान्य है: {reason}"
+help = 'एक वर्ग पर `@ contract { target = "evm" }` लिखें'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "असमर्थित प्रयोगात्मक EVM contract आकार: {reason}"
+help = "एक ऐसा वर्ग उपयोग करें जिसमें फ़ील्ड न हों, अदिश विधियाँ हों, और स्पष्ट सार्वजनिक प्रविष्टियाँ हों"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contract को लक्ष्य `{required}` चाहिए, पर चुना गया लक्ष्य `{target}` है"
+help = "contract का अपेक्षित निष्पादन लक्ष्य चुनें; स्रोत फ़ॉर्मेटिंग और HIR क्रमानुसारण annotation को बनाए रखते हैं"
+
 [diagnostics.INFO001]
 message = "कर्नेल `{kernel}` {device} डिवाइस पर क्रमिक रूप से चलता है"
 
@@ -4404,3 +4416,7 @@ help = "ऑडिट कारण का अनुसरण करके नि�
 [diagnostics.SEM008.issues.region_facts_not_built]
 message = "उधार-क्षेत्र तथ्य अभी '{construct}' के लिए नहीं बनते; उधार परीक्षक सन्निकटन के बजाय बंद रहता है"
 help = "इस रचना के उधार निर्णयों के लिए क्षेत्र-निष्कर्षण चाहिए; क्षेत्र इंजन को इसे ढकने के लिए इसकी सूचना दें"
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM स्पाइक {shape} ({reason}) मना करता है"
+help = "केवल सीमित अदिश evm_entry उपसमुच्चय का उपयोग करें; इस प्रयोगात्मक लक्ष्य का कोई पैकेज या निष्पादन पहलू नहीं है।"
