@@ -31,16 +31,23 @@ struct Chunk {
 
 /// Header size rounded to the chunk alignment, so the bump base keeps the
 /// allocation alignment of the chunk itself.
-const HEADER: usize = size_of::<Chunk>().next_multiple_of(CHUNK_ALIGN);
-const CHUNK_ALIGN: usize = 16;
+pub(crate) const HEADER: usize = size_of::<Chunk>().next_multiple_of(CHUNK_ALIGN);
+pub(crate) const CHUNK_ALIGN: usize = 16;
 /// Fresh-chunk capacity (data bytes), the C route's 64 KiB.
-const CHUNK_DATA: usize = 1 << 16;
+pub(crate) const CHUNK_DATA: usize = 1 << 16;
 
 /// End the run when an allocation cannot be satisfied: the C route's trap
 /// text and the program-logic exit class.
 #[cold]
 fn out_of_memory() -> ! {
     crate::exit_trap("out of memory", TrapKind::ProgramLogic)
+}
+
+/// The layout of one chunk holding `capacity` data bytes: `None` when the
+/// header addition overflows, so an impossible arena request lands in the
+/// honest out-of-memory trap instead of a wrapped, undersized allocation.
+pub(crate) fn chunk_layout(capacity: usize) -> Option<Layout> {
+    Layout::from_size_align(HEADER.checked_add(capacity)?, CHUNK_ALIGN).ok()
 }
 
 /// One program-lifetime bump arena. `UnsafeCell` keeps the bump cursor behind
@@ -98,8 +105,7 @@ impl Arena {
         }
         let wanted = size.checked_add(align).unwrap_or_else(|| out_of_memory());
         let capacity = CHUNK_DATA.max(wanted);
-        let layout = Layout::from_size_align(HEADER + capacity, CHUNK_ALIGN)
-            .unwrap_or_else(|_| out_of_memory());
+        let layout = chunk_layout(capacity).unwrap_or_else(|| out_of_memory());
         // SAFETY: `layout` has non-zero size. The cast is aligned: the
         // allocation is `CHUNK_ALIGN`, above `align_of::<Chunk>()`.
         #[allow(clippy::cast_ptr_alignment)]

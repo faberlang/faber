@@ -444,3 +444,16 @@ fn repeated_small_extends_grow_geometrically_not_one_run_per_extend() {
     assert_eq!(exact.capacity(), 3);
     assert_eq!(allocations() - before, 1);
 }
+
+#[test]
+fn chunk_layout_refuses_an_overflowing_header_addition() {
+    use crate::arena::{CHUNK_ALIGN, CHUNK_DATA, HEADER, chunk_layout};
+
+    assert!(
+        chunk_layout(usize::MAX).is_none(),
+        "a capacity that overflows the header addition must refuse the layout"
+    );
+    let layout = chunk_layout(CHUNK_DATA).expect("an ordinary chunk has a layout");
+    assert_eq!(layout.size(), HEADER + CHUNK_DATA);
+    assert_eq!(layout.align(), CHUNK_ALIGN);
+}
