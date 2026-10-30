@@ -58,6 +58,16 @@ fn root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
+/// The `CODE` of the first rendered `error[CODE[:issue]]` header, or `None`
+/// when stderr carries no coded error diagnostic.
+fn first_error_code(stderr: &str) -> Option<&str> {
+    stderr.lines().find_map(|line| {
+        let rest = line.strip_prefix("error[")?;
+        let (identity, _) = rest.split_once(']')?;
+        Some(identity.split_once(':').map_or(identity, |(code, _)| code))
+    })
+}
+
 /// A program only the clif lane runs: the runner's MIR-backed lane
 /// restriction refuses it, so a successful plain run proves the default
 /// engine compiled and executed it in memory.
@@ -125,7 +135,12 @@ fn plain_run_of_a_refused_program_falls_back_to_the_runner() {
         // The explicit target never falls back.
         assert_eq!(jit.status, Some(65), "{name}: refusal status");
         assert!(jit.stdout.is_empty(), "{name}: refusal precedes execution");
-        assert!(jit.stderr.contains("CODEGEN001"), "{name}: {}", jit.stderr);
+        assert_eq!(
+            first_error_code(&jit.stderr),
+            Some("CODEGEN001"),
+            "{name}: the compile-lane decline: {}",
+            jit.stderr
+        );
     }
 }
 
@@ -183,7 +198,10 @@ fn device_runs_keep_the_runner_as_their_host_engine() {
     assert_eq!(plain.stdout, runner.stdout);
     assert_eq!(plain.stderr, runner.stderr);
     assert!(
-        !plain.stderr.contains("warning["),
+        !plain
+            .stderr
+            .lines()
+            .any(|line| line.starts_with("warning[")),
         "the reference route prints no compile-lane warnings: {}",
         plain.stderr
     );
