@@ -20,7 +20,7 @@ fn lane_sum(vf32[4] v) → f32 {
 }
 
 fn scale(vf32[4] v, f32 s) → vf32[4] {
-    mut vf32[4] out ← copy v
+    mut vf32[4] out ← v
     mut int j ← 0
     while j ≺ 4 {
         out[j] ← v[j] * s

@@ -1374,6 +1374,20 @@ impl PartialEq for LedgerValue {
 }
 
 impl Value {
+    /// A store of a register-class value owns its storage (operator ruling
+    /// 7b25889f R1): vectors and matrices are silent values, so `b ← a`
+    /// copies and a later lane write through one binding never reaches
+    /// another. Tensors and every heap container keep their reference store.
+    /// A vector's lanes are numeric scalars, so the deep duplicate is the
+    /// whole copy.
+    #[must_use]
+    pub fn copied_register_class(self) -> Value {
+        match self {
+            Value::Vector(_) | Value::Matrix(_) => self.deep_copy(),
+            other => other,
+        }
+    }
+
     /// Deep duplicate for the `copy` access marker (D-6): every container,
     /// genus, and record cell reachable from `self` is rebuilt, so no storage
     /// is shared with the source. Sharing *within* the copied graph (two

@@ -288,8 +288,8 @@ impl<'a> ClifCapability<'a> {
                 Type::Primitive(Primitive::Numerus)
             ))
             .then(|| Gap::Subset("interval value".to_owned())),
+            Type::Vector(element, _) => self.type_gap(MirType::semantic(*element)),
             Type::Tensor(..)
-            | Type::Vector(..)
             | Type::Matrix(..)
             | Type::Sparsa(..)
             | Type::Atomic(_)
@@ -493,10 +493,10 @@ impl<'a> ClifCapability<'a> {
             | MirAggregateKind::EnumVariant(_)
             | MirAggregateKind::ClosureEnvironment(_)
             | MirAggregateKind::SharedCell
-            | MirAggregateKind::Interval { .. } => None,
+            | MirAggregateKind::Interval { .. }
+            | MirAggregateKind::Vector => None,
             MirAggregateKind::Tensor
             | MirAggregateKind::SparseTensor
-            | MirAggregateKind::Vector
             | MirAggregateKind::Matrix => Some(Gap::Policy("device construction".to_owned())),
         }
     }
@@ -811,6 +811,7 @@ impl MirVisitor for ClifCapability<'_> {
                 projection,
                 MirProjection::Index(_)
                     | MirProjection::ProvenIndex(_)
+                    | MirProjection::VectorLane(_)
                     | MirProjection::Field(_)
                     | MirProjection::VariantField { .. }
                     | MirProjection::ClosureCapture { .. }

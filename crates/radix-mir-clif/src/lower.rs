@@ -149,7 +149,8 @@ pub(crate) enum Rep {
     Bool,
     /// A raw-bits value `bN`: the pattern zero-extended in an `i64`.
     Bits(BitsWidth),
-    /// `lista<T>`: a pointer to a runtime list of tagged elements.
+    /// A `lista<T>` or a host-lowered register vector: a pointer to a runtime
+    /// list of tagged elements. Vector binds duplicate this carrier at stores.
     List,
     /// A `genus` instance: a pointer to a runtime record.
     Record,
@@ -272,6 +273,12 @@ pub(crate) fn rep_of(table: &TypeTable, ty: MirType) -> Lowered<Rep> {
             }
             rep_of(table, MirType::semantic(*inner))?;
             Ok(Rep::Opt)
+        }
+        // The CLIF host subset carries fixed-width vectors as tagged lists;
+        // vector stores duplicate them, and lane projections use list access.
+        Type::Vector(element, _) => {
+            rep_of(table, MirType::semantic(*element))?;
+            Ok(Rep::List)
         }
         Type::Array(element) | Type::BoundedArray { element, .. } | Type::Cursor(element) => {
             rep_of(table, MirType::semantic(*element))?;
@@ -1048,6 +1055,13 @@ impl FunctionLower<'_, '_> {
                 let zero = self.builder.ins().iconst(types::I64, 0);
                 self.call_runtime(&abi::LIST_GET, &[current, zero])?
             }
+            MirProjection::VectorLane(lane) => {
+                if current_rep != Rep::List {
+                    return Err(Decline::new("lane of a non-vector"));
+                }
+                let lane = self.builder.ins().iconst(types::I64, i64::from(*lane));
+                self.call_runtime(&abi::LIST_GET, &[current, lane])?
+            }
             MirProjection::Index(index) | MirProjection::ProvenIndex(index)
                 if current_rep == Rep::Map =>
             {
@@ -1286,9 +1300,9 @@ impl FunctionLower<'_, '_> {
     /// The element type of a list type.
     fn element_type(&self, list: MirType) -> Lowered<MirType> {
         match resolve(self.state.input.types, list.semantic_id()) {
-            Type::Array(element) | Type::BoundedArray { element, .. } => {
-                Ok(MirType::semantic(*element))
-            }
+            Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::Vector(element, _) => Ok(MirType::semantic(*element)),
             Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti) => {
                 convert::byte_element(self.state.input.types)
                     .map(MirType::semantic)
@@ -1426,6 +1440,7 @@ impl FunctionLower<'_, '_> {
                     _ => self.element_type(ty),
                 }
             }
+            MirProjection::VectorLane(_) => self.element_type(ty),
             MirProjection::Field(name) => Ok(self.field_slot(ty, *name)?.1),
             MirProjection::VariantField { variant, field } => {
                 Ok(self.variant_slot(*variant, *field)?.1)
@@ -1864,6 +1879,13 @@ impl FunctionLower<'_, '_> {
         let tag = self.cell_tag_value(rep, cell_ty)?;
         let bits = self.element_bits(value, rep);
         match last {
+            MirProjection::VectorLane(lane) => {
+                if handle_rep != Rep::List {
+                    return Err(Decline::new("lane of a non-vector"));
+                }
+                let lane = self.builder.ins().iconst(types::I64, i64::from(*lane));
+                self.call_runtime(&abi::LIST_SET, &[handle, lane, tag, bits])?;
+            }
             MirProjection::Index(last_index) | MirProjection::ProvenIndex(last_index)
                 if handle_rep == Rep::Map =>
             {
@@ -3998,6 +4020,22 @@ impl FunctionLower<'_, '_> {
             }
             other => other,
         };
+        let computed = if place.projections.is_empty()
+            && matches!(
+                resolve(
+                    self.state.input.types,
+                    self.place_type(place)?.semantic_id()
+                ),
+                Type::Vector(..)
+            ) {
+            let Some(value) = computed else {
+                return Err(Decline::new("unit vector assignment"));
+            };
+            let tag = self.builder.ins().iconst(types::I32, abi::TAG_LIST);
+            self.call_runtime(&abi::DUPLICATE, &[tag, value])?
+        } else {
+            computed
+        };
         if !place.projections.is_empty() {
             let Some(computed) = computed else {
                 return Err(Decline::new("unit element store"));
@@ -4045,7 +4083,11 @@ impl FunctionLower<'_, '_> {
             MirStatementKind::Construct {
                 destination,
                 aggregate,
-            } if aggregate.kind == MirAggregateKind::Array => {
+            } if matches!(
+                aggregate.kind,
+                MirAggregateKind::Array | MirAggregateKind::Vector
+            ) =>
+            {
                 self.construct_array(destination, aggregate)
             }
             MirStatementKind::Construct {

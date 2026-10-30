@@ -556,7 +556,9 @@ impl TypeChecker<'_> {
     /// copies.
     fn is_shareable_payload(&self, ty: TypeId) -> bool {
         let ty = self.resolve_inferred_type(ty);
-        if self.types.is_aliasing_container_through_option(ty) {
+        // A register-class `vector`/`matrix` copies on a plain bind (operator
+        // ruling 7b25889f R1), so it is never a shared payload.
+        if self.types.binds_by_sharing_through_option(ty) {
             return true;
         }
         match self.types.get(ty) {
