@@ -68,7 +68,7 @@ pub(crate) unsafe fn raw(handle: *const u8) -> (i128, u32) {
 ///
 /// `handle` came from this module.
 unsafe fn parts(handle: *const u8) -> (i128, u32) {
-    let dec = unsafe { &*handle.cast::<Dec>() };
+    let dec = unsafe { handle.cast::<Dec>().read_unaligned() };
     (dec.carrier, dec.scale)
 }
 
@@ -183,16 +183,16 @@ pub(crate) unsafe fn text(handle: *const u8) -> String {
 /// A stored carrier (scale 8) as a decimal.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_dec_stored(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     carrier: i64,
 ) -> *const u8 {
-    make(_arena, i128::from(carrier), STORED_SCALE)
+    make(arena, i128::from(carrier), STORED_SCALE)
 }
 
 /// An integer (scale 0) as a decimal.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_dec_int(_arena: *const super::Arena, value: i64) -> *const u8 {
-    make(_arena, i128::from(value), 0)
+pub extern "C" fn __faber_clif_v1_dec_int(arena: *const super::Arena, value: i64) -> *const u8 {
+    make(arena, i128::from(value), 0)
 }
 
 /// `left op right` for `op` 0 `+`, 1 `-`, 2 `*`, 3 `/`, 4 `%`.
@@ -202,7 +202,7 @@ pub extern "C" fn __faber_clif_v1_dec_int(_arena: *const super::Arena, value: i6
 /// Both handles came from this module.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_dec_binary(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     left: *const u8,
     right: *const u8,
     op: i32,
@@ -240,7 +240,7 @@ pub unsafe extern "C" fn __faber_clif_v1_dec_binary(
             (floor_rem_checked(x, y), scale)
         }
     };
-    make(_arena, carrier, scale)
+    make(arena, carrier, scale)
 }
 
 /// `-value`.
@@ -250,15 +250,11 @@ pub unsafe extern "C" fn __faber_clif_v1_dec_binary(
 /// `value` came from this module.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_dec_neg(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     value: *const u8,
 ) -> *const u8 {
     let (carrier, scale) = unsafe { parts(value) };
-    make(
-        _arena,
-        carrier.checked_neg().unwrap_or_else(overflow),
-        scale,
-    )
+    make(arena, carrier.checked_neg().unwrap_or_else(overflow), scale)
 }
 
 /// Three-way comparison: -1, 0 or 1.
@@ -287,7 +283,7 @@ pub unsafe extern "C" fn __faber_clif_v1_dec_compare(
 /// `value` came from this module.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_dec_store(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     value: *const u8,
 ) -> *const u8 {
     let (carrier, scale) = unsafe { parts(value) };
@@ -297,7 +293,7 @@ pub unsafe extern "C" fn __faber_clif_v1_dec_store(
         pow10(STORED_SCALE - scale).and_then(|factor| carrier.checked_mul(factor))
     };
     match rounded.and_then(|rounded| i64::try_from(rounded).ok()) {
-        Some(stored) => make(_arena, i128::from(stored), STORED_SCALE),
+        Some(stored) => make(arena, i128::from(stored), STORED_SCALE),
         None => std::ptr::null(),
     }
 }
@@ -309,10 +305,10 @@ pub unsafe extern "C" fn __faber_clif_v1_dec_store(
 /// `value` came from this module.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_dec_text(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     value: *const u8,
 ) -> *const u8 {
-    text_new(_arena, unsafe { text(value) }.as_bytes())
+    text_new(arena, unsafe { text(value) }.as_bytes())
 }
 
 /// End the run with a store trap for a decimal outside its slot.
@@ -454,11 +450,11 @@ fn from_carrier(arena: *const super::Arena, result: Result<i64, i32>) -> *const 
 /// value does not fit.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_dec_from_int(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     value: i64,
 ) -> *const u8 {
     from_carrier(
-        _arena,
+        arena,
         i128::from(value)
             .checked_mul(100_000_000)
             .and_then(|carrier| i64::try_from(carrier).ok())
@@ -470,10 +466,10 @@ pub extern "C" fn __faber_clif_v1_dec_from_int(
 /// (status 1 or 2) when it is not a decimal number or does not fit.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_dec_from_float(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     value: f64,
 ) -> *const u8 {
-    from_carrier(_arena, text_carrier(&value.to_string()))
+    from_carrier(arena, text_carrier(&value.to_string()))
 }
 
 /// A text converted to a stored decimal; null (status 1 or 2) when malformed
@@ -484,11 +480,11 @@ pub extern "C" fn __faber_clif_v1_dec_from_float(
 /// `text` is a well-formed text handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_dec_from_text(
-    _arena: *const super::Arena,
+    arena: *const super::Arena,
     text: *const u8,
 ) -> *const u8 {
     let source = super::text_str(unsafe { super::text_bytes(text) });
-    from_carrier(_arena, text_carrier(&source))
+    from_carrier(arena, text_carrier(&source))
 }
 
 /// A decimal as a float; `narrow` rounds it through `f32`.
