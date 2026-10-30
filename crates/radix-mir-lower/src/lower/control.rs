@@ -4475,8 +4475,10 @@ impl FunctionBuilder<'_> {
             // Route B (AEU-4): runtime-len `lista<T, magnitudo N>` lowers in the base
             // lane to a static split on the carrier `len` with N+1
             // guard-free arms (total N(N+1)/2 lanes). The N <= 10
-            // code-size cap keeps the split bounded; non-literal capacities
-            // (shape-generics) and N > 10 fall through to Unsupported.
+            // code-size cap keeps the split bounded; above the cap, and for
+            // non-literal capacities (shape-generics), the value loop lowers
+            // as the plain runtime-length loop an unbounded lista uses
+            // instead of declining.
             // `de` binds the index, not a lane, so it is a plain index loop
             // over the runtime length: the same shape as an unbounded lista,
             // independent of any literal capacity.
@@ -4487,14 +4489,14 @@ impl FunctionBuilder<'_> {
             }
             Type::BoundedArray { element, capacity } => {
                 let literal_n = if matches!(mode, HirIteraMode::Ex) {
-                    i64s_from_literal_index(*capacity, self.types)
-                        .and_then(|dims| dims.first().copied())
-                        .filter(|n| (0..=10).contains(n))
+                    i64s_from_literal_index(*capacity, self.types).and_then(|dims| dims.first().copied())
                 } else {
                     None
                 };
                 match literal_n {
-                    Some(n) => CollectionIteraKind::BoundedArray(*element, n),
+                    Some(n) if (0..=10).contains(&n) => CollectionIteraKind::BoundedArray(*element, n),
+                    Some(_) => CollectionIteraKind::Array(*element),
+                    None if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::Array(*element),
                     None => CollectionIteraKind::Unsupported,
                 }
             }
