@@ -53,11 +53,24 @@ fn semantic_error_message(source_file: &crate::driver::SourceFile, err: &crate::
 /// Tokenize source and return the lex inspection JSON payload.
 #[must_use]
 pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    lex_inspection_for_source_with_config(name, source, &crate::driver::Config::default())
+}
+
+/// [`lex_inspection_for_source`] under a caller-owned locale policy: the
+/// frontmatter locale resolves through `locale_config`'s root and product
+/// loader, so a product binary inspects a declared locale with no workspace
+/// `locale/` tree beside it.
+#[must_use]
+pub fn lex_inspection_for_source_with_config(
+    name: &str,
+    source: &str,
+    locale_config: &crate::driver::Config,
+) -> SourceInspection {
     let source_file = match source_file(name.to_owned(), source.to_owned()) {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let result = match lex_reader_surface(&source_file) {
+    let result = match lex_reader_surface(&source_file, locale_config) {
         Ok(result) => result,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
@@ -65,15 +78,21 @@ pub fn lex_inspection_for_source(name: &str, source: &str) -> SourceInspection {
 }
 
 /// Lex the peeled body under the file's own frontmatter reader locale, as check
-/// and compile do; no frontmatter locale falls back to the no-locale default.
-fn lex_reader_surface(source_file: &crate::driver::SourceFile) -> Result<crate::lexer::LexResult, String> {
-    let pack = match crate::program::compile::frontmatter_locale_pack_from_frontmatter(
-        &crate::driver::Config::default(),
+/// and compile do; no frontmatter locale falls back to the session pack, then
+/// the no-locale default. A declared locale that cannot be resolved under
+/// `locale_config` is an error — never a silent read in another surface.
+fn lex_reader_surface(
+    source_file: &crate::driver::SourceFile,
+    locale_config: &crate::driver::Config,
+) -> Result<crate::lexer::LexResult, String> {
+    let declared = crate::program::compile::frontmatter_locale_pack_from_frontmatter(
+        locale_config,
         source_file.frontmatter.as_ref(),
-    ) {
+    )
+    .map_err(|diagnostic| format!("error: {}", diagnostic.message))?;
+    let pack = match declared.or_else(|| locale_config.locale_pack.clone()) {
         Some(pack) => pack,
-        None => crate::driver::default_code_pack(&crate::driver::Config::default())
-            .map_err(|diagnostic| diagnostic.message)?,
+        None => crate::driver::default_code_pack(locale_config).map_err(|diagnostic| diagnostic.message)?,
     };
     Ok(crate::lexer::lex_with_locale_pack(source_file.content.as_str(), &pack))
 }
@@ -150,11 +169,22 @@ fn token_kind_display(kind: &crate::lexer::TokenKind) -> String {
 /// Parse source and return the AST inspection JSON payload.
 #[must_use]
 pub fn parse_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    parse_inspection_for_source_with_config(name, source, &crate::driver::Config::default())
+}
+
+/// [`parse_inspection_for_source`] under a caller-owned locale policy (see
+/// [`lex_inspection_for_source_with_config`]).
+#[must_use]
+pub fn parse_inspection_for_source_with_config(
+    name: &str,
+    source: &str,
+    locale_config: &crate::driver::Config,
+) -> SourceInspection {
     let source_file = match source_file(name.to_owned(), source.to_owned()) {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let lex_result = match lex_reader_surface(&source_file) {
+    let lex_result = match lex_reader_surface(&source_file, locale_config) {
         Ok(result) => result,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
@@ -232,17 +262,29 @@ fn write_parse_ast_json(out: &mut String, program: &crate::syntax::Program, inte
 /// Lower parsed source to HIR and return the inspection JSON payload.
 #[must_use]
 pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    hir_inspection_for_source_with_config(name, source, &crate::driver::Config::default())
+}
+
+/// [`hir_inspection_for_source`] under a caller-owned locale policy (see
+/// [`lex_inspection_for_source_with_config`]); the session the import
+/// contract walk mints carries the same root and loader.
+#[must_use]
+pub fn hir_inspection_for_source_with_config(
+    name: &str,
+    source: &str,
+    locale_config: &crate::driver::Config,
+) -> SourceInspection {
     let source_file = match source_file(name.to_owned(), source.to_owned()) {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let (mut program, mut interner) = match parse_inspect_program(&source_file) {
+    let (mut program, mut interner) = match parse_inspect_program(&source_file, locale_config) {
         Ok(parsed) => parsed,
         Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
     };
     // Imports resolve as check does: the program layer discovers the import
     // contract for an on-disk source (in-memory names keep an empty one).
-    let session = crate::driver::Session::new(crate::driver::Config::default().with_dev_locale_root());
+    let session = crate::driver::Session::new(locale_config.clone());
     let prepared = match crate::program::prepare_program_module_for_name(&source_file.name, source, &session) {
         Ok(prepared) => prepared,
         Err(diagnostic) => {
@@ -255,10 +297,11 @@ pub fn hir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
     };
     let contract = prepared.contract;
     crate::program::apply_default_import_names(&mut program, &mut interner, &contract.default_import_names);
-    let (mut resolver, mut types) = match prepare_hir_prerequisites(&source_file, &program, &mut interner, &contract) {
-        Ok(ready) => ready,
-        Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
-    };
+    let (mut resolver, mut types) =
+        match prepare_hir_prerequisites(&source_file, &program, &mut interner, &contract, locale_config) {
+            Ok(ready) => ready,
+            Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
+        };
     let (lowered, errors) = crate::hir::lower(crate::hir::LowerRequest {
         program: &program,
         resolver: &mut resolver,
@@ -413,11 +456,22 @@ fn format_mir_errors(source_file: &crate::driver::SourceFile, errors: Vec<crate:
 /// Analyze CLI annotations and return the normalized CLI IR JSON payload.
 #[must_use]
 pub fn cli_ir_inspection_for_source(name: &str, source: &str) -> SourceInspection {
+    cli_ir_inspection_for_source_with_config(name, source, &crate::driver::Config::default())
+}
+
+/// [`cli_ir_inspection_for_source`] under a caller-owned locale policy (see
+/// [`lex_inspection_for_source_with_config`]).
+#[must_use]
+pub fn cli_ir_inspection_for_source_with_config(
+    name: &str,
+    source: &str,
+    locale_config: &crate::driver::Config,
+) -> SourceInspection {
     let source_file = match source_file(name.to_owned(), source.to_owned()) {
         Ok(file) => file,
         Err(error) => return SourceInspection { text: String::new(), success: false, errors: vec![error] },
     };
-    let (program, interner) = match parse_inspect_program(&source_file) {
+    let (program, interner) = match parse_inspect_program(&source_file, locale_config) {
         Ok(parsed) => parsed,
         Err(errors) => return SourceInspection { text: String::new(), success: false, errors },
     };
@@ -431,8 +485,9 @@ pub fn cli_ir_inspection_for_source(name: &str, source: &str) -> SourceInspectio
 
 fn parse_inspect_program(
     source_file: &crate::driver::SourceFile,
+    locale_config: &crate::driver::Config,
 ) -> Result<(crate::syntax::Program, crate::lexer::Interner), Vec<String>> {
-    let lex_result = lex_reader_surface(source_file).map_err(|error| vec![error])?;
+    let lex_result = lex_reader_surface(source_file, locale_config).map_err(|error| vec![error])?;
     if !lex_result.success() {
         return Err(lexer_error_lines(source_file, &lex_result.errors));
     }
@@ -487,6 +542,7 @@ fn prepare_hir_prerequisites(
     program: &crate::syntax::Program,
     interner: &mut crate::lexer::Interner,
     contract: &crate::driver::ModuleImportContract,
+    locale_config: &crate::driver::Config,
 ) -> Result<(crate::semantic::Resolver, crate::semantic::TypeTable), Vec<String>> {
     let mut resolver = crate::semantic::Resolver::new();
     let mut types = crate::semantic::TypeTable::new();
@@ -506,9 +562,11 @@ fn prepare_hir_prerequisites(
     // Import bindings install after collection (as in the full pipeline) and
     // under the source's own reader locale; an unsupported export is skipped.
     let pack = crate::program::compile::frontmatter_locale_pack_from_frontmatter(
-        &crate::driver::Config::default(),
+        locale_config,
         source_file.frontmatter.as_ref(),
-    );
+    )
+    .ok()
+    .flatten();
     if let Err(error) = resolver.set_file_interfaces_from_snapshots_with_locale(
         &contract.file_interfaces,
         interner,
