@@ -159,7 +159,7 @@ impl<'s> Scope<'s> {
                 }
                 ImportedReferenceKind::Call => {
                     match top_level_function(&target.analysis, &member) {
-                        Some(def_id) => self.function(Home::Package(target_id.clone()), def_id),
+                        Some(def_id) => self.function(&Home::Package(target_id.clone()), def_id),
                         None => ImportedCallee::Unavailable,
                     }
                 }
@@ -206,7 +206,7 @@ impl<'s> Scope<'s> {
         let Some(def_id) = genus_method(&home.analysis, &genus, &method) else {
             return ImportedCallee::Unavailable;
         };
-        self.function(Home::Package(home_id.clone()), def_id)
+        self.function(&Home::Package(home_id.clone()), def_id)
     }
 
     /// The local edge of `module_id` whose installed file interface exports
@@ -279,15 +279,15 @@ impl<'s> Scope<'s> {
                 if !function_has_body(analysis, def_id) {
                     return ImportedCallee::Unavailable;
                 }
-                self.function(Home::Library(key), def_id)
+                self.function(&Home::Library(key), def_id)
             }
             ImportedReferenceKind::Method => ImportedCallee::Unavailable,
         }
     }
 
     /// The effect of one function, memoized with a cycle guard.
-    fn function(&mut self, home: Home, def_id: DefId) -> ImportedCallee {
-        let key = (home.clone(), def_id);
+    fn function(&mut self, home: &Home, def_id: DefId) -> ImportedCallee {
+        let key = ((*home).clone(), def_id);
         if let Some(known) = self.memo.done.get(&key) {
             return known.clone();
         }
@@ -299,7 +299,7 @@ impl<'s> Scope<'s> {
         }
         let nodes: &'s BTreeMap<ModuleId, AnalyzedProgramNode> = self.nodes;
         let libraries: &'s LibraryBodies = self.libraries;
-        let module = match &home {
+        let module = match home {
             Home::Package(module_id) => nodes.get(module_id).map(|node| &node.analysis),
             Home::Library(key) => libraries.get(key),
         };
@@ -314,7 +314,7 @@ impl<'s> Scope<'s> {
                 nodes,
                 imports: self.imports,
                 libraries,
-                from: home.clone(),
+                from: (*home).clone(),
                 memo: &mut *self.memo,
             };
             function_effect(

@@ -789,10 +789,10 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             cause_issue,
         } => installed_manifest_invalid_diagnostic(
             file,
-            specifier,
-            provider,
-            manifest_path,
-            reason,
+            &specifier,
+            &provider,
+            &manifest_path,
+            &reason,
             cause_issue,
         ),
         LibraryResolveError::InstalledSourceRootMissing {
@@ -813,7 +813,13 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             package,
             expected_path,
             known_modules,
-        } => unknown_module_diagnostic(file, specifier, package, expected_path, known_modules),
+        } => unknown_module_diagnostic(
+            file,
+            &specifier,
+            &package,
+            &expected_path,
+            &known_modules,
+        ),
         // Uncoded on purpose: the standing renderer contract prints prose
         // for coded non-Codegen diagnostics only through locale-pack
         // templates, and no pack carries a PKG001 template — coding this arm
@@ -835,7 +841,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
             specifier,
             provider,
             version,
-        } => locked_package_missing_diagnostic(file, specifier, provider, version),
+        } => locked_package_missing_diagnostic(file, &specifier, &provider, version.as_deref()),
         LibraryResolveError::ProviderUndeclared {
             specifier,
             provider,
@@ -851,10 +857,10 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
 
 fn unknown_module_diagnostic(
     file: &Path,
-    specifier: String,
-    package: String,
-    expected_path: PathBuf,
-    known_modules: Vec<String>,
+    specifier: &str,
+    package: &str,
+    expected_path: &Path,
+    known_modules: &[String],
 ) -> Diagnostic {
     crate::package_diagnostic_error(format!(
         "unknown library module `{specifier}` for provider `{package}`; expected {}; known modules: {}",
@@ -863,20 +869,19 @@ fn unknown_module_diagnostic(
     ))
     .with_file(file.display().to_string())
     .with_arg("issue", "unknown_library_module")
-    .with_arg("specifier", specifier)
-    .with_arg("provider", package)
+    .with_arg("specifier", specifier.to_owned())
+    .with_arg("provider", package.to_owned())
     .with_arg("expected_path", expected_path.display().to_string())
     .with_arg("known_modules", known_modules.join(","))
 }
 
 fn locked_package_missing_diagnostic(
     file: &Path,
-    specifier: String,
-    provider: String,
-    version: Option<String>,
+    specifier: &str,
+    provider: &str,
+    version: Option<&str>,
 ) -> Diagnostic {
     let version_hint = version
-        .as_deref()
         .map(|v| format!(" (`{provider} = \"{v}\"`)"))
         .unwrap_or_default();
     crate::package_diagnostic_error(format!(
@@ -884,16 +889,16 @@ fn locked_package_missing_diagnostic(
     ))
     .with_file(file.display().to_string())
     .with_arg("issue", "missing_locked_package")
-    .with_arg("specifier", specifier)
-    .with_arg("provider", provider)
+    .with_arg("specifier", specifier.to_owned())
+    .with_arg("provider", provider.to_owned())
 }
 
 fn installed_manifest_invalid_diagnostic(
     file: &Path,
-    specifier: String,
-    provider: String,
-    manifest_path: PathBuf,
-    reason: String,
+    specifier: &str,
+    provider: &str,
+    manifest_path: &Path,
+    reason: &str,
     cause_issue: Option<Box<str>>,
 ) -> Diagnostic {
     let diagnostic = crate::package_diagnostic_error(format!(
@@ -902,8 +907,8 @@ fn installed_manifest_invalid_diagnostic(
     ))
     .with_file(file.display().to_string())
     .with_arg("issue", "invalid_installed_library_manifest")
-    .with_arg("specifier", specifier)
-    .with_arg("provider", provider)
+    .with_arg("specifier", specifier.to_owned())
+    .with_arg("provider", provider.to_owned())
     .with_arg("manifest_path", manifest_path.display().to_string());
     match cause_issue {
         Some(cause) => diagnostic.with_arg("cause_issue", cause.into_string()),

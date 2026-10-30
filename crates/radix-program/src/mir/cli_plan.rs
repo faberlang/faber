@@ -160,7 +160,8 @@ pub(super) fn plan_fmir_text_runtime_cli_root_entry(
             "fmir-text runtime CLI options",
         ));
     }
-    let exit_code = package_mir_cli_exit_code(&cli_program.exit, None, &[], unit, diagnostics)?;
+    let exit_code =
+        package_mir_cli_exit_code(cli_program.exit.as_ref(), None, &[], unit, diagnostics);
     let operands = cli_program
         .global_operands
         .iter()
@@ -311,7 +312,7 @@ pub(super) fn fmir_text_cli_placeholder_record_value(
     ty: &FmirTextCliValueType,
 ) -> Option<MirRuntimeRecordValue> {
     if *ty == FmirTextCliValueType::ListaTextus {
-        let list_ty = cli_record_type(&mut unit.analysis.types, &operand.ty, operand.rest)?;
+        let list_ty = cli_record_type(&mut unit.analysis.types, &operand.ty, operand.rest);
         return Some(MirRuntimeRecordValue::Array {
             ty: MirType::semantic(list_ty),
             items: Vec::new(),
@@ -460,11 +461,17 @@ fn finish_cli_root_entry(
             ));
             return None;
         }
-        let exit_code = package_mir_cli_exit_code(&cli_program.exit, None, &[], unit, diagnostics)?;
+        let exit_code =
+            package_mir_cli_exit_code(cli_program.exit.as_ref(), None, &[], unit, diagnostics);
         return Some((HashMap::new(), exit_code));
     };
-    let exit_code =
-        package_mir_cli_exit_code(&cli_program.exit, args_name, &fields, unit, diagnostics)?;
+    let exit_code = package_mir_cli_exit_code(
+        cli_program.exit.as_ref(),
+        args_name,
+        &fields,
+        unit,
+        diagnostics,
+    );
     Some((HashMap::from([(record_ty, fields)]), exit_code))
 }
 
@@ -1037,7 +1044,7 @@ pub(super) fn selected_command_record_type_rewrite(
     let mut fields = Vec::new();
     for (name, ty, rest, nullable) in field_names {
         let symbol = entry.analysis.interner.intern(&name);
-        let mut ty = cli_record_type(&mut entry.analysis.types, &ty, rest)?;
+        let mut ty = cli_record_type(&mut entry.analysis.types, &ty, rest);
         if nullable {
             ty = entry.analysis.types.option(ty);
         }

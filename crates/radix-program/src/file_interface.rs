@@ -145,7 +145,7 @@ pub fn extract_file_interface_with_identity(
             &analysis.resolver,
             export_identity.map(identity_for).as_ref(),
         )
-        .map_err(|err| interface_error(file_label, &name, err))?;
+        .map_err(|err| interface_error(file_label, &name, &err))?;
         interface.insert(FileExport {
             name,
             kind: FileExportKind::Function(callable),
@@ -161,7 +161,7 @@ pub fn extract_file_interface_with_identity(
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, "@ ad route", err))?;
+    .map_err(|err| interface_error(file_label, "@ ad route", &err))?;
 
     Ok(interface)
 }
@@ -285,7 +285,7 @@ fn snapshot_alias(
             &analysis.resolver,
             export_identity.map(identity_for).as_ref(),
         )
-        .map_err(|err| interface_error(file_label, &name, err))?,
+        .map_err(|err| interface_error(file_label, &name, &err))?,
     })
 }
 
@@ -423,7 +423,7 @@ fn snapshot_public_field(
         modifier: None,
         visibility: MemberVisibility::Publica,
     })
-    .map_err(|err| interface_error(file_label, label, err))
+    .map_err(|err| interface_error(file_label, label, &err))
 }
 
 fn identity_for(ctx: &ExportIdentityContext) -> InterfaceLibraryIdentity {
@@ -470,7 +470,7 @@ fn snapshot_interface_method(
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, interface_name, err))?;
+    .map_err(|err| interface_error(file_label, interface_name, &err))?;
     callable.set_axis_params(
         &method
             .params
@@ -503,7 +503,7 @@ fn snapshot_struct(
                     &analysis.resolver,
                     export_identity.map(identity_for).as_ref(),
                 )
-                .map_err(|err| interface_error(file_label, name, err))?,
+                .map_err(|err| interface_error(file_label, name, &err))?,
                 optional: field.sponte,
                 required: !field.sponte && field.init.is_none(),
                 default: field
@@ -517,7 +517,7 @@ fn snapshot_struct(
                             &analysis.resolver,
                             export_identity.map(identity_for).as_ref(),
                         )
-                        .map_err(|err| interface_error(file_label, name, err))
+                        .map_err(|err| interface_error(file_label, name, &err))
                     })
                     .transpose()?,
                 modifier: field.modifier,
@@ -626,7 +626,7 @@ fn snapshot_struct_method(
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, struct_name, err))?;
+    .map_err(|err| interface_error(file_label, struct_name, &err))?;
     callable.set_axis_params(
         &method
             .func
@@ -720,7 +720,7 @@ fn snapshot_function(
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, name, err))?;
+    .map_err(|err| interface_error(file_label, name, &err))?;
     callable.set_axis_params(
         &func
             .params
@@ -751,7 +751,7 @@ fn snapshot_function(
                 return Err(interface_error(
                     file_label,
                     name,
-                    FileInterfaceError::TensorEdgePolicyRequirementUnsupported,
+                    &FileInterfaceError::TensorEdgePolicyRequirementUnsupported,
                 ));
             };
             Ok(InterfaceTensorEdgePolicyRequirement {
@@ -763,7 +763,7 @@ fn snapshot_function(
                     &analysis.resolver,
                     export_identity.map(identity_for).as_ref(),
                 )
-                .map_err(|err| interface_error(file_label, name, err))?,
+                .map_err(|err| interface_error(file_label, name, &err))?,
                 rank: requirement.rank,
             })
         })
@@ -827,7 +827,7 @@ fn snapshot_const(
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, name, err))
+    .map_err(|err| interface_error(file_label, name, &err))
 }
 
 fn param_mode(mode: HirParamMode) -> SemanticParamMode {
@@ -870,7 +870,7 @@ fn reject_signature_only_fragment(
     Ok(())
 }
 
-fn interface_error(file_label: &str, export_name: &str, err: FileInterfaceError) -> Diagnostic {
+fn interface_error(file_label: &str, export_name: &str, err: &FileInterfaceError) -> Diagnostic {
     // Uncoded on purpose (P2): the standing renderer contract renders prose
     // for coded non-Codegen diagnostics only through locale-pack templates,
     // and no pack carries a PKG001 template — a coded diagnostic here renders
