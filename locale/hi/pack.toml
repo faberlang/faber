@@ -3580,6 +3580,14 @@ help = "स्वतंत्र मान के लिए `{varia} {name} ← 
 message = "`{name}` केवल-पठन मान `{binding}` को लिखने योग्य नाम के रूप में साझा करेगा (`{fixum}` गहरा है)"
 help = "स्वतंत्र मान के लिए `{varia} {name} ← {copy} {binding}` लिखें, या उसे अपने अधीन लेने के लिए `{varia} {name} ← {own} {binding}`"
 
+[diagnostics.SEM066]
+message = "`copy` अस्वीकृत: {head} की प्रतिलिपि नहीं बन सकती{?path| — सदस्य पथ है `|`}"
+help = "{head} एक पहचान वाला संसाधन है: मान को `{copy}` के बिना साझा करें, या संसाधन को `{own}` से अपने अधिकार में लें जहाँ उपभोक्ता उसे रख सके"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` अस्वीकृत: {head} की प्रतिलिपि नहीं बन सकती{?path| — सदस्य पथ है `|`}"
+help = "{head} एक पहचान वाला संसाधन है: मान को `{copy}` के बिना साझा करें, या संसाधन को `{own}` से अपने अधिकार में लें जहाँ उपभोक्ता उसे रख सके"
+
 [diagnostics.WARN001]
 message = "अप्रयुक्त variable"
 help = "variable हटाएँ या उसके आगे '_' लगाएँ"

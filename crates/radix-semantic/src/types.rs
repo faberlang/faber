@@ -90,6 +90,10 @@ pub const ISSUE_SHARED_INTO_OWN: &str = "shared_into_own";
 /// Suggested spelling attached to every illegal own-bind.
 pub const SUGGESTION_COPY: &str = "copy";
 
+/// A `copy` acquisition whose value transitively holds a member that cannot
+/// be duplicated (a conversation handle or another closable resource).
+pub const ISSUE_COPY_NONDUPLICABLE_MEMBER: &str = "copy_nonduplicable_member";
+
 /// Map a type-position syntax marker onto the type-table access fact.
 #[must_use]
 pub fn access_marker_from_type_mode(mode: radix_syntax::TypeMode) -> AccessMarker {

@@ -1006,16 +1006,21 @@ impl TypeChecker<'_> {
                 let ty = self.check_expr_with_expected(inner, expected);
                 if matches!(marker, radix_hir::HirArgMarker::Copy)
                     && ty != self.error_type
-                    && self
-                        .types
-                        .is_scalar_for_access_marker(self.resolve_inferred_type(ty))
                 {
-                    self.error_issue_with_args(
-                        SemanticErrorKind::LoweringError,
-                        crate::ISSUE_SCALAR_ACCESS_MARKER,
-                        inner_span,
-                        &[],
-                    );
+                    let resolved = self.resolve_inferred_type(ty);
+                    if self.types.is_scalar_for_access_marker(resolved) {
+                        self.error_issue_with_args(
+                            SemanticErrorKind::LoweringError,
+                            crate::ISSUE_SCALAR_ACCESS_MARKER,
+                            inner_span,
+                            &[],
+                        );
+                    } else {
+                        // Ruling 7b25889f R5: a deep duplicate must never
+                        // silently share a member with identity.
+                        let (_, payload) = self.types.peel_access_marker(resolved);
+                        self.refuse_copy_of_nonduplicable(payload, inner_span);
+                    }
                 }
                 ty
             }

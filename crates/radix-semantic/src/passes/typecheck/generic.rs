@@ -257,6 +257,10 @@ impl TypeChecker<'_> {
         markers: bool,
         axis_override: Option<&[bool]>,
     ) -> TypeId {
+        // The callee's declared parameter types, captured before any call-site
+        // instantiation: a generic `copy` parameter decides duplicability at
+        // the concrete argument (the `copy_nonduplicable_member` call site).
+        let declared_params: Vec<TypeId> = sig.params.iter().map(|param| param.ty).collect();
         // Size-type Z3 (Q3): `_` extent holes in a callee signature are
         // anonymous size parameters chosen per call. The declared signature
         // term is interned once, so its holes must be re-instantiated at the
@@ -331,7 +335,12 @@ impl TypeChecker<'_> {
             let axis_key = callee.or(if user_function { None } else { policy_callee });
             axis_key.and_then(|key| self.axis_params.get(&key).cloned())
         });
-        if self.check_call_args_lifting(&sig, args, span, user_function, markers, axis.as_deref()) {
+        let previous_declared_params =
+            std::mem::replace(&mut self.current_call_declared_params, declared_params);
+        let lifted =
+            self.check_call_args_lifting(&sig, args, span, user_function, markers, axis.as_deref());
+        self.current_call_declared_params = previous_declared_params;
+        if lifted {
             return expected.unwrap_or(self.error_type);
         }
         // A result that only needs a checked integer store to reach the slot

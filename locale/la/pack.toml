@@ -4881,6 +4881,14 @@ help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, au
 message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
 help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
 
+[diagnostics.SEM066]
+message = "`copy` recusatur: {head} duplicari non potest{?path| — semita membrorum est `|`}"
+help = "{head} res cum identitate est: valorem sine `{copy}` communicato, aut rem cum `{own}` suscipe ubi accipiens eam possidere potest"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` recusatur: {head} duplicari non potest{?path| — semita membrorum est `|`}"
+help = "{head} res cum identitate est: valorem sine `{copy}` communicato, aut rem cum `{own}` suscipe ubi accipiens eam possidere potest"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"

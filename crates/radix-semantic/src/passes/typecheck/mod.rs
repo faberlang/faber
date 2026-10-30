@@ -189,6 +189,7 @@ mod text_get_test;
 
 mod bits;
 mod closing;
+mod duplicability;
 #[cfg(test)]
 #[path = "construction_source_test.rs"]
 mod construction_source_test;
@@ -469,6 +470,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Well-formed `implet` contracts with their type arguments, keyed by
     /// struct def (D1.2). Bound satisfaction compares against these (D1.3).
     pub implemented_contracts: FxHashMap<DefId, Vec<radix_types::ContractRef>>,
+
+    /// The callee's declared (pre-instantiation) parameter types for the call
+    /// whose arguments are being checked. A generic `copy` parameter decides
+    /// duplicability at the call's concrete argument, not at its declaration.
+    pub current_call_declared_params: Vec<TypeId>,
 
     /// `implet` bounds of the generic parameters on the body currently being
     /// checked (D1.1): bound members are callable on a `T` receiver, and a
@@ -951,6 +957,7 @@ impl<'a> TypeChecker<'a> {
             struct_implements: Vec::new(),
             implemented_interfaces: FxHashMap::default(),
             implemented_contracts: FxHashMap::default(),
+            current_call_declared_params: Vec::new(),
             current_generic_bounds: FxHashMap::default(),
             next_hir_id: u32::MAX / 2,
             next_synthetic_def: radix_types::HIR_SYNTHETIC_DEF_ID_BASE,
