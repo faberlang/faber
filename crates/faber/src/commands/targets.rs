@@ -53,8 +53,9 @@ fn faber_target_row_specs() -> Result<Vec<FaberTargetRowSpec>, String> {
         ) {
             // Hidden CLI spellings — not discoverable `faber targets` rows:
             // the legacy source-backed scena runtime; the `clif-jit` engine,
-            // which is the `clif` row's in-memory run route; and the
-            // `runner` interpreter, which is the default `faber run` route.
+            // which is the `clif` row's in-memory run route and the default
+            // engine of a plain `faber run`; and the `runner` interpreter,
+            // which is that route's fallback and the `--target runner` route.
             continue;
         }
         let target = variant.to_radix();
@@ -108,12 +109,13 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[(
 
 /// Whether `faber run` reaches `target`.
 ///
-/// `faber run` interprets source by default; the targets it reaches are the
-/// device routes selected by `--device` ([`DeviceChoice::run_target_spelling`],
-/// the same match that maps a device choice to its route) and the compiled
-/// targets `--target` builds and runs ([`RunTarget`]). A built FMIR image, a
-/// FHIR envelope, a native host executable and a Rust package are build
-/// outputs, never `faber run` inputs.
+/// A plain `faber run` compiles through the clif-jit lane by default and
+/// falls back to the interpreter on a compile-time decline; the targets it
+/// reaches are the device routes selected by `--device`
+/// ([`DeviceChoice::run_target_spelling`], the same match that maps a device
+/// choice to its route) and the compiled targets `--target` builds and runs
+/// ([`RunTarget`]). A built FMIR image, a FHIR envelope, a native host
+/// executable and a Rust package are build outputs, never `faber run` inputs.
 fn faber_run_reaches(target: Target) -> bool {
     let name = target.to_string();
     DeviceChoice::value_variants()
