@@ -117,7 +117,7 @@ if [ "$total" -eq 0 ]; then
   exit 1
 fi
 jobs=${JOBS:-$(nproc 2>/dev/null || echo 8)}
-xargs -a "$work/files.txt" -P "$jobs" -n 1 "$0" --probe >"$work/tally.tsv"
+xargs -P "$jobs" -n 1 "$0" --probe <"$work/files.txt" >"$work/tally.tsv"
 
 echo "c target, $total exemplars (first rejection per file)"
 cut -f1 "$work/tally.tsv" | sort | uniq -c | sort -rn | sed 's/^/  /'
@@ -131,7 +131,7 @@ awk -F'\t' '$1 == "frontend" { print $2 }' "$work/tally.tsv" | sort | uniq -c | 
 status=0
 if [ "$run" -eq 1 ]; then
   awk -F'\t' '$1 == "emits" { print $3 }' "$work/tally.tsv" >"$work/emits.txt"
-  xargs -a "$work/emits.txt" -P "$jobs" -n 1 "$0" --exec >"$work/run.tsv"
+  xargs -P "$jobs" -n 1 "$0" --exec <"$work/emits.txt" >"$work/run.tsv"
   echo
   echo "emitting exemplars, built with: $cflags"
   cut -f1 "$work/run.tsv" | sort | uniq -c | sort -rn | sed 's/^/  /'
