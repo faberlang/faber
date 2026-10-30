@@ -669,7 +669,7 @@ impl TypeChecker<'_> {
             .collect();
         if sig.type_params.is_empty() {
             self.wrong_arity("callee_type_args_unsupported", span);
-            return self.reject_explicit_args(args);
+            return Some(self.reject_explicit_args(args));
         }
         if magnitudo.is_empty() && !size_args.is_empty() {
             // The marker is written where the callee declares no `size`
@@ -680,11 +680,11 @@ impl TypeChecker<'_> {
                 crate::ISSUE_SIZE_MARKER_UNEXPECTED,
                 span,
             );
-            return self.reject_explicit_args(args);
+            return Some(self.reject_explicit_args(args));
         }
         if size_args.len() > magnitudo.len() {
             self.wrong_arity("wrong_number_of_type_arguments", span);
-            return self.reject_explicit_args(args);
+            return Some(self.reject_explicit_args(args));
         }
         if type_args.len() > typus.len() {
             // A caller's own type param handed to a size-only callee is a
@@ -696,7 +696,7 @@ impl TypeChecker<'_> {
                     .any(|ty| matches!(self.types.get(*ty), Type::Param(_)))
             {
                 self.reject_type_arg_sort(first_size, span);
-                return self.reject_explicit_args(args);
+                return Some(self.reject_explicit_args(args));
             }
             let issue = if typus.is_empty() {
                 "callee_type_args_unsupported"
@@ -704,7 +704,7 @@ impl TypeChecker<'_> {
                 "wrong_number_of_type_arguments"
             };
             self.wrong_arity(issue, span);
-            return self.reject_explicit_args(args);
+            return Some(self.reject_explicit_args(args));
         }
         // Trailing defaults make the defaulted params of each sort a suffix
         // of that sort's list, so the required prefix is its non-defaulted
@@ -721,7 +721,7 @@ impl TypeChecker<'_> {
             || (!size_args.is_empty() && size_args.len() < magnitudo_min)
         {
             self.wrong_arity("wrong_number_of_type_arguments", span);
-            return self.reject_explicit_args(args);
+            return Some(self.reject_explicit_args(args));
         }
         if type_args
             .iter()
@@ -732,7 +732,7 @@ impl TypeChecker<'_> {
             // callee param, so reject with a named issue rather than leaking
             // an unsolved InferUnion as cannot_infer_variable_type.
             self.invalid_operand_types("explicit_union_type_arg_unsupported", span);
-            return self.reject_explicit_args(args);
+            return Some(self.reject_explicit_args(args));
         }
         None
     }
@@ -740,9 +740,9 @@ impl TypeChecker<'_> {
     /// Complete one explicit-argument rejection: the call arguments are still
     /// typechecked so their own diagnostics surface, then the call yields the
     /// shared error type.
-    fn reject_explicit_args(&mut self, args: &mut [HirCallArg]) -> Option<TypeId> {
+    fn reject_explicit_args(&mut self, args: &mut [HirCallArg]) -> TypeId {
         self.typecheck_call_arg_exprs(args);
-        Some(self.error_type)
+        self.error_type
     }
 
     /// Structured wrong-sort rejection for one explicit generic argument.

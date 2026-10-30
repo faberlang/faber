@@ -1181,51 +1181,19 @@ impl Resolver {
                     canonical_exports.insert(interner.intern(member), primary_sym);
                 }
                 let imported = match &export.kind {
-                    FileExportKind::Struct(strukt) => {
-                        match self.import_struct_file_export_shell(
-                            strukt,
-                            types,
-                            interner,
-                            export_identity.clone(),
-                        ) {
-                            Ok(value) => value,
-                            Err(err) => {
-                                skipped.push(FileInterfaceSkippedExport::from_error(
-                                    namespace_name,
-                                    export_identity.as_ref(),
-                                    None,
-                                    member_kind,
-                                    member,
-                                    projected_members.clone(),
-                                    &err,
-                                ));
-                                continue;
-                            }
-                        }
-                    }
-                    FileExportKind::Enum(nominal) => {
-                        match self.import_enum_file_export(
-                            interner.intern(&nominal.name),
-                            types,
-                            nominal,
-                            interner,
-                            export_identity.clone(),
-                        ) {
-                            Ok(value) => value,
-                            Err(err) => {
-                                skipped.push(FileInterfaceSkippedExport::from_error(
-                                    namespace_name,
-                                    export_identity.as_ref(),
-                                    None,
-                                    member_kind,
-                                    member,
-                                    projected_members.clone(),
-                                    &err,
-                                ));
-                                continue;
-                            }
-                        }
-                    }
+                    FileExportKind::Struct(strukt) => self.import_struct_file_export_shell(
+                        strukt,
+                        types,
+                        interner,
+                        export_identity.as_ref(),
+                    ),
+                    FileExportKind::Enum(nominal) => self.import_enum_file_export(
+                        interner.intern(&nominal.name),
+                        types,
+                        nominal,
+                        interner,
+                        export_identity.as_ref(),
+                    ),
                     FileExportKind::Interface(nominal) => {
                         let imported = self.import_nominal_file_export(
                             interner.intern(&nominal.name),
@@ -1233,7 +1201,7 @@ impl Resolver {
                             types,
                             Type::Interface,
                             Vec::new(),
-                            export_identity.clone(),
+                            export_identity.as_ref(),
                             InterfaceGenericParam::kinds(&nominal.params),
                         );
                         // Contract arity and argument substitution (D1.2)
@@ -1600,7 +1568,7 @@ impl Resolver {
         types: &mut TypeTable,
         make_type: impl FnOnce(DefId) -> Type,
         methods: Vec<ImportedFileInterfaceMethod>,
-        identity: Option<InterfaceLibraryIdentity>,
+        identity: Option<&InterfaceLibraryIdentity>,
         decl_param_kinds: Vec<radix_syntax::GenericParamKind>,
     ) -> ImportedFileExport {
         let nominal_kind = match kind {
@@ -1614,9 +1582,8 @@ impl Resolver {
         // type + def instead of minting a fresh nominal. Only applies to
         // identity-bearing interfaces: without a module identity the provenance
         // is unknown and the legacy name-keyed ambiguity guard must keep firing.
-        if let Some((existing_ty, existing_def)) = identity
-            .as_ref()
-            .and_then(|_| self.canonical_nominal_for(nominal_kind, identity.as_ref(), name))
+        if let Some((existing_ty, existing_def)) =
+            identity.and_then(|_| self.canonical_nominal_for(nominal_kind, identity, name))
         {
             return ImportedFileExport::Type(ImportedFileType {
                 ty: existing_ty,
@@ -1628,7 +1595,7 @@ impl Resolver {
         let def_id = self.fresh_def_id();
         let ty = types.intern(make_type(def_id));
         if let Some(nominal_kind) = nominal_kind {
-            self.register_imported_nominal_type(nominal_kind, identity.as_ref(), name, ty, def_id);
+            self.register_imported_nominal_type(nominal_kind, identity, name, ty, def_id);
         }
         if !decl_param_kinds.is_empty() {
             self.register_generic_param_kinds(def_id, decl_param_kinds.clone());
@@ -1665,26 +1632,26 @@ impl Resolver {
         types: &mut TypeTable,
         nominal: &InterfaceNominalExport,
         interner: &mut radix_lexer::Interner,
-        identity: Option<InterfaceLibraryIdentity>,
-    ) -> Result<ImportedFileExport, FileInterfaceError> {
+        identity: Option<&InterfaceLibraryIdentity>,
+    ) -> ImportedFileExport {
         // Canonical duplicate-reuse: a second alias of the same module unifies
         // to one semantic type. Only for identity-bearing interfaces; without
         // identity the legacy name-keyed ambiguity guard must keep firing.
-        if let Some((existing_ty, existing_def)) = identity.as_ref().and_then(|_| {
-            self.canonical_nominal_for(Some(InterfaceNominalKind::Enum), identity.as_ref(), name)
+        if let Some((existing_ty, existing_def)) = identity.and_then(|_| {
+            self.canonical_nominal_for(Some(InterfaceNominalKind::Enum), identity, name)
         }) {
-            return Ok(ImportedFileExport::Type(ImportedFileType {
+            return ImportedFileExport::Type(ImportedFileType {
                 ty: existing_ty,
                 def_id: Some(existing_def),
                 methods: Vec::new(),
                 decl_param_kinds: InterfaceGenericParam::kinds(&nominal.params),
-            }));
+            });
         }
         let enum_def = self.fresh_def_id();
         let ty = types.intern(Type::Enum(enum_def));
         self.register_imported_nominal_type(
             InterfaceNominalKind::Enum,
-            identity.as_ref(),
+            identity,
             name,
             ty,
             enum_def,
@@ -1744,12 +1711,12 @@ impl Resolver {
                 span: Span::default(),
             },
         );
-        Ok(ImportedFileExport::Type(ImportedFileType {
+        ImportedFileExport::Type(ImportedFileType {
             ty,
             def_id: Some(enum_def),
             methods: Vec::new(),
             decl_param_kinds,
-        }))
+        })
     }
 
     /// Remap enum variant payload fields (phase 2 of file import). Payload
@@ -1922,8 +1889,8 @@ impl Resolver {
         strukt: &InterfaceStructExport,
         types: &mut TypeTable,
         interner: &mut radix_lexer::Interner,
-        identity: Option<InterfaceLibraryIdentity>,
-    ) -> Result<ImportedFileExport, FileInterfaceError> {
+        identity: Option<&InterfaceLibraryIdentity>,
+    ) -> ImportedFileExport {
         let name = interner.intern(&strukt.name);
         let type_params: Vec<LexSymbol> = strukt
             .params
@@ -1933,10 +1900,10 @@ impl Resolver {
         // Canonical duplicate-reuse: a second alias of the same module unifies
         // to one semantic type. Only for identity-bearing interfaces; without
         // identity the legacy name-keyed ambiguity guard must keep firing.
-        if let Some((existing_ty, existing_def)) = identity.as_ref().and_then(|_| {
-            self.canonical_nominal_for(Some(InterfaceNominalKind::Struct), identity.as_ref(), name)
+        if let Some((existing_ty, existing_def)) = identity.and_then(|_| {
+            self.canonical_nominal_for(Some(InterfaceNominalKind::Struct), identity, name)
         }) {
-            return Ok(ImportedFileExport::Struct(ImportedFileStruct {
+            return ImportedFileExport::Struct(ImportedFileStruct {
                 is_json: strukt.is_json,
                 implements: Vec::new(),
                 def_id: existing_def,
@@ -1944,13 +1911,13 @@ impl Resolver {
                 fields: Vec::new(),
                 methods: Vec::new(),
                 type_params,
-            }));
+            });
         }
         let def_id = self.fresh_def_id();
         let ty = types.intern(Type::Struct(def_id));
         self.register_imported_nominal_type(
             InterfaceNominalKind::Struct,
-            identity.as_ref(),
+            identity,
             name,
             ty,
             def_id,
@@ -1970,7 +1937,7 @@ impl Resolver {
                 span: Span::default(),
             },
         );
-        Ok(ImportedFileExport::Struct(ImportedFileStruct {
+        ImportedFileExport::Struct(ImportedFileStruct {
             is_json: strukt.is_json,
             implements: Vec::new(),
             def_id,
@@ -1978,7 +1945,7 @@ impl Resolver {
             fields: Vec::new(),
             methods: Vec::new(),
             type_params,
-        }))
+        })
     }
 
     /// Remap the contracts an exported struct names in `implet`.
@@ -2097,7 +2064,7 @@ impl Resolver {
             .get(&namespace)
             .filter(|interface| !interface.exports.is_empty())
         {
-            if self.file_interface_export_key(interface, member).is_some() {
+            if Self::file_interface_export_key(interface, member).is_some() {
                 return true;
             }
             return self
@@ -2169,7 +2136,7 @@ impl Resolver {
         let interface = self.file_interfaces.get(&namespace)?;
         match interface
             .exports
-            .get(&self.file_interface_export_key(interface, member)?)?
+            .get(&Self::file_interface_export_key(interface, member)?)?
         {
             ImportedFileExport::Function(sig, _) => Some(sig),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
@@ -2189,7 +2156,6 @@ impl Resolver {
 
     /// Surface export key that carries a post-HIR canonical member name.
     fn file_interface_export_key_for_canonical(
-        &self,
         interface: &ImportedFileInterface,
         canonical: LexSymbol,
     ) -> Option<LexSymbol> {
@@ -2220,10 +2186,7 @@ impl Resolver {
             .get(&namespace)
             .filter(|interface| !interface.exports.is_empty())
         {
-            if self
-                .file_interface_export_key_for_canonical(interface, canonical)
-                .is_some()
-            {
+            if Self::file_interface_export_key_for_canonical(interface, canonical).is_some() {
                 return true;
             }
             return self
@@ -2252,8 +2215,9 @@ impl Resolver {
         let interface = self.file_interfaces.get(&namespace)?;
         match interface
             .exports
-            .get(&self.file_interface_export_key_for_canonical(interface, canonical)?)?
-        {
+            .get(&Self::file_interface_export_key_for_canonical(
+                interface, canonical,
+            )?)? {
             ImportedFileExport::Function(sig, _) => Some(sig),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
@@ -2278,8 +2242,9 @@ impl Resolver {
         let interface = self.file_interfaces.get(&namespace)?;
         match interface
             .exports
-            .get(&self.file_interface_export_key_for_canonical(interface, canonical)?)?
-        {
+            .get(&Self::file_interface_export_key_for_canonical(
+                interface, canonical,
+            )?)? {
             ImportedFileExport::Function(_, axis) => Some(axis),
             ImportedFileExport::Type(_) | ImportedFileExport::Struct(_) => None,
         }
@@ -2294,7 +2259,7 @@ impl Resolver {
         member: LexSymbol,
     ) -> Option<&[InterfaceUnavailable]> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let key = self.file_interface_export_key(interface, member)?;
+        let key = Self::file_interface_export_key(interface, member)?;
         interface.unavailable.get(&key).map(Vec::as_slice)
     }
 
@@ -2314,7 +2279,7 @@ impl Resolver {
             return None;
         }
         let interface = self.file_interfaces.get(&namespace)?;
-        let key = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let key = Self::file_interface_export_key_for_canonical(interface, canonical)?;
         interface.device_contracts.get(&key)
     }
 
@@ -2327,7 +2292,7 @@ impl Resolver {
         canonical: LexSymbol,
     ) -> Option<&[InterfaceUnavailable]> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let key = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let key = Self::file_interface_export_key_for_canonical(interface, canonical)?;
         interface.unavailable.get(&key).map(Vec::as_slice)
     }
 
@@ -2366,7 +2331,7 @@ impl Resolver {
             return None;
         }
         let interface = self.file_interfaces.get(&namespace)?;
-        let member = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let member = Self::file_interface_export_key_for_canonical(interface, canonical)?;
         let (def_id, requirements) = interface.tensor_edge_policy_requirements.get(&member)?;
         Some((*def_id, requirements))
     }
@@ -2379,7 +2344,7 @@ impl Resolver {
         canonical: LexSymbol,
     ) -> Option<TypeId> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let member = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let member = Self::file_interface_export_key_for_canonical(interface, canonical)?;
         if !interface.const_members.contains(&member) {
             return None;
         }
@@ -2460,7 +2425,6 @@ impl Resolver {
     }
 
     fn file_interface_export_key(
-        &self,
         interface: &ImportedFileInterface,
         member: LexSymbol,
     ) -> Option<LexSymbol> {
@@ -2514,7 +2478,7 @@ impl Resolver {
         let interface = self.file_interfaces.get(&namespace)?;
         match interface
             .exports
-            .get(&self.file_interface_export_key(interface, member)?)?
+            .get(&Self::file_interface_export_key(interface, member)?)?
         {
             ImportedFileExport::Type(ty) => Some(ty.ty),
             ImportedFileExport::Struct(strukt) => Some(strukt.ty),
@@ -2540,7 +2504,7 @@ impl Resolver {
         let interface = self.file_interfaces.get(&namespace)?;
         match interface
             .exports
-            .get(&self.file_interface_export_key(interface, member)?)?
+            .get(&Self::file_interface_export_key(interface, member)?)?
         {
             ImportedFileExport::Type(ty) => Some(ty.decl_param_kinds.clone()),
             ImportedFileExport::Struct(strukt) => self
@@ -2558,7 +2522,7 @@ impl Resolver {
     #[must_use]
     pub fn namespace_file_const(&self, namespace: LexSymbol, member: LexSymbol) -> Option<TypeId> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let member = self.file_interface_export_key(interface, member)?;
+        let member = Self::file_interface_export_key(interface, member)?;
         if !interface.const_members.contains(&member) {
             return None;
         }
@@ -2578,7 +2542,7 @@ impl Resolver {
         canonical: LexSymbol,
     ) -> Option<&InterfaceConstValue> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let member = self.file_interface_export_key_for_canonical(interface, canonical)?;
+        let member = Self::file_interface_export_key_for_canonical(interface, canonical)?;
         interface.const_values.get(&member)
     }
 
@@ -3250,7 +3214,7 @@ impl Resolver {
         variant_name: LexSymbol,
     ) -> Option<(DefId, TypeId)> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let type_key = self.file_interface_export_key(interface, type_name)?;
+        let type_key = Self::file_interface_export_key(interface, type_name)?;
         let ImportedFileExport::Type(ty) = interface.exports.get(&type_key)? else {
             return None;
         };
@@ -3328,7 +3292,7 @@ impl Resolver {
         type_name: LexSymbol,
     ) -> Option<DefId> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let type_key = self.file_interface_export_key(interface, type_name)?;
+        let type_key = Self::file_interface_export_key(interface, type_name)?;
         let export = interface.exports.get(&type_key)?;
         match export {
             ImportedFileExport::Type(ty) => ty.def_id,
@@ -3347,7 +3311,7 @@ impl Resolver {
         type_name: LexSymbol,
     ) -> Option<DefId> {
         let interface = self.file_interfaces.get(&namespace)?;
-        let type_key = self.file_interface_export_key(interface, type_name)?;
+        let type_key = Self::file_interface_export_key(interface, type_name)?;
         match interface.exports.get(&type_key)? {
             ImportedFileExport::Struct(strukt) => Some(strukt.def_id),
             ImportedFileExport::Type(_) | ImportedFileExport::Function(..) => None,

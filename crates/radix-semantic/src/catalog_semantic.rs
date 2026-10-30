@@ -339,7 +339,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::ImportAbsent => semantic_import_not_found_help(args),
         SemanticErrorKind::VariableUndefined => semantic_undefined_variable_help(args),
         SemanticErrorKind::ArityMismatch => semantic_wrong_arity_help(args),
-        SemanticErrorKind::ConstSharedIntoVar => semantic_const_shared_into_var_help(args),
+        SemanticErrorKind::ConstSharedIntoVar => Some(semantic_const_shared_into_var_help(args)),
         SemanticErrorKind::Warning(WarningKind::MonomorphicHoleSolvedToUnion) => {
             semantic_monomorphic_hole_solved_to_union_help(args)
         }
@@ -776,14 +776,14 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "gpu_builtin_device_function_required" => {
             Some("call GPU builtins only inside @ nucleum or @ nucleum fragment functions".to_owned())
         }
-        "nucleum_fragment_context" => nucleum_fragment_context_help(args),
+        "nucleum_fragment_context" => Some(nucleum_fragment_context_help(args)),
         "nucleum_fragment_effect" => nucleum_fragment_effect_help(args),
         "nucleum_fragment_type" => nucleum_fragment_type_help(args),
         "nucleum_fragment_throw_caller" => Some(
             "declare `⇥ text` on the calling kernel; the callee's constant throws become throw sites of the caller"
                 .to_owned(),
         ),
-        "nucleum_fragment_cycle" => nucleum_fragment_cycle_help(args),
+        "nucleum_fragment_cycle" => Some(nucleum_fragment_cycle_help(args)),
         "nucleum_fragment_expansion" => nucleum_fragment_expansion_help(args),
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
@@ -961,10 +961,9 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
     }
 }
 
-fn nucleum_fragment_context_help(args: &[DiagnosticArg]) -> Option<String> {
+fn nucleum_fragment_context_help(args: &[DiagnosticArg]) -> String {
     let caller = arg_value(args, "caller");
-    Some(
-        match (caller, arg_value(args, "reason")) {
+    match (caller, arg_value(args, "reason")) {
             (_, Some("entry_callee")) => {
                 "compose another @ nucleum fragment, or keep the dispatch on the calling @ nucleum entry"
             }
@@ -984,10 +983,9 @@ fn nucleum_fragment_context_help(args: &[DiagnosticArg]) -> Option<String> {
             (_, Some("host_callable")) => {
                 "call another @ nucleum fragment or an approved device intrinsic from this body"
             }
-            _ => "call an @ nucleum fragment only from an @ nucleum entry or another fragment",
-        }
-        .to_owned(),
-    )
+        _ => "call an @ nucleum fragment only from an @ nucleum entry or another fragment",
+    }
+    .to_owned()
 }
 
 fn nucleum_fragment_type_help(args: &[DiagnosticArg]) -> Option<String> {
@@ -1017,16 +1015,16 @@ fn nucleum_fragment_type_help(args: &[DiagnosticArg]) -> Option<String> {
     )
 }
 
-fn nucleum_fragment_cycle_help(args: &[DiagnosticArg]) -> Option<String> {
+fn nucleum_fragment_cycle_help(args: &[DiagnosticArg]) -> String {
     let cycle = arg_value(args, "cycle")
         .or_else(|| arg_value(args, "chain"))
         .unwrap_or("");
-    Some(if cycle.is_empty() {
+    if cycle.is_empty() {
         "remove the recursive fragment call; fragment composition requires an acyclic call graph"
             .to_owned()
     } else {
         format!("break the cycle {cycle}; fragment composition requires an acyclic call graph")
-    })
+    }
 }
 
 fn nucleum_fragment_expansion_help(args: &[DiagnosticArg]) -> Option<String> {
@@ -1188,12 +1186,12 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
 /// `← own x` of a read-only parameter is itself SEM057
 /// `own_argument_unmarked_parameter`, so the parameter help must name only
 /// `← copy x`.
-fn semantic_const_shared_into_var_help(args: &[DiagnosticArg]) -> Option<String> {
-    Some(if arg_value(args, "source") == Some("parameter") {
+fn semantic_const_shared_into_var_help(args: &[DiagnosticArg]) -> String {
+    if arg_value(args, "source") == Some("parameter") {
         "write `← copy x` for an independent value".to_owned()
     } else {
         "write `← copy x` for an independent value, or `← own x` to take it over".to_owned()
-    })
+    }
 }
 
 // TYPE MISMATCH

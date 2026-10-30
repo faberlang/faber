@@ -824,19 +824,19 @@ impl TypeChecker<'_> {
                 ..
             } => {
                 let branches = std::iter::once(then_block).chain(else_block.as_ref());
-                self.hull_of(branches.map(|block| self.block_value_range(block)))
+                Self::hull_of(branches.map(|block| self.block_value_range(block))).or_else(leaf)
+            }
+            HirExpressionKind::Discerne { arms, .. } => {
+                Self::hull_of(arms.iter().map(|arm| self.value_range(&arm.body, None)))
                     .or_else(leaf)
             }
-            HirExpressionKind::Discerne { arms, .. } => self
-                .hull_of(arms.iter().map(|arm| self.value_range(&arm.body, None)))
-                .or_else(leaf),
             _ => leaf(),
         }
     }
 
     /// The hull of the branch intervals; `None` as soon as one branch has no
     /// integer interval (the caller then judges the whole by its declared type).
-    fn hull_of(&self, branches: impl Iterator<Item = Option<IntRange>>) -> Option<IntRange> {
+    fn hull_of(branches: impl Iterator<Item = Option<IntRange>>) -> Option<IntRange> {
         let mut hull: Option<IntRange> = None;
         for branch in branches {
             let branch = branch?;

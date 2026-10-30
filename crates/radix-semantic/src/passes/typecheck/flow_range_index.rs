@@ -33,7 +33,7 @@
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId};
 
 use super::flow_range::{BoundKey, IntRange};
-use super::*;
+use super::{IndexId, Type, TypeChecker};
 
 impl TypeChecker<'_> {
     /// Record the proof for an index read, when every component is proven.
