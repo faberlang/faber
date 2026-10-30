@@ -194,7 +194,7 @@ pub fn compose_keeping_template_callees(
     let template_callees = {
         templates
             .iter()
-            .flat_map(|template| Resolver::all_callees(template))
+            .flat_map(Resolver::all_callees)
             .map(|site| site.callee)
             .collect::<Vec<_>>()
     };
