@@ -136,9 +136,9 @@ pub(crate) struct DeviceRuntimeMetadata {
     /// runtime adapters (never from logical receipts); a pooled reuse is not
     /// one. With `buffer_release_count` this is the steady-loop allocation
     /// promise's evidence: a steady loop (same kernels, same shapes) leaves
-    /// both unchanged after its first iteration. Absent in artifacts from
-    /// before the counters; read as 0 there. See
-    /// `docs/design/device-allocation-promise.md`.
+    /// both unchanged once it has warmed up. Absent in artifacts from before
+    /// the counters; read as 0 there. See the promise in
+    /// `docs/design/allocation-and-memory-lifecycle.md`.
     #[serde(default)]
     pub(crate) buffer_alloc_count: u64,
     /// Device buffer release calls that reached the driver; parking a
