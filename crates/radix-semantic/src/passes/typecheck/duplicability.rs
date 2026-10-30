@@ -14,7 +14,7 @@
 //! duplicability is decided per instantiation at the call site
 //! ([`TypeChecker::refuse_copy_argument_of_nonduplicable`]).
 
-use handroll::FxHashSet;
+use handroll::{FxHashMap, FxHashSet};
 use radix_hir::DefId;
 use radix_lexer::Span;
 use radix_types::{AccessMarker, AppliedArg, Type, TypeId};
@@ -54,12 +54,9 @@ impl TypeChecker<'_> {
     /// path is rooted at the copied value's own type (`Pocket.s`).
     pub(super) fn refuse_copy_of_nonduplicable(&mut self, payload: TypeId, span: Span) {
         let root = self.root_path_segment(payload);
-        let Some((path, head)) = self.nonduplicable_member(
-            payload,
-            root.clone(),
-            &mut FxHashSet::default(),
-            0,
-        ) else {
+        let Some((path, head)) =
+            self.nonduplicable_member(payload, root.clone(), &mut FxHashSet::default(), 0)
+        else {
             return;
         };
         let mut args: Vec<(&'static str, String)> = vec![("head", head)];
@@ -80,8 +77,12 @@ impl TypeChecker<'_> {
     /// The path root for one copied value: its nominal name when the value
     /// is a genus or enum, empty for every other shape.
     fn root_path_segment(&self, payload: TypeId) -> String {
-        match self.types.get(self.resolve_inferred_type(payload)) {
-            Type::Struct(def) | Type::Enum(def) => self.def_surface_name(*def),
+        match self.types.get(self.resolve_inferred_type(payload)).clone() {
+            Type::Struct(def) | Type::Enum(def) => self.def_surface_name(def),
+            Type::Applied(base, _) => match self.types.get(base) {
+                Type::Struct(def) | Type::Enum(def) => self.def_surface_name(*def),
+                _ => String::new(),
+            },
             _ => String::new(),
         }
     }
@@ -91,16 +92,43 @@ impl TypeChecker<'_> {
     /// *declared* parameter payload: a declared concrete payload was refused
     /// at its declaration, a declared generic one decides at the argument.
     pub(super) fn type_is_generic_carrier(&self, ty: TypeId) -> bool {
-        matches!(
-            self.types.get(self.resolve_inferred_type(ty)),
-            Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. }
-        )
+        self.type_contains_generic_carrier(ty, &mut FxHashSet::default(), 0)
+    }
+
+    fn type_contains_generic_carrier(
+        &self,
+        ty: TypeId,
+        seen: &mut FxHashSet<TypeId>,
+        depth: u32,
+    ) -> bool {
+        if depth > MAX_DEPTH {
+            return false;
+        }
+        let resolved = self.resolve_inferred_type(ty);
+        if !seen.insert(resolved) {
+            return false;
+        }
+        let (_, payload) = self.types.peel_access_marker(resolved);
+        match self.types.get(payload) {
+            Type::Param(_) | Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } => true,
+            Type::Alias(_, inner) => self.type_contains_generic_carrier(*inner, seen, depth + 1),
+            Type::Union(members) | Type::Tuple(members) | Type::Intersection(members) => members
+                .iter()
+                .any(|member| self.type_contains_generic_carrier(*member, seen, depth + 1)),
+            other => {
+                let mut children = Vec::new();
+                collect_member_children(other, &mut children);
+                children
+                    .into_iter()
+                    .any(|child| self.type_contains_generic_carrier(child, seen, depth + 1))
+            }
+        }
     }
 
     /// Depth-first search for a member with identity. Returns the member path
     /// (empty for the value itself) and its locale surface name.
     fn nonduplicable_member(
-        &self,
+        &mut self,
         ty: TypeId,
         path: String,
         seen: &mut FxHashSet<DefId>,
@@ -111,46 +139,61 @@ impl TypeChecker<'_> {
         }
         let resolved = self.resolve_inferred_type(ty);
         let (_, payload) = self.types.peel_access_marker(resolved);
-        match self.types.get(payload) {
+        match self.types.get(payload).clone() {
             // A lowerer-level refusal already reported this acquisition.
             Type::Error => None,
             Type::Struct(def) => {
-                if let Some(head) = self.conversation_head(*def) {
+                if let Some(head) = self.conversation_head(def) {
                     return Some((path, head));
                 }
-                if self.def_is_closable(*def) {
-                    return Some((path, self.def_surface_name(*def)));
+                if self.def_is_closable(def) {
+                    return Some((path, self.def_surface_name(def)));
                 }
-                if !seen.insert(*def) {
+                if !seen.insert(def) {
                     return None;
                 }
-                let found = self.search_struct_fields(*def, &path, seen, depth);
-                seen.remove(def);
+                let found = self.search_struct_fields(def, &path, seen, depth, None);
+                seen.remove(&def);
                 found
             }
             Type::Enum(def) => {
-                if !seen.insert(*def) {
+                if !seen.insert(def) {
                     return None;
                 }
-                let found = self.search_enum_variants(*def, &path, seen, depth);
-                seen.remove(def);
+                let found = self.search_enum_variants(def, &path, seen, depth, None);
+                seen.remove(&def);
                 found
             }
             Type::Interface(def) => {
                 // A value typed as the closing contract itself holds a
                 // resource with identity.
-                (self.types.closing_contract == Some(*def))
-                    .then(|| (path, self.def_surface_name(*def)))
+                (self.types.closing_contract == Some(def))
+                    .then(|| (path, self.def_surface_name(def)))
             }
-            Type::Applied(base, args) => {
-                let head = match self.types.get(*base) {
-                    Type::Struct(def) => self.conversation_head(*def),
-                    _ => None,
-                };
-                if let Some(head) = head {
-                    return Some((path, head));
+            Type::Applied(base, args) => match self.types.get(base).clone() {
+                Type::Struct(def) => {
+                    if let Some(head) = self.conversation_head(def) {
+                        return Some((path, head));
+                    }
+                    if self.def_is_closable(def) {
+                        return Some((path, self.def_surface_name(def)));
+                    }
+                    if !seen.insert(def) {
+                        return None;
+                    }
+                    let found = self.search_struct_fields(def, &path, seen, depth, Some(&args));
+                    seen.remove(&def);
+                    found
                 }
-                self.search_children(
+                Type::Enum(def) => {
+                    if !seen.insert(def) {
+                        return None;
+                    }
+                    let found = self.search_enum_variants(def, &path, seen, depth, Some(&args));
+                    seen.remove(&def);
+                    found
+                }
+                _ => self.search_children(
                     args.iter().filter_map(|arg| match arg {
                         AppliedArg::Type(inner) => Some(*inner),
                         AppliedArg::Size(_) => None,
@@ -158,14 +201,15 @@ impl TypeChecker<'_> {
                     &path,
                     seen,
                     depth,
-                )
+                ),
+            },
+            Type::Alias(_, inner) => self.nonduplicable_member(inner, path, seen, depth + 1),
+            Type::Union(members) | Type::Tuple(members) | Type::Intersection(members) => {
+                self.search_children(members.into_iter(), &path, seen, depth)
             }
-            Type::Alias(_, inner) => self.nonduplicable_member(*inner, path, seen, depth + 1),
-            Type::Union(members) | Type::Tuple(members) | Type::Intersection(members) => self
-                .search_children(members.iter().copied(), &path, seen, depth),
             other => {
                 let mut children = Vec::new();
-                collect_member_children(other, &mut children);
+                collect_member_children(&other, &mut children);
                 self.search_children(children.into_iter(), &path, seen, depth)
             }
         }
@@ -174,28 +218,52 @@ impl TypeChecker<'_> {
     /// Walk one genus's instance fields in declaration order (span order,
     /// because the field table is a hash map).
     fn search_struct_fields(
-        &self,
+        &mut self,
         def: DefId,
         path: &str,
         seen: &mut FxHashSet<DefId>,
         depth: u32,
+        applied_args: Option<&[AppliedArg]>,
     ) -> Option<(String, String)> {
         let info = self.structs.get(&def)?;
         let mut fields: Vec<_> = info
             .fields
             .iter()
             .filter(|(_, field)| field.modifier != Some(radix_syntax::FieldModifier::Const))
+            .map(|(name, field)| (*name, *field))
             .collect();
         fields.sort_by_key(|(_, field)| field.span.start);
+        let parameters = self
+            .type_params_by_def
+            .get(&def)
+            .cloned()
+            .unwrap_or_default();
+        let mut variables = FxHashMap::default();
+        let mut shape_variables = FxHashMap::default();
+        if let Some(applied_args) = applied_args {
+            for (parameter, argument) in parameters.iter().zip(applied_args) {
+                match argument {
+                    AppliedArg::Type(witness) => {
+                        variables.insert(*parameter, *witness);
+                    }
+                    AppliedArg::Size(witness) => {
+                        shape_variables.insert(*parameter, *witness);
+                    }
+                }
+            }
+        }
         for (name, field) in fields {
             let segment = self
                 .interner
-                .map(|interner| interner.resolve(*name).to_owned())
+                .map(|interner| interner.resolve(name).to_owned())
                 .unwrap_or_default();
             let child_path = join_field(path, &segment);
-            if let Some(found) =
-                self.nonduplicable_member(field.ty, child_path, seen, depth + 1)
-            {
+            let field_ty = if applied_args.is_some() {
+                self.substitute_type_params(field.ty, &mut variables, Some(&mut shape_variables))
+            } else {
+                field.ty
+            };
+            if let Some(found) = self.nonduplicable_member(field_ty, child_path, seen, depth + 1) {
                 return Some(found);
             }
         }
@@ -205,11 +273,12 @@ impl TypeChecker<'_> {
     /// Walk one enum's variants (declaration order: variant `DefId`s are
     /// allocated in declaration order) with their payload fields.
     fn search_enum_variants(
-        &self,
+        &mut self,
         def: DefId,
         path: &str,
         seen: &mut FxHashSet<DefId>,
         depth: u32,
+        applied_args: Option<&[AppliedArg]>,
     ) -> Option<(String, String)> {
         let mut variants: Vec<DefId> = self
             .variant_parent
@@ -218,8 +287,27 @@ impl TypeChecker<'_> {
             .map(|(variant, _)| *variant)
             .collect();
         variants.sort_by_key(|variant| variant.0);
+        let parameters = self
+            .type_params_by_def
+            .get(&def)
+            .cloned()
+            .unwrap_or_default();
+        let mut variables = FxHashMap::default();
+        let mut shape_variables = FxHashMap::default();
+        if let Some(applied_args) = applied_args {
+            for (parameter, argument) in parameters.iter().zip(applied_args) {
+                match argument {
+                    AppliedArg::Type(witness) => {
+                        variables.insert(*parameter, *witness);
+                    }
+                    AppliedArg::Size(witness) => {
+                        shape_variables.insert(*parameter, *witness);
+                    }
+                }
+            }
+        }
         for variant in variants {
-            let Some(fields) = self.variant_fields.get(&variant) else {
+            let Some(fields) = self.variant_fields.get(&variant).cloned() else {
                 continue;
             };
             let names = self
@@ -227,16 +315,26 @@ impl TypeChecker<'_> {
                 .get(&variant)
                 .cloned()
                 .unwrap_or_default();
-            for (index, field_ty) in fields.iter().enumerate() {
+            for (index, field_ty) in fields.into_iter().enumerate() {
                 let segment = names
                     .get(index)
                     .and_then(|name| {
-                        self.interner.map(|interner| interner.resolve(*name).to_owned())
+                        self.interner
+                            .map(|interner| interner.resolve(*name).to_owned())
                     })
                     .unwrap_or_else(|| ANONYMOUS_SEGMENT.to_owned());
                 let child_path = join_anonymous(path, &segment);
+                let field_ty = if applied_args.is_some() {
+                    self.substitute_type_params(
+                        field_ty,
+                        &mut variables,
+                        Some(&mut shape_variables),
+                    )
+                } else {
+                    field_ty
+                };
                 if let Some(found) =
-                    self.nonduplicable_member(*field_ty, child_path, seen, depth + 1)
+                    self.nonduplicable_member(field_ty, child_path, seen, depth + 1)
                 {
                     return Some(found);
                 }
@@ -247,7 +345,7 @@ impl TypeChecker<'_> {
 
     /// Walk every child under one anonymous segment.
     fn search_children(
-        &self,
+        &mut self,
         children: impl Iterator<Item = TypeId>,
         path: &str,
         seen: &mut FxHashSet<DefId>,
@@ -255,7 +353,8 @@ impl TypeChecker<'_> {
     ) -> Option<(String, String)> {
         let child_path = join_anonymous(path, ANONYMOUS_SEGMENT);
         for child in children {
-            if let Some(found) = self.nonduplicable_member(child, child_path.clone(), seen, depth + 1)
+            if let Some(found) =
+                self.nonduplicable_member(child, child_path.clone(), seen, depth + 1)
             {
                 return Some(found);
             }
@@ -274,11 +373,9 @@ impl TypeChecker<'_> {
         } else {
             return None;
         };
-        let surface = self
-            .locale_pack
-            .map_or(kind.latin(), |pack: &LocalePack| {
-                pack.type_surface(TypeBindingKind::Frame(kind))
-            });
+        let surface = self.locale_pack.map_or(kind.latin(), |pack: &LocalePack| {
+            pack.type_surface(TypeBindingKind::Frame(kind))
+        });
         Some(surface.to_owned())
     }
 
@@ -326,13 +423,20 @@ fn collect_member_children(ty: &Type, out: &mut Vec<TypeId>) {
         | Type::RangedArray { element, .. }
         | Type::BoundedQueue { element, .. }
         | Type::BoundedStack { element, .. } => out.push(*element),
-        Type::Map(key, value) | Type::Ledger(key, value) => {
+        Type::Map(key, value)
+        | Type::Ledger(key, value)
+        | Type::PromissumFailable(key, value)
+        | Type::AsyncCursor(key, value) => {
             out.push(*key);
             out.push(*value);
         }
         Type::Record(fields) => out.extend(fields.values().copied()),
-        Type::AsyncCursor(item, _) => out.push(*item),
-        Type::PromissumFailable(success, _) => out.push(*success),
+        Type::Applied(_, args) => {
+            out.extend(args.iter().filter_map(|arg| match arg {
+                AppliedArg::Type(inner) => Some(*inner),
+                AppliedArg::Size(_) => None,
+            }));
+        }
         _ => {}
     }
 }

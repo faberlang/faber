@@ -189,10 +189,13 @@ mod text_get_test;
 
 mod bits;
 mod closing;
-mod duplicability;
 #[cfg(test)]
 #[path = "construction_source_test.rs"]
 mod construction_source_test;
+mod duplicability;
+#[cfg(test)]
+#[path = "duplicability_test.rs"]
+mod duplicability_test;
 pub mod finalize;
 pub mod format;
 pub mod generic;

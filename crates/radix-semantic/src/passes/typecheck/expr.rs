@@ -1004,9 +1004,7 @@ impl TypeChecker<'_> {
                 // same refusal the binding-side form gets at the type.
                 let inner_span = inner.span;
                 let ty = self.check_expr_with_expected(inner, expected);
-                if matches!(marker, radix_hir::HirArgMarker::Copy)
-                    && ty != self.error_type
-                {
+                if matches!(marker, radix_hir::HirArgMarker::Copy) && ty != self.error_type {
                     let resolved = self.resolve_inferred_type(ty);
                     if self.types.is_scalar_for_access_marker(resolved) {
                         self.error_issue_with_args(

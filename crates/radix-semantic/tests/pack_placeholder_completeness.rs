@@ -38,6 +38,10 @@ const SUPPLIED: &[(&str, &[&str])] = &[
     // radix-semantic passes/typecheck/stmt.rs: reject_read_only_share_into_var
     //: the const root's name and the var cell's name.
     ("SEM065", &["binding", "name"]),
+    // radix-semantic passes/typecheck/duplicability.rs: the `copy`
+    // nonduplicable-member refusal always supplies its head and, when nested,
+    // its member path.
+    ("SEM066", &["head", "path"]),
     // radix-module diagnostics/convert.rs: convert_from_mixed_script_advisory
     ("LOCALE004", &["identifier", "scripts"]),
     // faber package/device/split_advice.rs: advice_diagnostic passes the

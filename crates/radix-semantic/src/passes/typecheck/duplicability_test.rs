@@ -46,7 +46,8 @@ fn assert_one_rejection_with(source: &str, expected: &[(&str, &str)]) {
             .iter()
             .find(|(arg_name, _)| arg_name == name)
             .unwrap_or_else(|| panic!("expected arg {name:?} in {found:?}"));
-        assert_eq!(arg, &(*name, *value).into(), "arg {name:?} mismatch");
+        assert_eq!(arg.0, *name, "arg {name:?} name mismatch");
+        assert_eq!(arg.1, *value, "arg {name:?} value mismatch");
     }
 }
 
@@ -121,6 +122,35 @@ fn copy_through_a_list_element_names_the_element_path() {
          \x20   nota g.vincula.longitudo()\n\
          }\n",
         &[("path", "Horreum.vincula[…].vinculum"), ("head", "sermo")],
+    );
+}
+
+#[test]
+fn copy_through_a_generic_genus_field_uses_its_instantiated_type() {
+    assert_one_rejection_with(
+        "genus Capsa<T> {\n\
+         \x20   varia T res\n\
+         }\n\
+         incipit {\n\
+         \x20   sit sermo s ← ad 'runtime:echo' (\"x\")\n\
+         \x20   sit Capsa<sermo> p ← Capsa<sermo> { res = s }\n\
+         \x20   varia Capsa<sermo> q ← copy p\n\
+         \x20   nota q.res\n\
+         }\n",
+        &[("path", "Capsa.res"), ("head", "sermo")],
+    );
+}
+
+#[test]
+fn copy_through_a_map_value_names_the_element_path() {
+    assert_one_rejection_with(
+        "incipit {\n\
+         \x20   sit sermo s ← ad 'runtime:echo' (\"x\")\n\
+         \x20   varia tabula<textus, sermo> m ← {}\n\
+         \x20   varia tabula<textus, sermo> n ← copy m\n\
+         \x20   nota n.longitudo()\n\
+         }\n",
+        &[("path", "[…]"), ("head", "sermo")],
     );
 }
 
@@ -212,6 +242,24 @@ fn generic_copy_parameter_decides_at_the_call_argument() {
          \x20   nota gemina(copy s)\n\
          }\n",
         &[("head", "sermo")],
+    );
+}
+
+#[test]
+fn generic_copy_parameter_checks_a_nested_generic_member_at_the_call() {
+    assert_one_rejection_with(
+        "genus Capsa<T> {\n\
+         \x20   varia T res\n\
+         }\n\
+         functio gemina<T>(copy Capsa<T> x) → numerus {\n\
+         \x20   redde 1\n\
+         }\n\
+         incipit {\n\
+         \x20   sit sermo s ← ad 'runtime:echo' (\"x\")\n\
+         \x20   sit Capsa<sermo> p ← Capsa<sermo> { res = s }\n\
+         \x20   nota gemina(copy p)\n\
+         }\n",
+        &[("path", "Capsa.res"), ("head", "sermo")],
     );
 }
 
