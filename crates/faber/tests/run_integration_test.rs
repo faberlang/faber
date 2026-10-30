@@ -531,11 +531,44 @@ kind = "bin"
     );
 }
 
+/// The single-file build lane reads its input from a path
+/// (`radix::module::Compiler::compile`), so `faber build -` reports the path
+/// `-` as unreadable (exit 66) with or without a locale flag. What a locale
+/// flag can decide is whether the input shape is admitted at all: `--locale`
+/// needs a package or entry file and refuses stdin, while
+/// `--diagnostics-locale` resolves stdin against the embedded packs and must
+/// hand the lane exactly what it would see with no flag.
 #[cfg(feature = "hir-go")]
 #[test]
-fn build_diagnostics_locale_keeps_stdin_build_available() {
+fn build_diagnostics_locale_passes_stdin_through_the_shape_gate() {
     let output_dir = temp_dir("build-diagnostics-locale-stdin");
+    let out_dir = output_dir.to_str().expect("utf8 output dir");
+
     let (stdout, stderr, ok) = run_faber_with_stdin(
+        &[
+            "build",
+            "--target",
+            "go",
+            "--locale",
+            "zh-Hans",
+            "--out-dir",
+            out_dir,
+            "-",
+        ],
+        b"main {}\n",
+    );
+    assert!(!ok, "reader locale must refuse stdin:\n{stderr}");
+    assert!(stdout.is_empty(), "rejected build wrote stdout: {stdout}");
+    assert!(
+        stderr.contains("--locale zh-Hans requires a package path or .fab entry file"),
+        "expected the reader-locale gate to refuse stdin, got:\n{stderr}"
+    );
+
+    let baseline = run_faber_with_stdin(
+        &["build", "--target", "go", "--out-dir", out_dir, "-"],
+        b"main {}\n",
+    );
+    let flagged = run_faber_with_stdin(
         &[
             "build",
             "--target",
@@ -543,16 +576,54 @@ fn build_diagnostics_locale_keeps_stdin_build_available() {
             "--diagnostics-locale",
             "th-TH",
             "--out-dir",
-            output_dir.to_str().expect("utf8 output dir"),
+            out_dir,
             "-",
         ],
         b"main {}\n",
     );
-
-    assert!(ok, "stdin build with diagnostics locale failed:\n{stderr}");
     assert!(
-        PathBuf::from(stdout.trim()).exists(),
-        "expected generated stdin output, got:\n{stdout}"
+        !flagged.1.contains("--diagnostics-locale th-TH requires"),
+        "the diagnostics-locale gate must not refuse stdin:\n{}",
+        flagged.1
+    );
+    assert_eq!(
+        flagged.2, baseline.2,
+        "diagnostics locale changed whether the stdin build ran:\n{}",
+        flagged.1
+    );
+    assert_eq!(
+        flagged.0, baseline.0,
+        "diagnostics locale changed the stdin build's stdout"
+    );
+    assert_eq!(
+        flagged.1, baseline.1,
+        "diagnostics locale changed the stdin build's stderr"
+    );
+
+    // A stdin build with an unknown diagnostics locale fails while loading the
+    // embedded pack (exit class 78), proof the flag reached the locale resolver
+    // instead of being turned away by the shape gate.
+    let (_stdout, stderr, ok) = run_faber_with_stdin(
+        &[
+            "build",
+            "--target",
+            "go",
+            "--diagnostics-locale",
+            "zz",
+            "--out-dir",
+            out_dir,
+            "-",
+        ],
+        b"main {}\n",
+    );
+    assert!(!ok, "unknown diagnostics locale must fail:\n{stderr}");
+    assert!(
+        stderr.contains("failed to load reader locale 'zz'"),
+        "expected the embedded-pack load failure, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("requires a package path"),
+        "the shape gate must not answer for stdin:\n{stderr}"
     );
 }
 
