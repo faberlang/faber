@@ -105,7 +105,7 @@ pub(crate) use cargo::{
 #[cfg(test)]
 pub use cargo::emit_generated_crate;
 #[cfg(all(feature = "mir-clif", feature = "runner"))]
-pub use clif_jit::cmd_run_clif_jit;
+pub use clif_jit::{cmd_run_clif_jit, run_default_engine_or_decline};
 pub use cmd::{
     CHECKS_BUT_DOES_NOT_LOWER, DeviceAdviceRequest, cmd_build, cmd_check_package, cmd_emit_package,
     should_treat_as_package_from_args, use_package_compiler_from_args,

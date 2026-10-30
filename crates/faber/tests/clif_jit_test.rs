@@ -2,8 +2,8 @@
 //! this process, with the same stdout, stderr and exit status as the runner
 //! and as a `--target clif` executable.
 //!
-//! Each case is compared against the runner (`faber run`); the runner and the
-//! linked clif executable agree on these programs (see
+//! Each case is compared against the runner (`faber run --target runner`);
+//! the runner and the linked clif executable agree on these programs (see
 //! `trap_text_parity_test.rs`), so agreement with the runner is agreement with
 //! both without linking anything here. The refusal cases compare against
 //! `faber build --target clif`, whose compile step is the same route.
@@ -85,7 +85,7 @@ fn clif_jit_matches_the_runner_on_stdout_stderr_and_status() {
     let dir = tempfile::tempdir().expect("scratch");
     for (name, text, status) in cases() {
         let source = write(dir.path(), name, text);
-        let runner = outcome(faber().arg("run").arg(&source));
+        let runner = outcome(faber().args(["run", "--target", "runner"]).arg(&source));
         let jit = outcome(faber().args(["run", "--target", "clif-jit"]).arg(&source));
         assert_eq!(runner.status, Some(status), "{name}: runner status");
         assert!(

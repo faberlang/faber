@@ -1,7 +1,9 @@
-//! `faber run --target runner`: the named default engine. Its behaviour,
-//! output, exit codes and trap stderr must be identical to a plain
-//! `faber run` (the no-`--target` route), and `faber build`/`emit` refuse the
-//! spelling by name, as they do for `clif-jit`.
+//! `faber run --target runner`: the named interpreted route. A plain
+//! `faber run` defaults to the clif-jit lane now (falling back to the runner
+//! on a compile-time decline — see `run_default_engine_test.rs`), so this
+//! file pins that the explicit spelling still interprets, and that
+//! `faber build`/`emit` refuse the spelling by name, as they do for
+//! `clif-jit`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -53,22 +55,52 @@ fn cases() -> Vec<(&'static str, &'static str, i32)> {
     ]
 }
 
+/// The explicit runner target interprets: these programs run with the
+/// interpreter's own stream shape — no compile-lane diagnostics ride along
+/// (the clif lanes print analysis warnings the interpreter does not), and the
+/// trap ends the run with the shared trap line.
 #[test]
-fn runner_target_is_identical_to_the_default_route() {
+fn runner_target_interprets_the_program() {
     let dir = tempfile::tempdir().expect("scratch");
     for (name, text, status) in cases() {
         let source = write(dir.path(), name, text);
-        let default = outcome(faber().arg("run").arg(&source));
         let runner = outcome(faber().args(["run", "--target", "runner"]).arg(&source));
-        assert_eq!(default.status, Some(status), "{name}: default status");
+        assert_eq!(runner.status, Some(status), "{name}: runner status");
         assert!(
-            !default.stdout.is_empty() || status != 0,
-            "{name}: the default route printed nothing"
+            !runner.stdout.is_empty() || status != 0,
+            "{name}: the runner printed nothing"
         );
-        assert_eq!(runner.stdout, default.stdout, "{name}: stdout");
-        assert_eq!(runner.stderr, default.stderr, "{name}: stderr");
-        assert_eq!(runner.status, default.status, "{name}: exit status");
+        assert!(
+            !runner.stderr.contains("warning["),
+            "{name}: the interpreter prints no compile-lane warnings: {}",
+            runner.stderr
+        );
+        if name == "trap_index" {
+            assert_eq!(
+                runner.stderr.trim_end(),
+                "error: array index out of bounds",
+                "{name}: trap line"
+            );
+        }
     }
+}
+
+/// `--target runner` is the interpreter by name, not an alias of the default
+/// engine: an AIR exemplar the clif lanes accept is refused by the runner's
+/// MIR-backed lane restriction, exactly as before the clif-jit default.
+#[test]
+fn runner_target_still_refuses_an_air_exemplar_the_jit_runs() {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../corpus/genus/air-struct-literal.fab")
+        .canonicalize()
+        .expect("corpus exemplar");
+    let runner = outcome(faber().args(["run", "--target", "runner"]).arg(&source));
+    assert_eq!(runner.status, Some(65), "{:?}", runner.stderr);
+    assert!(
+        runner.stderr.contains("TARGETLANE001"),
+        "the runner's own lane restriction: {}",
+        runner.stderr
+    );
 }
 
 #[test]

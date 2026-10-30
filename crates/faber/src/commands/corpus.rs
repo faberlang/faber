@@ -1206,13 +1206,16 @@ fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
 
 /// Arguments after the `faber` executable for one runner-target case.
 ///
-/// The runner target pins `--device reference`: it verifies the sequential MIR
-/// runner, so device selection must not depend on the host (`auto` routes kernel
-/// programs to Metal on a capable machine and fails closed elsewhere, and `cpu`
-/// is the multi-worker CPU device).
+/// The runner target pins `--target runner` (the interpreted route, not the
+/// clif-jit default of a plain `faber run`) and `--device reference`: it
+/// verifies the sequential MIR runner, so device selection must not depend
+/// on the host (`auto` routes kernel programs to Metal on a capable machine
+/// and fails closed elsewhere, and `cpu` is the multi-worker CPU device).
 fn runner_run_args(case: &Case) -> Vec<String> {
     let mut args = vec![
         "run".to_owned(),
+        "--target".to_owned(),
+        "runner".to_owned(),
         case.input.display().to_string(),
         "--device".to_owned(),
         "reference".to_owned(),
