@@ -4819,6 +4819,10 @@ help = "call materialize() to create an owned tensor before storing, returning, 
 message = "a borrowed tensor view is read-only and aliases its base"
 help = "pass the view as `{de}` for read-only use; call `materialize()` into a writable local before writing or passing it to `{in}`/`{own}` code"
 
+[diagnostics.SEM057.issues.kernel_argument_overlap]
+message = "kernel argument {position}{?binding| (`|`)} is writable and shares storage with argument {overlap}"
+help = "a kernel writes its `{in}` and `{own}` arguments while every argument stays live for the whole launch, so no two arguments may name one storage; pass disjoint tensors, or bind an independent copy with `← {copy}` / `materialize()` first"
+
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
 help = "make a writable local copy, then pass it with the parameter's `{in}` or `{own}` marker"

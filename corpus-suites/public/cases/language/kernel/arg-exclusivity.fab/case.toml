@@ -1,0 +1,11 @@
+version = 1
+id = "corpus/kernel/arg-exclusivity.fab"
+group = "language"
+input_root = "corpus"
+input = "kernel/arg-exclusivity.fab"
+category = "kernel"
+domain = "gpu"
+
+
+[expect]
+check_only = true

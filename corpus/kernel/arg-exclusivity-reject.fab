@@ -1,0 +1,76 @@
++++
+term = "nucleum"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "width_type_sugar", "shape_suffix", "fixum_decl", "incipit_stmt", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "transfer"]
+category = "kernel"
+canonical = false
+summary = "Kernel argument exclusivity refuses every call where a writable (`mut`/`own`) argument overlaps another argument: the whole tensor spelled twice, a `←` alias, a view of the same storage, or two `own` arguments sharing it."
+syntax = "axpy(mut t, t)"
+related = ["nucleum", "mutabilitas", "tensor"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM057:kernel_argument_overlap"
++++
+# =============================================================================
+# nucleum — kernel argument exclusivity rejects overlap (K1)
+# =============================================================================
+#
+# What this teaches:
+#   • A kernel's arguments stay live together for the whole launch, so a
+#     writable argument (`mut`, `own`) may not overlap any other argument —
+#     whichever side of the call it is written on.
+#   • The whole tensor spelled twice, a `←` alias of it, and a view of the
+#     same storage are all the same overlap: one storage, two arguments.
+#   • Each refusal is named: `kernel_argument_overlap` for whole-tensor and
+#     alias overlap, `tensor_view_read_only` when a view is one side of the
+#     pair (a view is read-only and names its base).
+#   • To pass a value that must not overlap, bind an independent copy
+#     (`← copy t`) or call `materialize()` on a view first.
+#
+# Common mistakes:
+#   • relying on argument order — a read-only argument before the `mut` one
+#     overlaps exactly like one after it
+#   • passing two `own` arguments that share storage — exclusive on both
+#     sides is still one storage
+#
+# See also: nucleum, mutabilitas, tensor
+# =============================================================================
+
+@ kernel
+@ public
+fn axpy(mut tf32[3] y, tf32[3] x) → void {
+    y ⇇ x
+}
+
+@ kernel
+@ public
+fn scale(tf32[3] a, mut tf32[3] b) → void {
+    b ⇇ a
+}
+
+@ kernel
+@ public
+fn take2(own tf32[3] a, own tf32[3] b) → void {
+    a ⇇ b
+}
+
+main {
+    mut tf32[3] t ← [1.0, 2.0, 3.0] ↦ tf32[3]
+    let tf32[3] u ← t
+
+    # 1. writable first, the same tensor after
+    axpy(mut t, t)
+
+    # 2. read-only first, writable second: the same overlap
+    scale(t, mut t)
+
+    # 3. a `←` alias names the same storage on either side
+    axpy(mut t, u)
+    scale(u, mut t)
+
+    # 4. a view of the writable argument's storage
+    axpy(mut t, t.reshape([3]))
+
+    # 5. two `own` arguments sharing one storage
+    take2(own t, own u)
+}
