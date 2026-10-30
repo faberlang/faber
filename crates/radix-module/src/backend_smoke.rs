@@ -171,6 +171,90 @@ fn log_smoke_skip(tool: &str, label: &str, action: &str) {
     trace_smoke_line(&format!("{tool} not found on PATH; skipping smoke {action} for {label}"));
 }
 
+/// Built `(rlib, deps)` pair for the in-tree `faber` runtime crate, shared by
+/// the bare-`rustc` emitted-Rust lib checks.
+///
+/// The rlib is built once per test process into the smoke cargo target dir
+/// (so `cargo clean` sweeps it). `None` (traced skip) when `cargo` cannot run;
+/// a runtime crate that is present but fails to build hard-fails, because a
+/// silently skipped compile proof would hide emission regressions.
+fn faber_runtime_rlib() -> Option<(PathBuf, PathBuf)> {
+    static RLIB: std::sync::OnceLock<Option<(PathBuf, PathBuf)>> = std::sync::OnceLock::new();
+    RLIB.get_or_init(|| {
+        if !cargo_available() {
+            log_smoke_skip("cargo", "faber runtime rlib", "build");
+            return None;
+        }
+        let runtime =
+            crate::test_support::faber_runtime_crate_path().unwrap_or_else(|| crate::test_support::runtime_dir("rust"));
+        let target_dir = smoke_cargo_target_dir().join("faber-runtime");
+        let output = command_ok(
+            Command::new("cargo")
+                .args(["build", "--manifest-path"])
+                .arg(runtime.join("Cargo.toml"))
+                .arg("--target-dir")
+                .arg(&target_dir)
+                .output(),
+            "build faber runtime rlib",
+        );
+        assert!(
+            output.status.success(),
+            "faber runtime rlib build failed:\n{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let profile = target_dir.join("debug");
+        let rlib = profile.join("libfaber.rlib");
+        assert!(rlib.is_file(), "faber runtime rlib missing at {}", rlib.display());
+        Some((rlib, profile.join("deps")))
+    })
+    .clone()
+}
+
+/// Type-checks emitted Rust library text with bare `rustc`, linking the
+/// in-tree `faber` runtime crate (`faber::FaberZero`, `faber::trap`, …) the
+/// way the corpus Rust leg does, and returns the compiler [`Output`] so a
+/// caller can also assert on diagnostics (for example, warning-free arms).
+///
+/// `None` (traced skip) when `rustc` or the runtime rlib cannot run; the
+/// opt-in toolchain convention of this module. Present toolchains hard-fail
+/// on invalid artifacts via the caller's `assert!` on `status.success()`.
+#[must_use]
+pub fn rustc_typecheck_emitted_rust_lib(code: &str, label: &str) -> Option<Output> {
+    if !rustc_available() {
+        log_smoke_skip("rustc", label, "rustc lib typecheck");
+        return None;
+    }
+    let Some((rlib, deps)) = faber_runtime_rlib() else {
+        trace_smoke_line(&format!(
+            "faber runtime rlib unavailable; skipping smoke rustc lib typecheck for {label}"
+        ));
+        return None;
+    };
+    let dir = smoke_temp_dir(label);
+    let source_path = dir.path().join("lib.rs");
+    io_ok(fs::write(&source_path, code), "write emitted rust");
+    let output = command_ok(
+        Command::new("rustc")
+            .arg("--edition=2021")
+            .arg("--crate-type=lib")
+            .arg(&source_path)
+            .arg("-o")
+            .arg(dir.path().join("lib.rlib"))
+            // The emitted text references `faber::…` unqualified, so the lib
+            // check links the runtime crate explicitly — never by editing the
+            // emitted text.
+            .arg("--extern")
+            .arg(format!("faber={}", rlib.display()))
+            .arg("-L")
+            .arg(format!("dependency={}", deps.display()))
+            .output(),
+        "execute rustc",
+    );
+    log_smoke_passed(label, "rustc lib");
+    Some(output)
+}
+
 /// The in-tree Go runtime module (`runtime/go`). Mirrors `inf_audit_test.rs`.
 fn go_runtime_dir() -> PathBuf {
     crate::test_support::runtime_dir("go")
