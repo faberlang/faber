@@ -3663,7 +3663,10 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
                 if constant(&rhs.maximum) != Some(shift) {
                     return AbstractRange::unknown();
                 }
-                let factor = KernelRangeExpr::Constant(1_i128 << shift as u32);
+                let Ok(shift) = u32::try_from(shift) else {
+                    return AbstractRange::unknown();
+                };
+                let factor = KernelRangeExpr::Constant(1_i128 << shift);
                 [factor.clone(), factor.clone()]
             } else {
                 let (Some(divisor_min), Some(divisor_max)) =
@@ -3756,7 +3759,10 @@ fn binary_range(op: HirBinOp, lhs: AbstractRange, rhs: AbstractRange) -> Abstrac
             if constant(&rhs.maximum) != Some(shift) {
                 return AbstractRange::unknown();
             }
-            let factor = KernelRangeExpr::Constant(1_i128 << shift as u32);
+            let Ok(shift) = u32::try_from(shift) else {
+                return AbstractRange::unknown();
+            };
+            let factor = KernelRangeExpr::Constant(1_i128 << shift);
             let values = [
                 multiply(lhs.minimum.clone(), factor.clone()),
                 multiply(lhs.maximum.clone(), factor),

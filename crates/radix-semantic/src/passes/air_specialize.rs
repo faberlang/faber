@@ -492,7 +492,7 @@ fn explicit_size_index(ty: TypeId, types: &TypeTable, interner: &Interner) -> Op
 // already-interned literal rather than minting a new index.
 fn find_or_intern_literal(value: u64, types: &TypeTable) -> Option<IndexId> {
     (0..types.index_count())
-        .map(|ordinal| IndexId(ordinal as u32))
+        .filter_map(|ordinal| u32::try_from(ordinal).ok().map(IndexId))
         .find(|id| matches!(types.get_index(*id), IndexExpr::Literal(found) if *found == value))
 }
 

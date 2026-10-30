@@ -452,7 +452,7 @@ impl Evaluator<'_> {
         let class = self.class(expr.ty);
         match literal {
             HirLiteral::Int(v) => match class {
-                Some(Class::Float) => Value::Float(*v as f64),
+                Some(Class::Float) => Value::Float(radix_types::Magnus::from_u64(*v).to_f64()),
                 Some(Class::Int(..)) => Value::Int(i128::from(*v)),
                 _ => Value::Opaque,
             },
@@ -480,7 +480,9 @@ impl Evaluator<'_> {
                     Ok(Value::Int(v))
                 }
             }
-            (Value::Int(v), Some(Class::Float)) => Ok(Value::Float(v as f64)),
+            (Value::Int(v), Some(Class::Float)) => {
+                Ok(Value::Float(radix_types::Magnus::from_i128(v).to_f64()))
+            }
             (Value::Float(v), Some(Class::Float)) if !v.is_finite() => {
                 Err(Fault::at(ISSUE_OVERFLOW, expr.span))
             }
@@ -508,8 +510,12 @@ fn binary(op: HirBinOp, lhs: Value, rhs: Value, span: Span) -> Result<Value, Fau
     match (lhs, rhs) {
         (Value::Int(a), Value::Int(b)) => int_binary(op, a, b, span),
         (Value::Float(a), Value::Float(b)) => float_binary(op, a, b).ok_or(not_constant),
-        (Value::Int(a), Value::Float(b)) => float_binary(op, a as f64, b).ok_or(not_constant),
-        (Value::Float(a), Value::Int(b)) => float_binary(op, a, b as f64).ok_or(not_constant),
+        (Value::Int(a), Value::Float(b)) => {
+            float_binary(op, radix_types::Magnus::from_i128(a).to_f64(), b).ok_or(not_constant)
+        }
+        (Value::Float(a), Value::Int(b)) => {
+            float_binary(op, a, radix_types::Magnus::from_i128(b).to_f64()).ok_or(not_constant)
+        }
         (Value::Bool(a), Value::Bool(b)) => match op {
             HirBinOp::And => Ok(Value::Bool(a && b)),
             HirBinOp::Or => Ok(Value::Bool(a || b)),
