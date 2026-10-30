@@ -18,6 +18,8 @@
 
 use radix_runtime_contract::trap::TrapKind;
 use std::alloc::{Layout, alloc, dealloc};
+#[cfg(test)]
+use std::cell::Cell;
 use std::cell::UnsafeCell;
 
 /// One arena chunk: a fixed header followed by `capacity` bump bytes.
@@ -46,6 +48,10 @@ fn out_of_memory() -> ! {
 /// (device steps are declined), so no locking is needed.
 pub struct Arena {
     current: UnsafeCell<*mut Chunk>,
+    /// Test-only count of `alloc_raw` calls, so tests can bound how many
+    /// fresh runs a sequence of operations allocates.
+    #[cfg(test)]
+    allocations: Cell<usize>,
 }
 
 #[cfg(test)]
@@ -62,12 +68,25 @@ impl Arena {
     pub(crate) fn new() -> Self {
         Self {
             current: UnsafeCell::new(std::ptr::null_mut()),
+            #[cfg(test)]
+            allocations: Cell::new(0),
         }
+    }
+
+    /// Test-only: how many `alloc_raw` calls this arena has served. A buffer
+    /// growth run is exactly one call, so the count bounds reallocations.
+    #[cfg(test)]
+    pub(crate) fn allocations(&self) -> usize {
+        self.allocations.get()
     }
 
     /// Bump-allocate `size` bytes at `align`; a new chunk when the current one
     /// cannot serve the request.
     pub(crate) fn alloc_raw(&self, size: usize, align: usize) -> *mut u8 {
+        #[cfg(test)]
+        {
+            self.allocations.set(self.allocations.get() + 1);
+        }
         debug_assert!(
             align.is_power_of_two(),
             "arena alignment must be a power of two"
@@ -253,6 +272,12 @@ impl<T: Copy> ArenaBuf<T> {
         self.length == 0
     }
 
+    /// The element capacity of the current run.
+    #[cfg(test)]
+    pub(crate) fn capacity(&self) -> usize {
+        self.capacity
+    }
+
     pub(crate) fn clear(&mut self) {
         self.length = 0;
     }
@@ -303,7 +328,7 @@ impl<T: Copy> ArenaBuf<T> {
             return;
         }
         if length > self.capacity {
-            self.reserve_exact(arena, length);
+            self.reserve(arena, length);
         }
         // SAFETY: `items` covers `length` elements; the tail is filled here.
         unsafe {
@@ -324,7 +349,7 @@ impl<T: Copy> ArenaBuf<T> {
             .checked_add(items.len())
             .unwrap_or_else(|| out_of_memory());
         if wanted > self.capacity {
-            self.reserve_exact(arena, wanted);
+            self.reserve(arena, wanted);
         }
         // SAFETY: the buffer covers `wanted` elements after the reserve.
         unsafe {
@@ -346,6 +371,19 @@ impl<T: Copy> ArenaBuf<T> {
             capacity => capacity * 2,
         };
         self.reserve_exact(arena, next);
+    }
+
+    /// Ensure room for `wanted` elements: a fresh run of at least `wanted`,
+    /// and of twice the current capacity when that is larger, so repeated
+    /// small grows need only logarithmically many runs and copy each live
+    /// element a bounded number of times. Overflowed doubling falls back to
+    /// the exact demand; the run itself is still checked when allocated.
+    fn reserve(&mut self, arena: *const Arena, wanted: usize) {
+        let doubled = match self.capacity.checked_mul(2) {
+            Some(doubled) if doubled > wanted => doubled,
+            _ => wanted,
+        };
+        self.reserve_exact(arena, doubled);
     }
 
     /// Move the elements into a fresh run of at least `capacity`.

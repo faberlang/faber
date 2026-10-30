@@ -384,3 +384,63 @@ fn arena_churn_measurement() {
     let arena_time = before.elapsed();
     println!("text/list churn rounds={ROUNDS} legacy_box_vec={legacy:?} root_arena={arena_time:?}");
 }
+
+#[test]
+fn repeated_small_extends_grow_geometrically_not_one_run_per_extend() {
+    let arena = Arena::new();
+    let arena = std::ptr::from_ref(&arena);
+    // SAFETY: the arena outlives every use here and the runtime is
+    // single-threaded.
+    let allocations = || unsafe { (*arena).allocations() };
+
+    const EXTENDS: usize = 5_000;
+    let mut buffer = crate::arena::ArenaBuf::new();
+    for value in 0..EXTENDS {
+        let element = value as i64;
+        buffer.extend_from_slice(arena, std::slice::from_ref(&element));
+    }
+    assert_eq!(buffer.len(), EXTENDS);
+    assert_eq!(buffer.as_slice()[0], 0);
+    assert_eq!(buffer.as_slice()[EXTENDS / 2], (EXTENDS / 2) as i64);
+    assert_eq!(buffer.as_slice()[EXTENDS - 1], (EXTENDS - 1) as i64);
+    // Exact growth allocates one fresh run per extend and copies every live
+    // element again each time (quadratic work, quadratic retained garbage);
+    // geometric growth needs only a logarithmic number of runs and leaves
+    // headroom under twice the demand.
+    let runs = allocations();
+    assert!(
+        runs <= 24,
+        "each single-element extend allocated its own run: {runs} runs for {EXTENDS} extends"
+    );
+    let capacity = buffer.capacity();
+    assert!(
+        capacity > EXTENDS,
+        "no headroom after {EXTENDS} extends: capacity {capacity}"
+    );
+    assert!(
+        capacity <= 2 * EXTENDS,
+        "capacity {capacity} overshoots doubling for {EXTENDS} extends"
+    );
+
+    // The resize path grows by the same law.
+    let before = allocations();
+    let mut buffer = crate::arena::ArenaBuf::new();
+    for length in 1..=EXTENDS {
+        buffer.resize(arena, length, 7);
+    }
+    assert_eq!(buffer.len(), EXTENDS);
+    assert_eq!(buffer.as_slice()[0], 7);
+    assert_eq!(buffer.as_slice()[EXTENDS - 1], 7);
+    let runs = allocations() - before;
+    assert!(
+        runs <= 24,
+        "each one-element resize allocated its own run: {runs} runs for {EXTENDS} resizes"
+    );
+    assert!(buffer.capacity() > EXTENDS);
+
+    // Direct construction stays exact: one run of the asked capacity.
+    let before = allocations();
+    let exact = crate::arena::ArenaBuf::from_slice(arena, &[1i64, 2, 3]);
+    assert_eq!(exact.capacity(), 3);
+    assert_eq!(allocations() - before, 1);
+}
