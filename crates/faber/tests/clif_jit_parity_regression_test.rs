@@ -32,6 +32,16 @@ fn failure_line(output: &Output) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// The `CODE` of the first rendered `error[CODE[:issue]]` header, or `None`
+/// when stderr carries no coded error diagnostic.
+fn first_error_code(stderr: &str) -> Option<&str> {
+    stderr.lines().find_map(|line| {
+        let rest = line.strip_prefix("error[")?;
+        let (identity, _) = rest.split_once(']')?;
+        Some(identity.split_once(':').map_or(identity, |(code, _)| code))
+    })
+}
+
 fn assert_refused(source: &Path, shape: &str) {
     let jit = run(source, "clif-jit");
     let object = Command::new(env!("CARGO_BIN_EXE_faber"))
@@ -44,7 +54,11 @@ fn assert_refused(source: &Path, shape: &str) {
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert_eq!(output.status.code(), Some(65), "{source:?}: {stderr}");
         assert!(output.stdout.is_empty(), "refusal must precede execution");
-        assert!(stderr.contains("CODEGEN001"), "{stderr}");
+        assert_eq!(
+            first_error_code(&stderr),
+            Some("CODEGEN001"),
+            "refusal is the compile-lane decline: {stderr}"
+        );
         assert!(stderr.contains(shape), "expected {shape}: {stderr}");
     }
 }
