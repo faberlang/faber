@@ -121,17 +121,17 @@ impl LiveTuusCursorEscapeChecker<'_> {
                 context,
                 EscapeContext::LocalInit | EscapeContext::IteraSource
             ) {
-                self.error(self.issue_for_tuus_cursor_escape(context), expr.span);
+                self.error(Self::issue_for_tuus_cursor_escape(context), expr.span);
             }
             return;
         }
 
         if self.is_live_local_path(expr) && !matches!(context, EscapeContext::IteraSource) {
-            self.error(self.issue_for_bound_cursor_escape(context), expr.span);
+            self.error(Self::issue_for_bound_cursor_escape(context), expr.span);
         }
     }
 
-    fn issue_for_tuus_cursor_escape(&self, context: EscapeContext) -> &'static str {
+    fn issue_for_tuus_cursor_escape(context: EscapeContext) -> &'static str {
         match context {
             EscapeContext::CallArg => ISSUE_CALL_ARG,
             EscapeContext::Return => ISSUE_RETURN,
@@ -141,7 +141,7 @@ impl LiveTuusCursorEscapeChecker<'_> {
         }
     }
 
-    fn issue_for_bound_cursor_escape(&self, context: EscapeContext) -> &'static str {
+    fn issue_for_bound_cursor_escape(context: EscapeContext) -> &'static str {
         match context {
             EscapeContext::CallArg => ISSUE_CALL_ARG,
             EscapeContext::Return => ISSUE_RETURN,

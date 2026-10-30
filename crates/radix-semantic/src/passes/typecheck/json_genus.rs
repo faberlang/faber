@@ -184,7 +184,7 @@ impl TypeChecker<'_> {
             );
             return None;
         }
-        let Some(name) = self.annotation_string_value(&option.value) else {
+        let Some(name) = Self::annotation_string_value(&option.value) else {
             self.error_issue(
                 SemanticErrorKind::AnnotationInvalid,
                 ISSUE_JSON_FIELD_ANNOTATION_OPTION,
@@ -203,7 +203,7 @@ impl TypeChecker<'_> {
         Some(name)
     }
 
-    fn annotation_string_value(&self, value: &HirAnnotationValue) -> Option<Symbol> {
+    fn annotation_string_value(value: &HirAnnotationValue) -> Option<Symbol> {
         match value {
             HirAnnotationValue::String(symbol) => Some(*symbol),
             HirAnnotationValue::Expr(expr) => match &expr.kind {

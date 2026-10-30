@@ -20,7 +20,7 @@
 //! converts by the digits rule, never to its character. Failable rows follow
 //! D17: a `⊥` default, or `textus` propagation through the active channel.
 
-use super::*;
+use super::{HirExpression, NumericWidth, Primitive, Symbol, Type, TypeChecker, TypeId};
 
 pub(super) const ISSUE_CODE_HINT_PAIR_MISMATCH: &str = "code_hint_pair_mismatch";
 

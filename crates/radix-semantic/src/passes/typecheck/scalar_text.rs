@@ -105,7 +105,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::MethodCall(_, name, _, args, _) if args.len() == 2 => {
                 self.interner
                     .is_some_and(|interner| interner.resolve(*name) == "sectio")
-                    && self.is_unit_sectio_span(&args[0].expr, &args[1].expr)
+                    && Self::is_unit_sectio_span(&args[0].expr, &args[1].expr)
             }
             _ => false,
         }
@@ -138,12 +138,12 @@ impl TypeChecker<'_> {
             == 1
     }
 
-    fn is_unit_sectio_span(&mut self, start: &HirExpression, end: &HirExpression) -> bool {
+    fn is_unit_sectio_span(start: &HirExpression, end: &HirExpression) -> bool {
         match (&start.kind, &end.kind) {
             (
                 HirExpressionKind::Path(start_id),
                 HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs),
-            ) if self.paths_same(*start_id, lhs) => {
+            ) if Self::paths_same(*start_id, lhs) => {
                 matches!(&rhs.kind, HirExpressionKind::Literal(HirLiteral::Int(1)))
             }
             (
@@ -154,7 +154,7 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn paths_same(&self, left: DefId, rhs: &HirExpression) -> bool {
+    fn paths_same(left: DefId, rhs: &HirExpression) -> bool {
         matches!(&rhs.kind, HirExpressionKind::Path(right) if *right == left)
     }
 

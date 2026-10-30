@@ -1148,7 +1148,7 @@ impl ReductionBodyState {
         span: Span,
     ) {
         match &callee.kind {
-            HirExpressionKind::Path(def_id) => self.classify_callee(checker, *def_id, span),
+            HirExpressionKind::Path(def_id) => Self::classify_callee(checker, *def_id, span),
             other => {
                 if !matches!(other, HirExpressionKind::Error) {
                     effect(checker, span, "dynamic_function");
@@ -1192,7 +1192,7 @@ impl ReductionBodyState {
     /// device intrinsics, `@ nucleum fragment` calls and inlinable kernels
     /// (public or private) are admitted; async or fallible kernels, graphics
     /// stages, and ordinary host callables are not.
-    fn classify_callee(&mut self, checker: &mut TypeChecker<'_>, def_id: DefId, span: Span) {
+    fn classify_callee(checker: &mut TypeChecker<'_>, def_id: DefId, span: Span) {
         if checker.resolver.gpu_builtin(def_id).is_some() {
             return;
         }
