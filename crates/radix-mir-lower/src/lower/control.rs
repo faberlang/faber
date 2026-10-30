@@ -2861,7 +2861,7 @@ impl FunctionBuilder<'_> {
             let HirPattern::TypeTest { ty, binding, .. } = pattern else {
                 if matches!(pattern, HirPattern::Wildcard | HirPattern::Binding(_, _)) {
                     has_default = true;
-                    self.lower_type_test_arm_body(arm, &destination, result_ty)?;
+                    self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
                     reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
                     break;
                 }
@@ -2875,7 +2875,7 @@ impl FunctionBuilder<'_> {
                 if let Some((def_id, name)) = binding {
                     self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span);
                 }
-                self.lower_type_test_arm_body(arm, &destination, result_ty)?;
+                self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
                 reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
                 break;
             }
@@ -2897,7 +2897,7 @@ impl FunctionBuilder<'_> {
             if let Some((def_id, name)) = binding {
                 self.bind_type_test_family(*def_id, *name, &scrutinee_place, *ty, arm.span);
             }
-            self.lower_type_test_arm_body(arm, &destination, result_ty)?;
+            self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
             reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
             self.switch_to(else_id);
         }
@@ -2952,7 +2952,7 @@ impl FunctionBuilder<'_> {
     fn lower_type_test_arm_body(
         &mut self,
         arm: &HirCasuArm,
-        destination: &Option<MirPlace>,
+        destination: Option<MirPlace>,
         result_ty: TypeId,
     ) -> Option<()> {
         if let Some(destination) = destination {
@@ -2961,7 +2961,7 @@ impl FunctionBuilder<'_> {
                     .push(MirError::unsupported(arm.span, "type-test value arm is not a block"));
                 return None;
             };
-            self.lower_block_to_destination(block, destination.clone(), MirType::semantic(result_ty), arm.span)?;
+            self.lower_block_to_destination(block, destination, MirType::semantic(result_ty), arm.span)?;
         } else {
             self.lower_expr_value(&arm.body)?;
         }

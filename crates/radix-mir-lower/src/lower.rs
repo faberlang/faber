@@ -3856,7 +3856,7 @@ impl<'a> FunctionBuilder<'a> {
                 .captured_binding_metadata
                 .get(&def_id)
                 .map(|(_, ty)| *ty);
-            let place = self.adapt_narrowed_place(place, storage_ty, expr)?;
+            let place = self.adapt_narrowed_place(place, storage_ty, expr);
             return Some(MirOperand::Place(place));
         }
         let Some(binding) = self.bindings.get(&def_id).copied() else {
@@ -3964,7 +3964,7 @@ impl<'a> FunctionBuilder<'a> {
             return None;
         };
 
-        let place = self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr)?;
+        let place = self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr);
         Some(MirOperand::Place(place))
     }
 
@@ -4936,7 +4936,7 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn type_zero_struct_operand(&mut self, def_id: DefId, mir_ty: MirType, span: Span) -> Option<MirOperand> {
-        let fields = self.materialize_struct_fields(def_id, &[], aggregate::StructFieldFill::AllZero, span)?;
+        let fields = self.materialize_struct_fields(def_id, &[], &aggregate::StructFieldFill::AllZero, span)?;
         Some(self.construct_temp(
             MirAggregateKind::Struct(def_id),
             MirAggregateFields::Named(fields),

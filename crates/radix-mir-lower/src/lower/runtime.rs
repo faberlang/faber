@@ -4965,7 +4965,7 @@ impl FunctionBuilder<'_> {
         if !seen.insert(def_id) {
             return Some(());
         }
-        let fields = self.materialize_struct_fields(def_id, &[], aggregate::StructFieldFill::Construction, span)?;
+        let fields = self.materialize_struct_fields(def_id, &[], &aggregate::StructFieldFill::Construction, span)?;
         if !fields.is_empty() {
             defaults.push(MirStructFieldDefaults { def_id, fields });
         }
