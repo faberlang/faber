@@ -20,7 +20,7 @@ no_expected = "declaration-only"
 #     slots len..N with a real fill value — the default fill is the numeric
 #     zero of T; a `⊥` default names a different fill (element-typed)
 #   • the fill is a real value written at the conversion site, never a read of
-#     the carrier's uninitialized spare slots
+#     the carrier's spare slots
 #   • iterating the padded tensor is a plain Route T unroll (N lanes, budget 64)
 #   • zero fill plus an additive body (`sum`) needs no mask — 0 is the additive
 #     neutral; every non-neutral exit (product, min/max, first-match, append)

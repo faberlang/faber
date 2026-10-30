@@ -2010,6 +2010,21 @@ static inline int64_t faber_list_index(faber_i128 index, int64_t length) {
         return list;                                                                    \
     }                                                                                   \
                                                                                         \
+    /* A bounded literal (`xs: list<T, size N> ← [a, b]`): the carrier reserves     \
+     * its whole declared capacity and every spare cell holds the typed zero        \
+     * before the live prefix is copied in, so a later push has the capacity the    \
+     * type names. */                                                               \
+    static inline faber_list_##NAME *faber_list_##NAME##_of_fixed_capacity(             \
+        faber_arena *arena, int64_t count, const TYPE *items, int64_t capacity) {       \
+        faber_list_##NAME *list = faber_list_##NAME##_new_fixed(arena, capacity);       \
+        if (count > 0) {                                                                \
+            memcpy(list->items, items,                                                  \
+                   faber_collection_allocation_size(count, sizeof *items));             \
+        }                                                                               \
+        list->len = count;                                                              \
+        return list;                                                                    \
+    }                                                                                   \
+                                                                                        \
     /* `xs ↦ list<T, size N>`: a copy that carries capacity N, or false when the      \
      * source is longer. The copy is fixed, so a later push at capacity traps. */ \
     static inline bool faber_list_##NAME##_bounded(faber_arena *arena,                 \
