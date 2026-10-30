@@ -593,42 +593,7 @@ fn script_package_config(
 /// `norma:` imports are linked by `script::run_with_session`.
 pub(super) fn is_package_interpret_input(path: &Path) -> bool {
     package::is_manifest_backed_or_directory_package_input(path)
-        || manifestless_file_declares_non_kernel_import(path)
-}
-
-/// Whether a manifestless `.fab` file declares an import outside the kernel
-/// and outside `norma:`, which `script::run_with_session` links itself.
-fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
-    if !is_single_fab_file(path) {
-        return false;
-    }
-    let Ok(raw_source) = fs::read_to_string(path) else {
-        return false;
-    };
-    let display_name = path.display().to_string();
-    let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
-        return false;
-    };
-    // The no-locale default is `en`; a default pack that fails to load is a
-    // failed read, not a Latin fallback.
-    let Some(code_pack) = package::default_config_with_locale(radix::module::Target::HirTypeScript)
-        .ok()
-        .and_then(|config| config.locale_pack)
-    else {
-        return false;
-    };
-    let lex = radix::module::lexer::lex_with_locale_pack(peeled.body, &code_pack);
-    let parse = radix::module::parser::parse(lex);
-    let Some(program) = parse.program else {
-        return false;
-    };
-    program.statements.iter().any(|statement| {
-        let radix::module::syntax::StmtKind::Import(import) = &statement.kind else {
-            return false;
-        };
-        let path = parse.interner.resolve(import.path);
-        !radix::module::kernel::is_kernel_import_path(path) && !path.starts_with("norma:")
-    })
+        || package::manifestless_file_declares_non_kernel_import(path)
 }
 
 /// Whether `path` is a single `.fab` file (the single-source runner input).
@@ -900,9 +865,9 @@ fn run_on_device_session_shaped_with<H: radix_mir_runner::Host + ?Sized>(
 }
 
 /// A device run that failed after it started executing still emits its stats
-/// artifact (exit 1, the host meter and device receipt up to the failure), as
-/// a failing run does on the reference route; the caller then reports the
-/// returned diagnostics. A failure before launch has nothing to report.
+/// artifact with the run's sysexits class, the host meter and device receipt
+/// up to the failure; the caller then reports the returned diagnostics. A
+/// failure before launch has nothing to report.
 #[cfg(feature = "device-runtime")]
 fn finish_failed_device_run(
     failure: package::mir::DeviceSessionFailure,
@@ -917,8 +882,15 @@ fn finish_failed_device_run(
         // The run's own failure is the one reported: `finish_device_run`
         // exits the process itself when the artifact cannot be written, so
         // anything it does return is added to that failure.
-        if let Err(artifact) = finish_device_run(run, metadata, started, stats, stats_file, out, 1)
-        {
+        if let Err(artifact) = finish_device_run(
+            run,
+            metadata,
+            started,
+            stats,
+            stats_file,
+            out,
+            exit_status::status_for_run_diagnostics(&diagnostics),
+        ) {
             return diagnostics.into_iter().chain(artifact).collect();
         }
     }
@@ -927,7 +899,7 @@ fn finish_failed_device_run(
 
 /// Emit the host stats and device receipt in [`DEVICE_STATS_MARKER`] format
 /// for a finished device run that was asked to collect stats; `exit` is the
-/// run's recorded exit code (1 for a run that failed).
+/// run's process exit code, including the sysexits class of a failed run.
 #[cfg(feature = "device-runtime")]
 fn finish_device_run(
     run: package::mir::DeviceSessionRun,
@@ -947,10 +919,10 @@ fn finish_device_run(
     if let (Some(metadata), Some(runner_stats)) = (metadata, run_stats_value) {
         writeln!(out, "{DEVICE_STATS_MARKER}").ok();
         // `--stats` writes the structured artifact to stdout, so stdout stays
-        // marker-only there and the peak high-water note goes to stderr; the
-        // file-only mode (`--stats-file` alone) has no other channel and keeps
-        // both receipt lines on stdout. Either way the artifact carries
-        // `peak_allocated_bytes`.
+        // marker-only there and the peak high-water note goes to stderr. In
+        // file-only mode (`--stats-file` alone), the peak note remains on
+        // stdout; the backend-selection receipt is reported to stderr in both
+        // modes. Either way the artifact carries `peak_allocated_bytes`.
         let peak_note = format!(
             "device: peak allocated {} bytes",
             device.runtime.peak_allocated_bytes
