@@ -531,6 +531,70 @@ kind = "bin"
     );
 }
 
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_preserves_single_file_frontmatter_code_locale() {
+    let source = write_single_file(
+        "build-diagnostics-locale-frontmatter",
+        r#"+++
+locale = "la"
++++
+
+incipit {
+  nota "Salve, Munde!"
+}
+"#,
+    );
+    let output_dir = temp_dir("build-diagnostics-locale-frontmatter-out");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--target",
+        "go",
+        "--diagnostics-locale",
+        "th-TH",
+        "--out-dir",
+        output_dir.to_str().expect("utf8 output dir"),
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(
+        ok,
+        "diagnostics locale changed the source frontmatter code locale:\n{stderr}"
+    );
+    assert!(
+        PathBuf::from(stdout.trim()).exists(),
+        "expected generated Go output, got:\n{stdout}"
+    );
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_rejects_unsupported_input_shape() {
+    let source = write_plain_file("build-diagnostics-locale-unsupported", "main {}\n");
+    let output_dir = temp_dir("build-diagnostics-locale-unsupported-out");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--target",
+        "go",
+        "--diagnostics-locale",
+        "th-TH",
+        "--out-dir",
+        output_dir.to_str().expect("utf8 output dir"),
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(!ok, "unsupported input shape should fail");
+    assert!(stdout.is_empty(), "rejected build wrote stdout: {stdout}");
+    assert!(
+        stderr.contains(
+            "--diagnostics-locale th-TH requires a package path or .fab entry file (or stdin)"
+        ),
+        "expected diagnostics-locale input-shape gate to reject the input, got:\n{stderr}"
+    );
+}
+
 /// The single-file build lane reads its input from a path
 /// (`radix::module::Compiler::compile`), so `faber build -` reports the path
 /// `-` as unreadable (exit 66) with or without a locale flag. What a locale

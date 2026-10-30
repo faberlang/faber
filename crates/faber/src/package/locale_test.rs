@@ -102,12 +102,15 @@ fn single_file_build_cli_locale_overrides_frontmatter_code_locale() {
         false
     ));
     let (config, diagnostic_pack) =
-        single_file_build_config_with_locale(Target::HirGo, &entry, Some("la"), None)
+        single_file_build_config_with_locale(Target::HirGo, &entry, Some("la"), Some("th-TH"))
             .expect("single-file locale config");
     let code_pack = config.locale_pack.expect("code pack");
     assert_eq!(code_pack.metadata.id, "la");
     assert!(config.locale_pack_explicit);
-    assert_eq!(diagnostic_pack.expect("diagnostic pack").metadata.id, "la");
+    assert_eq!(
+        diagnostic_pack.expect("diagnostic pack").metadata.id,
+        "th-TH"
+    );
 
     let _ = fs::remove_dir_all(root);
 }
