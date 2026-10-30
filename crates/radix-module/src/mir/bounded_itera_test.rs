@@ -138,29 +138,37 @@ fn bounded_lista_ex_arm_k_unrolls_only_lanes_below_k() {
     assert!(!dump.contains("[const int 3]"), "no arm may read lane >= capacity: {dump}");
 }
 
+/// Above the N <= 10 split cap the `ex` value loop lowers as the plain
+/// runtime-length loop an unbounded lista uses: the bound is the carrier
+/// `len`, and there is no static split.
 #[test]
-fn bounded_lista_ex_capacity_above_ten_stays_unsupported() {
-    let unit = analyze_source(
-        &session(),
-        "bounded-itera.fab",
-        r"functio big(lista<numerus, magnitudo 11> xs) → vacuum {
+fn bounded_lista_ex_capacity_above_ten_lowers_to_length_loop() {
+    let source = r"functio big(lista<numerus, magnitudo 11> xs) → vacuum {
   itera ex xs sit x {
     nota x
   }
   redde
-}",
-        AnalyzeRequest::default(),
-    )
-    .expect("source analyzes; the decline is MIR's");
-    let errors = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
-        .expect_err("N > 10 exceeds the Route B code-size cap and must fail closed");
-    assert_eq!(errors.len(), 1, "exactly the itera decline fires: {errors:?}");
+}";
+    let unit = analyze_source(&session(), "bounded-itera.fab", source, AnalyzeRequest::default())
+        .expect("source analyzes; the loop is not a decline");
+    let lowered = lower_analyzed_unit(unit.application_view(), MirLoweringOptions::default())
+        .expect("capacity above ten lowers as the plain runtime-length loop");
+    validate_program(lowered.validated.program(), lowered.validated.validation())
+        .expect("the runtime-length loop MIR must validate");
+    let dump = dump_program(lowered.validated.program());
     assert!(
-        errors[0]
-            .issue
-            .contains("itera_collection_before_iterator_mir_lowering"),
-        "the N <= 10 cap keeps the Unsupported diagnostic family: {:?}",
-        errors[0].issue
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "bounded lista<T, magnitudo 11> itera ex must lower to the length loop: {dump}"
+    );
+    assert!(
+        dump.contains("runtime collection length("),
+        "the loop bound is the runtime carrier len: {dump}"
+    );
+    assert!(
+        !dump
+            .lines()
+            .any(|line| line.trim_start().starts_with("switch ")),
+        "above the cap there is no static split on len: {dump}"
     );
 }
 

@@ -463,6 +463,7 @@ impl ModuleState<'_> {
 
     fn signature_for(&self, function: &MirFunction) -> Lowered<Signature> {
         let mut signature = self.module.make_signature();
+        signature.params.push(AbiParam::new(self.pointer));
         if function.is_generator {
             // The collector: a runtime list every `cede` appends to.
             signature.params.push(AbiParam::new(types::I64));
@@ -559,6 +560,9 @@ impl ModuleState<'_> {
             return Ok(*found);
         }
         let mut signature = self.module.make_signature();
+        if symbol.name != abi::MAIN.name {
+            signature.params.push(AbiParam::new(self.pointer));
+        }
         for param in symbol.params {
             signature
                 .params
@@ -707,6 +711,8 @@ struct FunctionLower<'f, 'a> {
     values: FxHashMap<MirValueId, (Option<Value>, Rep)>,
     refs: FxHashMap<&'static str, FuncRef>,
     function_refs: FxHashMap<MirFunctionId, FuncRef>,
+    /// The arena inherited from the program entry as the hidden first parameter.
+    arena: Option<Value>,
     /// A generator's collector list, its leading parameter.
     collector: Option<Value>,
     generator: bool,
@@ -772,6 +778,7 @@ fn lower_function(state: &mut ModuleState<'_>, function: &MirFunction) -> Lowere
             wide_slots: handroll::FxHashSet::default(),
             narrow: handroll::FxHashSet::default(),
             huge: handroll::FxHashSet::default(),
+            arena: None,
             recovery_regions: handroll::FxHashMap::default(),
         };
         lower.run(function)?;
@@ -803,6 +810,7 @@ impl FunctionLower<'_, '_> {
             .ok_or_else(|| Decline::new("missing entry block"))?;
         self.builder.append_block_params_for_function_params(entry);
         self.builder.switch_to_block(entry);
+        self.arena = Some(self.builder.block_params(entry)[0]);
 
         let environment = self.state.closure_environment(function.id);
         self.declare_function_slots(function, environment.as_ref())?;
@@ -890,9 +898,9 @@ impl FunctionLower<'_, '_> {
         environment: Option<&MirClosureEnvironment>,
     ) -> Lowered<()> {
         let table = self.state.input.types;
-        let mut offset = usize::from(function.is_generator);
+        let mut offset = 1 + usize::from(function.is_generator);
         if function.is_generator {
-            self.collector = Some(self.builder.block_params(entry)[0]);
+            self.collector = Some(self.builder.block_params(entry)[1]);
         }
         if let Some(environment) = &environment {
             let value = self.builder.block_params(entry)[offset];
@@ -1278,7 +1286,10 @@ impl FunctionLower<'_, '_> {
     /// Call a runtime symbol; returns its first result when it has one.
     fn call_runtime(&mut self, symbol: &RuntimeSymbol, args: &[Value]) -> Lowered<Option<Value>> {
         let reference = self.runtime_ref(symbol)?;
-        let call = self.builder.ins().call(reference, args);
+        let mut values = Vec::with_capacity(args.len() + 1);
+        values.push(self.arena.expect("arena entry parameter"));
+        values.extend_from_slice(args);
+        let call = self.builder.ins().call(reference, &values);
         Ok(self.builder.inst_results(call).first().copied())
     }
 
@@ -4186,7 +4197,8 @@ impl FunctionLower<'_, '_> {
         {
             return Err(Decline::new("direct call of a generator"));
         }
-        let mut values = Vec::with_capacity(args.len() + 1);
+        let mut values = Vec::with_capacity(args.len() + 2);
+        values.push(self.arena.expect("arena entry parameter"));
         values.extend(environment);
         let by_address = self.address_flags(id);
         let returns = self.call_arguments(&by_address, args, &params, &mut values)?;
@@ -4239,7 +4251,7 @@ impl FunctionLower<'_, '_> {
         let list = self
             .call_runtime(&abi::LIST_NEW, &[])?
             .ok_or_else(|| Decline::new("list new result"))?;
-        let mut values = vec![list];
+        let mut values = vec![self.arena.expect("arena entry parameter"), list];
         for (position, arg) in args.iter().enumerate() {
             let (value, have) = self.scalar(arg)?;
             let value = match params.get(position) {
@@ -4295,7 +4307,8 @@ impl FunctionLower<'_, '_> {
                 MirCallee::Value(operand) => self.try_indirect_target(operand)?,
                 _ => self.try_direct_target(callee)?,
             };
-        let mut values = Vec::with_capacity(args.len() + 1);
+        let mut values = Vec::with_capacity(args.len() + 2);
+        values.push(self.arena.expect("arena entry parameter"));
         if let TryTarget::Direct(_, Some(environment)) | TryTarget::Indirect(_, environment) =
             &target
         {
@@ -4427,6 +4440,7 @@ impl FunctionLower<'_, '_> {
         };
         let flags = self.type_address_flags(signature);
         let mut abi_signature = self.state.module.make_signature();
+        abi_signature.params.push(AbiParam::new(self.state.pointer));
         abi_signature.params.push(AbiParam::new(types::I64));
         let mut params = Vec::with_capacity(signature.params.len());
         for (position, param) in signature.params.iter().enumerate() {
@@ -5283,9 +5297,15 @@ impl FunctionLower<'_, '_> {
             .ins()
             .iconst(types::I64, i64::try_from(suffix.len()).unwrap_or(0));
         let reference = self.runtime_ref(&abi::DEC_TRAP_STORE)?;
-        self.builder
-            .ins()
-            .call(reference, &[value, pointer, length]);
+        self.builder.ins().call(
+            reference,
+            &[
+                self.arena.expect("arena entry parameter"),
+                value,
+                pointer,
+                length,
+            ],
+        );
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
         Ok(stored)
@@ -5420,14 +5440,29 @@ impl FunctionLower<'_, '_> {
         if self.is_wide(value) {
             let (low, high) = self.split_wide(value);
             let reference = self.runtime_ref(&abi::TRAP_STORE_WIDE)?;
-            self.builder
-                .ins()
-                .call(reference, &[low, high, pointer, length, unsigned]);
+            self.builder.ins().call(
+                reference,
+                &[
+                    self.arena.expect("arena entry parameter"),
+                    low,
+                    high,
+                    pointer,
+                    length,
+                    unsigned,
+                ],
+            );
         } else {
             let reference = self.runtime_ref(&abi::TRAP_STORE)?;
-            self.builder
-                .ins()
-                .call(reference, &[value, pointer, length, unsigned]);
+            self.builder.ins().call(
+                reference,
+                &[
+                    self.arena.expect("arena entry parameter"),
+                    value,
+                    pointer,
+                    length,
+                    unsigned,
+                ],
+            );
         }
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
@@ -5446,17 +5481,31 @@ impl FunctionLower<'_, '_> {
             Rep::Int if self.is_wide(value) => self.print_wide(stream, value)?,
             Rep::Int => {
                 let reference = self.runtime_ref(&abi::PRINT_I64)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Float => {
                 let reference = self.runtime_ref(&abi::PRINT_F64)?;
                 let narrow = self.float_narrow(argument);
                 let narrow = self.builder.ins().iconst(types::I32, narrow);
-                self.builder.ins().call(reference, &[stream, value, narrow]);
+                self.builder.ins().call(
+                    reference,
+                    &[
+                        self.arena.expect("arena entry parameter"),
+                        stream,
+                        value,
+                        narrow,
+                    ],
+                );
             }
             Rep::Bool => {
                 let reference = self.runtime_ref(&abi::PRINT_BOOL)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Bits(width) => {
                 let bits = self
@@ -5464,32 +5513,58 @@ impl FunctionLower<'_, '_> {
                     .ins()
                     .iconst(types::I32, i64::from(width.bits()));
                 let reference = self.runtime_ref(&abi::PRINT_BITS)?;
-                self.builder.ins().call(reference, &[stream, value, bits]);
+                self.builder.ins().call(
+                    reference,
+                    &[
+                        self.arena.expect("arena entry parameter"),
+                        stream,
+                        value,
+                        bits,
+                    ],
+                );
             }
             Rep::List => {
                 let reference = self.runtime_ref(&abi::PRINT_LIST)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Record => {
                 let reference = self.runtime_ref(&abi::PRINT_RECORD)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Opt => {
                 let reference = self.runtime_ref(&abi::PRINT_OPT)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Map | Rep::Set => {
                 let reference = self.runtime_ref(&abi::PRINT_MAP)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Regex | Rep::Match | Rep::Dec | Rep::Inf | Rep::Ins => {
                 let text = self.render_text(value, rep)?;
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
-                self.builder.ins().call(reference, &[stream, text]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, text],
+                );
             }
             Rep::Text | Rep::Char => {
                 let reference = self.runtime_ref(&abi::PRINT_TEXT)?;
-                self.builder.ins().call(reference, &[stream, value]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), stream, value],
+                );
             }
             Rep::Func => return Err(Decline::new("function value print")),
             Rep::Tuple => return Err(Decline::new("tuple print")),
@@ -6198,7 +6273,10 @@ impl FunctionLower<'_, '_> {
             .ins()
             .iconst(types::I64, i64::try_from(message.len()).unwrap_or(0));
         let reference = self.runtime_ref(&abi::TRAP)?;
-        self.builder.ins().call(reference, &[pointer, length]);
+        self.builder.ins().call(
+            reference,
+            &[self.arena.expect("arena entry parameter"), pointer, length],
+        );
         self.builder.ins().trap(TrapCode::unwrap_user(1));
         self.builder.switch_to_block(next);
         Ok(())

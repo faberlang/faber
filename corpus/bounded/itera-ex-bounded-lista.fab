@@ -4,7 +4,7 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "itera_stmt", "nota_stmt"]
 category = "list"
 canonical = false
-summary = "Value iteration over a runtime-length list<T, size N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; spare slots are never read."
+summary = "Value iteration over a runtime-length list<T, size N> (N <= 10) lowers to a static split on len; arm k unrolls k lanes; above 10 the loop lowers as the plain runtime-length loop, so any capacity runs."
 syntax = "for from list<T, size N> let x { }"
 related = ["lista", "ex", "itera", "longitudo"]
 locale = "en"
@@ -25,7 +25,9 @@ no_expected = "declaration-only"
 # Common mistakes:
 #   • expecting this to unroll in an `@ radix lane "air"` function — Route B
 #     is base-language only
-#   • capacities above 10 — the N(N+1)/2 lane budget caps at N = 10
+#   • capacities above 10 — the static split caps at N = 10; above it the
+#     loop lowers as the plain runtime-length loop (see
+#     itera-ex-bounded-lista-above-ten)
 #
 # See also: lista, itera-ex-air-lista
 # =============================================================================

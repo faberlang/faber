@@ -1,0 +1,52 @@
++++
+term = "itera-ex-bounded-lista-above-ten"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "assignment", "call_expr", "call_suffix", "argument_list", "argument", "itera_stmt", "nota_stmt"]
+category = "list"
+canonical = false
+summary = "Value iteration over a runtime-length list<T, size N> with N above 10 lowers to the plain runtime-length loop an unbounded list uses, so any capacity runs."
+syntax = "for from list<T, size N> let x { }"
+related = ["itera-ex-bounded-lista", "lista", "ex", "itera", "longitudo"]
+locale = "en"
++++
+# =============================================================================
+# itera-ex-bounded-lista-above-ten — value loop above the Route B split cap.
+# =============================================================================
+#
+# What this teaches:
+#   • the static len split (N+1 arms) is a small-N optimization: at N <= 10 the
+#     value loop still lowers to the `discerne` on len
+#   • above 10, and for a non-literal capacity, the loop lowers as the plain
+#     runtime-length loop an unbounded `list<T>` uses — the body runs exactly
+#     len times, so any capacity runs
+#   • spare slots past len are never read, exactly as in the split arms
+#
+# Common mistakes:
+#   • expecting capacities above 10 to decline — only the split is capped;
+#     the loop itself is not
+#
+# See also: itera-ex-bounded-lista, lista, itera-ex-air-lista
+# =============================================================================
+
+fn total(list<f32, size 12> w) → f32 {
+    mut f32 s ← 0.0
+    for from w let x {
+        s ← s + x
+    }
+    return s
+}
+
+fn count(list<int, size 64> xs) → int {
+    mut int n ← 0
+    for from xs let x {
+        n ← n + x
+    }
+    return n
+}
+
+main {
+    let list<f32, size 12> w ← [1.5, 2.5]
+    print total(w)
+    let list<int, size 64> xs ← [1, 2, 3]
+    print count(xs)
+}

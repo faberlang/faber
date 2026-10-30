@@ -10,6 +10,7 @@ use super::{
     List, Present, TAG_MATCH, TAG_TEXT, exit_trap, list_new_from, list_ref, text_bytes, text_new,
     text_str,
 };
+use crate::arena::ArenaPointer;
 use crate::regex_program::{self, MatchValue, RegexProgram};
 use radix_runtime_contract::trap::TrapKind;
 use std::sync::Mutex;
@@ -17,8 +18,8 @@ use std::sync::Mutex;
 /// The rejection payload of the latest failed compile.
 static REGEX_ERROR: Mutex<String> = Mutex::new(String::new());
 
-fn leak<T>(value: T) -> *const T {
-    Box::into_raw(Box::new(value))
+fn leak<T>(arena: *const super::Arena, value: T) -> *const T {
+    arena.put(value)
 }
 
 /// # Safety
@@ -42,12 +43,15 @@ unsafe fn text_of(text: *const u8) -> String {
     text_str(unsafe { text_bytes(text) }).into_owned()
 }
 
-fn some_text(text: Option<&str>) -> *const Present {
+fn some_text(arena: *const super::Arena, text: Option<&str>) -> *const Present {
     match text {
-        Some(text) => leak(Present {
-            tag: TAG_TEXT,
-            bits: text_new(text.as_bytes()) as i64,
-        }),
+        Some(text) => leak(
+            arena,
+            Present {
+                tag: TAG_TEXT,
+                bits: text_new(arena, text.as_bytes()) as i64,
+            },
+        ),
         None => std::ptr::null(),
     }
 }
@@ -59,9 +63,12 @@ fn some_text(text: Option<&str>) -> *const Present {
 ///
 /// `pattern` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_regex_compile(pattern: *const u8) -> *const RegexProgram {
+pub unsafe extern "C" fn __faber_clif_v1_regex_compile(
+    arena: *const super::Arena,
+    pattern: *const u8,
+) -> *const RegexProgram {
     match RegexProgram::compile(&unsafe { text_of(pattern) }) {
-        Ok(compiled) => leak(compiled),
+        Ok(compiled) => leak(arena, compiled),
         Err(payload) => {
             if let Ok(mut slot) = REGEX_ERROR.lock() {
                 *slot = payload;
@@ -73,12 +80,12 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_compile(pattern: *const u8) -> *c
 
 /// The payload of the latest rejected pattern, as a text.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_regex_error() -> *const u8 {
+pub extern "C" fn __faber_clif_v1_regex_error(arena: *const super::Arena) -> *const u8 {
     let payload = REGEX_ERROR
         .lock()
         .map(|slot| slot.clone())
         .unwrap_or_default();
-    text_new(payload.as_bytes())
+    text_new(arena, payload.as_bytes())
 }
 
 /// A regex literal: compiled once per evaluation; an invalid constant ends the
@@ -88,9 +95,12 @@ pub extern "C" fn __faber_clif_v1_regex_error() -> *const u8 {
 ///
 /// `pattern` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_regex_literal(pattern: *const u8) -> *const RegexProgram {
+pub unsafe extern "C" fn __faber_clif_v1_regex_literal(
+    arena: *const super::Arena,
+    pattern: *const u8,
+) -> *const RegexProgram {
     match RegexProgram::compile(&unsafe { text_of(pattern) }) {
-        Ok(compiled) => leak(compiled),
+        Ok(compiled) => leak(arena, compiled),
         Err(payload) => {
             exit_trap(
                 &format!("constant regex is invalid: {payload}"),
@@ -107,6 +117,7 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_literal(pattern: *const u8) -> *c
 /// Both handles are live.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_regex_matches(
+    _arena: *const super::Arena,
     regex: *const RegexProgram,
     text: *const u8,
 ) -> i8 {
@@ -120,14 +131,18 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_matches(
 /// Both handles are live.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_regex_find(
+    arena: *const super::Arena,
     regex: *const RegexProgram,
     text: *const u8,
 ) -> *const Present {
     match unsafe { program(regex) }.find(&unsafe { text_of(text) }) {
-        Some(value) => leak(Present {
-            tag: TAG_MATCH,
-            bits: leak(value) as i64,
-        }),
+        Some(value) => leak(
+            arena,
+            Present {
+                tag: TAG_MATCH,
+                bits: leak(arena, value) as i64,
+            },
+        ),
         None => std::ptr::null(),
     }
 }
@@ -139,15 +154,16 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_find(
 /// Both handles are live.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_regex_find_all(
+    arena: *const super::Arena,
     regex: *const RegexProgram,
     text: *const u8,
 ) -> *mut List {
     let items = unsafe { program(regex) }
         .find_all(&unsafe { text_of(text) })
         .into_iter()
-        .map(|value| (TAG_MATCH, leak(value) as i64))
+        .map(|value| (TAG_MATCH, leak(arena, value) as i64))
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// The pieces of the text between the matches, as a list of texts.
@@ -157,15 +173,16 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_find_all(
 /// Both handles are live.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_regex_split(
+    arena: *const super::Arena,
     regex: *const RegexProgram,
     text: *const u8,
 ) -> *mut List {
     let items = unsafe { program(regex) }
         .split(&unsafe { text_of(text) })
         .into_iter()
-        .map(|piece| (TAG_TEXT, text_new(piece.as_bytes()) as i64))
+        .map(|piece| (TAG_TEXT, text_new(arena, piece.as_bytes()) as i64))
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// The text with every match replaced by the literal replacement.
@@ -175,13 +192,14 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_split(
 /// All three handles are live.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_regex_replace(
+    arena: *const super::Arena,
     regex: *const RegexProgram,
     text: *const u8,
     replacement: *const u8,
 ) -> *const u8 {
     let replaced = unsafe { program(regex) }
         .replace_all_literal(&unsafe { text_of(text) }, &unsafe { text_of(replacement) });
-    text_new(replaced.as_bytes())
+    text_new(arena, replaced.as_bytes())
 }
 
 /// The text with the i-th match replaced by the i-th replacement; a count
@@ -192,6 +210,7 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_replace(
 /// All handles are live and `replacements` is a list of texts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_regex_replace_each(
+    arena: *const super::Arena,
     regex: *const RegexProgram,
     text: *const u8,
     replacements: *const List,
@@ -205,7 +224,7 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_replace_each(
     else {
         exit_trap("replace-each count mismatch", TrapKind::ProgramLogic);
     };
-    text_new(replaced.as_bytes())
+    text_new(arena, replaced.as_bytes())
 }
 
 /// The text of a match.
@@ -214,8 +233,11 @@ pub unsafe extern "C" fn __faber_clif_v1_regex_replace_each(
 ///
 /// `value` is a live match handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_match_text(value: *const MatchValue) -> *const u8 {
-    text_new(unsafe { found(value) }.text.as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_match_text(
+    arena: *const super::Arena,
+    value: *const MatchValue,
+) -> *const u8 {
+    text_new(arena, unsafe { found(value) }.text.as_bytes())
 }
 
 /// The code-point offset where a match starts.
@@ -224,7 +246,10 @@ pub unsafe extern "C" fn __faber_clif_v1_match_text(value: *const MatchValue) ->
 ///
 /// `value` is a live match handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_match_start(value: *const MatchValue) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_match_start(
+    _arena: *const super::Arena,
+    value: *const MatchValue,
+) -> i64 {
     i64::try_from(unsafe { found(value) }.start).unwrap_or(i64::MAX)
 }
 
@@ -234,7 +259,10 @@ pub unsafe extern "C" fn __faber_clif_v1_match_start(value: *const MatchValue) -
 ///
 /// `value` is a live match handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_match_end(value: *const MatchValue) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_match_end(
+    _arena: *const super::Arena,
+    value: *const MatchValue,
+) -> i64 {
     i64::try_from(unsafe { found(value) }.end).unwrap_or(i64::MAX)
 }
 
@@ -246,13 +274,14 @@ pub unsafe extern "C" fn __faber_clif_v1_match_end(value: *const MatchValue) -> 
 /// `value` is a live match handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_match_group(
+    arena: *const super::Arena,
     value: *const MatchValue,
     index: i64,
 ) -> *const Present {
     let group = usize::try_from(index)
         .ok()
         .and_then(|index| unsafe { found(value) }.group(index));
-    some_text(group)
+    some_text(arena, group)
 }
 
 /// A named group as a present text, or null.
@@ -262,10 +291,14 @@ pub unsafe extern "C" fn __faber_clif_v1_match_group(
 /// `value` is a live match handle and `name` a live text.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_match_named(
+    arena: *const super::Arena,
     value: *const MatchValue,
     name: *const u8,
 ) -> *const Present {
-    some_text(unsafe { found(value) }.named(&unsafe { text_of(name) }))
+    some_text(
+        arena,
+        unsafe { found(value) }.named(&unsafe { text_of(name) }),
+    )
 }
 
 /// A pattern text matching the given text literally.
@@ -274,8 +307,14 @@ pub unsafe extern "C" fn __faber_clif_v1_match_named(
 ///
 /// `text` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_escape(text: *const u8) -> *const u8 {
-    text_new(regex_program::escape(&unsafe { text_of(text) }).as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_text_escape(
+    arena: *const super::Arena,
+    text: *const u8,
+) -> *const u8 {
+    text_new(
+        arena,
+        regex_program::escape(&unsafe { text_of(text) }).as_bytes(),
+    )
 }
 
 /// The pattern of a regex, as a text (its display).
@@ -284,8 +323,11 @@ pub unsafe extern "C" fn __faber_clif_v1_text_escape(text: *const u8) -> *const 
 ///
 /// `regex` is a live regex handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_regex_text(regex: *const RegexProgram) -> *const u8 {
-    text_new(unsafe { program(regex) }.pattern().as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_regex_text(
+    arena: *const super::Arena,
+    regex: *const RegexProgram,
+) -> *const u8 {
+    text_new(arena, unsafe { program(regex) }.pattern().as_bytes())
 }
 
 /// Display of a regex element: its pattern.

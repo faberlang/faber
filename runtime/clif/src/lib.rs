@@ -15,6 +15,8 @@
 //! blocks are declined), so the process-global state needs no locking beyond
 //! what a `static` demands.
 
+mod arena;
+pub use arena::Arena;
 mod dec;
 mod format_rt;
 mod format_spec;
@@ -45,6 +47,13 @@ use radix_runtime_contract::display::{display_bivalens, display_fractus};
 use radix_runtime_contract::display_tokens::DisplayTokens;
 use radix_runtime_contract::trap::text::{self as trap_text, window_inside};
 use radix_runtime_contract::trap::{TrapKind, abort_exit_status, exit_status, trap_line};
+
+use crate::arena::{ArenaBuf, ArenaPointer};
+
+#[cfg(test)]
+pub(crate) fn test_arena_ptr() -> *const Arena {
+    crate::arena::test_arena_ptr()
+}
 
 /// Process-global runtime state, written once by [`__faber_clif_v1_main`].
 struct Context {
@@ -119,11 +128,12 @@ fn emit(stream: i32, line: &str) {
 
 /// The program's entry as the backend emits it: installs the output words,
 /// runs the program, and returns the process exit status.
-pub type Incipit = unsafe extern "C" fn() -> i32;
+pub type Incipit = unsafe extern "C" fn(*const std::ffi::c_void) -> i32;
 
-/// Run a program: record its arguments, call its `incipit`, flush stdout and
-/// hand back the exit status. A trap or an uncaught failure never returns; it
-/// flushes and exits the process with its own status.
+/// Run a program: record its arguments, install the root arena, call its
+/// `incipit`, release the arena, flush stdout and hand back the exit status. A
+/// trap or an uncaught failure never returns; it flushes and exits the process
+/// with its own status.
 ///
 /// This is the one entry both routes share. A linked executable reaches it
 /// through the emitted C `main` ([`__faber_clif_v1_main`]); an in-process image
@@ -134,13 +144,21 @@ pub type Incipit = unsafe extern "C" fn() -> i32;
 /// # Safety
 ///
 /// `incipit` must be the `faber_clif_incipit` the backend emitted for the
-/// program: a `() -> i32` function in the C calling convention that stays
+/// program: an `(arena) -> i32` function in the C calling convention that stays
 /// callable for the duration of the call.
 pub unsafe fn run_program(arguments: Vec<String>, incipit: Incipit) -> i32 {
     let _ = CONTEXT.set(Context { arguments });
+    // One program, one run, one root arena: fresh conversations, a fresh
+    // arena installed for the incipit, and everything released when it hands
+    // back the status. A trap path exits the process, whose kernel reclaims
+    // the chunks — the same law the linked C route runs under.
+    sermo::reset_conversations();
+    let arena = Arena::new();
+    let arena_pointer = std::ptr::from_ref(&arena).cast::<std::ffi::c_void>();
     // The entry hands back the process exit status (`main exit <expr>`), 0
     // when it returns nothing.
-    let status = unsafe { incipit() };
+    let status = unsafe { incipit(arena_pointer) };
+    drop(arena);
     flush();
     status
 }
@@ -167,6 +185,7 @@ pub unsafe extern "C" fn __faber_clif_v1_main(
 /// Each pointer addresses its length in readable bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_set_display_tokens(
+    _arena: *const Arena,
     true_pointer: *const u8,
     true_length: i64,
     false_pointer: *const u8,
@@ -191,21 +210,30 @@ pub unsafe extern "C" fn __faber_clif_v1_set_display_tokens(
 
 /// Print one signed integer line (stream 0 stdout, 1 stderr).
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_print_i64(stream: i32, value: i64) {
+pub extern "C" fn __faber_clif_v1_print_i64(_arena: *const Arena, stream: i32, value: i64) {
     emit(stream, &value.to_string());
 }
 
 /// Print one signed integer line for an exact intermediate beyond the 64-bit
 /// carrier, given as its low and high halves.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_print_wide(stream: i32, low: i64, high: i64) {
+pub extern "C" fn __faber_clif_v1_print_wide(
+    _arena: *const Arena,
+    stream: i32,
+    low: i64,
+    high: i64,
+) {
     emit(stream, &join_wide(low, high).to_string());
 }
 
 /// Render an exact intermediate as text.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_text_from_wide(low: i64, high: i64) -> *const u8 {
-    text_new(join_wide(low, high).to_string().as_bytes())
+pub extern "C" fn __faber_clif_v1_text_from_wide(
+    arena: *const Arena,
+    low: i64,
+    high: i64,
+) -> *const u8 {
+    text_new(arena, join_wide(low, high).to_string().as_bytes())
 }
 
 /// The smallest and largest exact integer (ruling 17a).
@@ -242,6 +270,7 @@ fn exact_trap(message: &str) -> ! {
 /// Exact product of two intermediates; outside the exact range is an overflow.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_wide_mul(
+    _arena: *const Arena,
     a_low: i64,
     a_high: i64,
     b_low: i64,
@@ -257,6 +286,7 @@ pub extern "C" fn __faber_clif_v1_wide_mul(
 /// Floor quotient (`remainder == 0`) or floor remainder of two intermediates.
 #[unsafe(no_mangle)]
 pub extern "C" fn __faber_clif_v1_wide_div(
+    _arena: *const Arena,
     a_low: i64,
     a_high: i64,
     b_low: i64,
@@ -282,13 +312,18 @@ pub extern "C" fn __faber_clif_v1_wide_div(
 
 /// The high half of the latest wide result.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_wide_hi() -> i64 {
+pub extern "C" fn __faber_clif_v1_wide_hi(_arena: *const Arena) -> i64 {
     WIDE_HIGH.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Print one float line; `narrow` selects the `f32` display contract.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_print_f64(stream: i32, value: f64, narrow: i32) {
+pub extern "C" fn __faber_clif_v1_print_f64(
+    _arena: *const Arena,
+    stream: i32,
+    value: f64,
+    narrow: i32,
+) {
     #[allow(clippy::cast_possible_truncation)]
     let text = if narrow == 0 {
         display_fractus(value)
@@ -300,7 +335,7 @@ pub extern "C" fn __faber_clif_v1_print_f64(stream: i32, value: f64, narrow: i32
 
 /// Print one boolean line using the program's output tokens.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_print_bool(stream: i32, value: i8) {
+pub extern "C" fn __faber_clif_v1_print_bool(_arena: *const Arena, stream: i32, value: i8) {
     emit(stream, display_bivalens(value != 0, tokens()));
 }
 
@@ -315,11 +350,14 @@ unsafe fn text_bytes<'a>(handle: *const u8) -> &'a [u8] {
     unsafe { std::slice::from_raw_parts(handle.add(8), usize::try_from(length).unwrap_or(0)) }
 }
 
-fn text_new(bytes: &[u8]) -> *const u8 {
+/// One text handle: `[len: i64][bytes...]` in the arena, the layout the
+/// generated literals are baked in.
+fn text_new(arena: *const Arena, bytes: &[u8]) -> *const u8 {
     let mut buffer = Vec::with_capacity(8 + bytes.len());
     buffer.extend_from_slice(&i64::try_from(bytes.len()).unwrap_or(0).to_ne_bytes());
     buffer.extend_from_slice(bytes);
-    Box::leak(buffer.into_boxed_slice()).as_ptr()
+    let stored = arena.put_slice(buffer.as_slice());
+    stored.cast::<u8>()
 }
 
 fn text_str(bytes: &[u8]) -> std::borrow::Cow<'_, str> {
@@ -334,19 +372,28 @@ fn bits_text(pattern: i64, width: i32) -> String {
 
 /// Print one raw-bits line: `0x` and lowercase hex digits at the full width.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_print_bits(stream: i32, pattern: i64, width: i32) {
+pub extern "C" fn __faber_clif_v1_print_bits(
+    _arena: *const Arena,
+    stream: i32,
+    pattern: i64,
+    width: i32,
+) {
     emit(stream, &bits_text(pattern, width));
 }
 
 /// Render a raw-bits value as text.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_text_from_bits(pattern: i64, width: i32) -> *const u8 {
-    text_new(bits_text(pattern, width).as_bytes())
+pub extern "C" fn __faber_clif_v1_text_from_bits(
+    arena: *const Arena,
+    pattern: i64,
+    width: i32,
+) -> *const u8 {
+    text_new(arena, bits_text(pattern, width).as_bytes())
 }
 
 /// A runtime list: tagged 64-bit elements (see `abi::TAG_*` in the generator).
 pub struct List {
-    items: Vec<(i32, i64)>,
+    items: ArenaBuf<(i32, i64)>,
 }
 
 const TAG_INT: i32 = 0;
@@ -377,11 +424,11 @@ const TAG_INS: i32 = 17;
 /// in insertion order.
 pub struct Map {
     set: bool,
-    entries: Vec<(i32, i64, i32, i64)>,
+    entries: ArenaBuf<(i32, i64, i32, i64)>,
     // Open-addressed entry positions; zero means empty, otherwise position + 1.
     // Only keys with a content-consistent hash are indexed. Other key families
     // retain the equality-preserving linear scan in `map_find`.
-    slots: Vec<usize>,
+    slots: ArenaBuf<usize>,
     index_mask: usize,
     indexed_len: usize,
 }
@@ -397,7 +444,7 @@ pub struct Present {
 pub struct Record {
     name: *const u8,
     variant: bool,
-    fields: Vec<(*const u8, i32, i64)>,
+    fields: ArenaBuf<(*const u8, i32, i64)>,
 }
 
 /// # Safety
@@ -415,8 +462,10 @@ unsafe fn list_mut<'a>(handle: *mut List) -> &'a mut List {
     unsafe { &mut *handle }
 }
 
-fn list_new_from(items: Vec<(i32, i64)>) -> *mut List {
-    Box::into_raw(Box::new(List { items }))
+fn list_new_from(arena: *const Arena, items: Vec<(i32, i64)>) -> *mut List {
+    arena.put(List {
+        items: ArenaBuf::from_slice(arena, &items),
+    })
 }
 
 /// Display one element; text elements are quoted as the runner quotes them.
@@ -483,51 +532,56 @@ fn record_text(record: &Record) -> String {
     format!("{name} {{ {} }}", parts.join(", "))
 }
 
-fn duplicate(tag: i32, bits: i64) -> i64 {
+fn duplicate(arena: *const Arena, tag: i32, bits: i64) -> i64 {
     match tag {
         TAG_MAP => {
             let source = unsafe { &*(bits as *const Map) };
-            let entries = source
+            let entries: Vec<(i32, i64, i32, i64)> = source
                 .entries
+                .as_slice()
                 .iter()
-                .map(|&(kt, kb, vt, vb)| (kt, duplicate(kt, kb), vt, duplicate(vt, vb)))
+                .map(|&(kt, kb, vt, vb)| {
+                    (kt, duplicate(arena, kt, kb), vt, duplicate(arena, vt, vb))
+                })
                 .collect();
-            Box::into_raw(Box::new(Map {
+            arena.put(Map {
                 set: source.set,
-                entries,
-                slots: Vec::new(),
+                entries: ArenaBuf::from_slice(arena, &entries),
+                slots: ArenaBuf::new(),
                 index_mask: 0,
                 indexed_len: 0,
-            })) as i64
+            }) as i64
         }
         TAG_OPT => match unsafe { (bits as *const Present).as_ref() } {
-            Some(present) => Box::into_raw(Box::new(Present {
+            Some(present) => arena.put(Present {
                 tag: present.tag,
-                bits: duplicate(present.tag, present.bits),
-            })) as i64,
+                bits: duplicate(arena, present.tag, present.bits),
+            }) as i64,
             None => 0,
         },
         TAG_LIST => {
             let source = unsafe { list_ref(bits as *const List) };
-            let items = source
+            let items: Vec<(i32, i64)> = source
                 .items
+                .as_slice()
                 .iter()
-                .map(|&(tag, bits)| (tag, duplicate(tag, bits)))
+                .map(|&(tag, bits)| (tag, duplicate(arena, tag, bits)))
                 .collect();
-            list_new_from(items) as i64
+            list_new_from(arena, items) as i64
         }
         TAG_STRUCT => {
             let source = unsafe { &*(bits as *const Record) };
-            let fields = source
+            let fields: Vec<(*const u8, i32, i64)> = source
                 .fields
+                .as_slice()
                 .iter()
-                .map(|&(name, tag, bits)| (name, tag, duplicate(tag, bits)))
+                .map(|&(name, tag, bits)| (name, tag, duplicate(arena, tag, bits)))
                 .collect();
-            Box::into_raw(Box::new(Record {
+            arena.put(Record {
                 name: source.name,
                 variant: source.variant,
-                fields,
-            })) as i64
+                fields: ArenaBuf::from_slice(arena, &fields),
+            }) as i64
         }
         _ => bits,
     }
@@ -539,8 +593,12 @@ fn duplicate(tag: i32, bits: i64) -> i64 {
 ///
 /// `bits` is a live handle of the kind `tag` names.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_duplicate(tag: i32, bits: i64) -> i64 {
-    duplicate(tag, bits)
+pub unsafe extern "C" fn __faber_clif_v1_duplicate(
+    arena: *const Arena,
+    tag: i32,
+    bits: i64,
+) -> i64 {
+    duplicate(arena, tag, bits)
 }
 
 fn map_text(map: &Map) -> String {
@@ -597,7 +655,7 @@ fn map_index_capacity(count: usize) -> Option<usize> {
         .map(|capacity| capacity.max(8))
 }
 
-fn map_index_build(map: &mut Map) {
+fn map_index_build(arena: *const Arena, map: &mut Map) {
     map.indexed_len = map
         .entries
         .iter()
@@ -608,7 +666,7 @@ fn map_index_build(map: &mut Map) {
         map.indexed_len = 0;
         return;
     };
-    let mut slots = vec![0; capacity];
+    let mut slots = ArenaBuf::filled(arena, capacity, 0);
     for (position, &(tag, bits, _, _)) in map.entries.iter().enumerate() {
         if let Some(hash) = map_key_hash(tag, bits) {
             let mut slot = hash as usize & (capacity - 1);
@@ -622,7 +680,7 @@ fn map_index_build(map: &mut Map) {
     map.index_mask = capacity - 1;
 }
 
-fn map_index_insert(map: &mut Map, position: usize) {
+fn map_index_insert(arena: *const Arena, map: &mut Map, position: usize) {
     let (tag, bits, _, _) = map.entries[position];
     let Some(hash) = map_key_hash(tag, bits) else {
         return;
@@ -635,7 +693,7 @@ fn map_index_insert(map: &mut Map, position: usize) {
     map.indexed_len = indexed_len;
     if map.slots.is_empty() {
         if map.indexed_len >= 8 {
-            map_index_build(map);
+            map_index_build(arena, map);
         }
         return;
     }
@@ -645,7 +703,7 @@ fn map_index_insert(map: &mut Map, position: usize) {
         .zip(map.slots.len().checked_mul(7))
         .is_none_or(|(count, limit)| count >= limit);
     if needs_growth {
-        map_index_build(map);
+        map_index_build(arena, map);
         return;
     }
     let mut slot = hash as usize & map.index_mask;
@@ -678,14 +736,14 @@ fn map_find(map: &Map, tag: i32, bits: i64) -> Option<usize> {
 
 /// New empty map (flag 0) or set (flag 1).
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_map_new(set: i32) -> *mut Map {
-    Box::into_raw(Box::new(Map {
+pub extern "C" fn __faber_clif_v1_map_new(arena: *const Arena, set: i32) -> *mut Map {
+    arena.put(Map {
         set: set != 0,
-        entries: Vec::new(),
-        slots: Vec::new(),
+        entries: ArenaBuf::new(),
+        slots: ArenaBuf::new(),
         index_mask: 0,
         indexed_len: 0,
-    }))
+    })
 }
 
 /// Insert or replace an entry.
@@ -695,6 +753,7 @@ pub extern "C" fn __faber_clif_v1_map_new(set: i32) -> *mut Map {
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_map_set(
+    arena: *const Arena,
     map: *mut Map,
     key_tag: i32,
     key: i64,
@@ -706,8 +765,8 @@ pub unsafe extern "C" fn __faber_clif_v1_map_set(
         map.entries[at] = (key_tag, key, value_tag, value);
     } else {
         let position = map.entries.len();
-        map.entries.push((key_tag, key, value_tag, value));
-        map_index_insert(map, position);
+        map.entries.push(arena, (key_tag, key, value_tag, value));
+        map_index_insert(arena, map, position);
     }
 }
 
@@ -717,7 +776,12 @@ pub unsafe extern "C" fn __faber_clif_v1_map_set(
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_map_get(map: *const Map, key_tag: i32, key: i64) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_map_get(
+    _arena: *const Arena,
+    map: *const Map,
+    key_tag: i32,
+    key: i64,
+) -> i64 {
     let map = unsafe { &*map };
     match map_find(map, key_tag, key) {
         Some(at) => map.entries[at].3,
@@ -732,6 +796,7 @@ pub unsafe extern "C" fn __faber_clif_v1_map_get(map: *const Map, key_tag: i32, 
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_map_get_opt(
+    arena: *const Arena,
     map: *const Map,
     key_tag: i32,
     key: i64,
@@ -740,7 +805,7 @@ pub unsafe extern "C" fn __faber_clif_v1_map_get_opt(
     match map_find(map, key_tag, key) {
         Some(at) => {
             let (_, _, tag, bits) = map.entries[at];
-            Box::into_raw(Box::new(Present { tag, bits }))
+            arena.put(Present { tag, bits })
         }
         None => std::ptr::null(),
     }
@@ -752,7 +817,12 @@ pub unsafe extern "C" fn __faber_clif_v1_map_get_opt(
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_map_has(map: *const Map, key_tag: i32, key: i64) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_map_has(
+    _arena: *const Arena,
+    map: *const Map,
+    key_tag: i32,
+    key: i64,
+) -> i8 {
     i8::from(map_find(unsafe { &*map }, key_tag, key).is_some())
 }
 
@@ -762,13 +832,18 @@ pub unsafe extern "C" fn __faber_clif_v1_map_has(map: *const Map, key_tag: i32, 
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_map_remove(map: *mut Map, key_tag: i32, key: i64) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_map_remove(
+    arena: *const Arena,
+    map: *mut Map,
+    key_tag: i32,
+    key: i64,
+) -> i8 {
     let map = unsafe { &mut *map };
     match map_find(map, key_tag, key) {
         Some(at) => {
             map.entries.remove(at);
             if !map.slots.is_empty() {
-                map_index_build(map);
+                map_index_build(arena, map);
             }
             1
         }
@@ -782,7 +857,7 @@ pub unsafe extern "C" fn __faber_clif_v1_map_remove(map: *mut Map, key_tag: i32,
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_map_len(map: *const Map) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_map_len(_arena: *const Arena, map: *const Map) -> i64 {
     i64::try_from(unsafe { &*map }.entries.len()).unwrap_or(i64::MAX)
 }
 
@@ -792,13 +867,16 @@ pub unsafe extern "C" fn __faber_clif_v1_map_len(map: *const Map) -> i64 {
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_map_keys(map: *const Map) -> *mut List {
+pub unsafe extern "C" fn __faber_clif_v1_map_keys(
+    arena: *const Arena,
+    map: *const Map,
+) -> *mut List {
     let items = unsafe { &*map }
         .entries
         .iter()
         .map(|&(tag, bits, _, _)| (tag, bits))
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// Values as a new list.
@@ -807,13 +885,16 @@ pub unsafe extern "C" fn __faber_clif_v1_map_keys(map: *const Map) -> *mut List 
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_map_values(map: *const Map) -> *mut List {
+pub unsafe extern "C" fn __faber_clif_v1_map_values(
+    arena: *const Arena,
+    map: *const Map,
+) -> *mut List {
     let items = unsafe { &*map }
         .entries
         .iter()
         .map(|&(_, _, tag, bits)| (tag, bits))
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// Print one map or set line.
@@ -822,7 +903,11 @@ pub unsafe extern "C" fn __faber_clif_v1_map_values(map: *const Map) -> *mut Lis
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_print_map(stream: i32, map: *const Map) {
+pub unsafe extern "C" fn __faber_clif_v1_print_map(
+    _arena: *const Arena,
+    stream: i32,
+    map: *const Map,
+) {
     emit(stream, &map_text(unsafe { &*map }));
 }
 
@@ -832,14 +917,21 @@ pub unsafe extern "C" fn __faber_clif_v1_print_map(stream: i32, map: *const Map)
 ///
 /// `map` is a live runtime map.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_from_map(map: *const Map) -> *const u8 {
-    text_new(map_text(unsafe { &*map }).as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_text_from_map(
+    arena: *const Arena,
+    map: *const Map,
+) -> *const u8 {
+    text_new(arena, map_text(unsafe { &*map }).as_bytes())
 }
 
 /// Box a present optional payload.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_opt_some(tag: i32, bits: i64) -> *const Present {
-    Box::into_raw(Box::new(Present { tag, bits }))
+pub extern "C" fn __faber_clif_v1_opt_some(
+    arena: *const Arena,
+    tag: i32,
+    bits: i64,
+) -> *const Present {
+    arena.put(Present { tag, bits })
 }
 
 /// Payload bits of a present optional; none ends the run.
@@ -848,10 +940,15 @@ pub extern "C" fn __faber_clif_v1_opt_some(tag: i32, bits: i64) -> *const Presen
 ///
 /// `handle` is null or a present optional.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_opt_bits(handle: *const Present) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_opt_bits(
+    _arena: *const Arena,
+    handle: *const Present,
+) -> i64 {
     match unsafe { handle.as_ref() } {
         Some(present) => present.bits,
-        None => abort("unwrap of nihil"),
+        None => unsafe {
+            __faber_clif_v1_trap(_arena, c"unwrapped a none value".as_ptr().cast(), 22)
+        },
     }
 }
 
@@ -861,7 +958,11 @@ pub unsafe extern "C" fn __faber_clif_v1_opt_bits(handle: *const Present) -> i64
 ///
 /// `handle` is null or a present optional.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_opt_bits_or(handle: *const Present, fallback: i64) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_opt_bits_or(
+    _arena: *const Arena,
+    handle: *const Present,
+    fallback: i64,
+) -> i64 {
     unsafe { handle.as_ref() }.map_or(fallback, |present| present.bits)
 }
 
@@ -871,7 +972,11 @@ pub unsafe extern "C" fn __faber_clif_v1_opt_bits_or(handle: *const Present, fal
 ///
 /// Both are null or present optionals.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_opt_eq(left: *const Present, right: *const Present) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_opt_eq(
+    _arena: *const Arena,
+    left: *const Present,
+    right: *const Present,
+) -> i8 {
     match unsafe { (left.as_ref(), right.as_ref()) } {
         (None, None) => 1,
         (Some(a), Some(b)) => i8::from(a.tag == b.tag && element_equal(a.tag, a.bits, b.bits)),
@@ -895,7 +1000,11 @@ fn opt_top_text(handle: *const Present) -> String {
 ///
 /// `handle` is null or a present optional.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_print_opt(stream: i32, handle: *const Present) {
+pub unsafe extern "C" fn __faber_clif_v1_print_opt(
+    _arena: *const Arena,
+    stream: i32,
+    handle: *const Present,
+) {
     emit(stream, &opt_top_text(handle));
 }
 
@@ -905,8 +1014,11 @@ pub unsafe extern "C" fn __faber_clif_v1_print_opt(stream: i32, handle: *const P
 ///
 /// `handle` is null or a present optional.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_from_opt(handle: *const Present) -> *const u8 {
-    text_new(opt_top_text(handle).as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_text_from_opt(
+    arena: *const Arena,
+    handle: *const Present,
+) -> *const u8 {
+    text_new(arena, opt_top_text(handle).as_bytes())
 }
 
 /// New empty record.
@@ -915,12 +1027,16 @@ pub unsafe extern "C" fn __faber_clif_v1_text_from_opt(handle: *const Present) -
 ///
 /// `name` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_record_new(name: *const u8, variant: i32) -> *mut Record {
-    Box::into_raw(Box::new(Record {
+pub unsafe extern "C" fn __faber_clif_v1_record_new(
+    arena: *const Arena,
+    name: *const u8,
+    variant: i32,
+) -> *mut Record {
+    arena.put(Record {
         name,
         variant: variant != 0,
-        fields: Vec::new(),
-    }))
+        fields: ArenaBuf::new(),
+    })
 }
 
 fn record_equal(left: &Record, right: &Record) -> bool {
@@ -940,6 +1056,7 @@ fn record_equal(left: &Record, right: &Record) -> bool {
 /// Both are live runtime records.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_record_eq(
+    _arena: *const Arena,
     left: *const Record,
     right: *const Record,
 ) -> i8 {
@@ -953,6 +1070,7 @@ pub unsafe extern "C" fn __faber_clif_v1_record_eq(
 /// `record` is a live runtime record and `field` a well-formed text.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_record_set(
+    arena: *const Arena,
     record: *mut Record,
     index: i64,
     field: *const u8,
@@ -962,9 +1080,9 @@ pub unsafe extern "C" fn __faber_clif_v1_record_set(
     let record = unsafe { &mut *record };
     let index = usize::try_from(index).unwrap_or(0);
     if record.fields.len() <= index {
-        record.fields.resize(index + 1, (field, 0, 0));
+        record.fields.resize(arena, index + 1, (field, 0, 0));
     }
-    record.fields[index] = (field, tag, bits);
+    record.fields.set(index, (field, tag, bits));
 }
 
 /// Field bits at `index`.
@@ -973,12 +1091,16 @@ pub unsafe extern "C" fn __faber_clif_v1_record_set(
 ///
 /// `record` is a live runtime record.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_record_get(record: *const Record, index: i64) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_record_get(
+    _arena: *const Arena,
+    record: *const Record,
+    index: i64,
+) -> i64 {
     let record = unsafe { &*record };
     usize::try_from(index)
         .ok()
         .and_then(|at| record.fields.get(at))
-        .map_or(0, |&(_, _, bits)| bits)
+        .map_or(0, |(_, _, bits)| bits)
 }
 
 /// Print one record line.
@@ -987,7 +1109,11 @@ pub unsafe extern "C" fn __faber_clif_v1_record_get(record: *const Record, index
 ///
 /// `record` is a live runtime record.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_print_record(stream: i32, record: *const Record) {
+pub unsafe extern "C" fn __faber_clif_v1_print_record(
+    _arena: *const Arena,
+    stream: i32,
+    record: *const Record,
+) {
     emit(stream, &record_text(unsafe { &*record }));
 }
 
@@ -997,14 +1123,17 @@ pub unsafe extern "C" fn __faber_clif_v1_print_record(stream: i32, record: *cons
 ///
 /// `record` is a live runtime record.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_from_record(record: *const Record) -> *const u8 {
-    text_new(record_text(unsafe { &*record }).as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_text_from_record(
+    arena: *const Arena,
+    record: *const Record,
+) -> *const u8 {
+    text_new(arena, record_text(unsafe { &*record }).as_bytes())
 }
 
 /// New empty list.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_list_new() -> *mut List {
-    list_new_from(Vec::new())
+pub extern "C" fn __faber_clif_v1_list_new(arena: *const Arena) -> *mut List {
+    list_new_from(arena, Vec::new())
 }
 
 /// Append one element.
@@ -1013,8 +1142,13 @@ pub extern "C" fn __faber_clif_v1_list_new() -> *mut List {
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_push(list: *mut List, tag: i32, bits: i64) {
-    unsafe { list_mut(list) }.items.push((tag, bits));
+pub unsafe extern "C" fn __faber_clif_v1_list_push(
+    arena: *const Arena,
+    list: *mut List,
+    tag: i32,
+    bits: i64,
+) {
+    unsafe { list_mut(list) }.items.push(arena, (tag, bits));
 }
 
 /// Append every element of `source` to `list`.
@@ -1023,9 +1157,15 @@ pub unsafe extern "C" fn __faber_clif_v1_list_push(list: *mut List, tag: i32, bi
 ///
 /// Both are live runtime lists.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_extend(list: *mut List, source: *const List) {
-    let copied = unsafe { list_ref(source) }.items.clone();
-    unsafe { list_mut(list) }.items.extend(copied);
+pub unsafe extern "C" fn __faber_clif_v1_list_extend(
+    arena: *const Arena,
+    list: *mut List,
+    source: *const List,
+) {
+    let copied = unsafe { list_ref(source) }.items.as_slice().to_vec();
+    unsafe { list_mut(list) }
+        .items
+        .extend_from_slice(arena, &copied);
 }
 
 /// Number of elements.
@@ -1034,7 +1174,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_extend(list: *mut List, source: *c
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_len(list: *const List) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_list_len(_arena: *const Arena, list: *const List) -> i64 {
     i64::try_from(unsafe { list_ref(list) }.items.len()).unwrap_or(i64::MAX)
 }
 
@@ -1065,13 +1205,17 @@ fn window_trap_if_negative(start: i64, end: i64) {
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_get(list: *const List, index: i64) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_list_get(
+    _arena: *const Arena,
+    list: *const List,
+    index: i64,
+) -> i64 {
     let list = unsafe { list_ref(list) };
     match usize::try_from(index)
         .ok()
         .and_then(|at| list.items.get(at))
     {
-        Some(&(_, bits)) => bits,
+        Some((_, bits)) => bits,
         None => index_out_of_bounds(index),
     }
 }
@@ -1083,6 +1227,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_get(list: *const List, index: i64)
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_set(
+    _arena: *const Arena,
     list: *mut List,
     index: i64,
     tag: i32,
@@ -1147,7 +1292,11 @@ fn element_equal(tag: i32, left: i64, right: i64) -> bool {
 ///
 /// Both are live runtime lists.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_eq(left: *const List, right: *const List) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_list_eq(
+    _arena: *const Arena,
+    left: *const List,
+    right: *const List,
+) -> i8 {
     i8::from(element_equal(TAG_LIST, left as i64, right as i64))
 }
 
@@ -1158,6 +1307,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_eq(left: *const List, right: *cons
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_contains(
+    _arena: *const Arena,
     list: *const List,
     tag: i32,
     bits: i64,
@@ -1176,10 +1326,13 @@ pub unsafe extern "C" fn __faber_clif_v1_list_contains(
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_reversed(list: *const List) -> *mut List {
-    let mut items = unsafe { list_ref(list) }.items.clone();
+pub unsafe extern "C" fn __faber_clif_v1_list_reversed(
+    arena: *const Arena,
+    list: *const List,
+) -> *mut List {
+    let mut items = unsafe { list_ref(list) }.items.as_slice().to_vec();
     items.reverse();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 fn element_order(tag: i32, left: i64, right: i64) -> std::cmp::Ordering {
@@ -1223,6 +1376,7 @@ fn list_order(left: &List, right: &List) -> std::cmp::Ordering {
 /// Both are live runtime lists.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_compare(
+    _arena: *const Arena,
     left: *const List,
     right: *const List,
 ) -> i64 {
@@ -1235,10 +1389,13 @@ pub unsafe extern "C" fn __faber_clif_v1_list_compare(
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_sorted(list: *const List) -> *mut List {
-    let mut items = unsafe { list_ref(list) }.items.clone();
+pub unsafe extern "C" fn __faber_clif_v1_list_sorted(
+    arena: *const Arena,
+    list: *const List,
+) -> *mut List {
+    let mut items = unsafe { list_ref(list) }.items.as_slice().to_vec();
     items.sort_by(|a, b| element_order(a.0, a.1, b.1));
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// A new copy ordered stably by a parallel list of keys; a length mismatch
@@ -1249,17 +1406,18 @@ pub unsafe extern "C" fn __faber_clif_v1_list_sorted(list: *const List) -> *mut 
 /// Both are live runtime lists.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_sorted_by_keys(
+    arena: *const Arena,
     list: *const List,
     keys: *const List,
 ) -> *mut List {
     let items = &unsafe { list_ref(list) }.items;
     let keys = &unsafe { list_ref(keys) }.items;
     if items.len() != keys.len() {
-        unsafe { __faber_clif_v1_trap(c"sort_by_keys length mismatch".as_ptr().cast(), 28) }
+        unsafe { __faber_clif_v1_trap(arena, c"sort_by_keys length mismatch".as_ptr().cast(), 28) }
     }
     let mut order: Vec<usize> = (0..items.len()).collect();
     order.sort_by(|&a, &b| element_order(keys[a].0, keys[a].1, keys[b].1));
-    list_new_from(order.into_iter().map(|at| items[at]).collect())
+    list_new_from(arena, order.into_iter().map(|at| items[at]).collect())
 }
 
 /// Print one list line.
@@ -1268,7 +1426,11 @@ pub unsafe extern "C" fn __faber_clif_v1_list_sorted_by_keys(
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_print_list(stream: i32, list: *const List) {
+pub unsafe extern "C" fn __faber_clif_v1_print_list(
+    _arena: *const Arena,
+    stream: i32,
+    list: *const List,
+) {
     emit(stream, &list_text(unsafe { list_ref(list) }));
 }
 
@@ -1278,8 +1440,11 @@ pub unsafe extern "C" fn __faber_clif_v1_print_list(stream: i32, list: *const Li
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_from_list(list: *const List) -> *const u8 {
-    text_new(list_text(unsafe { list_ref(list) }).as_bytes())
+pub unsafe extern "C" fn __faber_clif_v1_text_from_list(
+    arena: *const Arena,
+    list: *const List,
+) -> *const u8 {
+    text_new(arena, list_text(unsafe { list_ref(list) }).as_bytes())
 }
 
 /// Print one text line (stream 0 stdout, 1 stderr).
@@ -1288,7 +1453,11 @@ pub unsafe extern "C" fn __faber_clif_v1_text_from_list(list: *const List) -> *c
 ///
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_print_text(stream: i32, handle: *const u8) {
+pub unsafe extern "C" fn __faber_clif_v1_print_text(
+    _arena: *const Arena,
+    stream: i32,
+    handle: *const u8,
+) {
     emit(stream, &text_str(unsafe { text_bytes(handle) }));
 }
 
@@ -1299,6 +1468,7 @@ pub unsafe extern "C" fn __faber_clif_v1_print_text(stream: i32, handle: *const 
 /// Both handles address well-formed texts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_concat(
+    arena: *const Arena,
     left: *const u8,
     right: *const u8,
 ) -> *const u8 {
@@ -1308,12 +1478,12 @@ pub unsafe extern "C" fn __faber_clif_v1_text_concat(
     buffer.extend_from_slice(&i64::try_from(length).unwrap_or(0).to_ne_bytes());
     buffer.extend_from_slice(left);
     buffer.extend_from_slice(right);
-    Box::leak(buffer.into_boxed_slice()).as_ptr()
+    arena.put_slice(buffer.as_slice()).cast::<u8>()
 }
 
 /// Render an integer as text.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
+pub extern "C" fn __faber_clif_v1_text_from_i64(arena: *const Arena, value: i64) -> *const u8 {
     let mut digits = [0u8; 20];
     let mut cursor = digits.len();
     let mut magnitude = value.unsigned_abs();
@@ -1333,7 +1503,7 @@ pub extern "C" fn __faber_clif_v1_text_from_i64(value: i64) -> *const u8 {
     let mut buffer = Vec::with_capacity(8 + text.len());
     buffer.extend_from_slice(&i64::try_from(text.len()).unwrap_or(0).to_ne_bytes());
     buffer.extend_from_slice(text);
-    Box::leak(buffer.into_boxed_slice()).as_ptr()
+    arena.put_slice(buffer.as_slice()).cast::<u8>()
 }
 
 /// The only Unicode scalar of a text, if it holds exactly one.
@@ -1344,9 +1514,9 @@ fn only_scalar(bytes: &[u8]) -> Option<char> {
     chars.next().is_none().then_some(first)
 }
 
-fn char_text(ch: char) -> *const u8 {
+fn char_text(arena: *const Arena, ch: char) -> *const u8 {
     let mut buffer = [0u8; 4];
-    text_new(ch.encode_utf8(&mut buffer).as_bytes())
+    text_new(arena, ch.encode_utf8(&mut buffer).as_bytes())
 }
 
 /// A one-letter text from a text of exactly one scalar; null otherwise.
@@ -1355,7 +1525,10 @@ fn char_text(ch: char) -> *const u8 {
 ///
 /// `text` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_char_from_text(text: *const u8) -> *const u8 {
+pub unsafe extern "C" fn __faber_clif_v1_char_from_text(
+    _arena: *const Arena,
+    text: *const u8,
+) -> *const u8 {
     match only_scalar(unsafe { text_bytes(text) }) {
         Some(_) => text,
         None => std::ptr::null(),
@@ -1364,21 +1537,21 @@ pub unsafe extern "C" fn __faber_clif_v1_char_from_text(text: *const u8) -> *con
 
 /// A one-letter text from a code point; null for a surrogate or past Unicode.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_char_from_code(value: i64) -> *const u8 {
+pub extern "C" fn __faber_clif_v1_char_from_code(arena: *const Arena, value: i64) -> *const u8 {
     match u32::try_from(value).ok().and_then(char::from_u32) {
-        Some(ch) => char_text(ch),
+        Some(ch) => char_text(arena, ch),
         None => std::ptr::null(),
     }
 }
 
 /// A one-letter text from a decimal digit; null outside 0 to 9.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_char_from_digit(value: i64) -> *const u8 {
+pub extern "C" fn __faber_clif_v1_char_from_digit(arena: *const Arena, value: i64) -> *const u8 {
     match u32::try_from(value)
         .ok()
         .and_then(|digit| char::from_digit(digit, 10))
     {
-        Some(ch) => char_text(ch),
+        Some(ch) => char_text(arena, ch),
         None => std::ptr::null(),
     }
 }
@@ -1389,7 +1562,7 @@ pub extern "C" fn __faber_clif_v1_char_from_digit(value: i64) -> *const u8 {
 ///
 /// `text` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_char_code(text: *const u8) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_char_code(_arena: *const Arena, text: *const u8) -> i64 {
     only_scalar(unsafe { text_bytes(text) }).map_or(0, |ch| i64::from(u32::from(ch)))
 }
 
@@ -1399,7 +1572,7 @@ pub unsafe extern "C" fn __faber_clif_v1_char_code(text: *const u8) -> i64 {
 ///
 /// `text` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_char_digit(text: *const u8) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_char_digit(_arena: *const Arena, text: *const u8) -> i64 {
     only_scalar(unsafe { text_bytes(text) })
         .and_then(|ch| ch.to_digit(10))
         .map_or(-1, i64::from)
@@ -1411,12 +1584,15 @@ pub unsafe extern "C" fn __faber_clif_v1_char_digit(text: *const u8) -> i64 {
 ///
 /// `text` is a live runtime text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_chars(text: *const u8) -> *mut List {
+pub unsafe extern "C" fn __faber_clif_v1_text_chars(
+    arena: *const Arena,
+    text: *const u8,
+) -> *mut List {
     let items = text_str(unsafe { text_bytes(text) })
         .chars()
-        .map(|ch| (TAG_CHAR, char_text(ch) as i64))
+        .map(|ch| (TAG_CHAR, char_text(arena, ch) as i64))
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// `f32` to the nearest `f16` pattern, ties to even.
@@ -1482,7 +1658,7 @@ fn f16_to_f32(bits: u16) -> f32 {
 /// The `b16` pattern of an `f16` value held as `f64`; a NaN keeps its sign
 /// and top payload bits and never collapses to infinity.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_f16_to_bits(value: f64) -> i64 {
+pub extern "C" fn __faber_clif_v1_f16_to_bits(_arena: *const Arena, value: f64) -> i64 {
     #[allow(clippy::cast_possible_truncation)]
     let wide = (value as f32).to_bits();
     if value.is_nan() {
@@ -1496,7 +1672,7 @@ pub extern "C" fn __faber_clif_v1_f16_to_bits(value: f64) -> i64 {
 /// The `f16` value of a `b16` pattern, held as `f64`; a NaN keeps its
 /// payload.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_f16_from_bits(pattern: i64) -> f64 {
+pub extern "C" fn __faber_clif_v1_f16_from_bits(_arena: *const Arena, pattern: i64) -> f64 {
     #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
     let bits = (pattern as u64 & 0xffff) as u16;
     if bits & 0x7c00 == 0x7c00 && bits & 0x03ff != 0 {
@@ -1509,20 +1685,24 @@ pub extern "C" fn __faber_clif_v1_f16_from_bits(pattern: i64) -> f64 {
 
 /// Render a float as text; `narrow` selects the `f32` display contract.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_text_from_f64(value: f64, narrow: i32) -> *const u8 {
+pub extern "C" fn __faber_clif_v1_text_from_f64(
+    arena: *const Arena,
+    value: f64,
+    narrow: i32,
+) -> *const u8 {
     #[allow(clippy::cast_possible_truncation)]
     let text = if narrow == 0 {
         display_fractus(value)
     } else {
         display_fractus(value as f32)
     };
-    text_new(text.as_bytes())
+    text_new(arena, text.as_bytes())
 }
 
 /// Render a boolean as text with the program's output tokens.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_text_from_bool(value: i8) -> *const u8 {
-    text_new(display_bivalens(value != 0, tokens()).as_bytes())
+pub extern "C" fn __faber_clif_v1_text_from_bool(arena: *const Arena, value: i8) -> *const u8 {
+    text_new(arena, display_bivalens(value != 0, tokens()).as_bytes())
 }
 
 /// Text equality.
@@ -1531,7 +1711,11 @@ pub extern "C" fn __faber_clif_v1_text_from_bool(value: i8) -> *const u8 {
 ///
 /// Both handles address well-formed texts.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_eq(left: *const u8, right: *const u8) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_text_eq(
+    _arena: *const Arena,
+    left: *const u8,
+    right: *const u8,
+) -> i8 {
     i8::from(unsafe { text_bytes(left) == text_bytes(right) })
 }
 
@@ -1541,7 +1725,11 @@ pub unsafe extern "C" fn __faber_clif_v1_text_eq(left: *const u8, right: *const 
 ///
 /// Both handles address well-formed texts.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_cmp(left: *const u8, right: *const u8) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_text_cmp(
+    _arena: *const Arena,
+    left: *const u8,
+    right: *const u8,
+) -> i64 {
     match unsafe { text_bytes(left).cmp(text_bytes(right)) } {
         std::cmp::Ordering::Less => -1,
         std::cmp::Ordering::Equal => 0,
@@ -1555,7 +1743,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_cmp(left: *const u8, right: *const
 ///
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_len(handle: *const u8) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_text_len(_arena: *const Arena, handle: *const u8) -> i64 {
     let count = text_str(unsafe { text_bytes(handle) }).chars().count();
     i64::try_from(count).unwrap_or(i64::MAX)
 }
@@ -1571,7 +1759,10 @@ pub unsafe extern "C" fn __faber_clif_v1_text_len(handle: *const u8) -> i64 {
 ///
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_parse_bool(handle: *const u8) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_text_parse_bool(
+    _arena: *const Arena,
+    handle: *const u8,
+) -> i8 {
     let text = text_str(unsafe { text_bytes(handle) });
     let words = tokens();
     if text == words.true_.as_str() {
@@ -1589,7 +1780,11 @@ pub unsafe extern "C" fn __faber_clif_v1_text_parse_bool(handle: *const u8) -> i
 ///
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_index(handle: *const u8, index: i64) -> *const u8 {
+pub unsafe extern "C" fn __faber_clif_v1_text_index(
+    arena: *const Arena,
+    handle: *const u8,
+    index: i64,
+) -> *const u8 {
     let text = text_str(unsafe { text_bytes(handle) });
     match usize::try_from(index)
         .ok()
@@ -1597,7 +1792,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_index(handle: *const u8, index: i6
     {
         Some(found) => {
             let mut buffer = [0_u8; 4];
-            text_new(found.encode_utf8(&mut buffer).as_bytes())
+            text_new(arena, found.encode_utf8(&mut buffer).as_bytes())
         }
         None => index_trap(index, trap_text::TEXT_INDEX_OUT_OF_BOUNDS),
     }
@@ -1610,6 +1805,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_index(handle: *const u8, index: i6
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_index_opt(
+    arena: *const Arena,
     handle: *const u8,
     index: i64,
 ) -> *const Present {
@@ -1620,11 +1816,11 @@ pub unsafe extern "C" fn __faber_clif_v1_text_index_opt(
     {
         Some(found) => {
             let mut buffer = [0_u8; 4];
-            let character = text_new(found.encode_utf8(&mut buffer).as_bytes());
-            Box::into_raw(Box::new(Present {
+            let character = text_new(arena, found.encode_utf8(&mut buffer).as_bytes());
+            arena.put(Present {
                 tag: TAG_TEXT,
                 bits: character as i64,
-            }))
+            })
         }
         None => std::ptr::null(),
     }
@@ -1637,6 +1833,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_index_opt(
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_get_opt(
+    arena: *const Arena,
     list: *const List,
     index: i64,
 ) -> *const Present {
@@ -1645,7 +1842,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_get_opt(
         .ok()
         .and_then(|at| list.items.get(at))
     {
-        Some(&(tag, bits)) => Box::into_raw(Box::new(Present { tag, bits })),
+        Some((tag, bits)) => arena.put(Present { tag, bits }),
         None => std::ptr::null(),
     }
 }
@@ -1657,13 +1854,14 @@ pub unsafe extern "C" fn __faber_clif_v1_list_get_opt(
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_appended(
+    arena: *const Arena,
     list: *const List,
     tag: i32,
     bits: i64,
 ) -> *mut List {
-    let mut items = unsafe { list_ref(list) }.items.clone();
+    let mut items = unsafe { list_ref(list) }.items.as_slice().to_vec();
     items.push((tag, bits));
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 fn clamp_range(start: i64, end: i64, length: usize) -> (usize, usize) {
@@ -1679,13 +1877,14 @@ fn clamp_range(start: i64, end: i64, length: usize) -> (usize, usize) {
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_slice(
+    arena: *const Arena,
     list: *const List,
     start: i64,
     end: i64,
 ) -> *mut List {
     let items = &unsafe { list_ref(list) }.items;
     let (start, end) = clamp_range(start, end, items.len());
-    list_new_from(items[start..end].to_vec())
+    list_new_from(arena, items[start..end].to_vec())
 }
 
 /// A new text of the clamped character range `start..end`.
@@ -1695,6 +1894,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_slice(
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_slice(
+    arena: *const Arena,
     handle: *const u8,
     start: i64,
     end: i64,
@@ -1703,7 +1903,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_slice(
     let chars: Vec<char> = text.chars().collect();
     let (start, end) = clamp_range(start, end, chars.len());
     let sliced: String = chars[start..end].iter().collect();
-    text_new(sliced.as_bytes())
+    text_new(arena, sliced.as_bytes())
 }
 
 /// A new list: 0 take, 1 take-last, 2 drop-first, by count.
@@ -1713,6 +1913,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_slice(
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_window(
+    arena: *const Arena,
     list: *const List,
     mode: i32,
     count: i64,
@@ -1725,12 +1926,12 @@ pub unsafe extern "C" fn __faber_clif_v1_list_window(
         1 => (length.saturating_sub(count), length),
         _ => (count.min(length), length),
     };
-    list_new_from(items[start..end].to_vec())
+    list_new_from(arena, items[start..end].to_vec())
 }
 
-fn present_box(item: Option<(i32, i64)>) -> *const Present {
+fn present_box(arena: *const Arena, item: Option<(i32, i64)>) -> *const Present {
     match item {
-        Some((tag, bits)) => Box::into_raw(Box::new(Present { tag, bits })),
+        Some((tag, bits)) => arena.put(Present { tag, bits }),
         None => std::ptr::null(),
     }
 }
@@ -1741,13 +1942,19 @@ fn present_box(item: Option<(i32, i64)>) -> *const Present {
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_remove_first(list: *mut List) -> *const Present {
+pub unsafe extern "C" fn __faber_clif_v1_list_remove_first(
+    arena: *const Arena,
+    list: *mut List,
+) -> *const Present {
     let items = &mut unsafe { list_mut(list) }.items;
-    present_box(if items.is_empty() {
-        None
-    } else {
-        Some(items.remove(0))
-    })
+    present_box(
+        arena,
+        if items.is_empty() {
+            None
+        } else {
+            Some(items.remove(0))
+        },
+    )
 }
 
 /// Remove and return the last element as an optional.
@@ -1756,8 +1963,11 @@ pub unsafe extern "C" fn __faber_clif_v1_list_remove_first(list: *mut List) -> *
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_remove_last(list: *mut List) -> *const Present {
-    present_box(unsafe { list_mut(list) }.items.pop())
+pub unsafe extern "C" fn __faber_clif_v1_list_remove_last(
+    arena: *const Arena,
+    list: *mut List,
+) -> *const Present {
+    present_box(arena, unsafe { list_mut(list) }.items.pop())
 }
 
 /// Reverse a list in place.
@@ -1766,7 +1976,10 @@ pub unsafe extern "C" fn __faber_clif_v1_list_remove_last(list: *mut List) -> *c
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_reverse_in_place(list: *mut List) {
+pub unsafe extern "C" fn __faber_clif_v1_list_reverse_in_place(
+    _arena: *const Arena,
+    list: *mut List,
+) {
     unsafe { list_mut(list) }.items.reverse();
 }
 
@@ -1776,14 +1989,18 @@ pub unsafe extern "C" fn __faber_clif_v1_list_reverse_in_place(list: *mut List) 
 ///
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_map(handle: *const u8, mode: i32) -> *const u8 {
+pub unsafe extern "C" fn __faber_clif_v1_text_map(
+    arena: *const Arena,
+    handle: *const u8,
+    mode: i32,
+) -> *const u8 {
     let text = text_str(unsafe { text_bytes(handle) });
     let changed = match mode {
         0 => text.to_uppercase(),
         1 => text.to_lowercase(),
         _ => text.trim().to_owned(),
     };
-    text_new(changed.as_bytes())
+    text_new(arena, changed.as_bytes())
 }
 
 /// A text test: 0 starts-with, 1 ends-with.
@@ -1793,6 +2010,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_map(handle: *const u8, mode: i32) 
 /// Both handles address well-formed texts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_test(
+    _arena: *const Arena,
     left: *const u8,
     right: *const u8,
     mode: i32,
@@ -1813,6 +2031,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_test(
 /// Both handles address well-formed texts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_split(
+    arena: *const Arena,
     handle: *const u8,
     delimiter: *const u8,
 ) -> *mut List {
@@ -1820,9 +2039,9 @@ pub unsafe extern "C" fn __faber_clif_v1_text_split(
     let delimiter = text_str(unsafe { text_bytes(delimiter) });
     let items = text
         .split(&*delimiter)
-        .map(|part| (TAG_TEXT, text_new(part.as_bytes()) as i64))
+        .map(|part| (TAG_TEXT, text_new(arena, part.as_bytes()) as i64))
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// A text with every occurrence of `from` replaced by `to`.
@@ -1832,6 +2051,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_split(
 /// All handles address well-formed texts.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_replace(
+    arena: *const Arena,
     handle: *const u8,
     from: *const u8,
     to: *const u8,
@@ -1839,7 +2059,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_replace(
     let text = text_str(unsafe { text_bytes(handle) });
     let from = text_str(unsafe { text_bytes(from) });
     let to = text_str(unsafe { text_bytes(to) });
-    text_new(text.replace(&*from, &to).as_bytes())
+    text_new(arena, text.replace(&*from, &to).as_bytes())
 }
 
 /// Checked sum of an integer list; an overflow ends the run.
@@ -1848,12 +2068,15 @@ pub unsafe extern "C" fn __faber_clif_v1_text_replace(
 ///
 /// `list` is a live runtime list of integers.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_sum_i64(list: *const List) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_list_sum_i64(
+    arena: *const Arena,
+    list: *const List,
+) -> i64 {
     let mut total: i64 = 0;
     for &(_, bits) in &unsafe { list_ref(list) }.items {
         match total.checked_add(bits) {
             Some(next) => total = next,
-            None => unsafe { __faber_clif_v1_trap(c"numerus overflow".as_ptr().cast(), 16) },
+            None => unsafe { __faber_clif_v1_trap(arena, c"numerus overflow".as_ptr().cast(), 16) },
         }
     }
     total
@@ -1865,7 +2088,10 @@ pub unsafe extern "C" fn __faber_clif_v1_list_sum_i64(list: *const List) -> i64 
 ///
 /// `list` is a live runtime list of floats.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_sum_f64(list: *const List) -> f64 {
+pub unsafe extern "C" fn __faber_clif_v1_list_sum_f64(
+    _arena: *const Arena,
+    list: *const List,
+) -> f64 {
     unsafe { list_ref(list) }
         .items
         .iter()
@@ -1883,6 +2109,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_sum_f64(list: *const List) -> f64 
 /// `list` is a live runtime list of integers (modes 0 and 1) or floats.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_extremum(
+    arena: *const Arena,
     list: *const List,
     bound: i64,
     mode: i32,
@@ -1910,7 +2137,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_extremum(
             (tag, picked)
         })
         .collect();
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// Abort with a text message, the runner's `abort: <message>` (D5).
@@ -1919,16 +2146,12 @@ pub unsafe extern "C" fn __faber_clif_v1_list_extremum(
 ///
 /// `handle` addresses a well-formed text.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_abort_text(handle: *const u8) -> ! {
-    let reason = text_str(unsafe { text_bytes(handle) });
-    abort(&reason)
-}
-
-fn abort(reason: &str) -> ! {
+pub unsafe extern "C" fn __faber_clif_v1_abort_text(_arena: *const Arena, handle: *const u8) -> ! {
     flush();
+    let reason = text_str(unsafe { text_bytes(handle) });
     let mut stderr = std::io::stderr();
     let _ = writeln!(stderr, "abort: {reason}");
-    std::process::exit(abort_exit_status(reason));
+    std::process::exit(abort_exit_status(&reason));
 }
 
 /// Report a failed run and exit with the runner's code (D5).
@@ -1937,7 +2160,11 @@ fn abort(reason: &str) -> ! {
 ///
 /// `message` is null or points to `length` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_trap(message: *const u8, length: i64) -> ! {
+pub unsafe extern "C" fn __faber_clif_v1_trap(
+    _arena: *const Arena,
+    message: *const u8,
+    length: i64,
+) -> ! {
     flush();
     let length = usize::try_from(length).unwrap_or(0);
     let bytes = if message.is_null() {
@@ -1955,7 +2182,11 @@ pub unsafe extern "C" fn __faber_clif_v1_trap(message: *const u8, length: i64) -
 ///
 /// `message` is null or points to `length` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_trap_conversion(message: *const u8, length: i64) -> ! {
+pub unsafe extern "C" fn __faber_clif_v1_trap_conversion(
+    _arena: *const Arena,
+    message: *const u8,
+    length: i64,
+) -> ! {
     let length = usize::try_from(length).unwrap_or(0);
     let bytes = if message.is_null() {
         &[][..]
@@ -1976,6 +2207,7 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_conversion(message: *const u8, len
 /// `suffix` is null or points to `length` readable bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_trap_store(
+    _arena: *const Arena,
     value: i64,
     suffix: *const u8,
     length: i64,
@@ -2003,6 +2235,7 @@ pub unsafe extern "C" fn __faber_clif_v1_trap_store(
 /// `suffix` is null or points to `length` readable bytes.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_trap_store_wide(
+    _arena: *const Arena,
     low: i64,
     high: i64,
     suffix: *const u8,
@@ -2036,6 +2269,7 @@ static PARSE_STATUS: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32
 /// `text` is a well-formed text handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_parse_int(
+    _arena: *const Arena,
     text: *const u8,
     radix: i32,
     low: i64,
@@ -2063,7 +2297,7 @@ pub unsafe extern "C" fn __faber_clif_v1_parse_int(
 ///
 /// `text` is a well-formed text handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_parse_f64(text: *const u8) -> f64 {
+pub unsafe extern "C" fn __faber_clif_v1_parse_f64(_arena: *const Arena, text: *const u8) -> f64 {
     let source = text_str(unsafe { text_bytes(text) });
     let (status, value) = match source.parse::<f64>() {
         Ok(parsed) => (0, parsed),
@@ -2075,13 +2309,13 @@ pub unsafe extern "C" fn __faber_clif_v1_parse_f64(text: *const u8) -> f64 {
 
 /// The outcome of the latest parse.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_parse_status() -> i32 {
+pub extern "C" fn __faber_clif_v1_parse_status(_arena: *const Arena) -> i32 {
     PARSE_STATUS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// The failure text of a nonzero parse status (the runner's wording).
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
+pub extern "C" fn __faber_clif_v1_convert_message(arena: *const Arena, status: i32) -> *const u8 {
     let message = match status {
         2 => "textus to numerus conversion out of range",
         3 => "textus to fractus conversion failed",
@@ -2090,7 +2324,7 @@ pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
         6 => "numerus to numerus conversion out of range",
         _ => "textus to numerus conversion failed",
     };
-    text_new(message.as_bytes())
+    text_new(arena, message.as_bytes())
 }
 
 /// Set algebra into a new set: 0 union, 1 intersection, 2 difference,
@@ -2101,6 +2335,7 @@ pub extern "C" fn __faber_clif_v1_convert_message(status: i32) -> *const u8 {
 /// Both are live runtime sets.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_set_algebra(
+    arena: *const Arena,
     left: *const Map,
     right: *const Map,
     op: i32,
@@ -2120,13 +2355,13 @@ pub unsafe extern "C" fn __faber_clif_v1_set_algebra(
             entries.extend(right.entries.iter().filter(|e| !has(left, e)).copied());
         }
     }
-    Box::into_raw(Box::new(Map {
+    arena.put(Map {
         set: true,
-        entries,
-        slots: Vec::new(),
+        entries: ArenaBuf::from_slice(arena, &entries),
+        slots: ArenaBuf::new(),
         index_mask: 0,
         indexed_len: 0,
-    }))
+    })
 }
 
 /// Subset (mode 0: left within right) or superset (mode 1) test.
@@ -2136,6 +2371,7 @@ pub unsafe extern "C" fn __faber_clif_v1_set_algebra(
 /// Both are live runtime sets.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_set_subset(
+    _arena: *const Arena,
     left: *const Map,
     right: *const Map,
     mode: i32,
@@ -2157,7 +2393,7 @@ pub unsafe extern "C" fn __faber_clif_v1_set_subset(
 /// Scalar math the instruction set lacks: 0 exp, 1 ln, 2 log10, 3 sin,
 /// 4 cos, 5 tan, 6 cbrt (the same libm calls the runner makes).
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
+pub extern "C" fn __faber_clif_v1_math_f64(_arena: *const Arena, op: i32, value: f64) -> f64 {
     match op {
         0 => value.exp(),
         1 => value.ln(),
@@ -2171,7 +2407,7 @@ pub extern "C" fn __faber_clif_v1_math_f64(op: i32, value: f64) -> f64 {
 
 /// `a % b` on floats: `fmod`, the sign of the dividend.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_float_rem(a: f64, b: f64) -> f64 {
+pub extern "C" fn __faber_clif_v1_float_rem(_arena: *const Arena, a: f64, b: f64) -> f64 {
     a % b
 }
 
@@ -2183,6 +2419,7 @@ pub extern "C" fn __faber_clif_v1_float_rem(a: f64, b: f64) -> f64 {
 /// `list` is a live runtime list of integers or floats.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
+    arena: *const Arena,
     list: *const List,
     want_max: i32,
 ) -> *const Present {
@@ -2214,7 +2451,11 @@ pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
             }
         } else {
             unsafe {
-                __faber_clif_v1_trap(c"argmax/argmin receiver type mismatch".as_ptr().cast(), 36)
+                __faber_clif_v1_trap(
+                    arena,
+                    c"argmax/argmin receiver type mismatch".as_ptr().cast(),
+                    36,
+                )
             }
         };
         if replaces {
@@ -2222,17 +2463,17 @@ pub unsafe extern "C" fn __faber_clif_v1_list_arg_extremum(
         }
     }
     match winner {
-        Some(index) => Box::into_raw(Box::new(Present {
+        Some(index) => arena.put(Present {
             tag: 0,
             bits: i64::try_from(index).unwrap_or(0),
-        })),
+        }),
         None => std::ptr::null(),
     }
 }
 
 /// The exact integer `≈`: `10^9 · |a − b| ≤ max(|a|, |b|)`.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_approx_int(left: i64, right: i64) -> i8 {
+pub extern "C" fn __faber_clif_v1_approx_int(_arena: *const Arena, left: i64, right: i64) -> i8 {
     let (x, y) = (i128::from(left), i128::from(right));
     i8::from(1_000_000_000 * (x - y).abs() <= x.abs().max(y.abs()))
 }
@@ -2243,22 +2484,25 @@ pub extern "C" fn __faber_clif_v1_approx_int(left: i64, right: i64) -> i8 {
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_to_set(list: *const List) -> *mut Map {
+pub unsafe extern "C" fn __faber_clif_v1_list_to_set(
+    arena: *const Arena,
+    list: *const List,
+) -> *mut Map {
     let mut set = Map {
         set: true,
-        entries: Vec::new(),
-        slots: Vec::new(),
+        entries: ArenaBuf::new(),
+        slots: ArenaBuf::new(),
         index_mask: 0,
         indexed_len: 0,
     };
     for &(tag, bits) in &unsafe { list_ref(list) }.items {
         if map_find(&set, tag, bits).is_none() {
             let position = set.entries.len();
-            set.entries.push((tag, bits, 0, 0));
-            map_index_insert(&mut set, position);
+            set.entries.push(arena, (tag, bits, 0, 0));
+            map_index_insert(arena, &mut set, position);
         }
     }
-    Box::into_raw(Box::new(set))
+    arena.put(set)
 }
 
 /// A copy of a list whose elements keep their bits under a new tag.
@@ -2267,8 +2511,13 @@ pub unsafe extern "C" fn __faber_clif_v1_list_to_set(list: *const List) -> *mut 
 ///
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32) -> *mut List {
+pub unsafe extern "C" fn __faber_clif_v1_list_retag(
+    arena: *const Arena,
+    list: *const List,
+    tag: i32,
+) -> *mut List {
     list_new_from(
+        arena,
         unsafe { list_ref(list) }
             .items
             .iter()
@@ -2284,6 +2533,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_retag(list: *const List, tag: i32)
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_read_scalar(
+    _arena: *const Arena,
     list: *const List,
     width: i32,
     flags: i32,
@@ -2322,7 +2572,12 @@ pub unsafe extern "C" fn __faber_clif_v1_list_read_scalar(
 /// A scalar written as bytes in the byte order of a flag; see the generator's
 /// `SCALAR_BYTES`.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_scalar_bytes(bits: i64, width: i32, flags: i32) -> *mut List {
+pub extern "C" fn __faber_clif_v1_scalar_bytes(
+    arena: *const Arena,
+    bits: i64,
+    width: i32,
+    flags: i32,
+) -> *mut List {
     let width = usize::try_from(width).unwrap_or(0).min(8);
     let pattern = if flags & 4 != 0 && width == 4 {
         u64::from((f64::from_bits(bits as u64) as f32).to_bits())
@@ -2335,6 +2590,7 @@ pub extern "C" fn __faber_clif_v1_scalar_bytes(bits: i64, width: i32, flags: i32
         pattern.to_le_bytes()[..width].to_vec()
     };
     list_new_from(
+        arena,
         bytes
             .into_iter()
             .map(|byte| (TAG_BITS, i64::from(byte)))
@@ -2352,17 +2608,20 @@ unsafe fn interval_parts(handle: *const List) -> (i64, i64, bool) {
     (items[0].1, items[1].1, items[2].1 != 0)
 }
 
-fn interval_list(start: i64, end: i64, inclusive: bool) -> *mut List {
-    list_new_from(vec![
-        (TAG_INT, start),
-        (TAG_INT, end),
-        (TAG_BOOL, i64::from(inclusive)),
-    ])
+fn interval_list(arena: *const Arena, start: i64, end: i64, inclusive: bool) -> *mut List {
+    list_new_from(
+        arena,
+        vec![
+            (TAG_INT, start),
+            (TAG_INT, end),
+            (TAG_BOOL, i64::from(inclusive)),
+        ],
+    )
 }
 
-fn interval_box(start: i64, end: i64, inclusive: bool) -> *const Present {
-    let list = interval_list(start, end, inclusive);
-    __faber_clif_v1_opt_some(TAG_LIST, list as i64)
+fn interval_box(arena: *const Arena, start: i64, end: i64, inclusive: bool) -> *const Present {
+    let list = interval_list(arena, start, end, inclusive);
+    __faber_clif_v1_opt_some(arena, TAG_LIST, list as i64)
 }
 
 /// Intersection (mode 0) or union (mode 1) of two integer intervals, boxed as
@@ -2373,6 +2632,7 @@ fn interval_box(start: i64, end: i64, inclusive: bool) -> *const Present {
 /// Both handles are live intervals.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
+    arena: *const Arena,
     mode: i32,
     left: *const List,
     right: *const List,
@@ -2387,7 +2647,7 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
             std::cmp::Ordering::Equal => (left_end, left_inclusive && right_inclusive),
         };
         if start < end || (inclusive && start == end) {
-            interval_box(start, end, inclusive)
+            interval_box(arena, start, end, inclusive)
         } else {
             std::ptr::null()
         }
@@ -2411,7 +2671,7 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
             std::cmp::Ordering::Less => (first.1, first.2),
             std::cmp::Ordering::Equal => (first.1, first.2 || second.2),
         };
-        interval_box(first.0, end, inclusive)
+        interval_box(arena, first.0, end, inclusive)
     }
 }
 
@@ -2423,6 +2683,7 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_combine(
 /// `interval` is a live interval.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_interval_query(
+    _arena: *const Arena,
     mode: i32,
     interval: *const List,
     value: i64,
@@ -2455,14 +2716,17 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_query(
 ///
 /// `interval` is a live interval.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const List) -> *mut List {
+pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(
+    arena: *const Arena,
+    interval: *const List,
+) -> *mut List {
     let (start, end, inclusive) = unsafe { interval_parts(interval) };
     let items = if inclusive {
         (start..=end).map(|value| (TAG_INT, value)).collect()
     } else {
         (start..end).map(|value| (TAG_INT, value)).collect()
     };
-    list_new_from(items)
+    list_new_from(arena, items)
 }
 
 /// A copy of the range of a text (in characters) an interval names; a range
@@ -2473,6 +2737,7 @@ pub unsafe extern "C" fn __faber_clif_v1_interval_materialize(interval: *const L
 /// `text` is a well-formed text handle and `interval` a live interval.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_text_range(
+    arena: *const Arena,
     text: *const u8,
     interval: *const List,
 ) -> *const u8 {
@@ -2484,7 +2749,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_range(
     match window_inside(start, end, chars.len()) {
         Some((start, end)) => {
             let window: String = chars[start..end].iter().collect();
-            text_new(window.as_bytes())
+            text_new(arena, window.as_bytes())
         }
         None => exact_trap(&trap_text::text_window_outside(start, end, chars.len())),
     }
@@ -2498,6 +2763,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_range(
 /// `list` is a live list and `interval` a live interval.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_range(
+    arena: *const Arena,
     list: *const List,
     interval: *const List,
 ) -> *mut List {
@@ -2506,7 +2772,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_range(
     let items = &unsafe { list_ref(list) }.items;
     let (start, end) = (i128::from(start), i128::from(end) + i128::from(inclusive));
     match window_inside(start, end, items.len()) {
-        Some((start, end)) => list_new_from(items[start..end].to_vec()),
+        Some((start, end)) => list_new_from(arena, items[start..end].to_vec()),
         None => exact_trap(&trap_text::list_window_outside(start, end, items.len())),
     }
 }
@@ -2519,6 +2785,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_range(
 /// `list` is a live runtime list.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_list_rewidth(
+    arena: *const Arena,
     list: *const List,
     from: i32,
     to: i32,
@@ -2565,13 +2832,18 @@ pub unsafe extern "C" fn __faber_clif_v1_list_rewidth(
             }
         })
         .collect();
-    list_new_from(out)
+    list_new_from(arena, out)
 }
 
 /// A non-negative integer as fixed-width, zero-padded, lowercase digits in
 /// radix 2, 8 or 16; null when it is negative or wider than `width`.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_text_pack(value: i64, width: i64, radix: i32) -> *const u8 {
+pub extern "C" fn __faber_clif_v1_text_pack(
+    arena: *const Arena,
+    value: i64,
+    width: i64,
+    radix: i32,
+) -> *const u8 {
     let Ok(magnitude) = u64::try_from(value) else {
         return std::ptr::null();
     };
@@ -2585,7 +2857,7 @@ pub extern "C" fn __faber_clif_v1_text_pack(value: i64, width: i64, radix: i32) 
     if digits.len() > width {
         return std::ptr::null();
     }
-    text_new(format!("{digits:0>width$}").as_bytes())
+    text_new(arena, format!("{digits:0>width$}").as_bytes())
 }
 
 /// Text to a list of UTF-8, UTF-16 or UTF-32 units tagged as raw bits.
@@ -2594,7 +2866,11 @@ pub extern "C" fn __faber_clif_v1_text_pack(value: i64, width: i64, radix: i32) 
 ///
 /// `text` is a well-formed text handle.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_text_encode(text: *const u8, width: i32) -> *mut List {
+pub unsafe extern "C" fn __faber_clif_v1_text_encode(
+    arena: *const Arena,
+    text: *const u8,
+    width: i32,
+) -> *mut List {
     let source = text_str(unsafe { text_bytes(text) });
     let (tag, units): (i32, Vec<i64>) = match width {
         8 => (TAG_BITS, source.bytes().map(i64::from).collect()),
@@ -2604,7 +2880,7 @@ pub unsafe extern "C" fn __faber_clif_v1_text_encode(text: *const u8, width: i32
             source.chars().map(|ch| i64::from(u32::from(ch))).collect(),
         ),
     };
-    list_new_from(units.into_iter().map(|unit| (tag, unit)).collect())
+    list_new_from(arena, units.into_iter().map(|unit| (tag, unit)).collect())
 }
 
 /// A list of unit patterns to text; null when the list does not decode.
@@ -2613,7 +2889,11 @@ pub unsafe extern "C" fn __faber_clif_v1_text_encode(text: *const u8, width: i32
 ///
 /// `list` is a live runtime list of raw-bits elements.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_list_decode(list: *const List, mode: i32) -> *const u8 {
+pub unsafe extern "C" fn __faber_clif_v1_list_decode(
+    arena: *const Arena,
+    list: *const List,
+    mode: i32,
+) -> *const u8 {
     let units: Vec<u64> = unsafe { list_ref(list) }
         .items
         .iter()
@@ -2641,7 +2921,7 @@ pub unsafe extern "C" fn __faber_clif_v1_list_decode(list: *const List, mode: i3
             .map(|unit| u32::try_from(*unit).ok().and_then(char::from_u32))
             .collect::<Option<String>>(),
     };
-    decoded.map_or(std::ptr::null(), |text| text_new(text.as_bytes()))
+    decoded.map_or(std::ptr::null(), |text| text_new(arena, text.as_bytes()))
 }
 
 /// Whether a boxed payload carries `tag`; null (a none) never does.
@@ -2650,7 +2930,11 @@ pub unsafe extern "C" fn __faber_clif_v1_list_decode(list: *const List, mode: i3
 ///
 /// `handle` is null or a live boxed payload.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, tag: i32) -> i8 {
+pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(
+    _arena: *const Arena,
+    handle: *const Present,
+    tag: i32,
+) -> i8 {
     i8::from(unsafe { handle.as_ref() }.is_some_and(|present| present.tag == tag))
 }
 
@@ -2662,6 +2946,7 @@ pub unsafe extern "C" fn __faber_clif_v1_union_has_tag(handle: *const Present, t
 /// `record` is a live runtime record; `name` is a text handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_record_is_named(
+    _arena: *const Arena,
     record: *const Record,
     name: *const u8,
     variant: i32,
@@ -2679,6 +2964,7 @@ pub unsafe extern "C" fn __faber_clif_v1_record_is_named(
 /// `handle` is null or a live boxed payload; `name` is a text handle.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
+    _arena: *const Arena,
     handle: *const Present,
     name: *const u8,
 ) -> i8 {
@@ -2695,69 +2981,65 @@ pub unsafe extern "C" fn __faber_clif_v1_union_is_struct(
 /// A list or map element as an open-data element: a box of its tagged payload,
 /// with nested lists and maps boxed the same way. An element with no open-data
 /// form ends the run.
-fn box_open_element(tag: i32, bits: i64) -> (i32, i64) {
+fn box_open_element(arena: *const Arena, tag: i32, bits: i64) -> (i32, i64) {
     let payload = match tag {
         TAG_OPT => return (tag, bits),
-        // Normalize small inf values to the ordinary integer tag, just as the
-        // numeric conversion path does. This also covers inf inside lists/maps.
-        TAG_INF => {
-            return (
-                TAG_OPT,
-                unsafe { inf::__faber_clif_v1_inf_box(bits as *const u8) } as i64,
-            );
-        }
         TAG_INT | TAG_FLOAT | TAG_FLOAT32 | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
         TAG_LIST => {
             let list = unsafe { list_ref(bits as *const List) };
             let items = list
                 .items
                 .iter()
-                .map(|&(tag, bits)| box_open_element(tag, bits))
+                .map(|&(tag, bits)| box_open_element(arena, tag, bits))
                 .collect();
-            (TAG_LIST, list_new_from(items) as i64)
+            (TAG_LIST, list_new_from(arena, items) as i64)
         }
         TAG_MAP => {
             let map = unsafe { &*(bits as *const Map) };
-            let entries = map
+            let entries: Vec<(i32, i64, i32, i64)> = map
                 .entries
                 .iter()
                 .map(|&(key_tag, key, value_tag, value)| {
                     let (value_tag, value) = if map.set {
                         (value_tag, value)
                     } else {
-                        box_open_element(value_tag, value)
+                        box_open_element(arena, value_tag, value)
                     };
                     (key_tag, key, value_tag, value)
                 })
                 .collect();
             (
                 TAG_MAP,
-                Box::into_raw(Box::new(Map {
+                arena.put(Map {
                     set: map.set,
-                    entries,
-                    slots: Vec::new(),
+                    entries: ArenaBuf::from_slice(arena, &entries),
+                    slots: ArenaBuf::new(),
                     index_mask: 0,
                     indexed_len: 0,
-                })) as i64,
+                }) as i64,
             )
         }
         _ => exact_trap("this value has no open-data form on the clif target"),
     };
-    let boxed = Box::into_raw(Box::new(Present {
+    let boxed = arena.put(Present {
         tag: payload.0,
         bits: payload.1,
-    }));
+    });
     (TAG_OPT, boxed as i64)
 }
 
-/// A scalar, list or map as open data, recursively boxing collection elements.
+/// A list or map as open data: a box whose elements are open-data boxes.
 ///
 /// # Safety
 ///
-/// `bits` carries a live payload of `tag`, including handles for inf and collections.
+/// `bits` is a live runtime list (tag `TAG_LIST`) or map (tag `TAG_MAP`).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_dyn_box(tag: i32, bits: i64) -> *const Present {
-    let (_, boxed) = box_open_element(tag, bits);
+pub unsafe extern "C" fn __faber_clif_v1_dyn_box(
+    arena: *const Arena,
+    tag: i32,
+    bits: i64,
+) -> *const Present {
+    let (_, boxed) = box_open_element(arena, tag, bits);
     boxed as *const Present
 }
 

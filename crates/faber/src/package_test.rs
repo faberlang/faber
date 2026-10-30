@@ -11332,10 +11332,11 @@ main {
     let single_file = radix::services::compile_cli_path(&entry, false, Target::MirClif);
     assert!(single_file.output.is_none());
     assert!(
-        single_file
-            .diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("external definition call")),
+        single_file.diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some("CODEGEN001")
+                && diagnostic_has_arg(diagnostic, "category", "missing-abi-fact")
+                && diagnostic_has_arg(diagnostic, "shape", "external definition call")
+        }),
         "{:?}",
         single_file.diagnostics
     );
