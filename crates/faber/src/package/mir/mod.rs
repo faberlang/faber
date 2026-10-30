@@ -821,6 +821,29 @@ fn session_dispatcher(
     use super::host_factory::host_error_diagnostic;
     use std::time::Instant;
 
+    /// The row layout of every record (fixed-layout genus) element type the
+    /// kernel units bind as a tensor resource.
+    fn record_layouts(
+        units: &[radix_mir::KernelUnit],
+        validation: &radix_mir::MirValidationContext<'_>,
+    ) -> std::collections::HashMap<
+        radix_types::TypeId,
+        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
+    > {
+        let types = validation.types.as_table();
+        let mut records = std::collections::HashMap::new();
+        for resource in units.iter().flat_map(|unit| &unit.resources) {
+            let ty = resource.version.element_ty.semantic_id();
+            if matches!(types.get(ty), radix_types::Type::Struct(_))
+                && !records.contains_key(&ty)
+                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
+            {
+                records.insert(ty, std::sync::Arc::new(layout));
+            }
+        }
+        records
+    }
+
     let AdmittedDeviceSession {
         session, backend, ..
     } = admitted;
@@ -855,8 +878,9 @@ fn session_dispatcher(
     // Owned slabs are CUDA spanning only. The plan lays out only the roles the
     // spanning runtime can launch, so it must read the image before the
     // dispatcher takes its parts.
-    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned)
-        .then(|| super::device::placement_plan(lowered, &image, |role| role.launchable()));
+    let placement = matches!(backend, super::device::DeviceImageBackend::CudaSpanned).then(|| {
+        super::device::placement_plan(lowered, &image, super::device::SlabRole::launchable)
+    });
     let interner = validated
         .validation()
         .interner
@@ -913,29 +937,6 @@ fn session_dispatcher(
         image.kernels.into_iter().map(|(_, unit)| unit).collect();
     let dispatcher_start = Instant::now();
     let fused_entries = fusions.iter().map(|fused| fused.entry.clone()).collect();
-    /// The row layout of every record (fixed-layout genus) element type the
-    /// kernel units bind as a tensor resource.
-    fn record_layouts(
-        units: &[radix_mir::KernelUnit],
-        validation: &radix_mir::MirValidationContext<'_>,
-    ) -> std::collections::HashMap<
-        radix_types::TypeId,
-        std::sync::Arc<radix_mir_runner::dense::RecordLayout>,
-    > {
-        let types = validation.types.as_table();
-        let mut records = std::collections::HashMap::new();
-        for resource in units.iter().flat_map(|unit| &unit.resources) {
-            let ty = resource.version.element_ty.semantic_id();
-            if matches!(types.get(ty), radix_types::Type::Struct(_))
-                && !records.contains_key(&ty)
-                && let Ok(layout) = radix_mir_runner::dense::RecordLayout::resolve(ty, validation)
-            {
-                records.insert(ty, std::sync::Arc::new(layout));
-            }
-        }
-        records
-    }
-
     // gpu-reset Q02: a tensor of fixed-layout records binds as typed row
     // bytes; each record element type the kernels name gets its row layout
     // from the layout law (a type with no layout stays unsupported by name).

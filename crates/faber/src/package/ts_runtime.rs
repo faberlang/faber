@@ -30,6 +30,8 @@ fn runtime_error(message: impl Into<String>) -> Diagnostic {
 /// The compiled runtime for the embedded sources at `runtime_root` (a
 /// repository-shaped embedded root), compiling it on first use.
 pub(crate) fn compiled_runtime(runtime_root: &Path) -> Result<PathBuf, Diagnostic> {
+    static STAGING_SEQ: AtomicU64 = AtomicU64::new(0);
+
     let name = runtime_root
         .file_name()
         .and_then(|name| name.to_str())
@@ -39,7 +41,6 @@ pub(crate) fn compiled_runtime(runtime_root: &Path) -> Result<PathBuf, Diagnosti
     if compiled.join(COMPLETE_MARKER).is_file() {
         return Ok(compiled);
     }
-    static STAGING_SEQ: AtomicU64 = AtomicU64::new(0);
     let staging = parent.join(format!(
         ".{}.{}.{}.tmp",
         compiled

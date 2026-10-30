@@ -2941,7 +2941,6 @@ impl BodyFacts<'_> {
                 };
                 Some(D64Constant::Value(scaled, D64_STORE_SCALE))
             }
-            HirExpressionKind::Literal(radix_hir::HirLiteral::Float(_)) => None,
             HirExpressionKind::Unary(HirUnOp::Neg, operand) => match self.constant_d64(operand)? {
                 D64Constant::Value(value, scale) => value
                     .checked_neg()
