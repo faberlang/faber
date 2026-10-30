@@ -1,6 +1,6 @@
 //! Source-level admission, refusal and preservation for EVM contracts.
 
-use super::{Config, Target};
+use crate::driver::{Config, Target};
 use crate::{Compiler, Output};
 
 const CONTRACT: &str = r#"+++
