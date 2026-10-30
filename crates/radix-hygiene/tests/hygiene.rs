@@ -585,8 +585,16 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/radix-mir/src/device_program_plans_test.rs"
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
         // HostError `Display` contract: `{code}: {message}` rendering, pinned
-        // in its own file; every other HostError test asserts code and args.
+        // in its own file; every other HostError test asserts code and args,
+        // except the native session fault carve-out below.
         || rel == "crates/radix-device-core/src/error_display_test.rs"
+        // Native CPU session kernel fault: the wrapper composes the entry,
+        // lane and fault reason into the fault text (`fatal_message`,
+        // radix-device-cpu/src/native.rs) and the executor boundary is
+        // prose-typed (`KernelResult = Result<(), String>`), so the session
+        // test reads them from the message. Missing field: entry/lane/reason
+        // args on the kernel-fault `HostError` (`device_kernel_fault`).
+        || rel == "crates/radix-device-cpu/src/native_test.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {

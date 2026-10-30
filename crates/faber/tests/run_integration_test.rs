@@ -480,6 +480,217 @@ fn run_refuses_built_fmir_images_by_name() {
     assert_eq!(stdout.trim(), "hi");
 }
 
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_does_not_override_single_file_code_locale() {
+    let package = temp_dir("build-diagnostics-locale-code");
+    let source_dir = package.join("src");
+    fs::create_dir_all(&source_dir).expect("create source dir");
+    fs::write(
+        package.join("faber.toml"),
+        r#"
+[package]
+name = "build-diagnostics-locale-code"
+version = "0.0.0"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[locale]
+locale = "la"
+
+[build]
+target = "go"
+kind = "bin"
+"#,
+    )
+    .expect("write manifest");
+    let entry = source_dir.join("main.fab");
+    fs::write(&entry, "main {}\n").expect("write English source");
+    let output_dir = package.join("out");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--target",
+        "go",
+        "--diagnostics-locale",
+        "th-TH",
+        "--out-dir",
+        output_dir.to_str().expect("utf8 output dir"),
+        entry.to_str().expect("utf8 entry"),
+    ]);
+
+    assert!(
+        ok,
+        "diagnostics locale changed the source code locale:\n{stderr}"
+    );
+    assert!(
+        PathBuf::from(stdout.trim()).exists(),
+        "expected generated Go output, got:\n{stdout}"
+    );
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_preserves_single_file_frontmatter_code_locale() {
+    let source = write_single_file(
+        "build-diagnostics-locale-frontmatter",
+        r#"+++
+locale = "la"
++++
+
+incipit {
+  nota "Salve, Munde!"
+}
+"#,
+    );
+    let output_dir = temp_dir("build-diagnostics-locale-frontmatter-out");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--target",
+        "go",
+        "--diagnostics-locale",
+        "th-TH",
+        "--out-dir",
+        output_dir.to_str().expect("utf8 output dir"),
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(
+        ok,
+        "diagnostics locale changed the source frontmatter code locale:\n{stderr}"
+    );
+    assert!(
+        PathBuf::from(stdout.trim()).exists(),
+        "expected generated Go output, got:\n{stdout}"
+    );
+}
+
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_rejects_unsupported_input_shape() {
+    let source = write_plain_file("build-diagnostics-locale-unsupported", "main {}\n");
+    let output_dir = temp_dir("build-diagnostics-locale-unsupported-out");
+
+    let (stdout, stderr, ok) = run_faber(&[
+        "build",
+        "--target",
+        "go",
+        "--diagnostics-locale",
+        "th-TH",
+        "--out-dir",
+        output_dir.to_str().expect("utf8 output dir"),
+        source.to_str().expect("utf8 source path"),
+    ]);
+
+    assert!(!ok, "unsupported input shape should fail");
+    assert!(stdout.is_empty(), "rejected build wrote stdout: {stdout}");
+    assert!(
+        stderr.contains(
+            "--diagnostics-locale th-TH requires a package path or .fab entry file (or stdin)"
+        ),
+        "expected diagnostics-locale input-shape gate to reject the input, got:\n{stderr}"
+    );
+}
+
+/// The single-file build lane reads its input from a path
+/// (`radix::module::Compiler::compile`), so `faber build -` reports the path
+/// `-` as unreadable (exit 66) with or without a locale flag. What a locale
+/// flag can decide is whether the input shape is admitted at all: `--locale`
+/// needs a package or entry file and refuses stdin, while
+/// `--diagnostics-locale` resolves stdin against the embedded packs and must
+/// hand the lane exactly what it would see with no flag.
+#[cfg(feature = "hir-go")]
+#[test]
+fn build_diagnostics_locale_passes_stdin_through_the_shape_gate() {
+    let output_dir = temp_dir("build-diagnostics-locale-stdin");
+    let out_dir = output_dir.to_str().expect("utf8 output dir");
+
+    let (stdout, stderr, ok) = run_faber_with_stdin(
+        &[
+            "build",
+            "--target",
+            "go",
+            "--locale",
+            "zh-Hans",
+            "--out-dir",
+            out_dir,
+            "-",
+        ],
+        b"main {}\n",
+    );
+    assert!(!ok, "reader locale must refuse stdin:\n{stderr}");
+    assert!(stdout.is_empty(), "rejected build wrote stdout: {stdout}");
+    assert!(
+        stderr.contains("--locale zh-Hans requires a package path or .fab entry file"),
+        "expected the reader-locale gate to refuse stdin, got:\n{stderr}"
+    );
+
+    let baseline = run_faber_with_stdin(
+        &["build", "--target", "go", "--out-dir", out_dir, "-"],
+        b"main {}\n",
+    );
+    let flagged = run_faber_with_stdin(
+        &[
+            "build",
+            "--target",
+            "go",
+            "--diagnostics-locale",
+            "th-TH",
+            "--out-dir",
+            out_dir,
+            "-",
+        ],
+        b"main {}\n",
+    );
+    assert!(
+        !flagged.1.contains("--diagnostics-locale th-TH requires"),
+        "the diagnostics-locale gate must not refuse stdin:\n{}",
+        flagged.1
+    );
+    assert_eq!(
+        flagged.2, baseline.2,
+        "diagnostics locale changed whether the stdin build ran:\n{}",
+        flagged.1
+    );
+    assert_eq!(
+        flagged.0, baseline.0,
+        "diagnostics locale changed the stdin build's stdout"
+    );
+    assert_eq!(
+        flagged.1, baseline.1,
+        "diagnostics locale changed the stdin build's stderr"
+    );
+
+    // A stdin build with an unknown diagnostics locale fails while loading the
+    // embedded pack (exit class 78), proof the flag reached the locale resolver
+    // instead of being turned away by the shape gate.
+    let (_stdout, stderr, ok) = run_faber_with_stdin(
+        &[
+            "build",
+            "--target",
+            "go",
+            "--diagnostics-locale",
+            "zz",
+            "--out-dir",
+            out_dir,
+            "-",
+        ],
+        b"main {}\n",
+    );
+    assert!(!ok, "unknown diagnostics locale must fail:\n{stderr}");
+    assert!(
+        stderr.contains("failed to load reader locale 'zz'"),
+        "expected the embedded-pack load failure, got:\n{stderr}"
+    );
+    assert!(
+        !stderr.contains("requires a package path"),
+        "the shape gate must not answer for stdin:\n{stderr}"
+    );
+}
+
 #[cfg(feature = "hir-rust")]
 #[test]
 fn build_reader_locale_accepts_direct_entry_file_input() {

@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
-    "capable": 405,
-    "analyzable": 567
+    "capable": 406,
+    "analyzable": 569
   },
   "terms": [
     {
@@ -510,8 +510,8 @@
     {
       "term": "matrix",
       "rule": "type",
-      "capable": 1,
-      "analyzable": 6
+      "capable": 2,
+      "analyzable": 7
     },
     {
       "term": "metior",
@@ -973,7 +973,7 @@
       "term": "vector",
       "rule": "type",
       "capable": 4,
-      "analyzable": 16
+      "analyzable": 17
     },
     {
       "term": "vel",

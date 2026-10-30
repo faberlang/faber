@@ -356,14 +356,11 @@ pub(crate) fn grid_reduce_node(
         })
 }
 
-/// The kernel tensor parameters a whole-grid reduction captures into a
-/// function-form term or group-key helper, in operand order (term first, then
-/// each key), each once. An index inside a helper body is never proven by the
-/// lane (the helper has no grid guard), so each such tensor owns one index
-/// fault slot and one element-count resource; the slots follow the grouped-key
-/// axis slots in the fault record. The helper bodies are separate
-/// functions the signature cannot see, so the set is the captures, not the
-/// indexes the bodies actually make.
+/// Kernel tensor parameters with unproven reads in whole-grid reduction
+/// helpers, in operand order (term first, then each key), each once. Each owns
+/// an index fault slot and element-count resource, after the grouped-key slots.
+/// Validated MIR supplies per-helper index summaries; without a visible helper
+/// body, conservatively reserve every tensor capture.
 #[must_use]
 pub fn grid_reduce_helper_tensors(
     function: &MirFunction,
@@ -411,7 +408,18 @@ pub fn grid_reduce_helper_tensors(
     let aliases = ParameterAliases::new(function);
     let mut tensors = Vec::new();
     for (start, count) in runs {
-        for operand in args.iter().skip(start).take(count) {
+        let indexed = match args.get(start + count) {
+            Some(MirOperand::Constant(crate::MirConstant::Function(id))) => {
+                validation.grid_reduce_helper_indexes.get(id)
+            }
+            _ => None,
+        };
+        for (capture, operand) in args.iter().skip(start).take(count).enumerate() {
+            if let Some(indexed) = indexed
+                && !indexed.iter().any(|position| *position as usize == capture)
+            {
+                continue;
+            }
             let MirOperand::Place(place) = operand else {
                 continue;
             };
@@ -1187,7 +1195,7 @@ pub(crate) fn append_matmul_runtime_extent_resources(
 /// grouped-key validity slot per output axis, then one slot per constant throw
 /// (see [`super::throw_sites`]), then ONE `d64` slot when the body does decimal
 /// arithmetic (see [`super::d64_fault_site`]). A whole-grid reduction adds, after its
-/// grouped-key slots, one slot per tensor captured into a term or key helper
+/// grouped-key slots, one slot per tensor with an unproven read in a term or key helper
 /// (see [`grid_reduce_helper_tensors`]). A kernel whose every
 /// tensor index is proven and that has no vector index or throw is untouched.
 fn append_fault_resources(
@@ -2270,12 +2278,12 @@ impl MirKernelSignature {
         interner: Option<&Interner>,
         allow_host_owned_tensor_entry: bool,
     ) -> Result<Self, MirAbiError> {
-        // The strict semantic-type match is the plain-elementwise law. A
-        // collection-op kernel remaps the shape by contract (Transpose
-        // `[M,N] → [N,M]`), so for those the flat element-count equality
-        // below carries the binding shape and
-        // `apply_collection_op_contract` supplies the dispatch facts.
-        if !kernel_has_collection_op(function, |_| true)
+        let vector = vector_param_layout(param.ty, validation)?;
+        // A by-value vector is a count-one input resource, not an elementwise
+        // buffer. As in the multi-input arm, its lanes are read together and
+        // the returned scalar or tensor owns the output extent independently.
+        if vector.is_none()
+            && !kernel_has_collection_op(function, |_| true)
             && !validation
                 .types
                 .equals(param.ty.semantic_id(), function.return_ty.semantic_id())
@@ -2283,24 +2291,31 @@ impl MirKernelSignature {
             return Err(MirAbiError::new(ERR_KERNEL_PARAM_RETURN_MISMATCH));
         }
 
-        let param_element_ty =
-            buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?;
+        let (param_element_ty, param_element_count) = if vector.is_some() {
+            (param.ty, 1)
+        } else {
+            (
+                buffer_element_type(param.ty, validation, allow_host_owned_tensor_entry)?,
+                buffer_element_count(param.ty, validation)?,
+            )
+        };
         let return_element_ty = buffer_element_type(
             function.return_ty,
             validation,
             allow_host_owned_tensor_entry,
         )?;
-        require_same_element_type(param_element_ty, return_element_ty, validation)?;
-        let param_element_count = buffer_element_count(param.ty, validation)?;
         let return_element_count = buffer_element_count(function.return_ty, validation)?;
-        // The return-buffer equality law (shared with the multi-input arm):
-        // the input and output buffers are flat views of the same element
-        // count, so a host can assume one elementwise shape across bindings.
-        // A rectangular transpose's `[M,N]` and `[N,M]` shapes both hold the
-        // flat `M·N` count, so it passes here; genuinely size-changing
-        // kernels fail closed with the elementwise-only diagnostic.
-        if param_element_count != return_element_count {
-            return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+        if vector.is_none() {
+            require_same_element_type(param_element_ty, return_element_ty, validation)?;
+            // The return-buffer equality law (shared with the multi-input arm):
+            // the input and output buffers are flat views of the same element
+            // count, so a host can assume one elementwise shape across bindings.
+            // A rectangular transpose's `[M,N]` and `[N,M]` shapes both hold the
+            // flat `M·N` count, so it passes here; genuinely size-changing
+            // kernels fail closed with the elementwise-only diagnostic.
+            if param_element_count != return_element_count {
+                return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+            }
         }
 
         let mut signature = Self {

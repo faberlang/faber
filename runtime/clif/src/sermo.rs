@@ -15,6 +15,7 @@
 //! Norma `IoFault` variant name) and the error path. The platform message
 //! never crosses.
 
+use crate::arena::ArenaPointer;
 use std::sync::Mutex;
 
 use faber_leaf::{self as leaf, Arg, LeafError, LeafErrorKind, Reply};
@@ -236,10 +237,16 @@ struct Slot {
 
 /// The process-global conversation table, indexed by its one-based handle.
 //
-// A slot is boxed so its address survives the table growing; every accessor
-// export takes this table shape.
-#[allow(clippy::vec_box)]
-static CONVERSATIONS: Mutex<Vec<Box<Slot>>> = Mutex::new(Vec::new());
+// The table records arena-owned slot addresses, never runtime objects. It is
+// cleared when a new program starts so stale handles cannot cross root arenas.
+static CONVERSATIONS: Mutex<Vec<usize>> = Mutex::new(Vec::new());
+
+pub(crate) fn reset_conversations() {
+    CONVERSATIONS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clear();
+}
 
 /// The slot a one-based handle names.
 ///
@@ -247,9 +254,11 @@ static CONVERSATIONS: Mutex<Vec<Box<Slot>>> = Mutex::new(Vec::new());
 // Read by the accessor exports of the next unit; the tests use it today. The
 // table stays a `Vec` so the open export can append to it.
 #[allow(dead_code, clippy::ptr_arg, clippy::vec_box)]
-fn slot(table: &mut Vec<Box<Slot>>, handle: i64) -> Option<&mut Slot> {
+fn slot(table: &mut Vec<usize>, handle: i64) -> Option<&mut Slot> {
     let index = usize::try_from(handle).ok()?.checked_sub(1)?;
-    table.get_mut(index).map(|slot| &mut **slot)
+    let slot = *table.get(index)? as *mut Slot;
+    // SAFETY: every entry is installed from a `Slot` allocated by the arena.
+    Some(unsafe { &mut *slot })
 }
 
 /// Reopen a slot on the opener values a leaf slot reads.
@@ -270,7 +279,11 @@ fn reopen(slot: &mut Slot, opener: &[Opener]) {
 ///
 /// When it is not null, `route` must point at `route_len` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn __faber_clif_v1_sermo_open(route: *const u8, route_len: i64) -> i64 {
+pub unsafe extern "C" fn __faber_clif_v1_sermo_open(
+    arena: *const super::Arena,
+    route: *const u8,
+    route_len: i64,
+) -> i64 {
     let Ok(length) = usize::try_from(route_len) else {
         return 0;
     };
@@ -287,10 +300,11 @@ pub unsafe extern "C" fn __faber_clif_v1_sermo_open(route: *const u8, route_len:
     let mut table = CONVERSATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    table.push(Box::new(Slot {
+    let slot = arena.put(Slot {
         conversation: Conversation::open(route),
         fault: None,
-    }));
+    });
+    table.push(slot as usize);
     i64::try_from(table.len()).unwrap_or(0)
 }
 
@@ -298,7 +312,7 @@ pub unsafe extern "C" fn __faber_clif_v1_sermo_open(route: *const u8, route_len:
 ///
 /// An unknown handle is a no-op.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_sermo_set_opener_nil(handle: i64) {
+pub extern "C" fn __faber_clif_v1_sermo_set_opener_nil(_arena: *const super::Arena, handle: i64) {
     let mut table = CONVERSATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -312,7 +326,11 @@ pub extern "C" fn __faber_clif_v1_sermo_set_opener_nil(handle: i64) {
 ///
 /// An unknown handle is a no-op.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_sermo_set_opener_i64(handle: i64, value: i64) {
+pub extern "C" fn __faber_clif_v1_sermo_set_opener_i64(
+    _arena: *const super::Arena,
+    handle: i64,
+    value: i64,
+) {
     let mut table = CONVERSATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -331,6 +349,7 @@ pub extern "C" fn __faber_clif_v1_sermo_set_opener_i64(handle: i64, value: i64) 
 /// point to a well-formed runtime text.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_sermo_set_opener_valor(
+    _arena: *const super::Arena,
     handle: i64,
     boxed: *const super::Present,
 ) {
@@ -364,7 +383,11 @@ pub unsafe extern "C" fn __faber_clif_v1_sermo_set_opener_valor(
 /// leaf fault is recorded on the slot so the `failed` export reports it. An
 /// unknown handle returns `fallback` and records nothing.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_sermo_materialize_i64(handle: i64, fallback: i64) -> i64 {
+pub extern "C" fn __faber_clif_v1_sermo_materialize_i64(
+    _arena: *const super::Arena,
+    handle: i64,
+    fallback: i64,
+) -> i64 {
     let mut table = CONVERSATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -387,7 +410,7 @@ pub extern "C" fn __faber_clif_v1_sermo_materialize_i64(handle: i64, fallback: i
 /// any recorded fault; a leaf fault is recorded on the slot. An unknown handle
 /// is a no-op and records nothing.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_sermo_drain(handle: i64) {
+pub extern "C" fn __faber_clif_v1_sermo_drain(_arena: *const super::Arena, handle: i64) {
     let mut table = CONVERSATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -403,7 +426,7 @@ pub extern "C" fn __faber_clif_v1_sermo_drain(handle: i64) {
 /// Whether conversation `handle` is in a failed state: 1 when its slot has a
 /// recorded fault, or when the handle is unknown (fail closed), else 0.
 #[unsafe(no_mangle)]
-pub extern "C" fn __faber_clif_v1_sermo_failed(handle: i64) -> i8 {
+pub extern "C" fn __faber_clif_v1_sermo_failed(_arena: *const super::Arena, handle: i64) -> i8 {
     let mut table = CONVERSATIONS
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -436,6 +459,7 @@ fn raw(bytes: &[u8], out_len: Option<&mut i64>) -> *const u8 {
 /// When it is not null, `out_len` must be writable.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_sermo_fault_kind(
+    _arena: *const super::Arena,
     handle: i64,
     out_len: *mut i64,
 ) -> *const u8 {
@@ -459,6 +483,7 @@ pub unsafe extern "C" fn __faber_clif_v1_sermo_fault_kind(
 /// When it is not null, `out_len` must be writable.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn __faber_clif_v1_sermo_fault_path(
+    _arena: *const super::Arena,
     handle: i64,
     out_len: *mut i64,
 ) -> *const u8 {

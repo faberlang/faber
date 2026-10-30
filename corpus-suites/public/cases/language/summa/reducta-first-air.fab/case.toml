@@ -10,6 +10,9 @@ domain = "gpu"
 [expect]
 check_only = true
 
+[targets.clif-jit]
+outcome = "pass"
+
 [targets.mir]
 outcome = "known-fail"
 phase = "emit"

@@ -1,0 +1,26 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "field_list", "field_init", "assignment", "expr_stmt"]
+category = "binding"
+summary = "A deep copy of a class holding a channel is refused with the member path."
+syntax = "mut Envelope duplicate ← copy packet"
+related = ["channel", "genus"]
+locale = "en"
+no_expected = "rejects"
+diagnostic = "SEM066:copy_nonduplicable_member"
++++
+# Copying a class would silently share its live channel. It is refused before
+# runtime, and the diagnostic names the field containing that identity-bearing
+# resource.
+
+class Envelope {
+    mut channel payload
+}
+
+main {
+    let channel source ← call 'runtime:echo' ("hello")
+    let Envelope packet ← Envelope { payload = source }
+    mut Envelope duplicate ← copy packet
+    print duplicate.payload
+}

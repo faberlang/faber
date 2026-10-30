@@ -3568,6 +3568,14 @@ help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc
 message = "`{name}` sẽ chia sẻ `{binding}`, một giá trị chỉ đọc, dưới dạng tên có thể ghi (`{fixum}` là sâu)"
 help = "viết `{varia} {name} ← {copy} {binding}` để có giá trị độc lập, hoặc `{varia} {name} ← {own} {binding}` để tiếp quản nó"
 
+[diagnostics.SEM066]
+message = "`copy` bị từ chối: {head} không thể nhân bản{?path| — đường dẫn thành viên là `|`}"
+help = "{head} là tài nguyên có định danh: hãy chia sẻ giá trị mà không dùng `{copy}`, hoặc nhận tài nguyên bằng `{own}` khi nơi nhận có thể sở hữu nó"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` bị từ chối: {head} không thể nhân bản{?path| — đường dẫn thành viên là `|`}"
+help = "{head} là tài nguyên có định danh: hãy chia sẻ giá trị mà không dùng `{copy}`, hoặc nhận tài nguyên bằng `{own}` khi nơi nhận có thể sở hữu nó"
+
 [diagnostics.WARN001]
 message = "biến không được sử dụng"
 help = "xóa biến hoặc thêm tiền tố '_' vào biến"
@@ -4380,3 +4388,7 @@ help = "Kiểm tra lý do và dùng dạng kernel được thiết bị đã ch�
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: {kind} của nó trên {partitions} phân vùng có thể tránh được: {avoidable} ({reason})"
 help = "Theo lý do kiểm tra để tìm phần phụ thuộc. Giữ các lượt đọc và ghi đã phân vùng trong cùng lane, và khi có thể hãy dùng bố cục bộ đệm tương ứng."
+
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "dữ liệu vùng mượn chưa được dựng cho '{construct}'; bộ kiểm tra mượn đóng cửa thay vì xấp xỉ"
+help = "dạng này cần suy luận vùng cho các quyết định mượn của nó; hãy báo cáo để bộ máy vùng phủ nó"

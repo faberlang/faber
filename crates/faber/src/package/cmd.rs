@@ -10,7 +10,7 @@ use radix::services::DiagnosticMode;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::input_shape::locale_without_package_error;
+use crate::input_shape::{diagnostics_locale_without_package_error, locale_without_package_error};
 
 #[cfg(feature = "hir-rust")]
 use super::cargo::{
@@ -175,6 +175,15 @@ fn report_diagnostics_and_exit_mode(
 pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: bool, safe: bool) {
     if let Some(message) = locale_without_package_error(
         command.locale.as_deref(),
+        std::slice::from_ref(&command.input),
+        command.package,
+    ) {
+        eprintln!("error: {message}");
+        crate::exit_status::exit_usage();
+    }
+
+    if let Some(message) = diagnostics_locale_without_package_error(
+        command.diagnostics_locale.as_deref(),
         std::slice::from_ref(&command.input),
         command.package,
     ) {

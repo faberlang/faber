@@ -2159,6 +2159,10 @@ help = "keep conditions, bounds and scalar arguments to values known before the 
 message = "a kernel cannot use a saturating float yet ({site}); device lowering of saturating floats is not built"
 help = "use a bare float width in the kernel; keep `{saturatus}<f32>` at the host boundary and convert with `↦`"
 
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "borrow-region facts are not built for '{construct}' yet; the borrow checker fails closed instead of approximating"
+help = "this construct needs region inference for its borrow decisions; report it so the region engine covers it"
+
 [diagnostics.SEM008.issues.nucleum_typed_error_channel]
 message = "kernel '{kernel}' declares a typed error channel; a kernel may declare only a text error"
 help = "declare `⇥ {textus}` (one constant message per failure site) and let the launching host map it to its own error type"
@@ -4819,6 +4823,10 @@ help = "call materialize() to create an owned tensor before storing, returning, 
 message = "a borrowed tensor view is read-only and aliases its base"
 help = "pass the view as `{de}` for read-only use; call `materialize()` into a writable local before writing or passing it to `{in}`/`{own}` code"
 
+[diagnostics.SEM057.issues.kernel_argument_overlap]
+message = "kernel argument {position}{?binding| (`|`)} is writable and shares storage with argument {overlap}"
+help = "a kernel writes its `{in}` and `{own}` arguments while every argument stays live for the whole launch, so no two arguments may name one storage; pass disjoint tensors, or bind an independent copy with `← {copy}` / `materialize()` first"
+
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
 help = "make a writable local copy, then pass it with the parameter's `{in}` or `{own}` marker"
@@ -5322,6 +5330,14 @@ help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or
 [diagnostics.SEM065.issues.const_shared_into_var]
 message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
 help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
+
+[diagnostics.SEM066]
+message = "`copy` is refused: {head} cannot be duplicated{?path| — the member path is `|`}"
+help = "{head} is a resource with identity: share the value without `{copy}`, or take the resource over with `{own}` where the consumer may own it"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` is refused: {head} cannot be duplicated{?path| — the member path is `|`}"
+help = "{head} is a resource with identity: share the value without `{copy}`, or take the resource over with `{own}` where the consumer may own it"
 
 [diagnostics.WARN001]
 message = "unused variable"

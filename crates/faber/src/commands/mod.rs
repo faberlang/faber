@@ -258,13 +258,24 @@ pub fn run() {
     dispatch(command);
 }
 
-/// Refuse an in-memory engine (`clif-jit`) where an artifact is asked for:
-/// it compiles into the running process and has no output to write.
+/// Refuse an engine that runs in memory (`clif-jit`, `runner`) where an
+/// artifact is asked for: neither compiles an output to write.
 fn reject_in_memory_engine(target: Option<crate::cli::FaberCliTarget>) {
-    if target.is_some_and(crate::cli::FaberCliTarget::is_in_memory_engine) {
-        eprintln!("error: clif-jit runs in memory; use --target clif to build an executable");
-        exit_status::exit_usage();
+    let Some(target) = target.filter(|target| target.is_in_memory_engine()) else {
+        return;
+    };
+    match target {
+        crate::cli::FaberCliTarget::ClifJit => {
+            eprintln!("error: clif-jit runs in memory; use --target clif to build an executable");
+        }
+        crate::cli::FaberCliTarget::Runner => {
+            eprintln!(
+                "error: runner is the in-memory interpreter; build needs a compiled target (see `faber targets`)"
+            );
+        }
+        _ => {}
     }
+    exit_status::exit_usage();
 }
 
 fn dispatch(command: Command) {

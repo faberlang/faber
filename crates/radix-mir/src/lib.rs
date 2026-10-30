@@ -58,6 +58,7 @@ pub mod ty;
 pub mod validate;
 pub mod vector_expand;
 pub mod visit;
+pub mod wrapping_store;
 
 #[cfg(test)]
 mod control_test;
@@ -86,6 +87,8 @@ mod structurize_test;
 mod vector_expand_test;
 #[cfg(test)]
 mod vector_op_test;
+#[cfg(test)]
+mod wrapping_store_test;
 
 /// Shared lista→tensor shape helpers used by validation and the MIR runner.
 pub mod lista_tensor_conversio;
@@ -266,6 +269,9 @@ pub use validate::{
 };
 pub use visit::{
     terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value,
+};
+pub use wrapping_store::{
+    WrappingStoreRegion, WrappingStoreSite, wrapping_reduce_width, wrapping_store_regions,
 };
 
 /// Field name for string-backed fac/cape handler error message projection.

@@ -73,10 +73,10 @@ impl Emitter<'_> {
             };
             format!(
                 "faber_list_{}_new_fixed(faber_a, {capacity})",
-                self.elem_suffix(elem)?
+                elem.suffix()
             )
         } else {
-            format!("faber_list_{}_new(faber_a, 0)", self.elem_suffix(elem)?)
+            format!("faber_list_{}_new(faber_a, 0)", elem.suffix())
         };
         Ok(self.list_operand(text, elem))
     }
@@ -106,24 +106,42 @@ impl Emitter<'_> {
             operands.push(operand);
         }
         let effect = operands.iter().any(|operand| operand.effect);
-        let prelude = self.sequence(&mut operands)?;
+        let prelude = self.sequence(&mut operands);
         let items = operands
             .iter()
             .map(|operand| operand.text.as_str())
             .collect::<Vec<_>>()
             .join(", ");
         self.support.need(Helper::List(elem, ListOp::Of));
-        let of = if self.is_fixed(expr) {
-            "of_fixed"
+        // WHY: a bounded literal reserves its declared capacity, not its
+        // length: the spare cells hold typed zero and a later push may grow to
+        // `N`. An inferred literal's capacity is its own length, and a list
+        // with no capacity is the growable carrier.
+        let capacity = if self.is_fixed(expr) {
+            expr.ty.and_then(|ty| self.list_capacity(ty))
         } else {
-            "of"
+            None
         };
-        let call = format!(
-            "faber_list_{n}_{of}(faber_a, {count}, ({t}[]){{{items}}})",
-            n = self.elem_suffix(elem)?,
-            count = operands.len(),
-            t = self.elem_c_type(elem)?,
-        );
+        let call = match capacity {
+            Some(capacity) => format!(
+                "faber_list_{n}_of_fixed_capacity(faber_a, {count}, ({t}[]){{{items}}}, {capacity})",
+                n = elem.suffix(),
+                count = operands.len(),
+                t = elem.c_type(),
+            ),
+            None if self.is_fixed(expr) => format!(
+                "faber_list_{n}_of_fixed(faber_a, {count}, ({t}[]){{{items}}})",
+                n = elem.suffix(),
+                count = operands.len(),
+                t = elem.c_type(),
+            ),
+            None => format!(
+                "faber_list_{n}_of(faber_a, {count}, ({t}[]){{{items}}})",
+                n = elem.suffix(),
+                count = operands.len(),
+                t = elem.c_type(),
+            ),
+        };
         let operand = self.list_operand(wrap(&prelude, &call), elem);
         Ok(operand.with_effect(effect))
     }
@@ -137,7 +155,7 @@ impl Emitter<'_> {
         elements: &[HirArrayElement],
         elem: Elem,
     ) -> Result<Operand, CodegenError> {
-        let suffix = self.elem_suffix(elem)?;
+        let suffix = elem.suffix();
         self.support.need(Helper::List(elem, ListOp::New));
         self.support.need(Helper::List(elem, ListOp::Push));
         let target = format!("faber_t{}", self.temps);
@@ -221,7 +239,7 @@ impl Emitter<'_> {
         if !matches!(position.value, Value::Int | Value::Exact) {
             return Err(unsupported("list index that is not an integer"));
         }
-        self.list_at_operands(list, position, elem)
+        Ok(self.list_at_operands(list, position, elem))
     }
 
     /// The checked element read from already-evaluated list and position
@@ -231,15 +249,15 @@ impl Emitter<'_> {
         list: Operand,
         position: Operand,
         elem: Elem,
-    ) -> Result<Operand, CodegenError> {
+    ) -> Operand {
         let effect = list.effect || position.effect;
         let mut operands = [list, position];
-        let prelude = self.sequence(&mut operands)?;
+        let prelude = self.sequence(&mut operands);
         let [list, position] = operands;
         self.support.need(Helper::List(elem, ListOp::At));
         let call = format!(
             "faber_list_{}_at({}, {})",
-            self.elem_suffix(elem)?,
+            elem.suffix(),
             list.text,
             position.text
         );
@@ -250,7 +268,7 @@ impl Emitter<'_> {
         } else {
             text
         };
-        Ok(Operand::new(text, Value::from(elem.ty())).with_effect(effect))
+        Operand::new(text, Value::from(elem.ty())).with_effect(effect)
     }
 
     /// `xs[i] ← value` as a statement line.
@@ -287,7 +305,7 @@ impl Emitter<'_> {
         self.support.need(Helper::List(elem, ListOp::Set));
         Ok(format!(
             "faber_list_{}_set({}, {}, {});",
-            self.elem_suffix(elem)?,
+            elem.suffix(),
             list.text,
             position.text,
             item.text
@@ -317,16 +335,6 @@ impl Emitter<'_> {
         let Value::List(elem) = list.value else {
             return Err(unsupported("method call on a value that is not a list"));
         };
-        if matches!(elem, Elem::Genus(_))
-            && !matches!(
-                entry.mir_kind,
-                IntrinsicMirKind::Collection(
-                    MirCollectionOp::Length | MirCollectionOp::IsEmpty | MirCollectionOp::Append
-                )
-            )
-        {
-            return Err(unsupported("list method outside genus-list storage"));
-        }
         if args
             .iter()
             .any(|arg| arg.name.is_some() || arg.spread || arg.marker.is_some())
@@ -362,12 +370,12 @@ impl Emitter<'_> {
                 let item = self.element(&arg.expr, elem)?;
                 let effect = list.effect || item.effect;
                 let mut operands = [list, item];
-                let prelude = self.sequence(&mut operands)?;
+                let prelude = self.sequence(&mut operands);
                 let [list, item] = operands;
                 self.support.need(Helper::List(elem, ListOp::Push));
                 let call = format!(
                     "faber_list_{}_push(faber_a, {}, {})",
-                    self.elem_suffix(elem)?,
+                    elem.suffix(),
                     list.text,
                     item.text
                 );
@@ -379,7 +387,7 @@ impl Emitter<'_> {
             _ if name == "ordina" && args.is_empty() => {
                 self.support.need(Helper::List(elem, ListOp::At));
                 Ok(Operand::new(
-                    format!("faber_list_{}_sort({})", self.elem_suffix(elem)?, list.text),
+                    format!("faber_list_{}_sort({})", elem.suffix(), list.text),
                     Value::Void,
                 )
                 .with_effect(true))
@@ -394,7 +402,6 @@ impl Emitter<'_> {
     /// each item is passed to the function pointer (with the hidden arena
     /// when the program allocates). `reduce`/`cumulate` carry the accumulator
     /// through the loop; `all`/`any` short-circuit.
-    #[expect(clippy::too_many_lines)]
     fn list_higher_order(
         &mut self,
         list: Operand,
@@ -404,9 +411,9 @@ impl Emitter<'_> {
         args: &[HirCallArg],
     ) -> Result<Operand, CodegenError> {
         let list_text = list.text;
-        let suffix = self.elem_suffix(elem)?;
-        let list_ptr = self.elem_list_c_pointer(elem)?;
-        let source = self.elem_c_type(elem)?;
+        let suffix = elem.suffix();
+        let list_ptr = elem.list_c_pointer();
+        let source = elem.c_type();
         let arena = if self.arena { "faber_a, " } else { "" };
         if args.is_empty() || args.len() > 2 {
             return Err(unsupported("higher-order list method with the wrong arity"));
@@ -469,9 +476,9 @@ impl Emitter<'_> {
                 let Some(Ty::List(mapped)) = call_result else {
                     return Err(unsupported("mapper result that is not a list"));
                 };
-                let mapped_suffix = self.elem_suffix(mapped)?;
-                let mapped_ptr = self.elem_list_c_pointer(mapped)?;
-                let mapped_source = self.elem_c_type(mapped)?;
+                let mapped_suffix = mapped.suffix();
+                let mapped_ptr = mapped.list_c_pointer();
+                let mapped_source = mapped.c_type();
                 let call = format!(
                     "{}({arena}(faber_ho_src)->items[faber_ho_i])",
                     function.text
@@ -510,8 +517,8 @@ impl Emitter<'_> {
                     let Ty::List(element) = result_class else {
                         return Err(unsupported("cumulate result that is not a list"));
                     };
-                    let element_suffix = self.elem_suffix(element)?;
-                    let element_ptr = self.elem_list_c_pointer(element)?;
+                    let element_suffix = element.suffix();
+                    let element_ptr = element.list_c_pointer();
                     self.support.need(Helper::List(element, ListOp::New));
                     self.support.need(Helper::List(element, ListOp::Push));
                     format!(
@@ -556,7 +563,7 @@ impl Emitter<'_> {
                 (
                     format!(
                         "faber_map_{}_{side}(faber_a, {})",
-                        self.map_suffix(k, v)?,
+                        Self::map_suffix(k, v),
                         list.text
                     ),
                     elem,
@@ -564,21 +571,12 @@ impl Emitter<'_> {
             }
             _ => return Err(unsupported("sort of a value that is not a list")),
         };
-        if matches!(elem, Elem::Genus(_)) {
-            return Err(unsupported("sorting a list of genus"));
-        }
         self.support.need(Helper::List(elem, ListOp::New));
-        let sorted = format!(
-            "faber_list_{}_sorted(faber_a, {list_text})",
-            self.elem_suffix(elem)?
-        );
+        let sorted = format!("faber_list_{}_sorted(faber_a, {list_text})", elem.suffix());
         let text = match direction {
             radix_hir::HirSortDirection::Ascending => sorted,
             radix_hir::HirSortDirection::Descending => {
-                format!(
-                    "faber_list_{}_inverted(faber_a, {sorted})",
-                    self.elem_suffix(elem)?
-                )
+                format!("faber_list_{}_inverted(faber_a, {sorted})", elem.suffix())
             }
         };
         Ok(self.list_operand(text, elem).with_effect(list.effect))
@@ -594,9 +592,6 @@ impl Emitter<'_> {
         entry: &radix_intrinsics::MethodIntrinsic,
         args: &[HirCallArg],
     ) -> Result<Operand, CodegenError> {
-        if matches!(elem, Elem::Genus(_)) {
-            return Err(unsupported("optional query on a list of genus"));
-        }
         let inner = Inner::from_ty(elem.ty())
             .ok_or_else(|| unsupported("list element without an optional form"))?;
         // An element argument or an index argument, evaluated after the list.
@@ -639,7 +634,7 @@ impl Emitter<'_> {
                     | MirCollectionOp::RemoveLast
                     | MirCollectionOp::ReverseInPlace
             );
-        let prelude = self.sequence(&mut operands)?;
+        let prelude = self.sequence(&mut operands);
         self.support.need(Helper::List(elem, ListOp::At));
         self.need_class(Ty::Opt(inner));
         let operand = self.list_query_read(elem, inner, op, entry, &operands)?;
@@ -662,13 +657,13 @@ impl Emitter<'_> {
         entry: &radix_intrinsics::MethodIntrinsic,
         operands: &[Operand],
     ) -> Result<Operand, CodegenError> {
-        let suffix = self.elem_suffix(elem)?;
+        let suffix = elem.suffix();
         let o = |at: usize| operands[at].text.clone();
         Ok(match op {
             MirCollectionOp::First => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_get({}, 0, &{slot})", o(0));
-                self.optional_call(elem, inner, &slot, &call)?
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::Last => {
                 let slot = format!("faber_o{}", self.temps);
@@ -676,22 +671,22 @@ impl Emitter<'_> {
                     "faber_list_{suffix}_get({0}, ({0})->len - 1, &{slot})",
                     o(0)
                 );
-                self.optional_call(elem, inner, &slot, &call)?
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::Index if entry.return_kind == IntrinsicReturnKind::OptionInner => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_get({}, {}, &{slot})", o(0), o(1));
-                self.optional_call(elem, inner, &slot, &call)?
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::RemoveFirst => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_remove_first({}, &{slot})", o(0));
-                self.optional_call(elem, inner, &slot, &call)?
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::RemoveLast => {
                 let slot = format!("faber_o{}", self.temps);
                 let call = format!("faber_list_{suffix}_remove_last({}, &{slot})", o(0));
-                self.optional_call(elem, inner, &slot, &call)?
+                self.optional_call(elem, inner, &slot, &call)
             }
             MirCollectionOp::ArgMax | MirCollectionOp::ArgMin if elem == Elem::Int => {
                 let which = if op == MirCollectionOp::ArgMax {
@@ -721,7 +716,7 @@ impl Emitter<'_> {
         op: MirCollectionOp,
         operands: &[Operand],
     ) -> Result<Operand, CodegenError> {
-        let suffix = self.elem_suffix(elem)?;
+        let suffix = elem.suffix();
         let o = |at: usize| operands[at].text.clone();
         Ok(match op {
             MirCollectionOp::Contains => Operand::new(
@@ -808,9 +803,9 @@ impl Emitter<'_> {
         inner: Inner,
         slot: &str,
         call: &str,
-    ) -> Result<Operand, CodegenError> {
+    ) -> Operand {
         self.temps += 1;
-        let c_type = self.elem_c_type(elem)?;
+        let c_type = elem.c_type();
         let text = match inner.scalar_struct() {
             Some(name) => format!(
                 "(__extension__ ({{ {c_type} {slot} = 0; bool {slot}h = {call}; (({name}){{{slot}h, {slot}}}); }}))"
@@ -819,19 +814,16 @@ impl Emitter<'_> {
                 format!("(__extension__ ({{ {c_type} {slot} = NULL; (void){call}; {slot}; }}))")
             }
         };
-        Ok(Operand::new(text, Value::Opt(inner)))
+        Operand::new(text, Value::Opt(inner))
     }
 
     /// How `print` and a template hole show a list, as the runner does.
     pub(crate) fn show_list(&mut self, text: &str, elem: Elem) -> Result<String, CodegenError> {
-        if matches!(elem, Elem::Genus(_)) {
-            return Err(unsupported("display of a list of genus"));
-        }
         self.support.need(Helper::List(elem, ListOp::Show));
         if elem != Elem::Bool {
             return Ok(format!(
                 "faber_list_{}_show(faber_a, {text})",
-                self.elem_suffix(elem)?
+                elem.suffix()
             ));
         }
         let tokens = self.names.display_tokens();

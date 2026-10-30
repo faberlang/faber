@@ -113,6 +113,47 @@ int main(int argc, char **argv) {
     flags = faber_list_bool_of(&arena, 2, (bool[]){true, false});
     check_text("bool show", faber_list_bool_show(&arena, flags, "true", "false"), "[true, false]");
     check_text("empty show", faber_list_i64_show(&arena, faber_list_i64_new(&arena, 0)), "[]");
+    {
+        faber_list_i64 *fixed = faber_list_i64_new_fixed(&arena, 4);
+        int64_t removed;
+        check_int("fixed zero slot 0", fixed->items[0], 0);
+        check_int("fixed zero slot 3", fixed->items[3], 0);
+        faber_list_i64_push(&arena, fixed, 10);
+        faber_list_i64_push(&arena, fixed, 20);
+        faber_list_i64_push(&arena, fixed, 30);
+        check_int("fixed remove first", faber_list_i64_remove_first(fixed, &removed), 1);
+        check_int("fixed removed first value", removed, 10);
+        check_int("fixed first after remove", fixed->items[0], 20);
+        check_int("fixed vacated after remove first", fixed->items[2], 0);
+        check_int("fixed remove last", faber_list_i64_remove_last(fixed, &removed), 1);
+        check_int("fixed removed last value", removed, 30);
+        check_int("fixed vacated after remove last", fixed->items[1], 0);
+        faber_list_i64_clear(fixed);
+        check_int("fixed clear length", fixed->len, 0);
+        check_int("fixed clear first slot", fixed->items[0], 0);
+        check_int("fixed clear last slot", fixed->items[3], 0);
+
+        texts = faber_list_text_new_fixed(&arena, 2);
+        check_int("fixed text empty typed zero", strcmp(texts->items[0], ""), 0);
+    }
+    /* A bounded literal reserves its declared capacity: the spare cells hold
+       typed zero and a later push fills up to the capacity the type names. */
+    {
+        faber_list_i64 *literal = faber_list_i64_of_fixed_capacity(
+            &arena, 2, (int64_t[]){INT64_C(1), INT64_C(2)}, 4);
+        check_int("bounded literal length", literal->len, 2);
+        check_int("bounded literal capacity", literal->cap, 4);
+        check_int("bounded literal zero spare slot", literal->items[3], 0);
+        check_int("bounded literal typed zero text",
+                  strcmp(faber_list_text_of_fixed_capacity(&arena, 1, (faber_text[]){"a"}, 3)
+                             ->items[2],
+                         ""),
+                  0);
+        faber_list_i64_push(&arena, literal, 30);
+        faber_list_i64_push(&arena, literal, 40);
+        check_text("bounded literal after pushes", faber_list_i64_show(&arena, literal),
+                   "[1, 2, 30, 40]");
+    }
     bits = faber_list_b8_new(&arena, 0);
     faber_list_b8_push(&arena, bits, 0x00);
     faber_list_b8_push(&arena, bits, 0x0f);

@@ -116,6 +116,30 @@ fn ref_over_an_optional_scalar_is_refused() {
 }
 
 #[test]
+fn a_vector_ref_local_is_refused() {
+    // Operator ruling 7b25889f R1: a vector is a silent value, so `ref` over
+    // one is the scalar refusal, and `b ← a` copies on its own.
+    let errors = error_issues(
+        "main {\n    let vf32[3] a ← [1.0, 2.0, 3.0] ↦ vf32[3]\n    ref vf32[3] b ← a\n    print b[0]\n}\n",
+    );
+    assert!(
+        errors.iter().any(|e| e == "scalar_access_marker"),
+        "{errors:?}"
+    );
+}
+
+#[test]
+fn a_matrix_ref_local_is_refused() {
+    let errors = error_issues(
+        "main {\n    let mf32[2, 2] a ← [[1.0, 2.0], [3.0, 4.0]] ↦ mf32[2, 2]\n    ref mf32[2, 2] b ← a\n    print b[[0, 0]]\n}\n",
+    );
+    assert!(
+        errors.iter().any(|e| e == "scalar_access_marker"),
+        "{errors:?}"
+    );
+}
+
+#[test]
 fn ref_over_a_non_optional_union_keeps_the_nested_marker_refusal() {
     let errors = error_issues(
         "class A { mut int x }\nclass B { mut int y }\nmain {\n    let A a ← A { x = 1 }\n    let B b ← B { y = 2 }\n    ref A ∪ B cur ← a\n    print cur.x\n}\n",
