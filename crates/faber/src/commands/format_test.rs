@@ -1557,3 +1557,45 @@ fn format_width_stdin_uses_only_the_flag() {
         stdout_of(&wrapped)
     );
 }
+
+/// `faber format` on an import-bearing file resolves the import target's own
+/// frontmatter locale through the format session's embedded reader packs: on
+/// an installed binary, with no workspace `locale/` tree beside it, formatting
+/// must not fail on the imported Latin module. The discovered root is cleared
+/// on the exact session the command mints, so only the embedded loader can
+/// serve the import's declared locale.
+#[test]
+fn format_resolves_import_locale_through_loader_without_root() {
+    let dir = tempfile::tempdir().expect("create scratch");
+    let provider = dir.path().join("valida.fab");
+    fs::write(
+        &provider,
+        "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio nomen(textus s) → textus {\n    redde s\n}\n",
+    )
+    .expect("write provider");
+    let path = dir.path().join("main.fab");
+    let source = "+++\nlocale = \"en\"\n+++\nimport from \"./valida\" valida\n\nmain {\n    print valida.nomen(\"a\")\n}\n";
+    fs::write(&path, source).expect("write main");
+
+    let mut session = format_session(&path, None, source).expect("format session");
+    session.config.locale_root = None; // the installed-binary condition
+
+    let name = path.display().to_string();
+    let result = reemit_faber(
+        &session,
+        session.config.locale_pack.as_ref().expect("emission pack"),
+        &name,
+        source,
+    );
+    assert!(
+        result.success(),
+        "the import's declared Latin locale must resolve through the embedded loader: {:?}",
+        result.diagnostics
+    );
+    let code = result.output.expect("formatted output").code;
+    assert!(
+        code.contains("valida.nomen"),
+        "the formatted source must keep the resolved import call:\n{code}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
