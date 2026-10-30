@@ -95,7 +95,7 @@ fn typescript_tensor_method_forms_use_the_checked_carrier_call() {
 fn go_tensor_method_forms_use_the_checked_carrier_call() {
     let code = emit(Target::HirGo);
     assert!(
-        code.contains("v, err := p_grid.AccipeChecked(func() []int { acc := make([]int, 2, 2); for i := range acc { acc[i] = 0 }; acc = acc[:2]; acc[0] = 0; acc[1] = 1; return acc }()); if err != nil { panic(err) }"),
+        code.contains("v, err := p_grid.AccipeChecked([]int{0, 1}); if err != nil { panic(err) }; return v"),
         "an in-range literal call is a plain value:\n{code}"
     );
     assert!(
