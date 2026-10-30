@@ -318,7 +318,7 @@ impl<'a> LaneIndexProof<'a> {
     }
 
     /// The proof state of a whole-grid reduction's term or group-key helper.
-    /// The helper has no lane and no grid guard. Checker-carried ProvenIndex
+    /// The helper has no lane and no grid guard. Checker-carried `ProvenIndex`
     /// reads remain proven; without that carrier, only a literal or sequential
     /// counter proves a coordinate. Other reads need the kernel's bounds compare.
     #[must_use]
