@@ -1686,7 +1686,10 @@ impl FunctionLower<'_, '_> {
                         .map_err(|_| Decline::new("text header offset"))?,
                 );
                 let reference = self.runtime_ref(&abi::TRAP_CONVERSION)?;
-                self.builder.ins().call(reference, &[bytes, length]);
+                self.builder.ins().call(
+                    reference,
+                    &[self.arena.expect("arena entry parameter"), bytes, length],
+                );
                 self.builder.ins().trap(TrapCode::unwrap_user(1));
             }
             Some(_) => return Err(Decline::new("conversion failure channel type")),

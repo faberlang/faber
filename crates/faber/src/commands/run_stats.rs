@@ -18,7 +18,8 @@
 //! - `host_encode_ns`: launch-encode wall time with `host_blocked_ns` taken
 //!   out. This is the host's own encode cost and is disjoint from
 //!   `host_blocked_ns`.
-//! - `gpu_busy_ns`: the GPU's own clock over completed command buffers.
+//! - `gpu_busy_ns`: the GPU's own clock over completed device work; CUDA sums
+//!   per-launch event durations and reports per-batch idle as `wall_ns - gpu_busy_ns`.
 //!
 //! Versioning: `host_blocked_ns` was added at `format_version` 1 as an
 //! optional field, the way `gpu_timer_available` was. An artifact without it
@@ -82,8 +83,8 @@ pub(crate) struct DeviceMetadata {
     /// not GPU time; read `gpu_busy_ns` for that. See the module docs for
     /// which device timers overlap.
     pub(crate) execution_ns: u64,
-    /// GPU nanoseconds of completed command buffers (device time only). 0
-    /// when the driver cannot read a device clock.
+    /// GPU nanoseconds of completed device work (CUDA launch durations or
+    /// Metal command-buffer intervals). 0 when the driver cannot read a device clock.
     pub(crate) gpu_busy_ns: u64,
     pub(crate) gpu_timing: String,
     pub(crate) timed_launches: u64,
@@ -161,6 +162,22 @@ pub(crate) struct DeviceRuntimeMetadata {
     /// A logical device spanning several partitions (rule 18) only.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) span: Option<DeviceSpanMetadata>,
+    /// Per-retired-batch GPU work/idle accounting, when provided by the device.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) gpu_steps: Vec<DeviceGpuStepMetadata>,
+}
+
+/// GPU busy and idle accounting for one retired launch batch.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeviceGpuStepMetadata {
+    pub(crate) launches: u64,
+    pub(crate) timed_launches: u64,
+    pub(crate) gpu_busy_ns: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) wall_ns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) idle_ns: Option<u64>,
 }
 
 /// Partition traffic and launch modes of a spanned logical device.
@@ -526,6 +543,17 @@ impl DeviceMetadata {
                 span: runtime.span.as_ref().map(|span| {
                     DeviceSpanMetadata::from_stats(span).with_avoidable(&receipt.span_avoidable)
                 }),
+                gpu_steps: runtime
+                    .gpu_steps
+                    .iter()
+                    .map(|step| DeviceGpuStepMetadata {
+                        launches: step.launches,
+                        timed_launches: step.timed_launches,
+                        gpu_busy_ns: step.gpu_busy_ns,
+                        wall_ns: step.wall_ns,
+                        idle_ns: step.idle_ns,
+                    })
+                    .collect(),
             },
             entries: runtime
                 .entry_gpu

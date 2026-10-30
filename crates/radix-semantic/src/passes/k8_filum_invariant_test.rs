@@ -63,6 +63,75 @@ fn plane(statement: &str) -> String {
 }
 
 #[test]
+fn flattened_lane_row_needs_a_proven_inner_range() {
+    accepted(
+        r"incipit {
+    varia tensor<i32, [3]> lanes ← vacua
+    varia tensor<i32, [906]> scratch ← vacua
+    itera ex lanes apud [k] filum lane sit value {
+        sit i32 base ← k * 301
+        sit i32 lo ← 1
+        sit i32 hi ← 301
+        itera ab lo‥hi sit j {
+            scratch[[base + j]] ← value
+        }
+    }
+}",
+    );
+}
+
+#[test]
+fn flat_lane_offset_without_a_covering_stride_is_refused() {
+    rejected(
+        r"incipit {
+    varia tensor<i32, [3]> lanes ← vacua
+    varia tensor<i32, [12]> scratch ← vacua
+    itera ex lanes apud [k] filum lane sit value {
+        sit i32 hi ← 4
+        itera ab 0‥hi sit j {
+            scratch[[k + j]] ← value
+        }
+    }
+}",
+        "write_not_own_coordinate",
+    );
+    rejected(
+        r"incipit {
+    varia tensor<i32, [3]> lanes ← vacua
+    varia tensor<i32, [12]> scratch ← vacua
+    itera ex lanes apud [k] filum lane sit value {
+        sit i32 pitch ← 2
+        sit i32 base ← k * pitch
+        sit i32 hi ← 4
+        itera ab 0‥hi sit j {
+            scratch[[base + j]] ← value
+        }
+    }
+}",
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn flat_lane_row_may_not_cross_its_stride_boundary() {
+    rejected(
+        r"incipit {
+    varia tensor<i32, [3]> lanes ← vacua
+    varia tensor<i32, [12]> scratch ← vacua
+    itera ex lanes apud [k] filum lane sit value {
+        sit i32 pitch ← 4
+        sit i32 base ← k * pitch
+        sit i32 hi ← 5
+        itera ab 0‥hi sit j {
+            scratch[[base + j]] ← value
+        }
+    }
+}",
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
 fn invariant_components_beside_lane_coordinates_accepted() {
     accepted(&row("cache[[pos, j]] ← value"));
     accepted(&row("cache[[1, j]] ← value"));
