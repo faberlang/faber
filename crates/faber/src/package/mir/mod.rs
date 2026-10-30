@@ -406,6 +406,10 @@ pub struct DeviceRunReceipt {
     /// window, in nanoseconds; GPU wait, not host work. A subset of
     /// `runtime.blocking_wait_ns`.
     pub host_blocked_ns: u64,
+    /// Cumulative host bytes fresh kernel-output twins materialized during
+    /// the run: a launch allocates no host array for its output, and the
+    /// first host read that needs real bytes materializes the twin once.
+    pub host_fresh_output_bytes: u64,
     /// How much of the launch time the runtime could measure.
     pub gpu_timing: DeviceGpuTiming,
     /// The avoidable cross-partition syncs the spanned run's calls implied
@@ -781,6 +785,7 @@ impl DeviceRunPhases {
             downloaded_bytes: self.dispatcher.transfers.downloaded_bytes,
             host_encode_ns: self.dispatcher.host_encode_ns,
             host_blocked_ns: self.dispatcher.host_blocked_ns,
+            host_fresh_output_bytes: self.dispatcher.host_fresh_output_bytes,
             gpu_timing,
             span_avoidable: self
                 .dispatcher
