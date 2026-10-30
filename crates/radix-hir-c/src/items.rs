@@ -76,6 +76,7 @@ pub(crate) struct FunctionText {
 #[derive(Default)]
 pub(crate) struct Items {
     pub(crate) genera: String,
+    pub(crate) genus_order: Vec<DefId>,
     pub(crate) constants: String,
     /// Assignments to the module constants that cannot be initialised at file
     /// scope (they allocate in the arena `main` owns); they run first in `main`.
@@ -225,7 +226,7 @@ impl Emitter<'_> {
                     .push_str(&self.class_constants(item.def_id)?);
             }
         }
-        items.genera = self.genus_declarations(&order)?;
+        items.genus_order = order;
         for (def_id, function) in functions {
             items.functions.push(FunctionText {
                 def_id,

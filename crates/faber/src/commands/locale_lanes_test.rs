@@ -100,16 +100,22 @@ fn verify_lane_reads_declared_locale_without_workspace_root() {
         None,
         &installed_locale_config(&input),
     );
+    // A clean Latin read under the declared locale produces no diagnostics at
+    // all — not merely none of the lost-locale codes — and the aspect
+    // machinery still ran (its coverage report is present; without a Lean
+    // checker configured the entries report `ToolchainMissing`, which the
+    // lane's success gate accounts for separately).
     assert!(
-        !result
-            .diagnostics
-            .iter()
-            .any(|d| d.code == Some("PARSE001") || d.code == Some("LOCALE003")),
-        "verify must read the Latin source under its declared locale: {:?}",
+        result.diagnostics.is_empty(),
+        "verify must read the Latin source cleanly under its declared locale: {:?}",
         result
             .diagnostics
             .iter()
             .map(|d| (d.code, d.issue(), d.args.clone()))
             .collect::<Vec<_>>()
+    );
+    assert!(
+        result.coverage.is_some(),
+        "verify must still produce its aspect coverage report"
     );
 }

@@ -10,7 +10,7 @@ use radix::services::DiagnosticMode;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::input_shape::locale_without_package_error;
+use crate::input_shape::{diagnostics_locale_without_package_error, locale_without_package_error};
 
 #[cfg(feature = "hir-rust")]
 use super::cargo::{
@@ -182,10 +182,25 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         crate::exit_status::exit_usage();
     }
 
+    if let Some(message) = diagnostics_locale_without_package_error(
+        command.diagnostics_locale.as_deref(),
+        std::slice::from_ref(&command.input),
+        command.package,
+    ) {
+        eprintln!("error: {message}");
+        crate::exit_status::exit_usage();
+    }
+
     let raw_input_path = PathBuf::from(&command.input);
     let target = resolve_build_target(&command, &raw_input_path);
     if !super::target_gate::target_compiled_in(target) {
         super::target_gate::exit_target_not_in_this_build(target);
+    }
+    if target == Target::MirEvm {
+        eprintln!(
+            "error: evm is an experimental single-file emit target; use faber emit --target evm, not build"
+        );
+        crate::exit_status::exit_usage();
     }
     let is_package = use_package_compiler(target, &raw_input_path, command.package);
     let input_path = if is_package {
@@ -1344,6 +1359,12 @@ fn lowering_units(config: &radix::module::Config, input_path: &Path) -> Vec<Path
 /// Unlike `cmd_build`, this command does not materialize the generated Cargo
 /// crate. It is a compiler-inspection surface for the assembled backend output.
 pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, linter: bool) {
+    if command.target == Target::MirEvm {
+        eprintln!(
+            "error: evm supports experimental single-file emit only; package emit is unsupported"
+        );
+        crate::exit_status::exit_usage();
+    }
     // SGR-U2: `.fab` metal-text emits take the package lane's merged
     // consumer, mirroring the build branch — radix-program::emit has no
     // MirMetal artifact plan and reports the input as unsupported.

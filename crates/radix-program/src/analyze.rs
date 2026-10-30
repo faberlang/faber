@@ -1131,9 +1131,7 @@ fn build_module_graph(
             if decl.target.is_some() {
                 continue;
             }
-            let Some(binding) = import_binding(&file.interner, decl) else {
-                continue;
-            };
+            let binding = import_binding(&file.interner, decl);
             let import_path = file.interner.resolve(decl.path);
             match resolve_import(spec, library_resolver, &file.path, import_path) {
                 ImportResolution::Local(target) => {
@@ -1180,9 +1178,7 @@ fn package_import_identities_for_file(
         if decl.target.is_some() {
             continue;
         }
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
+        let binding = import_binding(&file.interner, decl);
         let import_path = file.interner.resolve(decl.path);
         let ImportResolution::Local(target) =
             resolve_import(spec, library_resolver, &file.path, import_path)
@@ -1741,9 +1737,7 @@ fn file_interfaces_for_file(
         if decl.target.is_some() {
             continue;
         }
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
+        let binding = import_binding(&file.interner, decl);
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
@@ -1833,9 +1827,7 @@ fn install_transitive_local_interfaces(
         if decl.target.is_some() {
             continue;
         }
-        let Some(binding) = import_binding(&target_file.interner, decl) else {
-            continue;
-        };
+        let binding = import_binding(&target_file.interner, decl);
         let import_path = target_file.interner.resolve(decl.path);
         let inner = match resolve_import(spec, library_resolver, &target_file.path, import_path) {
             ImportResolution::Local(inner) => inner,
@@ -1906,9 +1898,7 @@ fn namespace_exports_for_file(
         if decl.target.is_some() {
             continue;
         }
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
+        let binding = import_binding(&file.interner, decl);
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
@@ -1955,9 +1945,7 @@ fn namespace_seams_for_file(
         if decl.target.is_some() {
             continue;
         }
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
+        let binding = import_binding(&file.interner, decl);
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(_) => {
@@ -1991,9 +1979,7 @@ fn namespace_declarations_for_file(
         if decl.target.is_some() {
             continue;
         }
-        let Some(binding) = import_binding(&file.interner, decl) else {
-            continue;
-        };
+        let binding = import_binding(&file.interner, decl);
         let import_path = file.interner.resolve(decl.path);
         match resolve_import(spec, library_resolver, &file.path, import_path) {
             ImportResolution::Local(target) => {
@@ -2030,20 +2016,18 @@ fn namespace_declarations_for_file(
 /// The namespace binding an import declaration introduces.
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`.
-fn import_binding(interner: &Interner, decl: &ImportDecl) -> Option<String> {
+fn import_binding(interner: &Interner, decl: &ImportDecl) -> String {
     match &decl.kind {
-        ImportKind::Named { name, alias, .. } => Some(
-            interner
-                .resolve(alias.as_ref().unwrap_or(name).name)
-                .to_owned(),
-        ),
-        ImportKind::Wildcard { alias } => Some(interner.resolve(alias.name).to_owned()),
+        ImportKind::Named { name, alias, .. } => interner
+            .resolve(alias.as_ref().unwrap_or(name).name)
+            .to_owned(),
+        ImportKind::Wildcard { alias } => interner.resolve(alias.name).to_owned(),
         // EOT-2M: a selective import introduces no namespace binding; key its
         // interface by the import path itself so the semantic resolve pass
         // (which has no namespace to consult) finds members there. Paths are
         // never valid identifiers, so this key cannot collide with a named or
         // wildcard namespace entry.
-        ImportKind::Selective { .. } => Some(interner.resolve(decl.path).to_owned()),
+        ImportKind::Selective { .. } => interner.resolve(decl.path).to_owned(),
     }
 }
 

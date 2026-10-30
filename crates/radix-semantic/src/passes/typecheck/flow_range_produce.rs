@@ -43,7 +43,7 @@ use radix_intrinsics::{IntrinsicReceiver, IntrinsicReturnKind};
 use super::control::{FactKey, LeafRefinement};
 use super::flow_range::{AxisIdentity, BoundKey, Endpoint, FactValue, IntRange, axis_bound};
 
-use super::*;
+use super::{DefId, IndexExpr, IndexId, Primitive, Symbol, Type, TypeChecker, TypeId};
 
 /// An absolute bound out at the 64-bit representation limit is that limit, not
 /// a fact (a bare `numerus` is unbounded for this purpose).

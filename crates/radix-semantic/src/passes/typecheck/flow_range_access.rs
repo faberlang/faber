@@ -22,7 +22,7 @@ use radix_intrinsics::{IntrinsicReceiver, MethodIntrinsic};
 
 use super::flow_range::{BoundKey, IntRange};
 use super::flow_range_produce::{hi_const, lo_const};
-use super::*;
+use super::{DefId, ErrorSink, TypeChecker};
 
 /// The expression a store node wraps, when the node only moves the value into
 /// its slot (the interval is the operand's).

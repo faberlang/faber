@@ -11,6 +11,9 @@ domain = "gpu"
 stdout = "stdout.expected"
 check_only = false
 
+[targets.clif-jit]
+outcome = "pass"
+
 [targets.mir]
 outcome = "known-fail"
 phase = "emit"

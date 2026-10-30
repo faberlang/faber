@@ -699,7 +699,7 @@ impl CliBuilder<'_> {
     ) {
         match braced_optio_view_strict(braced, self.interner) {
             BracedView::Valid(view) => {
-                let option = self.option_from_braced(view, span);
+                let option = self.option_from_braced(&view, span);
                 self.push_option(option, placement, span, globals, local);
             }
             BracedView::Malformed(error) => self.malformed_annotation(error),
@@ -719,7 +719,7 @@ impl CliBuilder<'_> {
     ) {
         match braced_operandus_view_strict(braced, self.interner) {
             BracedView::Valid(view) => {
-                let operand = self.operand_from_braced(view, span);
+                let operand = self.operand_from_braced(&view, span);
                 self.push_operand(operand, placement, span, globals, local);
             }
             BracedView::Malformed(error) => self.malformed_annotation(error),
@@ -769,7 +769,7 @@ impl CliBuilder<'_> {
 
     fn option_from_braced(
         &mut self,
-        view: radix_syntax::BracedOptioView<'_>,
+        view: &radix_syntax::BracedOptioView<'_>,
         span: Span,
     ) -> CliOption {
         let ty = self.optional_cli_type(view.ty, span);
@@ -790,7 +790,7 @@ impl CliBuilder<'_> {
 
     fn operand_from_braced(
         &mut self,
-        view: radix_syntax::BracedOperandusView<'_>,
+        view: &radix_syntax::BracedOperandusView<'_>,
         span: Span,
     ) -> CliOperand {
         CliOperand {
@@ -842,10 +842,10 @@ impl CliBuilder<'_> {
     fn option_default(&self, explicit: Option<&Expr>, ty: &CliType) -> Option<CliDefault> {
         explicit
             .map(|expr| self.default(expr))
-            .or_else(|| self.implicit_option_default(ty))
+            .or_else(|| Self::implicit_option_default(ty))
     }
 
-    fn implicit_option_default(&self, ty: &CliType) -> Option<CliDefault> {
+    fn implicit_option_default(ty: &CliType) -> Option<CliDefault> {
         if *ty == CliType::Bivalens {
             Some(CliDefault::Bool(false))
         } else {
@@ -1124,7 +1124,7 @@ impl CliBuilder<'_> {
         let paths = self.command_paths(commands);
         let mut aliases = FxHashSet::default();
         // BO-D-9: build the global binding set once; reuse per command.
-        let global_bindings = self.global_bindings(globals);
+        let global_bindings = Self::global_bindings(globals);
         for command in commands {
             self.validate_command(command, &global_bindings, &paths, &mut aliases);
         }
@@ -1203,12 +1203,12 @@ impl CliBuilder<'_> {
         local_operands: &[CliOperand],
         globals: &CliSurface,
     ) {
-        let global_bindings = self.global_bindings(globals);
+        let global_bindings = Self::global_bindings(globals);
         self.validate_global_option_collisions(label, local_options, &global_bindings);
         self.validate_global_operand_collisions(label, local_operands, &global_bindings);
     }
 
-    fn global_bindings<'a>(&self, globals: &'a CliSurface) -> FxHashSet<&'a str> {
+    fn global_bindings(globals: &CliSurface) -> FxHashSet<&str> {
         globals
             .options
             .iter()

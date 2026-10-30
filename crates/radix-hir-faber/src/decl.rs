@@ -910,7 +910,7 @@ impl super::FaberCodegen<'_> {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        writer.write(&self.name_for_def(contract.contract, names));
+        writer.write(&self.name_for_def_imported(contract.contract, names));
         if contract.args.is_empty() {
             return;
         }

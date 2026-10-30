@@ -6,7 +6,7 @@
   "generatedBy": "scripta/emit-compat-json.py",
   "summary": {
     "capable": 508,
-    "analyzable": 564
+    "analyzable": 566
   },
   "terms": [
     {
@@ -511,7 +511,7 @@
       "term": "matrix",
       "rule": "type",
       "capable": 0,
-      "analyzable": 6
+      "analyzable": 7
     },
     {
       "term": "metior",
@@ -973,7 +973,7 @@
       "term": "vector",
       "rule": "type",
       "capable": 1,
-      "analyzable": 16
+      "analyzable": 17
     },
     {
       "term": "vel",

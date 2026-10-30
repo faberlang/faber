@@ -23,10 +23,10 @@ use radix_hir::DefId;
 use radix_mir::visit::MirVisitor;
 use radix_mir::{
     MirAggregate, MirAggregateKind, MirBinOp, MirCallee, MirCollectionOp, MirConstant,
-    MirConversion, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirOperand,
-    MirOptionChainLink, MirOptionOp, MirParam, MirPlace, MirProgram, MirProjection, MirRuntimeCall,
-    MirSermoOp, MirStatementKind, MirTemp, MirTerminator, MirTerminatorKind, MirType, MirUnOp,
-    MirValue, MirValueKind, ValidatedMir,
+    MirConversion, MirFunction, MirFunctionId, MirFunctionSignature, MirIntrinsic, MirLocal,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirParam, MirParamMode, MirPlace, MirProgram,
+    MirProjection, MirRuntimeCall, MirSermoOp, MirStatementKind, MirTemp, MirTerminator,
+    MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueKind, ValidatedMir,
 };
 use radix_types::vocabulary::{CapabilityGap, Lowerability};
 use radix_types::{Primitive, SemanticMutability, Type, TypeId, TypeTable};
@@ -71,6 +71,11 @@ impl Gap {
 /// order; the first gap drives the diagnostic shape substring.
 pub struct ClifCapability<'a> {
     types: &'a TypeTable,
+    /// Callable signatures the validation context carries (keyed by source
+    /// `DefId`): the only place an `optional` parameter is still visible, since
+    /// lowering inlines defaults at call sites and types bare-optionals as the
+    /// plain parameter.
+    signatures: &'a FxHashMap<DefId, MirFunctionSignature>,
     function_sources: FxHashSet<DefId>,
     /// When set, only these functions are classified (the entry's call
     /// closure); unreachable library code is never lowered, so it is never a gap.
@@ -168,10 +173,70 @@ fn reachable_from(program: &MirProgram, entry: Option<MirFunctionId>) -> FxHashS
     seen
 }
 
+/// A mutable union needs an addressable box with concrete-place writeback;
+/// treating the caller's concrete record handle as that box can dereference
+/// arbitrary memory. Aliases and explicit reference wrappers keep this gap.
+pub(crate) fn is_mut_union(types: &TypeTable, param: &MirParam) -> bool {
+    if param.mode != MirParamMode::MutRef {
+        return false;
+    }
+    let mut ty = param.ty.semantic_id();
+    loop {
+        match types.get(ty) {
+            Type::Alias(_, inner) | Type::Ref(_, inner) => ty = *inner,
+            Type::Union(_) => return true,
+            _ => return false,
+        }
+    }
+}
+
+/// MIR range counters currently land in i64 locals after every increment.
+/// Conservatively decline a function with a backward edge, an inclusive comparison and
+/// i64::MAX: the sentinel after the inclusive endpoint cannot fit that local.
+/// This is structural, not a source-file or span heuristic; dynamic edges remain
+/// a separate lowering limitation.
+pub(crate) fn has_i64_edge_loop(function: &MirFunction) -> bool {
+    #[derive(Default)]
+    struct Probe {
+        max: bool,
+        inclusive: bool,
+    }
+    impl MirVisitor for Probe {
+        fn visit_operand(&mut self, operand: &MirOperand) {
+            self.max |= matches!(operand, MirOperand::Constant(MirConstant::Int(i64::MAX)));
+            radix_mir::visit::walk_operand(self, operand);
+        }
+        fn visit_value(&mut self, value: &MirValue) {
+            self.inclusive |= matches!(
+                &value.kind,
+                MirValueKind::Binary {
+                    op: MirBinOp::LtEq | MirBinOp::GtEq,
+                    ..
+                }
+            );
+            radix_mir::visit::walk_value(self, value);
+        }
+    }
+    let mut probe = Probe::default();
+    probe.visit_function(function);
+    probe.max
+        && probe.inclusive
+        && function.blocks.iter().enumerate().any(|(index, block)| {
+            radix_mir::visit::terminator_successors(&block.terminator.kind)
+                .iter()
+                .any(|successor| {
+                    function.blocks[..=index]
+                        .iter()
+                        .any(|previous| previous.id == *successor)
+                })
+        })
+}
+
 impl<'a> ClifCapability<'a> {
-    fn new(types: &'a TypeTable) -> Self {
+    fn new(types: &'a TypeTable, signatures: &'a FxHashMap<DefId, MirFunctionSignature>) -> Self {
         Self {
             types,
+            signatures,
             function_sources: FxHashSet::default(),
             reachable: None,
             sermo_handles: FxHashSet::default(),
@@ -727,6 +792,21 @@ impl MirVisitor for ClifCapability<'_> {
         {
             return;
         }
+        if has_i64_edge_loop(function) {
+            self.record(Gap::Subset(
+                "inclusive loop with i64-max operand".to_owned(),
+            ));
+        }
+        // An `optional` parameter is lowered as a plain one whose omitted
+        // calls either inline a default (coalesce) or pass none under the
+        // parameter's own type (bare `optional`); the callee's none-tolerant
+        // reads have no native lowering, so the function declines by name.
+        if let Some(source) = function.source
+            && let Some(signature) = self.signatures.get(&source)
+            && signature.params.iter().any(|param| param.optional)
+        {
+            self.record(Gap::Subset("optional parameter omission".to_owned()));
+        }
         if function.is_generator && function.error_ty.is_some() {
             self.record(Gap::Subset("failable generator function".to_owned()));
         }
@@ -741,6 +821,9 @@ impl MirVisitor for ClifCapability<'_> {
     }
 
     fn visit_param(&mut self, param: &MirParam) {
+        if is_mut_union(self.types, param) {
+            self.record(Gap::Subset("mutable union parameter".to_owned()));
+        }
         self.check_type(param.ty);
     }
 
@@ -824,6 +907,23 @@ impl MirVisitor for ClifCapability<'_> {
     }
 
     fn visit_runtime_call(&mut self, call: &MirRuntimeCall) {
+        if let MirIntrinsic::Convert(conversion) = &call.intrinsic
+            && conversion.store.is_none()
+            && matches!(
+                self.types
+                    .get(self.resolve_alias(conversion.source_ty.semantic_id())),
+                Type::Bits(radix_types::BitsWidth::B64)
+            )
+            && matches!(
+                self.types
+                    .get(self.resolve_alias(conversion.target_ty.semantic_id())),
+                Type::SizedNumeric(Primitive::Numerus, radix_types::NumericWidth::U64)
+            )
+        {
+            self.record(Gap::Subset("b64 to u64 conversion".to_owned()));
+            radix_mir::visit::walk_runtime_call(self, call);
+            return;
+        }
         if let MirIntrinsic::Convert(conversion) = &call.intrinsic
             && conversion.store.is_some()
             && self.type_gap(conversion.source_ty).is_none()
@@ -909,8 +1009,11 @@ impl MirVisitor for ClifCapability<'_> {
 /// Classify a validated program against the CLIF target before emission.
 #[must_use]
 pub fn classify_clif_lowerability(validated: &ValidatedMir<'_>) -> Lowerability {
-    ClifCapability::new(validated.validation().types.as_table())
-        .classify_program(validated.program())
+    ClifCapability::new(
+        validated.validation().types.as_table(),
+        &validated.validation().functions,
+    )
+    .classify_program(validated.program())
 }
 
 /// Classify only the functions reachable from `entry` (what the lowering will
@@ -921,13 +1024,17 @@ pub fn classify_clif_reachable(
     entry: Option<MirFunctionId>,
 ) -> Lowerability {
     let program = validated.program();
-    let mut classifier = ClifCapability::new(validated.validation().types.as_table());
+    let mut classifier = ClifCapability::new(
+        validated.validation().types.as_table(),
+        &validated.validation().functions,
+    );
     classifier.reachable = Some(reachable_from(program, entry));
     classifier.classify_program(program)
 }
 
-/// Classify with an explicit type table (fixture entry; same walk).
+/// Classify with an explicit type table (fixture entry; same walk). A fixture
+/// carries no callable signatures, so no parameter is optional here.
 #[must_use]
 pub fn classify_with_types(program: &MirProgram, types: &TypeTable) -> Lowerability {
-    ClifCapability::new(types).classify_program(program)
+    ClifCapability::new(types, &FxHashMap::default()).classify_program(program)
 }

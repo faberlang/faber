@@ -947,7 +947,8 @@ pub unsafe extern "C" fn __faber_clif_v1_opt_bits(
     match unsafe { handle.as_ref() } {
         Some(present) => present.bits,
         None => unsafe {
-            __faber_clif_v1_trap(_arena, c"unwrapped a none value".as_ptr().cast(), 22)
+            let message = text_new(_arena, b"unwrap of nihil");
+            __faber_clif_v1_abort_text(_arena, message)
         },
     }
 }
@@ -2985,6 +2986,10 @@ fn box_open_element(arena: *const Arena, tag: i32, bits: i64) -> (i32, i64) {
     let payload = match tag {
         TAG_OPT => return (tag, bits),
         TAG_INT | TAG_FLOAT | TAG_FLOAT32 | TAG_BOOL | TAG_TEXT | TAG_CHAR => (tag, bits),
+        TAG_INF => match unsafe { inf::as_i64(bits as *const u8) } {
+            Some(integer) => (TAG_INT, integer),
+            None => (TAG_INF, bits),
+        },
         TAG_LIST => {
             let list = unsafe { list_ref(bits as *const List) };
             let items = list

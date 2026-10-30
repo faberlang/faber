@@ -463,14 +463,22 @@ impl Emitter<'_> {
             (Value::Set(elem), Ty::List(slot)) if slot == elem => {
                 self.support.need(Helper::List(elem, ListOp::New));
                 Operand::new(
-                    format!("faber_list_{}_copy(faber_a, {})", elem.suffix(), value.text),
+                    format!(
+                        "faber_list_{}_copy(faber_a, {})",
+                        self.elem_suffix(elem)?,
+                        value.text
+                    ),
                     Value::List(elem),
                 )
             }
             (Value::List(elem), Ty::Set(slot)) if slot == elem => {
                 self.support.need(Helper::List(elem, ListOp::New));
                 Operand::new(
-                    format!("faber_set_{}_of(faber_a, {})", elem.suffix(), value.text),
+                    format!(
+                        "faber_set_{}_of(faber_a, {})",
+                        self.elem_suffix(elem)?,
+                        value.text
+                    ),
                     Value::Set(elem),
                 )
             }
@@ -482,7 +490,7 @@ impl Emitter<'_> {
                 Operand::new(
                     format!(
                         "faber_map_{}_keys(faber_a, {})",
-                        Self::map_suffix(k, v),
+                        self.map_suffix(k, v)?,
                         value.text
                     ),
                     Value::List(k),
@@ -493,7 +501,7 @@ impl Emitter<'_> {
                 Operand::new(
                     format!(
                         "faber_map_{}_values(faber_a, {})",
-                        Self::map_suffix(k, v),
+                        self.map_suffix(k, v)?,
                         value.text
                     ),
                     Value::List(v),
@@ -731,10 +739,10 @@ impl Emitter<'_> {
         let n = self.temps;
         self.temps += 1;
         let (v, s) = (format!("faber_v{n}"), format!("faber_s{n}"));
-        let c_type = elem.list_c_pointer();
+        let c_type = self.elem_list_c_pointer(elem)?;
         let call = format!(
             "faber_list_{}_bounded(faber_a, {}, {capacity}, &{v})",
-            elem.suffix(),
+            self.elem_suffix(elem)?,
             value.text
         );
         let tail = match recovery {
@@ -822,7 +830,7 @@ impl Emitter<'_> {
         if actual_elem != from_elem {
             return Err(list_width_refusal(from, to));
         }
-        let prelude = self.bind(&mut value);
+        let prelude = self.bind(&mut value)?;
         let be = if be { "true" } else { "false" };
         let call = if decode {
             self.support
@@ -834,7 +842,7 @@ impl Emitter<'_> {
             );
             format!(
                 "faber_bytes_to_{}(faber_a, {bytes}, {be})",
-                to_elem.suffix()
+                self.elem_suffix(to_elem)?
             )
         } else {
             self.support.need(Helper::List(to_elem, ListOp::New));

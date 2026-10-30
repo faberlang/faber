@@ -566,8 +566,8 @@ impl DenseStorage {
 
     /// Run `f` over the little-endian bytes of the element `range`: borrowed
     /// (zero-copy) on little-endian hosts, an owned copy elsewhere. `None` for
-    /// `Values` or a range outside the array. Deferred zeros hand back zero
-    /// bytes without materializing (a deferred twin reads as zeros).
+    /// boxed storage, an invalid range, or a byte length that overflows
+    /// `usize`. Deferred zeros hand back zero bytes without materializing.
     pub fn with_le_bytes<R>(
         &self,
         range: Range<usize>,
@@ -589,38 +589,17 @@ impl DenseStorage {
                 Some(f(Cow::Borrowed(part)))
             }
             Self::Values(_) | Self::VectorValues { .. } => None,
-            Self::FreshZeros { kind, len } => {
-                if range.end > *len {
-                    return None;
-                }
-                Some(f(Cow::Owned(vec![0; range.len() * kind.width()])))
-            }
-            Self::FreshRecordZeros { layout, len } => {
-                let size = layout.size();
-                let start = range.start.checked_mul(size)?;
-                let end = range.end.checked_mul(size)?;
-                if range.end > *len {
-                    return None;
-                }
-                Some(f(Cow::Owned(vec![0; end - start])))
-            }
+            Self::FreshZeros { kind, len } => zero_le_bytes(*len, kind.width(), range, f),
+            Self::FreshRecordZeros { layout, len } => zero_le_bytes(*len, layout.size(), range, f),
             Self::FreshVectorZeros {
                 lane_kind,
                 lanes,
                 len,
-            } => {
-                if range.end > *len {
-                    return None;
-                }
-                let width = lane_kind.width() * usize::from(*lanes);
-                Some(f(Cow::Owned(vec![0; range.len() * width])))
-            }
+            } => zero_le_bytes(*len, lane_kind.width() * usize::from(*lanes), range, f),
         }
     }
 
-    /// Run `f` over the little-endian bytes of the element `range`, borrowing
-    /// the element array's bytes on little-endian hosts and using an encoded
-    /// copy elsewhere. `None` for `Values` or a range outside the array.
+    /// See [`Self::with_le_bytes`], passing a byte slice rather than a `Cow`.
     pub fn with_byte_slice<R>(&self, range: Range<usize>, f: impl FnOnce(&[u8]) -> R) -> Option<R> {
         self.with_le_bytes(range, |bytes| f(&bytes))
     }
@@ -658,12 +637,12 @@ impl DenseStorage {
                     _ => false,
                 }
             }
-            Self::Values(_) | Self::VectorValues { .. } => false,
-            // `materialized_zeros` above already replaced the deferral, so
-            // this arm runs at most once and the retry sees real storage.
-            Self::FreshZeros { .. }
+            // Deferred variants have already materialized above.
+            Self::Values(_)
+            | Self::VectorValues { .. }
+            | Self::FreshZeros { .. }
             | Self::FreshRecordZeros { .. }
-            | Self::FreshVectorZeros { .. } => self.write_le_bytes(range, bytes),
+            | Self::FreshVectorZeros { .. } => false,
         }
     }
 }
@@ -689,6 +668,20 @@ fn zero_value(kind: DenseKind) -> Value {
         DenseKind::U64 => Value::UInt(0),
         DenseKind::Bool => Value::Bool(false),
     }
+}
+
+fn zero_le_bytes<R>(
+    len: usize,
+    width: usize,
+    range: Range<usize>,
+    f: impl FnOnce(Cow<'_, [u8]>) -> R,
+) -> Option<R> {
+    if range.end > len {
+        return None;
+    }
+    let count = range.end.checked_sub(range.start)?;
+    let byte_len = count.checked_mul(width)?;
+    Some(f(Cow::Owned(vec![0; byte_len])))
 }
 
 fn le_bytes<T: DenseElement, R>(
@@ -1090,19 +1083,7 @@ impl DenseCell {
         if !self.read(DenseStorage::is_deferred_zeros) {
             return;
         }
-        if cfg!(debug_assertions) {
-            assert!(
-                self.borrow.get() == 0,
-                "DenseCell: mutable borrow while already borrowed"
-            );
-            self.borrow.set(-1);
-        }
-        // SAFETY: the single-thread discipline in the type documentation; in
-        // debug builds the flag above proves no other borrow is live.
-        unsafe { &mut *self.inner.get() }.materialized_zeros();
-        if cfg!(debug_assertions) {
-            self.borrow.set(0);
-        }
+        self.write(|_| {});
     }
 
     pub fn len(&self) -> usize {
@@ -1227,9 +1208,7 @@ impl DenseCell {
         self.read(|storage| storage.with_le_bytes(range, f))
     }
 
-    /// Run `f` over the little-endian bytes of the element `range`, borrowing
-    /// the element array's bytes on little-endian hosts and using an encoded
-    /// copy elsewhere. `None` for `Values` or a range outside the array.
+    /// See [`DenseStorage::with_byte_slice`].
     pub fn with_byte_slice<R>(&self, range: Range<usize>, f: impl FnOnce(&[u8]) -> R) -> Option<R> {
         self.read(|storage| storage.with_byte_slice(range, f))
     }

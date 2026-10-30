@@ -41,6 +41,7 @@ pub mod broadcast_reduction;
 pub mod capability;
 pub mod def_id_closure;
 pub mod error;
+pub mod evm_contract;
 pub mod figura;
 pub mod format_type;
 pub mod function_facts;
@@ -224,15 +225,15 @@ pub use types::{
     FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
     INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF, ISSUE_ASSIGN_TO_DE_PARAMETER,
     ISSUE_CALL_MARKER_MISMATCH, ISSUE_CALL_MARKER_MISSING, ISSUE_CALL_MARKER_ON_READ_ONLY,
-    ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN, ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN,
-    ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF, ISSUE_PROJECTION_INTO_OWN,
-    ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_SCALAR_ACCESS_MARKER,
-    ISSUE_SHARED_INTO_OWN, ISSUE_SIZE_MARKER_REQUIRED, ISSUE_SIZE_MARKER_UNEXPECTED,
-    ISSUE_UNMARKED_INTO_OWN, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
-    ResolvedGenericBinding, ResolvedGenericCall, SUGGESTION_COPY, SchemaColumnDef, SchemaDef,
-    SemanticGenericParamDefault, SemanticMutability, SemanticParamMode, TensorFamilyKind,
-    TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable, TypeTableSnapshot,
-    access_marker_from_type_mode, collection_type_specs, is_atomic_element_type,
+    ISSUE_COPY_NONDUPLICABLE_MEMBER, ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN,
+    ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
+    ISSUE_PROJECTION_INTO_OWN, ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+    ISSUE_SCALAR_ACCESS_MARKER, ISSUE_SHARED_INTO_OWN, ISSUE_SIZE_MARKER_REQUIRED,
+    ISSUE_SIZE_MARKER_UNEXPECTED, ISSUE_UNMARKED_INTO_OWN, InferVar, MarkerFamily, ParamType,
+    Primitive, PrimitiveTypeSpec, ResolvedGenericBinding, ResolvedGenericCall, SUGGESTION_COPY,
+    SchemaColumnDef, SchemaDef, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
+    TypeTableSnapshot, access_marker_from_type_mode, collection_type_specs, is_atomic_element_type,
     is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
     lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
@@ -695,6 +696,7 @@ pub fn analyze_with_cli(
         }
         Err(e) => diagnostics.extend(e),
     }
+    diagnostics.extend(evm_contract::validate_hir(&hir, &types, interner));
     let refusals = passes::ledger_gate::check(&hir, &types);
     passes::ledger_gate::replace_cascades(&mut diagnostics, refusals);
     if !diagnostics.iter().any(SemanticError::is_error) {
@@ -758,6 +760,7 @@ pub fn analyze_with_cli(
                 | Target::MirLlvm
                 | Target::MirLlvmHost
                 | Target::MirClif
+                | Target::MirEvm
                 | Target::MirAmd
                 | Target::MirMetal
                 | Target::MirWgsl

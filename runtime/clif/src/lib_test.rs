@@ -32,6 +32,37 @@ fn text_concat_and_integer_text_keep_exact_bytes() {
 }
 
 #[test]
+fn open_data_boxes_inf_with_canonical_integer_tags_and_exact_payloads() {
+    let arena = crate::test_arena_ptr();
+    for (digits, tag) in [
+        ("7", TAG_INT),
+        ("-9223372036854775808", TAG_INT),
+        ("9223372036854775808", TAG_INF),
+        ("18446744073709551616", TAG_INF),
+        ("-18446744073709551617", TAG_INF),
+    ] {
+        let value =
+            unsafe { inf::__faber_clif_v1_inf_digits(arena, text_new(arena, digits.as_bytes())) };
+        let boxed = unsafe { __faber_clif_v1_dyn_box(arena, TAG_INF, value as i64) };
+        assert_eq!(unsafe { &*boxed }.tag, tag, "{digits}");
+        let recovered = unsafe { inf::__faber_clif_v1_inf_unbox(arena, boxed) };
+        assert!(!recovered.is_null());
+        assert_eq!(unsafe { inf::text(recovered) }, digits);
+
+        let list = list_new_from(arena, vec![(TAG_INF, value as i64)]);
+        let boxed_list = unsafe { __faber_clif_v1_dyn_box(arena, TAG_LIST, list as i64) };
+        let elements = unsafe { list_ref((*boxed_list).bits as *const List) };
+        let (element_tag, bits) = elements.items[0];
+        assert_eq!(element_tag, TAG_OPT, "{digits}");
+        let element = bits as *const Present;
+        assert_eq!(unsafe { &*element }.tag, tag, "{digits}");
+        let recovered = unsafe { inf::__faber_clif_v1_inf_unbox(arena, element) };
+        assert!(!recovered.is_null());
+        assert_eq!(unsafe { inf::text(recovered) }, digits);
+    }
+}
+
+#[test]
 #[ignore = "timing oracle: run with --release -- --ignored --nocapture"]
 fn indexed_map_insert_scaling_probe() {
     use std::time::Instant;
@@ -383,4 +414,148 @@ fn arena_churn_measurement() {
     }
     let arena_time = before.elapsed();
     println!("text/list churn rounds={ROUNDS} legacy_box_vec={legacy:?} root_arena={arena_time:?}");
+}
+
+#[test]
+fn repeated_small_extends_grow_geometrically_not_one_run_per_extend() {
+    let arena = Arena::new();
+    let arena = std::ptr::from_ref(&arena);
+    // SAFETY: the arena outlives every use here and the runtime is
+    // single-threaded.
+    let allocations = || unsafe { (*arena).allocations() };
+
+    const EXTENDS: usize = 5_000;
+    let mut buffer = crate::arena::ArenaBuf::new();
+    for value in 0..EXTENDS {
+        let element = value as i64;
+        buffer.extend_from_slice(arena, std::slice::from_ref(&element));
+    }
+    assert_eq!(buffer.len(), EXTENDS);
+    assert_eq!(buffer.as_slice()[0], 0);
+    assert_eq!(buffer.as_slice()[EXTENDS / 2], (EXTENDS / 2) as i64);
+    assert_eq!(buffer.as_slice()[EXTENDS - 1], (EXTENDS - 1) as i64);
+    // Exact growth allocates one fresh run per extend and copies every live
+    // element again each time (quadratic work, quadratic retained garbage);
+    // geometric growth needs only a logarithmic number of runs and leaves
+    // headroom under twice the demand.
+    let runs = allocations();
+    assert!(
+        runs <= 24,
+        "each single-element extend allocated its own run: {runs} runs for {EXTENDS} extends"
+    );
+    let capacity = buffer.capacity();
+    assert!(
+        capacity > EXTENDS,
+        "no headroom after {EXTENDS} extends: capacity {capacity}"
+    );
+    assert!(
+        capacity <= 2 * EXTENDS,
+        "capacity {capacity} overshoots doubling for {EXTENDS} extends"
+    );
+
+    // The resize path grows by the same law.
+    let before = allocations();
+    let mut buffer = crate::arena::ArenaBuf::new();
+    for length in 1..=EXTENDS {
+        buffer.resize(arena, length, 7);
+    }
+    assert_eq!(buffer.len(), EXTENDS);
+    assert_eq!(buffer.as_slice()[0], 7);
+    assert_eq!(buffer.as_slice()[EXTENDS - 1], 7);
+    let runs = allocations() - before;
+    assert!(
+        runs <= 24,
+        "each one-element resize allocated its own run: {runs} runs for {EXTENDS} resizes"
+    );
+    assert!(buffer.capacity() > EXTENDS);
+
+    // Direct construction stays exact: one run of the asked capacity.
+    let before = allocations();
+    let exact = crate::arena::ArenaBuf::from_slice(arena, &[1i64, 2, 3]);
+    assert_eq!(exact.capacity(), 3);
+    assert_eq!(allocations() - before, 1);
+}
+
+#[test]
+fn chunk_layout_refuses_an_overflowing_header_addition() {
+    use crate::arena::{CHUNK_ALIGN, CHUNK_DATA, HEADER, chunk_layout};
+
+    assert!(
+        chunk_layout(usize::MAX).is_none(),
+        "a capacity that overflows the header addition must refuse the layout"
+    );
+    let layout = chunk_layout(CHUNK_DATA).expect("an ordinary chunk has a layout");
+    assert_eq!(layout.size(), HEADER + CHUNK_DATA);
+    assert_eq!(layout.align(), CHUNK_ALIGN);
+}
+
+#[test]
+fn allocations_span_chunks_and_straddle_chunk_boundaries() {
+    use crate::arena::{ArenaPointer, CHUNK_DATA};
+
+    // An allocation larger than one fresh chunk gets a chunk of its own and
+    // reads back whole.
+    let arena = Arena::new();
+    let arena = std::ptr::from_ref(&arena);
+    let oversized = vec![0xA5u8; CHUNK_DATA + 1];
+    let big = ArenaPointer::put_slice(arena, &oversized);
+    // SAFETY: `big` is a live slice of this test's arena.
+    let read_back = unsafe { &*big };
+    assert_eq!(read_back.len(), CHUNK_DATA + 1);
+    assert!(read_back.iter().all(|&byte| byte == 0xA5));
+    assert_eq!(
+        // SAFETY: see above.
+        unsafe { (*arena).chunk_count() },
+        1,
+        "an oversized allocation lives in a single chunk"
+    );
+
+    // A pair straddling the chunk boundary: the first allocation ends on the
+    // chunk's last byte, the second must open the next chunk.
+    let arena = Arena::new();
+    let arena = std::ptr::from_ref(&arena);
+    let almost_all = vec![0x11u8; CHUNK_DATA - 1];
+    let a = ArenaPointer::put_slice(arena, &almost_all);
+    let last = ArenaPointer::put_slice(arena, &[0x22u8]);
+    assert_eq!(
+        // SAFETY: `arena` is live for the whole test.
+        unsafe { (*arena).chunk_count() },
+        1,
+        "an allocation filling the chunk's last byte stays in the first chunk"
+    );
+    let first = ArenaPointer::put_slice(arena, &[0x33u8]);
+    assert_eq!(
+        // SAFETY: `arena` is live for the whole test.
+        unsafe { (*arena).chunk_count() },
+        2,
+        "the byte after a full chunk opens the next chunk"
+    );
+
+    // SAFETY: all three slices are live in this test's arena.
+    unsafe {
+        assert!((*a).iter().all(|&byte| byte == 0x11));
+        assert_eq!((*last)[0], 0x22);
+        assert_eq!((*first)[0], 0x33);
+    }
+
+    // Addresses stay stable as the arena grows past the boundary.
+    let addresses = [
+        a.cast::<u8>() as usize,
+        last.cast::<u8>() as usize,
+        first.cast::<u8>() as usize,
+    ];
+    let trailing = ArenaPointer::put_slice(arena, &[0x44u8; 128]);
+    assert_eq!(
+        [
+            a.cast::<u8>() as usize,
+            last.cast::<u8>() as usize,
+            first.cast::<u8>() as usize
+        ],
+        addresses,
+        "arena addresses are stable for the program's life"
+    );
+    // SAFETY: `trailing` is a live slice of this test's arena.
+    unsafe {
+        assert!((*trailing).iter().all(|&byte| byte == 0x44));
+    }
 }

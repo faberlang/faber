@@ -3849,3 +3849,26 @@ fn installed_packs_render_braced_templates_literally() {
         }
     }
 }
+
+#[test]
+fn evm_refusal_templates_accept_the_structured_backend_facts() {
+    let diagnostic = crate::Diagnostic::codegen_error("experimental backend refusal")
+        .with_code("PKG001")
+        .with_arg("issue", "evm_unsupported")
+        .with_arg("target", "evm")
+        .with_arg("reason", "unsupported_type")
+        .with_arg("shape", "f64");
+    for locale in ["en", "la"] {
+        let pack = installed_pack(locale);
+        assert!(
+            pack.diagnostics["PKG001"]
+                .issues
+                .contains_key("evm_unsupported")
+        );
+        assert!(
+            pack.render_diagnostic_text(&diagnostic)
+                .expect("structured arguments render")
+                .is_some()
+        );
+    }
+}

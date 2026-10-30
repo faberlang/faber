@@ -14,7 +14,10 @@
 //! backend lowers the same decision. Other pairs involving an `ordo` fall
 //! through to the ordinary `unsupported_conversio` rejection.
 
-use super::*;
+use super::{
+    DefId, FxHashMap, HirExpression, HirItemKind, HirModule, Primitive, Symbol, Type, TypeChecker,
+    TypeId,
+};
 use radix_hir::{HirConversioRoute, HirOrdoRouteMember, HirOrdoRow, HirOrdoValue, HirPresentation};
 
 pub(super) const ISSUE_ORDO_CONVERSIO_STRING_MEMBER: &str = "ordo_conversio_string_member";

@@ -513,14 +513,14 @@ impl FunctionBuilder<'_> {
             }
             None => collection,
         };
-        self.lower_transform_over(collection, callback, kind, result_ty, expr.span)
+        self.lower_transform_over(&collection, callback, kind, result_ty, expr.span)
     }
 
     /// Loop `callback` over an already-materialized array place, building a
     /// `result_ty` array (filter keeps items, map appends callback results).
     fn lower_transform_over(
         &mut self,
-        collection: MirPlace,
+        collection: &MirPlace,
         callback: MirCallee,
         kind: TransformKind,
         result_ty: MirType,
@@ -678,7 +678,7 @@ impl FunctionBuilder<'_> {
             expr.span,
         );
         let found_all = self.materialize_operand_place(found_all, matches_ty, expr.span);
-        let replacements = self.lower_transform_over(found_all, callback, TransformKind::Map, texts_ty, expr.span)?;
+        let replacements = self.lower_transform_over(&found_all, callback, TransformKind::Map, texts_ty, expr.span)?;
         Some(self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::RegexReplaceEach),
             vec![regex, text, replacements],
@@ -729,7 +729,7 @@ impl FunctionBuilder<'_> {
         let key_fn = self.lower_closure_function(closure, MirType::semantic(key_ty))?;
         let collection_ty = MirType::semantic(receiver_ty);
         let (place, ty) = self.lower_assignment_place_with_fallback(receiver, collection_ty)?;
-        let keys = self.lower_transform_over(place.clone(), key_fn, TransformKind::Map, key_lista_ty, expr.span)?;
+        let keys = self.lower_transform_over(&place, key_fn, TransformKind::Map, key_lista_ty, expr.span)?;
         let sorted = self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
             vec![MirOperand::Place(place.clone()), keys],
@@ -894,7 +894,7 @@ impl FunctionBuilder<'_> {
                     span: body.span,
                 };
                 let key_fn = self.lower_closure_function(&closure, MirType::semantic(key_ty))?;
-                let keys = self.lower_transform_over(terms.clone(), key_fn, TransformKind::Map, key_lista_ty, span)?;
+                let keys = self.lower_transform_over(&terms, key_fn, TransformKind::Map, key_lista_ty, span)?;
                 self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::SortByKeys),
                     vec![MirOperand::Place(terms), keys],

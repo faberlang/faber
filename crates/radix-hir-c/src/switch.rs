@@ -81,7 +81,7 @@ impl Emitter<'_> {
                 }
             };
             let value = operand.value;
-            let declaration = self.bind(&mut operand);
+            let declaration = self.bind(&mut operand)?;
             self.line(out, declaration.trim_end());
             subjects.push(Subject {
                 name: operand.text,

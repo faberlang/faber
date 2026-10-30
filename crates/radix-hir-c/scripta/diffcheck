@@ -9,7 +9,8 @@
 # tests/fixtures/reject/*.fab: emission must fail with a named "unsupported on
 # target c" rejection and must not produce a program.
 # Run by hand from anywhere; no crate test depends on it.
-#   scripta/diffcheck [run-fixture.fab ...]
+#   scripta/diffcheck [run-fixture.fab ...] runs only those run fixtures; with no
+# arguments it checks every run, reject and trap fixture in the crate.
 #
 # The faber binary is rebuilt every time (a no-op when current), with every
 # novelty feature, so the novelty diffchecks share one binary and never undo
@@ -80,9 +81,11 @@ echo "ok   runtime (collection allocation overflow traps by name)"
 if [ $# -gt 0 ]; then
   fixtures=("$@")
   rejects=()
+  check_traps=0
 else
   fixtures=("$here"/tests/fixtures/run/*.fab)
   rejects=("$here"/tests/fixtures/reject/*.fab)
+  check_traps=1
 fi
 pass=0
 fail=0
@@ -141,39 +144,41 @@ for fab in ${rejects[@]+"${rejects[@]}"}; do
     fail=$((fail + 1))
   fi
 done
-for fab in "$here"/tests/fixtures/trap/*.fab; do
-  [ -f "$fab" ] || continue
-  checked=$((checked + 1))
-  name=trap_$(basename "$fab" .fab)
-  rm -f "$work/$name" "$work/$name.c" "$work/$name.cc.out" "$work/$name.bin.out" "$work/$name.bin.err"
-  if ! "$faber" emit -t c "$fab" >"$work/$name.c" 2>"$work/$name.emit.err"; then
-    echo "FAIL $name: emit rejected: $(head -c 300 "$work/$name.emit.err")"
-    fail=$((fail + 1))
-    continue
-  fi
-  # shellcheck disable=SC2086
-  if ! "$cc" $cflags -I "$runtime" -o "$work/$name" "$work/$name.c" -lm >"$work/$name.cc.out" 2>&1; then
-    echo "FAIL $name: the C compiler rejected the program"
-    head -n 8 "$work/$name.cc.out"
-    fail=$((fail + 1))
-    continue
-  fi
-  if "$work/$name" >"$work/$name.bin.out" 2>"$work/$name.bin.err"; then
-    trap_rc=0
-  else
-    trap_rc=$?
-  fi
-  if [ "$trap_rc" -eq 1 ] \
-    && grep -qx 'error: collection allocation size overflow' "$work/$name.bin.err" \
-    && ! grep -qE 'runtime error:|ERROR: AddressSanitizer' "$work/$name.bin.err"; then
-    echo "ok   $name (emitted C reports the checked allocation failure)"
-    pass=$((pass + 1))
-  else
-    echo "FAIL $name: emitted C did not fail cleanly (exit $trap_rc)"
-    head -n 12 "$work/$name.bin.err"
-    fail=$((fail + 1))
-  fi
-done
+if [ "$check_traps" -eq 1 ]; then
+  for fab in "$here"/tests/fixtures/trap/*.fab; do
+    [ -f "$fab" ] || continue
+    checked=$((checked + 1))
+    name=trap_$(basename "$fab" .fab)
+    rm -f "$work/$name" "$work/$name.c" "$work/$name.cc.out" "$work/$name.bin.out" "$work/$name.bin.err"
+    if ! "$faber" emit -t c "$fab" >"$work/$name.c" 2>"$work/$name.emit.err"; then
+      echo "FAIL $name: emit rejected: $(head -c 300 "$work/$name.emit.err")"
+      fail=$((fail + 1))
+      continue
+    fi
+    # shellcheck disable=SC2086
+    if ! "$cc" $cflags -I "$runtime" -o "$work/$name" "$work/$name.c" -lm >"$work/$name.cc.out" 2>&1; then
+      echo "FAIL $name: the C compiler rejected the program"
+      head -n 8 "$work/$name.cc.out"
+      fail=$((fail + 1))
+      continue
+    fi
+    if "$work/$name" >"$work/$name.bin.out" 2>"$work/$name.bin.err"; then
+      trap_rc=0
+    else
+      trap_rc=$?
+    fi
+    if [ "$trap_rc" -eq 1 ] \
+      && grep -qx 'error: collection allocation size overflow' "$work/$name.bin.err" \
+      && ! grep -qE 'runtime error:|ERROR: AddressSanitizer' "$work/$name.bin.err"; then
+      echo "ok   $name (emitted C reports the checked allocation failure)"
+      pass=$((pass + 1))
+    else
+      echo "FAIL $name: emitted C did not fail cleanly (exit $trap_rc)"
+      head -n 12 "$work/$name.bin.err"
+      fail=$((fail + 1))
+    fi
+  done
+fi
 if [ "$checked" -eq 0 ]; then
   echo "FAIL: no fixtures found; nothing was checked" >&2
   exit 1

@@ -108,6 +108,11 @@ struct Aliases {
     /// Mutable, awaited and runtime-provided bindings are excluded: their
     /// value is not their initializer.
     inits: FxHashMap<DefId, HirExpression>,
+    /// The affine coordinate each immutable local's initializer resolves to,
+    /// computed once per body and memoized here. A local resolves only when
+    /// every binding its initializer names is value-stable (see
+    /// [`InitCoords`]); anything else keeps the local an opaque variable.
+    init_coords: FxHashMap<DefId, Coordinate>,
     /// Variables a call may rebind (the call's argument variables).
     poisoned_vars: FxHashSet<DefId>,
     /// Roots whose field facts a call may rewrite.
@@ -123,6 +128,23 @@ impl Aliases {
     /// field of it get roots of their own, which a call maps to the storage of
     /// the receiver expression.
     fn build(
+        params: &[HirParam],
+        body: &HirBlock,
+        types: &TypeTable,
+        interner: &Interner,
+        mode: ParamRoots,
+        scan: Option<&Module<'_>>,
+        receiver: Option<&Receiver>,
+    ) -> Self {
+        let mut result = Self::build_aliases(params, body, types, interner, mode, scan, receiver);
+        result.init_coords =
+            InitCoords::resolve(&result.inits, &result.bindings, &result.poisoned_vars);
+        result
+    }
+
+    /// The alias equations of the body, without the initializer-coordinate
+    /// memo (which needs the settled poison sets of [`Aliases::build`]).
+    fn build_aliases(
         params: &[HirParam],
         body: &HirBlock,
         types: &TypeTable,
@@ -755,6 +777,157 @@ impl Coordinate {
     }
 }
 
+/// Resolution of an immutable local's initializer to the affine coordinate
+/// the local keeps for its whole life. A local resolves only when every
+/// binding its initializer names is value-stable across that life: a def no
+/// store, call or rebind of the body can change — a parameter, a loop
+/// binder, a module constant, or another immutable local whose own
+/// initializer is value-stable. An initializer that names a mutable or
+/// call-poisoned binding reads a value later stores may change, so the local
+/// keeps its own opaque variable instead of the source's live identity.
+///
+/// Each initializer is walked once and memoized, so a chain that names a
+/// local twice (`a₁ ← a₀ + a₀`, …) costs one walk per local instead of
+/// doubling with the chain. A total node budget bounds the whole map:
+/// when it runs out, the locals still unresolved keep the opaque-variable
+/// decline, which loses proofs but proves nothing false.
+struct InitCoords;
+
+/// Total initializer nodes one body may expand across all its locals.
+const INIT_COORDINATE_BUDGET: u64 = 8192;
+
+impl InitCoords {
+    fn resolve(
+        inits: &FxHashMap<DefId, HirExpression>,
+        bindings: &[HirLocal],
+        poisoned: &FxHashSet<DefId>,
+    ) -> FxHashMap<DefId, Coordinate> {
+        let mut unstable: FxHashSet<DefId> = poisoned.iter().copied().collect();
+        unstable.extend(
+            bindings
+                .iter()
+                .filter(|local| local.mutable)
+                .map(|local| local.def_id),
+        );
+        let mut resolver = Resolver {
+            inits,
+            unstable,
+            memo: FxHashMap::default(),
+            visiting: Vec::new(),
+            budget: INIT_COORDINATE_BUDGET,
+        };
+        // Sorted for a deterministic budget cutoff: hash-map order would
+        // decide which locals keep their proofs when the budget runs out.
+        let mut defs: Vec<DefId> = inits.keys().copied().collect();
+        defs.sort_unstable_by_key(|def| def.0);
+        for def in defs {
+            resolver.of(def);
+        }
+        resolver.memo
+    }
+}
+
+struct Resolver<'a> {
+    inits: &'a FxHashMap<DefId, HirExpression>,
+    unstable: FxHashSet<DefId>,
+    memo: FxHashMap<DefId, Coordinate>,
+    visiting: Vec<DefId>,
+    budget: u64,
+}
+
+impl Resolver<'_> {
+    /// The coordinate accesses through `def` name: its initializer's
+    /// coordinate when that is value-stable, `def` as an opaque variable
+    /// otherwise.
+    fn of(&mut self, def: DefId) -> Coordinate {
+        if let Some(resolved) = self.memo.get(&def) {
+            return resolved.clone();
+        }
+        if self.visiting.contains(&def) {
+            // A cycle of initializers is a malformed tree; the local keeps
+            // its own opaque variable.
+            return Coordinate::variable(def);
+        }
+        let Some(init) = self.inits.get(&def) else {
+            return Coordinate::variable(def);
+        };
+        self.visiting.push(def);
+        let resolved = self.expr(init);
+        self.visiting.pop();
+        let resolved = resolved.unwrap_or_else(|| Coordinate::variable(def));
+        self.memo.insert(def, resolved.clone());
+        resolved
+    }
+
+    fn expr(&mut self, expr: &HirExpression) -> Option<Coordinate> {
+        work::count(1);
+        if self.budget == 0 {
+            return None;
+        }
+        self.budget -= 1;
+        if let Some(offset) = super::const_int_value(expr) {
+            return Some(Coordinate::constant(offset));
+        }
+        match &expr.kind {
+            HirExpressionKind::Path(def) => {
+                if self.unstable.contains(def) {
+                    // A mutable or call-poisoned source changes after the
+                    // snapshot; the local is not its live alias.
+                    return None;
+                }
+                Some(self.of(*def))
+            }
+            HirExpressionKind::Widen { operand, .. } => self.expr(operand),
+            HirExpressionKind::Conversio {
+                source,
+                implicit: Some(_),
+                ..
+            } => self.expr(source),
+            HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+                self.expr(lhs)?.plus(&self.expr(rhs)?)
+            }
+            HirExpressionKind::Binary(HirBinOp::Sub, lhs, rhs) => {
+                self.expr(lhs)?.minus(&self.expr(rhs)?)
+            }
+            HirExpressionKind::Binary(HirBinOp::Mul, lhs, rhs) => {
+                let lhs = self.expr(lhs)?;
+                let rhs = self.expr(rhs)?;
+                // A product of two variables is not affine: no coefficient.
+                if lhs.terms.is_empty() {
+                    rhs.scaled(lhs.offset)
+                } else if rhs.terms.is_empty() {
+                    lhs.scaled(rhs.offset)
+                } else {
+                    None
+                }
+            }
+            HirExpressionKind::Unary(HirUnOp::Neg, operand) => self.expr(operand)?.scaled(-1),
+            _ => None,
+        }
+    }
+}
+
+/// Operation counter of the coordinate walk, so tests assert expansion work
+/// as a count of visited nodes instead of a timing.
+pub(crate) mod work {
+    use std::cell::Cell;
+
+    thread_local! {
+        static NODES: Cell<u64> = const { Cell::new(0) };
+    }
+
+    /// Record `nodes` visited expression nodes.
+    pub(crate) fn count(nodes: u64) {
+        NODES.with(|counter| counter.set(counter.get() + nodes));
+    }
+
+    /// Take the recorded node count, resetting the counter.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn take() -> u64 {
+        NODES.with(|counter| counter.replace(0))
+    }
+}
+
 fn coordinates(aliases: &Aliases, expr: &HirExpression) -> Option<Vec<Coordinate>> {
     match &expr.kind {
         HirExpressionKind::Array(elements) => elements
@@ -774,29 +947,33 @@ fn coordinates(aliases: &Aliases, expr: &HirExpression) -> Option<Vec<Coordinate
 
 /// The affine address of one index expression: a constant, a variable, or a
 /// sum, difference or constant product of those. An immutable local
-/// resolves through its initializer (the `base` of `h[[base + j]]` is
-/// `k * pitch`); an initializer that is not an address leaves the local an
-/// opaque variable. Anything else is not an address the proof can name.
+/// resolves to the coordinate its initializer proved at alias-build time
+/// ([`InitCoords`]): its own opaque variable when the initializer is not an
+/// address or its dependencies are not value-stable. Anything else is not
+/// an address the proof can name.
 fn coordinate(aliases: &Aliases, expr: &HirExpression) -> Option<Coordinate> {
     coordinate_at(aliases, expr, 0)
 }
 
-/// `depth` bounds resolution through initializers. An initializer can only
-/// name bindings declared before it, so the chain is finite; the bound only
-/// guards the walk against a malformed tree.
+/// `depth` bounds the syntactic walk. Initializer chains resolve through the
+/// memoized map, so the bound only guards the walk of one expression tree
+/// against a malformed nest.
 fn coordinate_at(aliases: &Aliases, expr: &HirExpression, depth: usize) -> Option<Coordinate> {
     if depth > 64 {
         return None;
     }
+    work::count(1);
     if let Some(offset) = super::const_int_value(expr) {
         return Some(Coordinate::constant(offset));
     }
     match &expr.kind {
-        HirExpressionKind::Path(def) => Some(match aliases.inits.get(def) {
-            Some(init) => coordinate_at(aliases, init, depth + 1)
+        HirExpressionKind::Path(def) => Some(
+            aliases
+                .init_coords
+                .get(def)
+                .cloned()
                 .unwrap_or_else(|| Coordinate::variable(*def)),
-            None => Coordinate::variable(*def),
-        }),
+        ),
         HirExpressionKind::Widen { operand, .. } => coordinate_at(aliases, operand, depth),
         HirExpressionKind::Conversio {
             source,
@@ -1500,8 +1677,13 @@ fn prove(
             // scope at the write prove the residual inside `[0, pitch)`, the
             // lanes address disjoint index runs (row `k` is
             // `[k * pitch, (k + 1) * pitch)`), exactly as the unchanged
-            // leading coordinate of a 2-D row does.
+            // leading coordinate of a 2-D row does. Like the unchanged
+            // leading coordinate, this is a one-coordinate lane loop's rule:
+            // a multidimensional lane domain has concurrent lanes that share
+            // the leading lane coordinate, so its writes must name every
+            // lane coordinate and keep the composed-coordinate proof.
             let flattened_lane_row = access.depth == 1
+                && access.composed.len() == 1
                 && access
                     .composed
                     .first()

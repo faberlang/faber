@@ -10,6 +10,10 @@ product = "../../corpus-product"
 
 [targets.runner]
 
+# In-memory native execution, inheriting runner expectations unless explicitly
+# overridden; compile-time lowering gaps are reported separately as refused.
+[targets.clif-jit]
+
 [targets.roundtrip]
 mode = "roundtrip"
 

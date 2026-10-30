@@ -58,7 +58,7 @@ impl TypeChecker<'_> {
         (ret, err)
     }
 
-    fn param_types<'b>(&self, params: impl IntoIterator<Item = &'b HirParam>) -> Vec<ParamType> {
+    fn param_types<'b>(params: impl IntoIterator<Item = &'b HirParam>) -> Vec<ParamType> {
         params
             .into_iter()
             .map(|param| ParamType {
@@ -88,7 +88,7 @@ impl TypeChecker<'_> {
     /// boundary. Body checking may still synthesize return flow internally, but
     /// call sites need a concrete contract before any body is visited.
     pub fn function_signature(&mut self, func: &HirFunction) -> FuncSig {
-        let params = self.param_types(&func.params);
+        let params = Self::param_types(&func.params);
         let ret = func.ret_ty.unwrap_or_else(|| self.vacuum_type());
         let (ret, err) =
             self.callable_boundary_return(ret, func.err_ty, func.is_async, func.is_generator);
@@ -121,6 +121,17 @@ impl TypeChecker<'_> {
         }
 
         for field in &struct_item.fields {
+            // A `sponte` field's nullable carrier (`Option<T>`) is part of the
+            // field's representation contract with the LLVM lane, which lays
+            // nullable fields out through a carrier `TypeId` it cannot intern
+            // itself (the arena is immutable at emit time). Field access
+            // interns exactly this carrier (`Typechecker::field_type_from_type`);
+            // interning it here too keeps the carrier present even when no
+            // body ever reads the field, instead of refusing emission for a
+            // program whose only fault is leaving an optional field unread.
+            if field.sponte {
+                self.types.option(field.ty);
+            }
             fields.insert(
                 field.name,
                 StructFieldInfo {
@@ -193,7 +204,7 @@ impl TypeChecker<'_> {
         let mut methods = FxHashMap::default();
 
         for method in &interface_item.methods {
-            let params = self.param_types(&method.params);
+            let params = Self::param_types(&method.params);
             let ret = method.ret_ty.unwrap_or_else(|| self.vacuum_type());
             let (ret, err) = self.callable_boundary_return(
                 ret,
@@ -280,6 +291,14 @@ impl TypeChecker<'_> {
             .zip(field_names)
         {
             let sponte = crate::builtins::frame_types::scrinium_field_sponte(field_name);
+            // Same carrier contract as a user `sponte` field (see
+            // `collect_struct`): the LLVM lane lays nullable fields out
+            // through the `Option<T>` carrier, so the builtin table interns it
+            // for every nullable scrinium field, not only the ones a body
+            // reads.
+            if sponte {
+                self.types.option(ty);
+            }
             fields.insert(
                 *name,
                 StructFieldInfo {

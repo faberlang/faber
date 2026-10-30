@@ -370,6 +370,13 @@ pub enum SemanticErrorKind {
     /// The legal spellings are `← copy x` and `← own x`.
     ConstSharedIntoVar,
 
+    /// A `copy` acquisition (value-side `copy e`, a `copy`-marked binding or
+    /// parameter, or a call-site `copy` echo) whose value transitively holds a
+    /// member that cannot be duplicated (a conversation handle or another
+    /// closable resource with identity). The deep duplicate would silently
+    /// share the resource; the refusal names the member path.
+    CopyNonduplicable,
+
     // Warnings
     Warning(WarningKind),
 }

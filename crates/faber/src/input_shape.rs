@@ -42,3 +42,22 @@ pub fn locale_without_package_error(
         "--locale {locale} requires a package path or .fab entry file"
     ))
 }
+
+/// Check the input shapes for which diagnostics-locale packs can be resolved.
+/// Stdin is supported separately using embedded packs, without package lookup.
+pub fn diagnostics_locale_without_package_error(
+    locale: Option<&str>,
+    input: &[String],
+    force_package: bool,
+) -> Option<String> {
+    let locale = locale?;
+    if input.len() == 1 && input[0] == "-" {
+        return None;
+    }
+    if locale_supports_input(input, force_package) {
+        return None;
+    }
+    Some(format!(
+        "--diagnostics-locale {locale} requires a package path or .fab entry file (or stdin)"
+    ))
+}

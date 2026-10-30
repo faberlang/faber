@@ -725,6 +725,54 @@ fn deferred_zeros_read_as_zeros_without_materializing() {
 }
 
 #[test]
+fn deferred_byte_views_validate_ranges_without_materializing() {
+    let (layout, _) = one_i32_row_layout();
+    for (storage, width) in [
+        (DenseStorage::fresh_zeros(DenseKind::U32, 3), 4),
+        (DenseStorage::fresh_zeros_record(layout, 3), 4),
+        (DenseStorage::fresh_zeros_vector(DenseKind::F32, 2, 3), 8),
+    ] {
+        let cell = DenseCell::new(storage);
+        for (start, end) in [(2, 1), (4, 1), (0, 4), (4, 4)] {
+            let mut called = false;
+            assert!(
+                cell.with_le_bytes(start..end, |_| called = true).is_none(),
+                "invalid range {start}..{end}"
+            );
+            assert!(!called, "an invalid range must not invoke the callback");
+            assert!(cell.with_byte_slice(start..end, |_| ()).is_none());
+        }
+        for index in [0, 3] {
+            assert_eq!(cell.as_le_bytes(index..index), Some(Vec::new()));
+        }
+        assert_eq!(
+            cell.with_byte_slice(1..3, <[u8]>::to_vec),
+            Some(vec![0; 2 * width])
+        );
+        assert_eq!(cell.backing_bytes(), 0, "byte reads stay deferred");
+    }
+}
+
+#[test]
+fn deferred_byte_views_reject_byte_length_overflow() {
+    let (layout, _) = one_i32_row_layout();
+    for storage in [
+        DenseStorage::fresh_zeros(DenseKind::U64, usize::MAX),
+        DenseStorage::fresh_zeros_record(layout, usize::MAX),
+        DenseStorage::fresh_zeros_vector(DenseKind::U64, 2, usize::MAX),
+    ] {
+        let cell = DenseCell::new(storage);
+        assert!(cell.with_le_bytes(0..usize::MAX, |_| ()).is_none());
+        assert_eq!(
+            cell.as_le_bytes(usize::MAX..usize::MAX),
+            Some(Vec::new()),
+            "an empty range needs no bytes even at a large index"
+        );
+        assert_eq!(cell.backing_bytes(), 0, "refused reads stay deferred");
+    }
+}
+
+#[test]
 fn deferred_vector_zeros_keep_each_elements_lanes_independent() {
     use std::mem::size_of;
     use std::rc::Rc;

@@ -106,6 +106,7 @@ fn prepare(validated: &ValidatedMir<'_>, interner: &Interner) -> Result<Prepared
             .map(|(def, variants)| (*def, variants.clone()))
             .collect(),
         optional_params: handroll::FxHashMap::default(),
+        handler_routes: validation.ad_routes.keys().cloned().collect(),
         environments: validation
             .closure_environments
             .iter()

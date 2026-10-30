@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+class Point {
+    mut int x = 0
+}
+
+main {
+    let list<Point> points ← [{ x = 1 }]
+    let list<Point> duplicate ← copy points
+    print duplicate.length()
+}

@@ -1157,13 +1157,13 @@ fn analyze_limes_callbacks_inner(
         let callback_defs = std::iter::once(*remap).chain(transform.iter().copied());
         for callback_def in callback_defs {
             if !active_callbacks.insert(callback_def) {
-                add_callback_failure(owner, KernelRequirementFailure::RecursiveCall);
+                add_callback_failure(owner, &KernelRequirementFailure::RecursiveCall);
                 continue;
             }
             let Some((callback, _)) = callables.get(&callback_def).copied() else {
                 add_callback_failure(
                     owner,
-                    KernelRequirementFailure::CalleeNotAdmitted {
+                    &KernelRequirementFailure::CalleeNotAdmitted {
                         callee: callback_def,
                     },
                 );
@@ -1195,7 +1195,7 @@ fn analyze_limes_callbacks_inner(
             } else {
                 add_callback_failure(
                     &mut callback_report,
-                    KernelRequirementFailure::UnsupportedIntegerRange {
+                    &KernelRequirementFailure::UnsupportedIntegerRange {
                         span: call_expr.span,
                     },
                 );
@@ -1252,7 +1252,7 @@ fn analyze_limes_callbacks_inner(
     }
 }
 
-fn add_callback_failure(report: &mut KernelRequirement, failure: KernelRequirementFailure) {
+fn add_callback_failure(report: &mut KernelRequirement, failure: &KernelRequirementFailure) {
     for target in &mut report.target_reports {
         target.failures.push(failure.clone());
         target.failures = dedupe(std::mem::take(&mut target.failures));
@@ -1671,7 +1671,7 @@ impl BodyFacts<'_> {
                     self.refine_condition(&clause.cond, true);
                     self.visit_block_stateful(&clause.body);
                     let entered = self.ranges.clone();
-                    self.ranges = merge_ranges(before, entered);
+                    self.ranges = merge_ranges(&before, entered);
                 }
             }
             HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
@@ -2061,7 +2061,7 @@ impl BodyFacts<'_> {
                     self.visit_block_stateful(else_block);
                 }
                 let else_ranges = self.ranges.clone();
-                self.ranges = merge_ranges(then_ranges, else_ranges);
+                self.ranges = merge_ranges(&then_ranges, else_ranges);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2072,7 +2072,7 @@ impl BodyFacts<'_> {
                 self.refine_condition(cond, true);
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
-                self.ranges = merge_loop_ranges(before, after);
+                self.ranges = merge_loop_ranges(before, &after);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2081,7 +2081,7 @@ impl BodyFacts<'_> {
                 let before = self.ranges.clone();
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
-                self.ranges = merge_loop_ranges(before, after);
+                self.ranges = merge_loop_ranges(before, &after);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2137,7 +2137,7 @@ impl BodyFacts<'_> {
                 }
                 self.visit_block_stateful(body);
                 let after = self.ranges.clone();
-                self.ranges = merge_loop_ranges(before, after);
+                self.ranges = merge_loop_ranges(before, &after);
                 expr.ty.map_or_else(AbstractRange::unknown, |ty| {
                     AbstractRange::from_type(ty, self.types)
                 })
@@ -2554,7 +2554,7 @@ impl BodyFacts<'_> {
             self.range_only_bindings.insert(binding);
             self.visit_block_stateful(body);
             let after = self.ranges.clone();
-            self.ranges = merge_loop_ranges(before, after);
+            self.ranges = merge_loop_ranges(before, &after);
             return;
         }
         self.bind_tensor_coordinates(iter, coordinates, body.span);
@@ -2570,7 +2570,7 @@ impl BodyFacts<'_> {
         }
         self.visit_block_stateful(body);
         let after = self.ranges.clone();
-        self.ranges = merge_loop_ranges(before, after);
+        self.ranges = merge_loop_ranges(before, &after);
     }
 
     fn visit_tensor_loop_many(
@@ -2610,7 +2610,7 @@ impl BodyFacts<'_> {
         }
         self.visit_block_stateful(body);
         let after = self.ranges.clone();
-        self.ranges = merge_loop_ranges(before, after);
+        self.ranges = merge_loop_ranges(before, &after);
     }
 
     fn refine_condition(&mut self, cond: &HirExpression, truth: bool) {
@@ -2730,7 +2730,7 @@ impl BodyFacts<'_> {
         let Some(bound) = bound.0 else {
             return;
         };
-        let Some(next) = refine_interval(normalized_op, current, bound, truth) else {
+        let Some(next) = refine_interval(normalized_op, current, &bound, truth) else {
             return;
         };
         self.ranges.insert(def_id, AbstractRange(Some(next)));
@@ -3894,7 +3894,7 @@ fn contains_shape(range: &KernelValueRange) -> bool {
 }
 
 fn merge_ranges(
-    before: FxHashMap<DefId, AbstractRange>,
+    before: &FxHashMap<DefId, AbstractRange>,
     after: FxHashMap<DefId, AbstractRange>,
 ) -> FxHashMap<DefId, AbstractRange> {
     let mut merged = before.clone();
@@ -3941,7 +3941,7 @@ fn merge_abstract_ranges(ranges: &[AbstractRange]) -> AbstractRange {
 /// a backedge.
 fn merge_loop_ranges(
     before: FxHashMap<DefId, AbstractRange>,
-    after: FxHashMap<DefId, AbstractRange>,
+    after: &FxHashMap<DefId, AbstractRange>,
 ) -> FxHashMap<DefId, AbstractRange> {
     before
         .into_iter()
@@ -4179,7 +4179,7 @@ fn reverse_comparison(op: HirBinOp) -> HirBinOp {
 fn refine_interval(
     op: HirBinOp,
     current: KernelValueRange,
-    bound: KernelValueRange,
+    bound: &KernelValueRange,
     truth: bool,
 ) -> Option<KernelValueRange> {
     let (Some(bound_min), Some(bound_max)) = (constant(&bound.minimum), constant(&bound.maximum))

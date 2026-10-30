@@ -4113,6 +4113,18 @@ help = "declare scalar fields only: `{textus} name`, `{numerus} n`, `{fractus} f
 message = "unknown annotation contract `{name}`"
 help = "import or declare the contract {genus} with `@ annotatio` before applying it"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "annotatio contractus compilatoris invalida: {reason}"
+help = 'scribe `@ contract { target = "evm" }` ante unum genus'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "forma contractus EVM experimentalis non sustinetur: {reason}"
+help = "utere uno genere sine campis cum methodis scalaribus et ingressibus publicis explicitis"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contractus destinationem `{required}` requirit; destinatio electa est `{target}`"
+help = "elige destinationem executionis requisitam; formatio fontis et serializatio HIR annotationem servant"
+
 [diagnostics.SEM018.issues.annotatio_not_a_contract]
 message = "`{name}` is not an annotation contract"
 help = "import or declare the contract {genus} with `@ annotatio` before applying it"
@@ -4889,6 +4901,14 @@ help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, au
 message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
 help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
 
+[diagnostics.SEM066]
+message = "`copy` recusatur: {head} duplicari non potest{?path| — semita membrorum est `|`}"
+help = "{head} res cum identitate est: valorem sine `{copy}` communicato, aut rem cum `{own}` suscipe ubi accipiens eam possidere potest"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` recusatur: {head} duplicari non potest{?path| — semita membrorum est `|`}"
+help = "{head} res cum identitate est: valorem sine `{copy}` communicato, aut rem cum `{own}` suscipe ubi accipiens eam possidere potest"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"
@@ -5640,3 +5660,7 @@ help = "Causam inspice et forma nuclei utere quam machina electa sustinet."
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
 help = "Sequere causam inspectionis ut dependentiam invenias. Lectiones et scripturas per partitiones divisas intra singulas vias contine, et dispositionibus bufferorum congruentibus utere ubi fieri potest."
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "Experimentum EVM recusat {shape} ({reason})"
+help = "Utere tantum parte scalari evm_entry; hoc experimentum nec fasciculos nec exsecutionem sustinet."

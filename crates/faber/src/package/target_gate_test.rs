@@ -64,3 +64,18 @@ fn experimental_target_help_differs_from_release_target_help() {
     let (experimental_help, release_help) = (experimental.help, release.help);
     assert_ne!(experimental_help, release_help);
 }
+
+#[test]
+fn evm_feature_gate_reports_the_experimental_feature() {
+    assert_eq!(
+        target_compiled_in(Target::MirEvm),
+        cfg!(feature = "mir-evm")
+    );
+    if !cfg!(feature = "mir-evm") {
+        let error = require_target_compiled_in(Target::MirEvm).expect_err("EVM is opt-in");
+        assert_eq!(error.code, Some("PKG001"));
+        assert_eq!(error.issue(), Some(TARGET_NOT_IN_THIS_BUILD));
+        assert_eq!(arg(&error, "feature"), Some("mir-evm"));
+        assert_eq!(arg(&error, "target"), Some("evm"));
+    }
+}

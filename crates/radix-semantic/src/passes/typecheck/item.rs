@@ -106,6 +106,10 @@ impl TypeChecker<'_> {
             if !mutable {
                 self.read_only_param_roots.insert(param.def_id);
             }
+            // A `copy` parameter duplicates at entry (D-6); refuse a declared
+            // payload that holds a member with identity. A generic payload is
+            // decided at each call site instead.
+            self.refuse_copy_slot_of_nonduplicable(param.ty, param.span);
             self.warn_union_annotation_guardrails(param.ty, param.span);
             self.check_hashable_keys(param.ty, param.span);
             self.record_binding_name(param.def_id, param.name);

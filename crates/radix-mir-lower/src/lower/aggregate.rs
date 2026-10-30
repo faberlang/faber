@@ -263,7 +263,7 @@ impl FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let explicit: Vec<_> = fields.iter().map(|(name, value)| (*name, value)).collect();
-        let named = self.materialize_struct_fields(def_id, &explicit, StructFieldFill::Construction, expr.span)?;
+        let named = self.materialize_struct_fields(def_id, &explicit, &StructFieldFill::Construction, expr.span)?;
         let ty = self.expr_ty(expr)?;
         let constructed = self.construct_temp(
             MirAggregateKind::Struct(def_id),
@@ -550,7 +550,7 @@ impl FunctionBuilder<'_> {
         }
         match source {
             Some(source) => self.lower_struct_update_fields(def_id, &explicit, source),
-            None => self.materialize_struct_fields(def_id, &explicit, StructFieldFill::Construction, span),
+            None => self.materialize_struct_fields(def_id, &explicit, &StructFieldFill::Construction, span),
         }
     }
 
@@ -664,7 +664,7 @@ impl FunctionBuilder<'_> {
         &mut self,
         def_id: DefId,
         explicit: &[(radix_lexer::Symbol, &HirExpression)],
-        fill: StructFieldFill,
+        fill: &StructFieldFill,
         span: Span,
     ) -> Option<Vec<MirNamedOperand>> {
         let mut supplied = FxHashSet::default();

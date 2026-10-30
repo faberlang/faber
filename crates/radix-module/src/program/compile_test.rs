@@ -4697,3 +4697,71 @@ functio nomen_tag(textus nomen) → bivalens {
         interface.exports.keys().collect::<Vec<_>>()
     );
 }
+
+#[cfg(feature = "hir-rust")]
+#[test]
+fn rust_emit_resolves_manifest_locale_through_session_loader_without_root() {
+    // Program-entry companion to the contract walk above (need
+    // done_when): the whole `Compiler::compile` of an en consumer importing
+    // a Latin provider whose package manifest declares `[reader] locale =
+    // "prov-la"`, with no workspace root. The session's loader serves the
+    // manifest locale under a re-identified id the workspace tree does not
+    // carry, so a regression to a freshly minted default config (which
+    // re-discovers the workspace root and finds no `prov-la` there) cannot
+    // pass: the provider would fall back to the importing pack, parse the
+    // Latin surface as English, and fail PARSE001.
+    let prov_la = {
+        let mut pack = la_locale_pack();
+        pack.metadata.id = "prov-la".to_owned();
+        pack
+    };
+    let mut config = crate::driver::Config::default();
+    config.locale_root = None;
+    let config =
+        config.with_locale_pack_loader(crate::driver::LocalePackLoader::new(move |locale_id| match locale_id {
+            "en" => Ok(en_locale_pack()),
+            "prov-la" => Ok(prov_la.clone()),
+            other => Err(format!("no pack for locale '{other}'")),
+        }));
+
+    let (_td, home) = temp_dir("manifest-loader-emit");
+    let tela = home.join("tela");
+    fs::create_dir_all(tela.join("src")).expect("tela src");
+    write_provider_manifest(&tela, "tela", "prov-la");
+    fs::write(
+        tela.join("src/valida.fab"),
+        r#"
+@ publica
+functio nomen_tag(textus nomen) → bivalens {
+    redde nomen ≢ ""
+}
+"#,
+    )
+    .expect("provider source");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        "+++\nlocale = \"en\"\n+++\nimport from \"tela:valida\" valida\n\nmain {\n    print valida.nomen_tag(\"a\")\n}\n",
+    )
+    .expect("app source");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let result = crate::Compiler::new(config.with_target(crate::codegen::Target::HirRust)).compile(&app);
+    assert!(
+        result.success(),
+        "the session's loader must serve the manifest locale through the whole compile: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let Some(crate::Output::Rust(output)) = result.output else {
+        panic!("expected rust output");
+    };
+    assert!(
+        output.code.contains("pub mod valida"),
+        "expected the manifest-locale provider module, got:\n{}",
+        output.code
+    );
+}

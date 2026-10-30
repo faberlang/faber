@@ -83,7 +83,7 @@ pub(super) fn plan_package_instances(
         if calls.first().is_some_and(|call| call.library.is_some()) {
             plan_linked_library_instances(
                 &target_path,
-                calls,
+                &calls,
                 links,
                 library_resolver,
                 library_cache,
@@ -274,7 +274,7 @@ struct LibraryInstancePlan {
 /// the caller's calls are retargeted to.
 fn plan_linked_library_instances(
     target_path: &Path,
-    calls: Vec<NamespaceGenericCall>,
+    calls: &[NamespaceGenericCall],
     links: &mut PackageMirLinks,
     library_resolver: &LibraryResolver,
     library_cache: &mut LibraryInterfaceCache,
@@ -290,7 +290,12 @@ fn plan_linked_library_instances(
         library_resolver,
         library_cache,
         |analysis, _| {
-            plan_instances_in_library_analysis(target_path, &calls, analysis, &mut semantic_errors)
+            Ok(plan_instances_in_library_analysis(
+                target_path,
+                calls,
+                analysis,
+                &mut semantic_errors,
+            ))
         },
     );
 
@@ -384,7 +389,7 @@ fn plan_instances_in_library_analysis(
     calls: &[NamespaceGenericCall],
     analysis: &mut radix_module::driver::AnalyzedModule,
     semantic_errors: &mut Vec<Diagnostic>,
-) -> Result<LibraryInstancePlan, radix_module::codegen::CodegenError> {
+) -> LibraryInstancePlan {
     let mut requests = Vec::with_capacity(calls.len());
     let mut planned_calls = Vec::with_capacity(calls.len());
     for call in calls {
@@ -411,11 +416,11 @@ fn plan_instances_in_library_analysis(
         );
     }
     if !semantic_errors.is_empty() || requests.is_empty() {
-        return Ok(LibraryInstancePlan {
+        return LibraryInstancePlan {
             instance_by_key: HashMap::new(),
             companions: HashMap::new(),
             planned_calls,
-        });
+        };
     }
 
     let report = radix_module::semantic::passes::air_specialize::specialize_requested(
@@ -437,11 +442,11 @@ fn plan_instances_in_library_analysis(
             companions.insert(*instance, backward.companion_def_id);
         }
     }
-    Ok(LibraryInstancePlan {
+    LibraryInstancePlan {
         instance_by_key: report.instance_defs.iter().cloned().collect(),
         companions,
         planned_calls,
-    })
+    }
 }
 
 fn discover_calls(
@@ -655,7 +660,7 @@ fn request_for_target(
             .zip(params)
             .map(|(binding, param)| {
                 let witness =
-                    rehome_witness(binding.witness, &source_types, target_types, &mut imported)?;
+                    rehome_witness(binding.witness, &source_types, target_types, &mut imported);
                 (param.kind == witness_sort(witness)).then_some(ResolvedGenericBinding {
                     name: param.name,
                     source: binding.source,
@@ -722,15 +727,15 @@ fn rehome_witness(
     source: &TypeTable,
     target: &mut TypeTable,
     imported: &mut HashMap<TypeId, TypeId>,
-) -> Option<GenericWitness> {
-    Some(match witness {
+) -> GenericWitness {
+    match witness {
         GenericWitness::Typus(ty) => GenericWitness::Typus(
             crate::mir::cli_plan::import_semantic_type(source, target, ty, imported),
         ),
         GenericWitness::Magnitudo(index) => {
             GenericWitness::Magnitudo(import_index_canonical(source, target, index))
         }
-    })
+    }
 }
 
 /// Package calls can carry equivalent concrete indices allocated by separate

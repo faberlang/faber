@@ -4511,6 +4511,18 @@ help = "declare scalar fields only: `{textus} name`, `{numerus} n`, `{fractus} f
 message = "unknown annotation contract `{name}`"
 help = "import or declare the contract {genus} with `@ annotation` before applying it"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "invalid compiler contract annotation: {reason}"
+help = 'write `@ contract { target = "evm" }` on one class'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "unsupported experimental EVM contract shape: {reason}"
+help = "use one field-free class with scalar methods and explicit public entries"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contract requires target `{required}`, but the selected target is `{target}`"
+help = "select the contract's required execution target; source formatting and HIR serialization preserve the annotation"
+
 [diagnostics.SEM018.issues.annotatio_not_a_contract]
 message = "`{name}` is not an annotation contract"
 help = "import or declare the contract {genus} with `@ annotation` before applying it"
@@ -5338,6 +5350,14 @@ help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or
 [diagnostics.SEM065.issues.const_shared_into_var]
 message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
 help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
+
+[diagnostics.SEM066]
+message = "`copy` is refused: {head} cannot be duplicated{?path| — the member path is `|`}"
+help = "{head} is a resource with identity: share the value without `{copy}`, or take the resource over with `{own}` where the consumer may own it"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` is refused: {head} cannot be duplicated{?path| — the member path is `|`}"
+help = "{head} is a resource with identity: share the value without `{copy}`, or take the resource over with `{own}` where the consumer may own it"
 
 [diagnostics.WARN001]
 message = "unused variable"
@@ -6236,3 +6256,7 @@ help = "Check the reason and use a kernel form supported by the selected device.
 [diagnostics.INFO001.issues.avoidable_sync]
 message = "kernel `{kernel}`: its {kind} across the {partitions} partitions is avoidable: {avoidable} ({reason})"
 help = "Follow the audit reason to find the dependency. Keep partitioned reads and writes lane-local and use matching buffer layouts where possible."
+
+[diagnostics.PKG001.issues.evm_unsupported]
+message = "EVM spike refuses {shape} ({reason})"
+help = "Use only the bounded scalar evm_entry subset; this experimental target has no package or execution surface."

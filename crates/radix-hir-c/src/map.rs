@@ -17,25 +17,24 @@ use radix_types::MirCollectionOp;
 use std::fmt::Write as _;
 
 impl Emitter<'_> {
-    /// The suffix of the map family's C names (`i64_text`).
-    pub(crate) fn map_suffix(k: Elem, v: Elem) -> String {
-        format!("{}_{}", k.suffix(), v.suffix())
+    pub(crate) fn map_suffix(&self, k: Elem, v: Elem) -> Result<String, CodegenError> {
+        Ok(format!("{}_{}", self.elem_suffix(k)?, self.elem_suffix(v)?))
     }
 
     /// The C struct type of a map value (`faber_map_i64_text *`).
-    pub(crate) fn map_c_type(k: Elem, v: Elem) -> String {
-        format!("faber_map_{} *", Self::map_suffix(k, v))
+    pub(crate) fn map_c_type(&self, k: Elem, v: Elem) -> Result<String, CodegenError> {
+        Ok(format!("faber_map_{} *", self.map_suffix(k, v)?))
     }
 
     /// `empty`: a new map with no storage yet.
-    pub(crate) fn empty_map(&mut self, k: Elem, v: Elem) -> Operand {
+    pub(crate) fn empty_map(&mut self, k: Elem, v: Elem) -> Result<Operand, CodegenError> {
         self.need_class(Ty::Map(k, v));
         self.support.need(Helper::List(k, ListOp::New));
         self.support.need(Helper::List(v, ListOp::New));
-        Operand::new(
-            format!("faber_map_{}_new(faber_a)", Self::map_suffix(k, v)),
+        Ok(Operand::new(
+            format!("faber_map_{}_new(faber_a)", self.map_suffix(k, v)?),
             Value::Map(k, v),
-        )
+        ))
     }
 
     /// `{ "k": v, … }`: one map, the entries put in source order.
@@ -45,10 +44,10 @@ impl Emitter<'_> {
         v: Elem,
         entries: &[HirObjectField],
     ) -> Result<Operand, CodegenError> {
-        let map = self.empty_map(k, v);
+        let map = self.empty_map(k, v)?;
         let target = format!("faber_t{}", self.temps);
         self.temps += 1;
-        let mut body = format!("{} {target} = {}; ", Self::map_c_type(k, v), map.text);
+        let mut body = format!("{} {target} = {}; ", self.map_c_type(k, v)?, map.text);
         for entry in entries {
             let key = self.map_key(&entry.key, k)?;
             let Some(value) = &entry.value else {
@@ -58,7 +57,7 @@ impl Emitter<'_> {
             write!(
                 body,
                 "faber_map_{}_put(faber_a, {target}, {}, {}); ",
-                Self::map_suffix(k, v),
+                self.map_suffix(k, v)?,
                 key.text,
                 value.text
             )
@@ -83,10 +82,10 @@ impl Emitter<'_> {
         let radix_syntax::JsonValue::Object(members) = value else {
             return Err(unsupported("json literal that is not an object"));
         };
-        let map = self.empty_map(k, v);
+        let map = self.empty_map(k, v)?;
         let target = format!("faber_t{}", self.temps);
         self.temps += 1;
-        let mut body = format!("{} {target} = {}; ", Self::map_c_type(k, v), map.text);
+        let mut body = format!("{} {target} = {}; ", self.map_c_type(k, v)?, map.text);
         for member in members {
             let raw = self.names.resolve_symbol(member.key);
             let decoded = radix_codegen_shared::unescape_faber_text(raw);
@@ -95,7 +94,7 @@ impl Emitter<'_> {
             write!(
                 body,
                 "faber_map_{}_put(faber_a, {target}, {key}, {}); ",
-                Self::map_suffix(k, v),
+                self.map_suffix(k, v)?,
                 value.text
             )
             .ok();
@@ -150,14 +149,14 @@ impl Emitter<'_> {
         let map = self.expr(base)?;
         let key = self.element(index, k)?;
         let mut operands = [map, key];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [map, key] = operands;
         self.need_class(Ty::Map(k, v));
         self.support.need(Helper::List(v, ListOp::New));
-        let suffix = Self::map_suffix(k, v);
+        let suffix = self.map_suffix(k, v)?;
         let slot = format!("faber_v{}", self.temps);
         self.temps += 1;
-        let c_type = v.c_type();
+        let c_type = self.elem_c_type(v)?;
         let call = format!(
             "faber_map_{suffix}_get({}, {}, &{slot})",
             map.text, key.text
@@ -184,7 +183,7 @@ impl Emitter<'_> {
         self.support.need(Helper::List(v, ListOp::New));
         Ok(format!(
             "faber_map_{}_put(faber_a, {}, {}, {});",
-            Self::map_suffix(k, v),
+            self.map_suffix(k, v)?,
             map.text,
             key.text,
             value.text
@@ -220,7 +219,7 @@ impl Emitter<'_> {
         {
             return Err(unsupported("named, spread, or marked argument"));
         }
-        let suffix = Self::map_suffix(k, v);
+        let suffix = self.map_suffix(k, v)?;
         match entry.mir_kind {
             IntrinsicMirKind::Collection(MirCollectionOp::Length) => {
                 let text = format!("({})->keys->len", map.text);
@@ -241,7 +240,7 @@ impl Emitter<'_> {
                 let key = self.element(&key.expr, k)?;
                 let value = self.element(&value.expr, v)?;
                 let mut operands = [map, key, value];
-                let prelude = self.sequence(&mut operands);
+                let prelude = self.sequence(&mut operands)?;
                 let [map, key, value] = operands;
                 self.need_class(Ty::Map(k, v));
                 let call = format!(
@@ -257,7 +256,7 @@ impl Emitter<'_> {
                 };
                 let key = self.element(&key.expr, k)?;
                 let mut operands = [map, key];
-                let prelude = self.sequence(&mut operands);
+                let prelude = self.sequence(&mut operands)?;
                 let [map, key] = operands;
                 let call = format!("(faber_map_{suffix}_has({}, {}))", map.text, key.text);
                 Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(true))
@@ -268,7 +267,7 @@ impl Emitter<'_> {
                 };
                 let key = self.element(&key.expr, k)?;
                 let mut operands = [map, key];
-                let prelude = self.sequence(&mut operands);
+                let prelude = self.sequence(&mut operands)?;
                 let [map, key] = operands;
                 let call = format!("(faber_map_{suffix}_delete({}, {}))", map.text, key.text);
                 Ok(Operand::new(wrap(&prelude, &call), Value::Truth).with_effect(true))
@@ -290,7 +289,7 @@ impl Emitter<'_> {
         };
         let key = self.element(&arg.expr, k)?;
         let mut operands = [map, key];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [map, key] = operands;
         let inner = Inner::from_ty(v.ty())
             .ok_or_else(|| unsupported("map value without an optional form"))?;
@@ -299,11 +298,11 @@ impl Emitter<'_> {
         let slot = format!("faber_o{}", self.temps);
         let call = format!(
             "faber_map_{}_get({}, {}, &{slot})",
-            Self::map_suffix(k, v),
+            self.map_suffix(k, v)?,
             map.text,
             key.text
         );
-        let operand = self.optional_call(v, inner, &slot, &call);
+        let operand = self.optional_call(v, inner, &slot, &call)?;
         Ok(Operand::new(wrap(&prelude, &operand.text), operand.value).with_effect(true))
     }
 
@@ -323,12 +322,12 @@ impl Emitter<'_> {
         }
         let effect = map.effect || key.effect;
         let mut operands = [map, key];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [map, key] = operands;
         self.need_class(Ty::Map(k, v));
         let call = format!(
             "(faber_map_{}_has({}, {}))",
-            Self::map_suffix(k, v),
+            self.map_suffix(k, v)?,
             map.text,
             key.text
         );

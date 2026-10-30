@@ -569,7 +569,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
 
     // ── type laws ────────────────────────────────────────────────────────
 
-    fn primitive_law(&self, prim: Primitive, law: TypeLaw) -> bool {
+    fn primitive_law(prim: Primitive, law: TypeLaw) -> bool {
         match law {
             TypeLaw::Transfer | TypeLaw::ExplicitDuplicate => true,
             TypeLaw::TrivialDuplicate => matches!(
@@ -608,7 +608,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
         }
     }
 
-    fn sized_numeric_law(&self, prim: Primitive, width: NumericWidth, law: TypeLaw) -> bool {
+    fn sized_numeric_law(prim: Primitive, width: NumericWidth, law: TypeLaw) -> bool {
         match prim {
             Primitive::Fractus => !matches!(law, TypeLaw::ReflexiveEquality),
             // The unbounded `inf` is a heap bignum on every carrier: duplicating
@@ -654,13 +654,13 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 }
                 (_, _) => self.type_law(*inner, law, visiting),
             },
-            Type::Primitive(prim) => Ok(self.primitive_law(*prim, law)),
-            Type::SizedNumeric(prim, width) => Ok(self.sized_numeric_law(*prim, *width, law)),
+            Type::Primitive(prim) => Ok(Self::primitive_law(*prim, law)),
+            Type::SizedNumeric(prim, width) => Ok(Self::sized_numeric_law(*prim, *width, law)),
             Type::ModularWord(_) | Type::SaturatingWord(_) | Type::SizedInstans(_) => Ok(true),
             // N7E-1: a policy-float cell carries the laws of the bare float of
             // its width (D2/D3: it evaluates as that float).
             Type::PolicyFloat(_, width) => {
-                Ok(self.sized_numeric_law(Primitive::Fractus, *width, law))
+                Ok(Self::sized_numeric_law(Primitive::Fractus, *width, law))
             }
             Type::Option(inner) => {
                 Ok(self.type_law(*inner, law, visiting)? && !matches!(law, TypeLaw::Ordering))
