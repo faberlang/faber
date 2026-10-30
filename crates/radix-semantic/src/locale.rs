@@ -955,7 +955,11 @@ fn latin_type_surface(kind: TypeBindingKind) -> &'static str {
         },
         TypeBindingKind::Ratio => "ratio",
         TypeBindingKind::Erratum => "erratum",
-        TypeBindingKind::Trapped => "interceptum",
+        // The registry identity is the canonical genus name `trapped` (the
+        // builtin registers that symbol); a pack's surface row spells it for
+        // its readers (`la` `interceptum`), exactly as `erratum`'s identity
+        // stays `erratum` under the en surface `error`.
+        TypeBindingKind::Trapped => "trapped",
         TypeBindingKind::Frame(kind) => kind.latin(),
     }
 }

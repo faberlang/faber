@@ -36,6 +36,7 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
     }
 
     let def_id = resolver.fresh_builtin_def_id();
+    resolver.register_builtin_trapped_def_id(def_id);
     let defined = resolver.define(crate::Symbol {
         def_id,
         name,
@@ -58,10 +59,32 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
 /// Lookup the builtin `trapped` definition id.
 #[must_use]
 pub fn def_id(resolver: &Resolver, interner: &mut Interner) -> Option<DefId> {
+    if let Some(def_id) = resolver.builtin_trapped_def_id() {
+        return Some(def_id);
+    }
     let name = interner.intern(TRAPPED_NAME);
     resolver
         .lookup_type(name)
         .filter(|def_id| def_id.is_builtin())
+}
+
+/// The `trapped<R, T>` application for one capture boundary: `R` is the
+/// body's success type, `T` the solved error channel.
+#[must_use]
+pub fn applied_type(
+    types: &mut TypeTable,
+    def_id: DefId,
+    success: TypeId,
+    error: TypeId,
+) -> TypeId {
+    let base = types.intern(Type::Enum(def_id));
+    types.intern(Type::Applied(
+        base,
+        vec![
+            radix_types::AppliedArg::Type(success),
+            radix_types::AppliedArg::Type(error),
+        ],
+    ))
 }
 
 /// Return whether any type applied the builtin `trapped` genus.
@@ -69,16 +92,19 @@ pub fn def_id(resolver: &Resolver, interner: &mut Interner) -> Option<DefId> {
 /// WHY: lowering interns `trapped<R, T>` as `Applied(Enum(def), [R, T])`, so
 /// the table already answers "does the program name it" without a second
 /// syntax walk that could disagree with type lowering about what a type
-/// position is.
-fn is_applied(types: &TypeTable, def_id: DefId) -> bool {
-    (0..types.type_count())
-        .filter_map(|index| u32::try_from(index).ok())
-        .any(|index| {
-            let Type::Applied(base, _) = types.get(TypeId(index)) else {
-                return false;
-            };
-            matches!(types.get(*base), Type::Enum(found) if *found == def_id)
-        })
+/// position is. A `capta { ... }` boundary applies the genus implicitly
+/// through its re-typed result, so its lowering marks the resolver flag
+/// beside the table scan.
+fn is_applied(types: &TypeTable, def_id: DefId, resolver: &Resolver) -> bool {
+    resolver.builtin_trapped_applied()
+        || (0..types.type_count())
+            .filter_map(|index| u32::try_from(index).ok())
+            .any(|index| {
+                let Type::Applied(base, _) = types.get(TypeId(index)) else {
+                    return false;
+                };
+                matches!(types.get(*base), Type::Enum(found) if *found == def_id)
+            })
 }
 
 /// Append the builtin `trapped<R, T>` enum item to lowered HIR when a type
@@ -92,7 +118,7 @@ pub fn inject_hir_item(
     let Some(def_id) = def_id(resolver, interner) else {
         return;
     };
-    if !is_applied(types, def_id) || items.iter().any(|item| item.def_id == def_id) {
+    if !is_applied(types, def_id, resolver) || items.iter().any(|item| item.def_id == def_id) {
         return;
     }
 

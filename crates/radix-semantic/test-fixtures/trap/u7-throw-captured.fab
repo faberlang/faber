@@ -3,7 +3,7 @@ locale = "en"
 +++
 
 # u7 — an explicit `throw` inside the body is an alternate exit toward the
-# same trap hole; at MIR it wraps into the carrier and never reaches
+# same `T` slot; it wraps into `thrown { error }` and never reaches
 # ReturnError.
 
 fn failable() → int ⇥ string {
@@ -11,6 +11,13 @@ fn failable() → int ⇥ string {
 }
 
 main {
-    let ∪ r ← trap { failable() }
-    print r
+    let _ r ← trap { failable() }
+    match r {
+        case returned let value {
+            print value
+        }
+        case thrown let error {
+            print error
+        }
+    }
 }

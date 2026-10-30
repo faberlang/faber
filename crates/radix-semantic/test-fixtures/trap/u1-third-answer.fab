@@ -3,9 +3,8 @@ locale = "en"
 +++
 
 # u1 — the third answer: `trap` accepts a failable call and reifies the
-# channel into a value union. `let _ r` binds to the solved
-# `int ∪ string` (WARN016 teaches the union shape; `let ∪ r` is the
-# warning-free spelling).
+# channel into the tagged genus `trapped<int, string>` (ruling f9d8a611):
+# variants `returned { value }` / `thrown { error }`, read with a match.
 
 fn failable() → int ⇥ string {
     return 42
@@ -13,5 +12,12 @@ fn failable() → int ⇥ string {
 
 main {
     let _ r ← trap { failable() }
-    print r
+    match r {
+        case returned let value {
+            print value
+        }
+        case thrown let error {
+            print error
+        }
+    }
 }

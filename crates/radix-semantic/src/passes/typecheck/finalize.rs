@@ -214,6 +214,22 @@ impl TypeChecker<'_> {
                 let capacity = self.canonicalize_index(capacity);
                 self.types.bounded_array(element, capacity)
             }
+            Type::Applied(base, args) => {
+                // Rebuild the application so nested holes in the arguments
+                // (a `capta` boundary's `T` slot rides here as
+                // `trapped<R, ∪>`) solve with the rest of the type.
+                let base = self.canonicalize_type(base);
+                let args = args
+                    .into_iter()
+                    .map(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            radix_types::AppliedArg::Type(self.canonicalize_type(id))
+                        }
+                        other => other,
+                    })
+                    .collect::<Vec<_>>();
+                self.types.intern(Type::Applied(base, args))
+            }
             Type::InferUnion(var) => {
                 // THU-U-05 solve: the accumulated member set is the answer.
                 // `union_members` is frozen once checking converges; finalize
@@ -537,6 +553,13 @@ impl TypeChecker<'_> {
                 }
             }
             Type::InferUnion(var) => {
+                // A `capta` boundary's `T` slot solves to exactly the escaping
+                // error types: one member is the healthy single-error-channel
+                // case, never a cross-shape surprise, so WARN017 stays silent
+                // (the empty channel carries `trap_error_channel_empty`).
+                if self.trap_error_holes.contains(&var) {
+                    return;
+                }
                 let members = self.union_members_snapshot(var);
                 let canonical = self.canonicalize_union_members(members);
                 if canonical.len() == 1 {

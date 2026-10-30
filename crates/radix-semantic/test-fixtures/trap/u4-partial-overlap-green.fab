@@ -2,14 +2,22 @@
 locale = "en"
 +++
 
-# u4 — partial overlap: T and E share a member but the synthesized union
-# keeps >= 2 members. Legal; narrowing keeps it sound.
+# u4 — partial overlap: the success type is also a member of the error
+# channel. Legal; each slot keeps its own shape and the variants keep them
+# apart.
 
 fn partial() → int ⇥ int ∪ string {
     return 1
 }
 
 main {
-    let ∪ r ← trap { partial() }
-    print r
+    let _ r ← trap { partial() }
+    match r {
+        case returned let value {
+            print value
+        }
+        case thrown let error {
+            print "thrown"
+        }
+    }
 }

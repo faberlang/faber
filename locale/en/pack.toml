@@ -3531,10 +3531,6 @@ help = "use '⊥' for a failable call: the optional default only covers an absen
 message = "trap member type mismatch"
 help = "check the member type flowing into the {capta} trap"
 
-[diagnostics.SEM010.issues.trap_union_collapsed]
-message = "{capta} trap union collapsed to '{type}': success and error are the same type, so the trap cannot distinguish them"
-help = "make the success type and the error channel distinguishable, or handle the error with {fac}/cape instead"
-
 [diagnostics.SEM011.issues.generic_type_arg_domain]
 message = "type argument {rejected} is not allowed for {param}; expected one of {accepted}"
 help = "choose one of the allowed type arguments for this generic parameter"
@@ -5602,6 +5598,15 @@ help = "number every hole (`§0`, `§1`, …) so each reads the argument you mea
 [diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
 message = "this template mixes plain and numbered holes; the plain holes read {reads}"
 help = "number every hole (`§0`, `§1`, …) so each reads the argument you mean"
+
+
+[diagnostics.WARN036]
+message = "nothing inside this {capta} boundary can fail: its error channel is empty"
+help = "drop the boundary, or call something failable inside it"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "nothing inside this {capta} boundary can fail: its error channel is empty"
+help = "drop the boundary, or call something failable inside it"
 
 [diagnostics.SEM010.issues.or_pattern_binding_mismatch]
 message = "or-pattern alternatives must bind the same names and types"

@@ -65,6 +65,7 @@ struct FrozenMaps<'a> {
     function_generator: Arc<FxHashMap<DefId, bool>>,
     variant_parents: Arc<FxHashMap<DefId, DefId>>,
     enum_variants: Arc<FxHashMap<DefId, Vec<DefId>>>,
+    enum_variant_by_name: Arc<FxHashMap<(DefId, Symbol), DefId>>,
     enum_type_params: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_fields: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
@@ -106,6 +107,10 @@ pub struct LoweringContextMaps<'a> {
     /// enums). Zero-init of a no-initializer enum-typed local picks the first
     /// variant; `variant_parents` only knows the reverse direction.
     enum_variants: FxHashMap<DefId, Vec<DefId>>,
+    /// (enum declaration, variant name) → variant def. Compiler-synthesized
+    /// arms (the `capta` boundary's `thrown { error }` wrap) resolve the
+    /// builtin genus's variants by name, exactly as authored patterns do.
+    enum_variant_by_name: FxHashMap<(DefId, Symbol), DefId>,
     enum_type_params: FxHashMap<DefId, Vec<Symbol>>,
     variant_fields: FxHashMap<DefId, Vec<Symbol>>,
     variant_field_tys: FxHashMap<DefId, FxHashMap<Symbol, MirType>>,
@@ -180,6 +185,7 @@ impl<'a> LoweringContextMaps<'a> {
             function_generator: FxHashMap::default(),
             variant_parents: FxHashMap::default(),
             enum_variants: FxHashMap::default(),
+            enum_variant_by_name: FxHashMap::default(),
             enum_type_params: FxHashMap::default(),
             variant_fields: FxHashMap::default(),
             variant_field_tys: FxHashMap::default(),
@@ -211,6 +217,7 @@ impl<'a> LoweringContextMaps<'a> {
                 function_generator: Arc::new(FxHashMap::default()),
                 variant_parents: Arc::new(FxHashMap::default()),
                 enum_variants: Arc::new(FxHashMap::default()),
+                enum_variant_by_name: Arc::new(FxHashMap::default()),
                 enum_type_params: Arc::new(FxHashMap::default()),
                 variant_fields: Arc::new(FxHashMap::default()),
                 variant_field_tys: Arc::new(FxHashMap::default()),
@@ -299,6 +306,7 @@ impl<'a> LoweringContextMaps<'a> {
             function_generator: Arc::new(core::mem::take(&mut maps.function_generator)),
             variant_parents: Arc::new(core::mem::take(&mut maps.variant_parents)),
             enum_variants: Arc::new(core::mem::take(&mut maps.enum_variants)),
+            enum_variant_by_name: Arc::new(core::mem::take(&mut maps.enum_variant_by_name)),
             enum_type_params: Arc::new(core::mem::take(&mut maps.enum_type_params)),
             variant_fields: Arc::new(core::mem::take(&mut maps.variant_fields)),
             variant_field_tys: Arc::new(core::mem::take(&mut maps.variant_field_tys)),
@@ -378,6 +386,7 @@ impl<'a> LoweringContextMaps<'a> {
             imported_struct_defaults: Arc::clone(&self.frozen.imported_struct_defaults),
             variant_parents: Arc::clone(&self.frozen.variant_parents),
             enum_variants: Arc::clone(&self.frozen.enum_variants),
+            enum_variant_by_name: Arc::clone(&self.frozen.enum_variant_by_name),
             enum_type_params: Arc::clone(&self.frozen.enum_type_params),
             variant_fields: Arc::clone(&self.frozen.variant_fields),
             variant_field_tys: Arc::clone(&self.frozen.variant_field_tys),
@@ -579,6 +588,10 @@ impl<'a> LoweringContextMaps<'a> {
                 .collect::<Vec<_>>();
             self.enum_variants.insert(enum_def, variant_defs.clone());
             self.validation.enum_variants.insert(enum_def, variant_defs);
+            for variant in &variants {
+                self.enum_variant_by_name
+                    .insert((enum_def, variant.name), variant.def_id);
+            }
             let commune = unit
                 .resolver
                 .commune_fields(enum_def)
@@ -912,6 +925,10 @@ impl<'a> LoweringContextMaps<'a> {
         }
         self.enum_variants.insert(enum_def_id, variants.clone());
         self.validation.enum_variants.insert(enum_def_id, variants);
+        for variant in &enum_item.variants {
+            self.enum_variant_by_name
+                .insert((enum_def_id, variant.name), variant.def_id);
+        }
         for variant in &enum_item.variants {
             self.variant_parents.insert(variant.def_id, enum_def_id);
             self.validation
