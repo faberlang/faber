@@ -32,6 +32,37 @@ fn text_concat_and_integer_text_keep_exact_bytes() {
 }
 
 #[test]
+fn open_data_boxes_inf_with_canonical_integer_tags_and_exact_payloads() {
+    let arena = crate::test_arena_ptr();
+    for (digits, tag) in [
+        ("7", TAG_INT),
+        ("-9223372036854775808", TAG_INT),
+        ("9223372036854775808", TAG_INF),
+        ("18446744073709551616", TAG_INF),
+        ("-18446744073709551617", TAG_INF),
+    ] {
+        let value =
+            unsafe { inf::__faber_clif_v1_inf_digits(arena, text_new(arena, digits.as_bytes())) };
+        let boxed = unsafe { __faber_clif_v1_dyn_box(arena, TAG_INF, value as i64) };
+        assert_eq!(unsafe { &*boxed }.tag, tag, "{digits}");
+        let recovered = unsafe { inf::__faber_clif_v1_inf_unbox(arena, boxed) };
+        assert!(!recovered.is_null());
+        assert_eq!(unsafe { inf::text(recovered) }, digits);
+
+        let list = list_new_from(arena, vec![(TAG_INF, value as i64)]);
+        let boxed_list = unsafe { __faber_clif_v1_dyn_box(arena, TAG_LIST, list as i64) };
+        let elements = unsafe { list_ref((*boxed_list).bits as *const List) };
+        let (element_tag, bits) = elements.items[0];
+        assert_eq!(element_tag, TAG_OPT, "{digits}");
+        let element = bits as *const Present;
+        assert_eq!(unsafe { &*element }.tag, tag, "{digits}");
+        let recovered = unsafe { inf::__faber_clif_v1_inf_unbox(arena, element) };
+        assert!(!recovered.is_null());
+        assert_eq!(unsafe { inf::text(recovered) }, digits);
+    }
+}
+
+#[test]
 #[ignore = "timing oracle: run with --release -- --ignored --nocapture"]
 fn indexed_map_insert_scaling_probe() {
     use std::time::Instant;

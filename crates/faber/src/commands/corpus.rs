@@ -2,6 +2,8 @@
 
 #[cfg(feature = "hir-rust")]
 mod canonical;
+#[cfg(feature = "mir-clif")]
+mod clif_jit;
 mod external;
 #[cfg(feature = "mir-llvm")]
 mod gpu;
@@ -411,7 +413,9 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         if let Some((flag, _)) = named.iter().find(|(_, given)| *given) {
             fail_usage(&format!("{flag} applies only to a suite"));
         }
-        if args.target != "runner" {
+        // The built-in executors (`runner`, `clif-jit`) run the input through
+        // this faber binary itself; every other target is recipe-driven.
+        if !matches!(args.target.as_str(), "runner" | "clif-jit") {
             fail_usage("non-runner targets require a suite with a target recipe");
         }
         LoadedSuite {
@@ -474,6 +478,15 @@ pub(super) fn cmd_corpus(args: &CorpusArgs) {
         #[cfg(feature = "mir-llvm")]
         {
             gpu::execute(&suite.cases, &input, discover_ms, started);
+            return;
+        }
+    }
+    if args.target == "clif-jit" {
+        #[cfg(not(feature = "mir-clif"))]
+        fail_unavailable("clif-jit corpus target requires a faber build with feature `mir-clif`");
+        #[cfg(feature = "mir-clif")]
+        {
+            clif_jit::execute(&suite.cases, &faber, discover_ms, started);
             return;
         }
     }
@@ -648,7 +661,9 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, SuiteError> {
     }
     // A target the suite declares no recipe for is a bad invocation of a valid
     // suite, found before any case is read: every other target needs a recipe.
-    if target != "runner" && !suite.targets.contains_key(target) {
+    // The `clif-jit` lane, like `runner`, is a built-in executor that needs no
+    // recipe — it runs each case through this faber's own JIT.
+    if !matches!(target, "runner" | "clif-jit") && !suite.targets.contains_key(target) {
         return Err(SuiteError::with_status(
             exit_status::USAGE,
             format!("suite has no [targets.{target}] recipe"),
@@ -684,7 +699,7 @@ fn load_suite(root: &Path, target: &str) -> Result<LoadedSuite, SuiteError> {
         }
     }
     selection::DomainTable::tag_cases(domains.as_ref(), &mut cases)?;
-    let recipe = if target == "runner" {
+    let recipe = if matches!(target, "runner" | "clif-jit") {
         None
     } else {
         Some(
@@ -920,14 +935,30 @@ fn parse_case(
     } else {
         manifest_dir.to_path_buf()
     };
-    let expectation = manifest.targets.remove(target).or_else(|| {
-        manifest
-            .group
-            .as_deref()
-            .and_then(|group| expectations.get(group))
-            .and_then(|group| group.get(target))
-            .cloned()
-    });
+    let expectation = manifest
+        .targets
+        .remove(target)
+        .or_else(|| {
+            // The `clif-jit` lane judges the runner's own expectations: a case
+            // without a `clif-jit` pin falls back to its `runner` pin.
+            (target == "clif-jit")
+                .then(|| manifest.targets.remove("runner"))
+                .flatten()
+        })
+        .or_else(|| {
+            manifest
+                .group
+                .as_deref()
+                .and_then(|group| expectations.get(group))
+                .and_then(|group| {
+                    group.get(target).or_else(|| {
+                        (target == "clif-jit")
+                            .then(|| group.get("runner"))
+                            .flatten()
+                    })
+                })
+                .cloned()
+        });
     let Some(mut expectation) = expectation else {
         return Err(format!(
             "{id}: target {target} has no expectation from the case or group"
@@ -982,7 +1013,8 @@ fn parse_case(
         Outcome::KnownFail
             if !(matches!(expectation.phase.as_deref(), Some("emit" | "build" | "run"))
                 || (target == "canonical" && expectation.phase.as_deref() == Some("format")))
-                || (target == "runner" && expectation.phase.as_deref() != Some("run"))
+                || (runs_program_in_memory(target)
+                    && expectation.phase.as_deref() != Some("run"))
                 || !matches!(
                     expectation.failure_kind.as_deref().unwrap_or("diagnostic"),
                     "diagnostic" | "stdout-mismatch" | "nonzero-exit" | "exit-mismatch"
@@ -1079,6 +1111,14 @@ fn parse_case(
     })
 }
 
+/// Targets whose corpus lane runs the case's program in memory through this
+/// faber binary: the interpreter (`runner`) and the Cranelift JIT
+/// (`clif-jit`), which judges the runner's own expectations. Both take
+/// runner-shaped pins: a run-phase outcome judged from the run itself.
+fn runs_program_in_memory(target: &str) -> bool {
+    matches!(target, "runner" | "clif-jit")
+}
+
 /// Reject every pin the selected target's executor cannot judge, so the executor never
 /// meets a shape it would have to guess at. Executors still report a missing field as a
 /// case failure rather than panic, but this is the one place that decides what is legal.
@@ -1092,10 +1132,12 @@ fn check_executor_support(
     let unsupported = |what: &str| Err(format!("{id}: target {target} cannot judge {what}"));
     match (target, expectation.outcome) {
         (_, Outcome::NotApplicable) => Ok(()),
-        ("runner", Outcome::KnownFail) if matches!(kind, "nonzero-exit" | "exit-mismatch") => {
+        ("runner" | "clif-jit", Outcome::KnownFail)
+            if matches!(kind, "nonzero-exit" | "exit-mismatch") =>
+        {
             unsupported(&format!("failure_kind {kind}"))
         }
-        ("runner", Outcome::Pass) if !matches!(phase, None | Some("run")) => {
+        ("runner" | "clif-jit", Outcome::Pass) if !matches!(phase, None | Some("run")) => {
             unsupported("a passing case with a phase other than run")
         }
         ("canonical" | "gpu", Outcome::KnownFail) if kind != "diagnostic" => unsupported(&format!(
@@ -1164,13 +1206,16 @@ fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
 
 /// Arguments after the `faber` executable for one runner-target case.
 ///
-/// The runner target pins `--device reference`: it verifies the sequential MIR
-/// runner, so device selection must not depend on the host (`auto` routes kernel
-/// programs to Metal on a capable machine and fails closed elsewhere, and `cpu`
-/// is the multi-worker CPU device).
+/// The runner target pins `--target runner` (the interpreted route, not the
+/// clif-jit default of a plain `faber run`) and `--device reference`: it
+/// verifies the sequential MIR runner, so device selection must not depend
+/// on the host (`auto` routes kernel programs to Metal on a capable machine
+/// and fails closed elsewhere, and `cpu` is the multi-worker CPU device).
 fn runner_run_args(case: &Case) -> Vec<String> {
     let mut args = vec![
         "run".to_owned(),
+        "--target".to_owned(),
+        "runner".to_owned(),
         case.input.display().to_string(),
         "--device".to_owned(),
         "reference".to_owned(),
