@@ -718,7 +718,7 @@ pub(super) fn is_package_interpret_input(path: &Path) -> bool {
 }
 
 /// Whether `path` is a single `.fab` file (the single-source runner input).
-#[cfg(test)]
+#[cfg(any(test, feature = "mir-clif"))]
 pub(super) fn is_single_fab_file(path: &Path) -> bool {
     path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("fab")
 }
