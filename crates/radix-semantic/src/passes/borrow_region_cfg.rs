@@ -513,10 +513,7 @@ impl Builder {
             let successor = clauses.get(index + 1).map_or(join, |(next, _)| *next);
             self.cfg
                 .add_edge(*condition, successor, CfgEdgeKind::BranchFalse);
-            if let Some(body_entry) = body.entry {
-                self.cfg
-                    .add_edge(*condition, body_entry, CfgEdgeKind::BranchTrue);
-            }
+            self.connect_branch(*condition, body, successor, CfgEdgeKind::BranchTrue);
             self.connect_normals(body, successor, CfgEdgeKind::Next);
         }
         let entry = clauses.first().map_or(join, |(condition, _)| *condition);
@@ -686,6 +683,7 @@ impl Builder {
         );
         let then_watermark = self.cfg.nodes.len();
         let then_fragment = self.build_block(then_block)?;
+        let then_end = self.cfg.nodes.len();
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
@@ -696,21 +694,21 @@ impl Builder {
             // runs the else arm when present (leaving the handled region —
             // it never enters the catch) and otherwise skips straight to the
             // join, mirroring MIR `lower_handled_si_stmt`.
-            self.connect_branch(condition, &then_fragment, CfgEdgeKind::BranchTrue);
+            self.connect_branch(condition, &then_fragment, join, CfgEdgeKind::BranchTrue);
             self.connect_normals(&then_fragment, join, CfgEdgeKind::Next);
             let catch_fragment = self.build_block(&catch.body)?;
-            self.connect_error_edges(then_watermark, catch_fragment.entry.unwrap_or(join));
+            self.connect_error_edges(
+                then_watermark,
+                then_end,
+                catch_fragment.entry.unwrap_or(join),
+            );
             self.connect_normals(&catch_fragment, join, CfgEdgeKind::Next);
             let else_fragment = if let Some(else_block) = else_block {
                 self.build_block(else_block)?
             } else {
                 Fragment::empty()
             };
-            if else_fragment.entry.is_some() {
-                self.connect_branch(condition, &else_fragment, CfgEdgeKind::BranchFalse);
-            } else {
-                self.cfg.add_edge(condition, join, CfgEdgeKind::BranchFalse);
-            }
+            self.connect_branch(condition, &else_fragment, join, CfgEdgeKind::BranchFalse);
             self.connect_normals(&else_fragment, join, CfgEdgeKind::Next);
             return Ok(Fragment::terminal_with_entry(condition, join));
         }
@@ -719,12 +717,8 @@ impl Builder {
         } else {
             Fragment::empty()
         };
-        self.connect_branch(condition, &then_fragment, CfgEdgeKind::BranchTrue);
-        if else_fragment.entry.is_some() {
-            self.connect_branch(condition, &else_fragment, CfgEdgeKind::BranchFalse);
-        } else {
-            self.cfg.add_edge(condition, join, CfgEdgeKind::BranchFalse);
-        }
+        self.connect_branch(condition, &then_fragment, join, CfgEdgeKind::BranchTrue);
+        self.connect_branch(condition, &else_fragment, join, CfgEdgeKind::BranchFalse);
         self.connect_normals(&then_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&else_fragment, join, CfgEdgeKind::Next);
         Ok(Fragment::terminal_with_entry(condition, join))
@@ -872,9 +866,7 @@ impl Builder {
         );
         self.cfg.add_edge(dispatch, join, CfgEdgeKind::BranchFalse);
         for fragment in &arm_fragments {
-            if let Some(entry) = fragment.entry {
-                self.cfg.add_edge(dispatch, entry, CfgEdgeKind::BranchTrue);
-            }
+            self.connect_branch(dispatch, fragment, join, CfgEdgeKind::BranchTrue);
             self.connect_normals(fragment, join, CfgEdgeKind::Next);
         }
         Ok(Fragment::terminal_with_entry(
@@ -894,12 +886,13 @@ impl Builder {
     ) -> Result<Fragment, CfgError> {
         let watermark = self.cfg.nodes.len();
         let body_fragment = self.build_block(body)?;
+        let body_end = self.cfg.nodes.len();
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
         let catch_fragment = self.build_block(&catch.body)?;
-        self.connect_error_edges(watermark, catch_fragment.entry.unwrap_or(join));
+        self.connect_error_edges(watermark, body_end, catch_fragment.entry.unwrap_or(join));
         self.connect_normals(&body_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&catch_fragment, join, CfgEdgeKind::Next);
         Ok(Fragment::terminal_with_entry(
@@ -941,12 +934,13 @@ impl Builder {
     ) -> Result<Fragment, CfgError> {
         let watermark = self.cfg.nodes.len();
         let body_fragment = self.build_block(body)?;
+        let body_end = self.cfg.nodes.len();
         let default_fragment = self.build_expression(default)?;
         let join = self.cfg.add_node(
             CfgNodeKind::Join,
             location(Some(expression.id), None, expression.span),
         );
-        self.connect_error_edges(watermark, default_fragment.entry.unwrap_or(join));
+        self.connect_error_edges(watermark, body_end, default_fragment.entry.unwrap_or(join));
         self.connect_normals(&body_fragment, join, CfgEdgeKind::Next);
         self.connect_normals(&default_fragment, join, CfgEdgeKind::Next);
         Ok(Fragment::terminal_with_entry(
@@ -1029,10 +1023,9 @@ impl Builder {
         Fragment::terminal(self.leaf_node(expression))
     }
 
-    /// Error edges from every node built since `watermark` (see
-    /// [`CfgEdgeKind::Error`]).
-    fn connect_error_edges(&mut self, watermark: usize, handler: CfgNodeId) {
-        for index in watermark..self.cfg.nodes.len() {
+    /// Error edges from nodes in `start..end` (see [`CfgEdgeKind::Error`]).
+    fn connect_error_edges(&mut self, start: usize, end: usize, handler: CfgNodeId) {
+        for index in start..end {
             self.cfg
                 .add_edge(CfgNodeId(index), handler, CfgEdgeKind::Error);
         }
@@ -1061,10 +1054,18 @@ impl Builder {
         }
     }
 
-    fn connect_branch(&mut self, from: CfgNodeId, fragment: &Fragment, kind: CfgEdgeKind) {
-        if let Some(entry) = fragment.entry {
-            self.cfg.add_edge(from, entry, kind);
-        }
+    /// Connect a branch to its fragment, or to `empty_target` when the
+    /// fragment has no node (an empty block or expression). Empty branches
+    /// still represent reachable control flow and must not disappear.
+    fn connect_branch(
+        &mut self,
+        from: CfgNodeId,
+        fragment: &Fragment,
+        empty_target: CfgNodeId,
+        kind: CfgEdgeKind,
+    ) {
+        self.cfg
+            .add_edge(from, fragment.entry.unwrap_or(empty_target), kind);
     }
 }
 
