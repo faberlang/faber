@@ -1325,6 +1325,8 @@ fn semantic_import_not_found_help(args: &[DiagnosticArg]) -> Option<String> {
 
 fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
+        "contract_annotation_invalid" => Some("write `@ contract { target = \"evm\" }` on one class".to_owned()),
+        "evm_contract_unsupported" => Some("the experimental EVM profile admits one field-free class with scalar methods and explicit public entries".to_owned()),
         "protecta_reserved" => {
             let publica = arg_value(args, "publica")?;
             let privata = arg_value(args, "privata")?;

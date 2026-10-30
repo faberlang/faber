@@ -26,6 +26,7 @@
 //! parse result without a program, is converted into an explicit diagnostic so
 //! callers still receive the same failure surface.
 
+mod evm_contract;
 #[cfg(feature = "hir-faber")]
 pub mod faber_format;
 mod file_frontmatter;
@@ -42,6 +43,7 @@ mod target_bindings;
 mod target_policy;
 
 pub use crate::semantic::{AnalyzedModuleApplicationView, PackageImportIdentities};
+pub use evm_contract::require_contract_execution_target;
 #[cfg(feature = "hir-faber")]
 pub use faber_format::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
@@ -335,6 +337,10 @@ pub fn compile_analyzed(session: &Session, name: &str, source: &str, analyzed: A
     apply_warn_policy(&mut analysis.diagnostics, &session.config.warn_policy);
     if analysis.diagnostics.iter().any(Diagnostic::is_error) {
         return CompileResult { output: None, diagnostics: analysis.diagnostics };
+    }
+
+    if let Err(error) = evm_contract::reject_wrong_target(&analysis, session.config.target) {
+        return compile_codegen_error(analysis, name, source, error);
     }
 
     // A unit that arrives here without passing through `analyze_source` (loaded
@@ -727,7 +733,7 @@ fn compile_codegen_error(
     let is_evm_refusal = err
         .args
         .iter()
-        .any(|arg| arg.name == "issue" && arg.value == "evm_unsupported");
+        .any(|arg| arg.name == "issue" && matches!(arg.value.as_str(), "evm_unsupported" | "contract_target_mismatch"));
     let mut diagnostic = Diagnostic::codegen_error(&err.message).with_args(err.args);
     // CODEGEN001 is an uncatalogued backend envelope. The experimental EVM
     // refusal uses the existing catalogued lowering/package family so packs
@@ -1115,17 +1121,15 @@ fn generate_llvm_text_output(
 
 #[cfg(feature = "mir-evm")]
 fn generate_evm_output(analysis: &mut AnalyzedModule, no_fuse: bool) -> Result<crate::Output, SpannedCodegenError> {
+    let metadata = evm_contract::resolve_metadata(analysis)?;
     prepare_mir_lowering_interner(analysis);
     let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
-    let artifact = radix_mir_evm::emit_evm(&mir.validated, &mir.interner).map_err(|error| codegen::CodegenError {
-        message: error.to_string(),
-        args: vec![
-            DiagnosticArg::new("issue", "evm_unsupported"),
-            DiagnosticArg::new("target", "evm"),
-            DiagnosticArg::new("reason", error.issue),
-            DiagnosticArg::new("shape", error.shape),
-        ],
-    })?;
+    let contract = evm_contract::lower_metadata(metadata, &mir.validated)?;
+    let artifact = match contract {
+        Some(contract) => radix_mir_evm::emit_evm_contract(&mir.validated, &mir.interner, &contract),
+        None => radix_mir_evm::emit_evm(&mir.validated, &mir.interner),
+    }
+    .map_err(evm_contract::backend_error)?;
     Ok(crate::Output::Evm(crate::EvmOutput {
         init: artifact.init,
         runtime: artifact.runtime,
@@ -5311,3 +5315,7 @@ mod codegen_analysis_tests;
 #[cfg(test)]
 #[path = "driver_behavior_test.rs"]
 mod driver_behavior_tests;
+
+#[cfg(test)]
+#[path = "evm_contract_test.rs"]
+mod evm_contract_tests;

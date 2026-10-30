@@ -302,7 +302,7 @@ fn radix_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             build: false,
             run: false,
             package: false,
-            note: "experimental Shanghai deployment-bytecode emit only; raw-word evm_entry spike; no package/build/run surface; default-off mir-evm",
+            note: "experimental Shanghai contracts with static scalar ABI; emit only; no storage or external calls; default-off mir-evm",
         },
         crate::codegen::Target::MirBasic => TargetCapabilities {
             check: true,

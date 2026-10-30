@@ -15,6 +15,32 @@ use crate::analyze::AnalyzedProgram;
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{Config, qualify_for_target};
 
+/// Enforce annotated contract environments before a package executes or emits
+/// an executable artifact. Source analysis, FHIR preservation and inspection
+/// keep their existing target-neutral qualification path.
+///
+/// # Errors
+/// Returns a named mismatch for every unit requiring another environment.
+pub(crate) fn require_contract_execution_targets(
+    program: &AnalyzedProgram,
+    target: radix_module::codegen::Target,
+) -> Result<(), Vec<Diagnostic>> {
+    let diagnostics: Vec<_> = program
+        .nodes
+        .values()
+        .filter_map(|node| {
+            radix_module::driver::require_contract_execution_target(&node.analysis, target)
+                .err()
+                .map(|diagnostic| (*diagnostic).with_file(node.path.display().to_string()))
+        })
+        .collect();
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
 /// Qualify every unit of a package in the neutral form for the build
 /// target in `config`.
 ///

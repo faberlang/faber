@@ -712,6 +712,10 @@ impl Lowerer<'_> {
     /// and implemented names are looked up here; semantic validity is later.
     pub fn lower_gens(&mut self, stmt: &Stmt, decl: &ClassDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
+        // Every class method has an implicit receiver, even when no source
+        // expression constructs or names the class. Record that nominal type
+        // at its declaration rather than relying on a later use to intern it.
+        self.types.intern(crate::Type::Struct(def_id));
 
         let type_params = self.lower_type_params(&decl.type_params);
         self.reject_type_declaration_bounds(&decl.type_params);

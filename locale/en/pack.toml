@@ -4499,6 +4499,18 @@ help = "declare scalar fields only: `{textus} name`, `{numerus} n`, `{fractus} f
 message = "unknown annotation contract `{name}`"
 help = "import or declare the contract {genus} with `@ annotation` before applying it"
 
+[diagnostics.SEM018.issues.contract_annotation_invalid]
+message = "invalid compiler contract annotation: {reason}"
+help = 'write `@ contract { target = "evm" }` on one class'
+
+[diagnostics.SEM018.issues.evm_contract_unsupported]
+message = "unsupported experimental EVM contract shape: {reason}"
+help = "use one field-free class with scalar methods and explicit public entries"
+
+[diagnostics.PKG001.issues.contract_target_mismatch]
+message = "contract requires target `{required}`, but the selected target is `{target}`"
+help = "select the contract's required execution target; source formatting and HIR serialization preserve the annotation"
+
 [diagnostics.SEM018.issues.annotatio_not_a_contract]
 message = "`{name}` is not an annotation contract"
 help = "import or declare the contract {genus} with `@ annotation` before applying it"

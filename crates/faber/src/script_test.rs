@@ -89,6 +89,32 @@ main {
 }
 
 #[test]
+fn run_named_refuses_evm_contract_before_ordinary_main() {
+    let source = r#"
+@ contract { target = "evm" }
+class Arithmetic {
+    @ public
+    fn add(int a, int b) → int { return a + b }
+}
+main { print "ordinary-main" }
+"#;
+    let mut host = BufferHost::default();
+    let error = run_named("contract-script.fab", source, &mut host)
+        .expect_err("the single-file script path must honor contract environments");
+    let RunSourceError::Frontend(diagnostics) = error else {
+        panic!("expected a contract environment refusal: {error:?}");
+    };
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some("PKG001")
+                && diagnostic.issue() == Some("contract_target_mismatch")
+        }),
+        "{diagnostics:?}"
+    );
+    assert!(host.stdout_lines.is_empty());
+}
+
+#[test]
 fn process_read_env_uses_the_shared_leaf() {
     unsafe { std::env::set_var("FABER_LEAF_ENV", "via-leaf") };
     let mut host = BufferHost::default();

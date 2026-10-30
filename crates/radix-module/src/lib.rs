@@ -217,7 +217,7 @@ pub enum Output {
     Basic(BasicOutput),
 }
 
-/// Experimental Shanghai bytecode, with the temporary raw-word evm_entry interface.
+/// Experimental Shanghai deployment and runtime bytecode for admitted entry shapes.
 #[cfg(feature = "mir-evm")]
 pub struct EvmOutput {
     /// Deployment bytecode that returns the runtime.

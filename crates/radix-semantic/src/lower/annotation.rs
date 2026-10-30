@@ -202,6 +202,32 @@ impl Lowerer<'_> {
     fn lower_braced_annotation(&mut self, braced: &BracedAnnotation, span: Span) -> HirAnnotation {
         let family_owned = self.interner.resolve(braced.name.name).to_owned();
 
+        if family_owned == "contract" {
+            // The compiler-owned marker was validated before HIR lowering.
+            // Keep its environment a constant metadata value, not an ordinary
+            // executable expression in the annotation payload.
+            let fields = braced
+                .fields
+                .iter()
+                .filter_map(|field| {
+                    let AnnotationFieldValue::Expr(expr) = &field.value else {
+                        return None;
+                    };
+                    let radix_syntax::ExprKind::Literal(radix_syntax::Literal::String(value)) =
+                        expr.kind
+                    else {
+                        return None;
+                    };
+                    Some(HirAnnotationField {
+                        name: field.name.name,
+                        value: HirAnnotationValue::String(value),
+                        span: field.span,
+                    })
+                })
+                .collect();
+            return HirAnnotation::with_fields(braced.name.name, fields, span);
+        }
+
         // Both families lower to the same `nomen` record, so one shared
         // builder covers `@ cli` and `@ imperium`; the family check inside
         // each view helper keeps them mutually exclusive.

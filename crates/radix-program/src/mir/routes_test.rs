@@ -192,3 +192,77 @@ fn explicit_gpu_selection_on_a_cpu_only_package_fails_closed() {
     }));
     assert!(host.stdout_lines.is_empty());
 }
+
+const EVM_CONTRACT: &str = r#"
+@ contract { target = "evm" }
+class Arithmetic {
+    @ public
+    fn add(int a, int b) → int { return a + b }
+}
+main { print 7 }
+"#;
+
+fn assert_contract_target_mismatch(diagnostics: &[Diagnostic]) {
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.code == Some("PKG001")
+                && diagnostic.issue() == Some("contract_target_mismatch")
+                && diagnostic
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "required" && arg.value == "evm")
+        }),
+        "expected contract environment refusal: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn contract_execution_requirement_is_enforced_at_package_run_and_artifact_preparation() {
+    let (_dir, entry) = package("routes-contract-environment", EVM_CONTRACT);
+    let seams = crate::test_support::test_mir_seams();
+    let config = Config::default();
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_mir(&config, &entry, &seams, &mut host)
+        .expect_err("an EVM contract cannot execute on the MIR interpreter");
+    assert_contract_target_mismatch(&diagnostics);
+    assert!(host.stdout_lines.is_empty());
+    let diagnostics = build_package_fmir_image(&config, &entry, &[], &seams)
+        .err()
+        .expect("an executable FMIR image cannot ignore an EVM requirement");
+    assert_contract_target_mismatch(&diagnostics);
+    let diagnostics = build_package_fmir_text_image(&config, &entry, &[], &seams)
+        .err()
+        .expect("an executable FMIR text image cannot ignore an EVM requirement");
+    assert_contract_target_mismatch(&diagnostics);
+}
+
+#[test]
+fn contract_metadata_survives_generic_package_check_and_mir_inspection() {
+    for source in [
+        EVM_CONTRACT.to_owned(),
+        EVM_CONTRACT.replace("@ contract { target = \"evm\" }\n", ""),
+    ] {
+        let (_dir, entry) = package("routes-contract-inspection", &source);
+        let seams = crate::test_support::test_mir_seams();
+        let config = Config::default();
+        crate::analyze::analyze_package(&config, &entry, &seams.analysis)
+            .unwrap_or_else(|errors| panic!("generic checking retains class metadata: {errors:?}"));
+        with_check_lowered_package_mir(&config, &entry, &seams, |_| ())
+            .unwrap_or_else(|errors| panic!("check --lower is inspection: {errors:?}"));
+        with_lowered_package_mir(&config, &entry, &seams, |_| ())
+            .unwrap_or_else(|errors| panic!("a target probe is inspection: {errors:?}"));
+    }
+}
+
+#[test]
+fn contract_execution_requirement_is_enforced_before_test_linking() {
+    let (_dir, entry) = package("routes-contract-test-link", EVM_CONTRACT);
+    let seams = crate::test_support::test_mir_seams();
+    let config = Config::default();
+    let package = crate::analyze::analyze_package(&config, &entry, &seams.analysis)
+        .expect("generic package analysis");
+    let scope = TestPackageScope::for_program(&package, Vec::new());
+    let diagnostics = with_linked_test_package_mir(package, &scope, &config, &seams, |_, _| ())
+        .expect_err("test execution cannot ignore an EVM environment");
+    assert_contract_target_mismatch(&diagnostics);
+}

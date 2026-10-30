@@ -41,6 +41,7 @@ pub mod broadcast_reduction;
 pub mod capability;
 pub mod def_id_closure;
 pub mod error;
+pub mod evm_contract;
 pub mod figura;
 pub mod format_type;
 pub mod function_facts;
@@ -695,6 +696,7 @@ pub fn analyze_with_cli(
         }
         Err(e) => diagnostics.extend(e),
     }
+    diagnostics.extend(evm_contract::validate_hir(&hir, &types, interner));
     let refusals = passes::ledger_gate::check(&hir, &types);
     passes::ledger_gate::replace_cascades(&mut diagnostics, refusals);
     if !diagnostics.iter().any(SemanticError::is_error) {

@@ -86,6 +86,10 @@ mod option_chain_call_tests;
 #[path = "rounding_conversio_run_test.rs"]
 mod rounding_conversio_run_tests;
 
+#[cfg(test)]
+#[path = "contract_environment_test.rs"]
+mod contract_environment_tests;
+
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
 use crate::mir::{KernelLowering, lower_analyzed_unit};
@@ -120,6 +124,16 @@ pub fn run_source<H: Host + ?Sized>(
     host: &mut H,
 ) -> Result<(), RunSourceError> {
     let mut analysis = analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
+    crate::driver::require_contract_execution_target(&analysis, crate::codegen::Target::MirStepper).map_err(
+        |diagnostic| {
+            let diagnostic = *diagnostic;
+            let diagnostic = match diagnostic.span {
+                Some(span) => diagnostic.with_source_context(name, source, span),
+                None => diagnostic.with_file(name),
+            };
+            RunSourceError::Frontend(vec![diagnostic])
+        },
+    )?;
     run_analyzed_with_kernel_lowering(&mut analysis, session.config.kernel_lowering, host)
         .map_err(RunSourceError::Stepper)
 }
@@ -147,6 +161,26 @@ pub fn run_analyzed_with_kernel_lowering<H: Host + ?Sized>(
     kernel_lowering: KernelLowering,
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
+    crate::driver::require_contract_execution_target(unit, crate::codegen::Target::MirStepper).map_err(
+        |diagnostic| {
+            let diagnostic = *diagnostic;
+            let issue = diagnostic
+                .issue()
+                .unwrap_or("contract_target_mismatch")
+                .to_owned();
+            vec![RunnerError {
+                code: diagnostic.code.unwrap_or("PKG001"),
+                issue,
+                span: diagnostic.span.unwrap_or_default(),
+                message: diagnostic.message,
+                args: diagnostic
+                    .args
+                    .into_iter()
+                    .map(|arg| (arg.name.to_owned(), arg.value))
+                    .collect(),
+            }]
+        },
+    )?;
     let options = crate::mir::MirLoweringOptions { kernel_lowering, ..Default::default() };
     #[cfg(feature = "device")]
     let bundle = crate::driver::prepare_air_backward_bundle(unit)
