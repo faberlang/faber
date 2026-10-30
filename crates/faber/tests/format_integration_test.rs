@@ -66,6 +66,19 @@ fn run_faber_format_stdout(path: &Path) -> String {
     normalize_trailing_newline(&stdout)
 }
 
+fn run_faber_format_write(path: &Path) {
+    let output = Command::new(env!("CARGO_BIN_EXE_faber"))
+        .args(["format", "--write"])
+        .arg(path)
+        .output()
+        .expect("run faber format --write");
+    assert!(
+        output.status.success(),
+        "faber format --write failed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
 #[test]
 fn format_convert_and_doc_keep_declaration_member_comments() {
     let temp_root = TempDir::new("faber-format", "declaration-member-comments");
@@ -112,15 +125,16 @@ fn format_convert_and_doc_keep_declaration_member_comments() {
         "Returns the piece name.",
     ];
 
-    let formatted = run_faber_format_stdout(&fixture);
+    run_faber_format_write(&fixture);
+    let formatted = fs::read_to_string(&fixture).expect("read formatted member fixture");
     for doc in expected_docs {
         assert!(
             formatted.contains(&format!("# {doc}")),
             "format must preserve declaration member comment `{doc}`:\n{formatted}"
         );
     }
-    fs::write(&fixture, &formatted).expect("write first format pass");
-    let second = run_faber_format_stdout(&fixture);
+    run_faber_format_write(&fixture);
+    let second = fs::read_to_string(&fixture).expect("read second format pass");
     assert_eq!(
         formatted, second,
         "format must be idempotent for member comments"

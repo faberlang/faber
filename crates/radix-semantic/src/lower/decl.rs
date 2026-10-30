@@ -1057,12 +1057,13 @@ impl Lowerer<'_> {
             .enumerate()
             .map(|(ordinal, shared)| {
                 let trivia = Self::hir_trivia(&shared.leading_trivia);
-                if !trivia.is_empty() {
+                if !trivia.is_empty()
+                    && let Ok(ordinal) = u32::try_from(ordinal)
+                {
+                    // The portable presentation schema uses a u32 ordinal;
+                    // do not panic lowering when a source exceeds that range.
                     self.register_attachment(
-                        HirTriviaOwnerKind::UnionSharedField {
-                            ordinal: u32::try_from(ordinal)
-                                .expect("union shared field count exceeds u32::MAX"),
-                        },
+                        HirTriviaOwnerKind::UnionSharedField { ordinal },
                         Some(HirOwnerRef::Def(def_id)),
                         trivia,
                     );

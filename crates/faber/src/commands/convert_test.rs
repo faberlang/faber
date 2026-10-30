@@ -29,14 +29,19 @@ fn convert_reports_filewise_failure_for_multi_file_kernel_package() {
     );
 
     let conversion = Command::new(&binary)
-        .args(["convert", "--to", "la", "--check"])
+        .args(["convert", "--to", "la", "--check", "--no-diagnostics"])
         .arg(&package)
         .output()
         .expect("convert two-file package file-by-file");
     assert!(!conversion.status.success());
     let stderr = String::from_utf8_lossy(&conversion.stderr);
+    let has_kernel_contract_diagnostic = stderr.lines().any(|line| {
+        line.strip_prefix("error[")
+            .and_then(|label| label.split_once(']'))
+            .is_some_and(|(identity, _)| identity == "SEM057:call_marker_on_read_only")
+    });
     assert!(
-        stderr.contains("SEM057:call_marker_on_read_only"),
+        has_kernel_contract_diagnostic,
         "file-at-a-time analysis loses the imported kernel call contract:\n{stderr}"
     );
 }
