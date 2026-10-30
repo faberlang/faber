@@ -924,11 +924,22 @@ impl Lowerer<'_> {
         let variants = decl
             .members
             .iter()
-            .map(|member| HirVariant {
-                def_id: self.variant_def_for(def_id, member.name.name),
-                name: member.name.name,
-                fields: Vec::new(),
-                span: member.span,
+            .map(|member| {
+                let def_id = self.variant_def_for(def_id, member.name.name);
+                let trivia = Self::hir_trivia(&member.leading_trivia);
+                if !trivia.is_empty() {
+                    self.register_attachment(
+                        HirTriviaOwnerKind::Member,
+                        Some(HirOwnerRef::Def(def_id)),
+                        trivia,
+                    );
+                }
+                HirVariant {
+                    def_id,
+                    name: member.name.name,
+                    fields: Vec::new(),
+                    span: member.span,
+                }
             })
             .collect();
 
@@ -969,8 +980,17 @@ impl Lowerer<'_> {
             })
             .collect();
 
+        let def_id = self.variant_def_for(enum_def_id, variant.name.name);
+        let trivia = Self::hir_trivia(&variant.leading_trivia);
+        if !trivia.is_empty() {
+            self.register_attachment(
+                HirTriviaOwnerKind::Member,
+                Some(HirOwnerRef::Def(def_id)),
+                trivia,
+            );
+        }
         HirVariant {
-            def_id: self.variant_def_for(enum_def_id, variant.name.name),
+            def_id,
             name: variant.name.name,
             fields,
             span: variant.span,
@@ -990,7 +1010,7 @@ impl Lowerer<'_> {
                 .map(|param| (param.def_id, param.name, param.kind)),
         );
 
-        let commune = self.lower_commune_fields(decl);
+        let commune = self.lower_commune_fields(def_id, decl);
         self.resolver
             .register_commune_fields(def_id, commune.clone());
 
@@ -1031,13 +1051,27 @@ impl Lowerer<'_> {
         self.lower_discretio(stmt, decl).into_iter().collect()
     }
 
-    fn lower_commune_fields(&mut self, decl: &UnionDecl) -> Vec<CommuneField> {
+    fn lower_commune_fields(&mut self, def_id: DefId, decl: &UnionDecl) -> Vec<CommuneField> {
         decl.shared_fields
             .iter()
-            .map(|shared| CommuneField {
-                name: shared.field.name.name,
-                ty: self.lower_type(&shared.field.ty),
-                span: shared.field.name.span,
+            .enumerate()
+            .map(|(ordinal, shared)| {
+                let trivia = Self::hir_trivia(&shared.leading_trivia);
+                if !trivia.is_empty() {
+                    self.register_attachment(
+                        HirTriviaOwnerKind::UnionSharedField {
+                            ordinal: u32::try_from(ordinal)
+                                .expect("union shared field count exceeds u32::MAX"),
+                        },
+                        Some(HirOwnerRef::Def(def_id)),
+                        trivia,
+                    );
+                }
+                CommuneField {
+                    name: shared.field.name.name,
+                    ty: self.lower_type(&shared.field.ty),
+                    span: shared.field.name.span,
+                }
             })
             .collect()
     }
@@ -1085,10 +1119,15 @@ impl Lowerer<'_> {
             .iter()
             .map(|method| {
                 let hir_method = self.lower_interface_method(method);
-                // Interface signatures have no node or def id to back-reference.
+                // Interface signatures retain a definition id, even though
+                // they have no body node; use it as the trivia back-reference.
                 let method_trivia = Self::hir_trivia(&method.leading_trivia);
                 if !method_trivia.is_empty() {
-                    self.register_attachment(HirTriviaOwnerKind::Member, None, method_trivia);
+                    self.register_attachment(
+                        HirTriviaOwnerKind::Member,
+                        Some(HirOwnerRef::Def(hir_method.def_id)),
+                        method_trivia,
+                    );
                 }
                 hir_method
             })

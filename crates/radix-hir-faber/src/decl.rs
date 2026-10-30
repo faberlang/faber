@@ -360,12 +360,10 @@ impl super::FaberCodegen<'_> {
 
     /// Emit leading trivia owned by a member `DefId`.
     ///
-    /// Genus fields, genus methods, and enum variants carry one. Interface
-    /// methods do not, so they skip this helper.
-    ///
-    /// `annotation_follows` drops the trivia run's trailing annotation-line
-    /// terminator (see [`crate::trivia::without_following_annotation`]) — the
-    /// annotation re-emitter writes that line break itself.
+    /// Genus fields and methods, enum members/variants, and interface methods
+    /// carry one. `annotation_follows` drops the trivia run's trailing
+    /// annotation-line terminator (see [`crate::trivia::without_following_annotation`])
+    /// — the annotation re-emitter writes that line break itself.
     pub(super) fn write_member_trivia(
         &self,
         def_id: DefId,
@@ -381,6 +379,18 @@ impl super::FaberCodegen<'_> {
             trivia
         };
         crate::trivia::write_leading_trivia(trivia, self.interner, writer);
+    }
+
+    /// Emit leading trivia owned by a shared field in a union declaration.
+    pub(super) fn write_union_shared_field_trivia(
+        &self,
+        def_id: DefId,
+        ordinal: u32,
+        writer: &mut CodeWriter,
+    ) {
+        if let Some(trivia) = self.trivia.for_union_shared_field(def_id, ordinal) {
+            crate::trivia::write_leading_trivia(trivia, self.interner, writer);
+        }
     }
 
     /// `def_id` is the struct item's own definition; struct field type sites
@@ -548,10 +558,21 @@ impl super::FaberCodegen<'_> {
         writer.writeln(" {");
         writer.indented(|writer| {
             if !e.commune_fields.is_empty() {
+                // The source's `@ commune` annotation belongs to the first
+                // shared-field declaration. Its leading comments must precede
+                // that annotation so they remain in a legal attachment slot.
+                self.write_union_shared_field_trivia(def_id, 0, writer);
                 writer.write("@ ");
                 writer.write(surface.contextual_keyword("commune"));
                 writer.newline();
                 for (ordinal, field) in e.commune_fields.iter().enumerate() {
+                    if ordinal > 0 {
+                        self.write_union_shared_field_trivia(
+                            def_id,
+                            self.slot_ordinal(ordinal, "commune field count"),
+                            writer,
+                        );
+                    }
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Def(def_id),
                         slot: HirTypeSlot::Field(self.slot_ordinal(ordinal, "commune field count")),
@@ -562,7 +583,12 @@ impl super::FaberCodegen<'_> {
                     writer.write(&self.symbol_to_string(field.name));
                     writer.newline();
                 }
-                writer.newline();
+                if e.variants
+                    .first()
+                    .is_none_or(|variant| self.trivia.for_def(variant.def_id).is_none())
+                {
+                    writer.newline();
+                }
             }
             for (idx, variant) in e.variants.iter().enumerate() {
                 self.write_member_trivia(variant.def_id, false, writer);
@@ -631,6 +657,7 @@ impl super::FaberCodegen<'_> {
         writer.writeln(" {");
         writer.indented(|writer| {
             for method in &i.methods {
+                self.write_member_trivia(method.def_id, !method.availability.is_empty(), writer);
                 for availability in &method.availability {
                     self.write_availability(availability, surface, writer);
                 }
