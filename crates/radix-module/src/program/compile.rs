@@ -863,7 +863,12 @@ fn cached_import_target(
     let exports = program_export_surface(&target_program, &target_interner);
     let declarations = program_declaration_surface(&target_program, &target_interner);
     let module_identity = import_target_identity(import_path, None);
-    let interface = file_interface_for_program(&target_program, &target_interner, module_identity.as_ref());
+    let interface = file_interface_for_program_with_access_markers(
+        &target_program,
+        &target_interner,
+        module_identity.as_ref(),
+        session.config.preserve_imported_param_access_markers,
+    );
     let region_name = super::default_import::program_region_name(&target_program, &target_interner);
     let cached = CachedImportTarget {
         exports,
@@ -1824,6 +1829,7 @@ fn sanitize_module_segment(segment: &str) -> String {
 struct SnapshotContext {
     module_identity: Option<InterfaceLibraryIdentity>,
     bindings: BTreeMap<String, InterfaceLibraryIdentity>,
+    preserve_param_access_markers: bool,
 }
 
 impl SnapshotContext {
@@ -1831,8 +1837,13 @@ impl SnapshotContext {
         program: &Program,
         interner: &crate::lexer::Interner,
         module_identity: Option<&InterfaceLibraryIdentity>,
+        preserve_param_access_markers: bool,
     ) -> Self {
-        let mut ctx = SnapshotContext { module_identity: module_identity.cloned(), bindings: BTreeMap::new() };
+        let mut ctx = SnapshotContext {
+            module_identity: module_identity.cloned(),
+            bindings: BTreeMap::new(),
+            preserve_param_access_markers,
+        };
         for stmt in &program.statements {
             let StmtKind::Import(decl) = &stmt.kind else {
                 continue;
@@ -1910,17 +1921,27 @@ fn import_target_identity(
     None
 }
 
+#[cfg(test)]
 fn file_interface_for_program(
     program: &Program,
     interner: &crate::lexer::Interner,
     module_identity: Option<&InterfaceLibraryIdentity>,
+) -> FileInterface {
+    file_interface_for_program_with_access_markers(program, interner, module_identity, true)
+}
+
+fn file_interface_for_program_with_access_markers(
+    program: &Program,
+    interner: &crate::lexer::Interner,
+    module_identity: Option<&InterfaceLibraryIdentity>,
+    preserve_param_access_markers: bool,
 ) -> FileInterface {
     let mut interface = FileInterface::new();
     if let Some(identity) = module_identity {
         interface = interface.with_identity(identity.clone());
     }
     let nominal_kinds = nominal_kinds_for_program(program, interner);
-    let ctx = SnapshotContext::for_program(program, interner, module_identity);
+    let ctx = SnapshotContext::for_program(program, interner, module_identity, preserve_param_access_markers);
     for stmt in &program.statements {
         // Keep the legacy unmarked-exported surface for interface snapshots
         // (mirror of the package path's `program_export_surface`): a public
@@ -2537,7 +2558,7 @@ fn interface_parameter_type_from_type_expr(
     ctx: &SnapshotContext,
 ) -> Option<InterfaceTypeSnapshot> {
     let snapshot = interface_type_from_type_expr(ty, interner, type_params, nominal_kinds, ctx)?;
-    let Some(mode) = ty.mode else {
+    let Some(mode) = ty.mode.filter(|_| ctx.preserve_param_access_markers) else {
         return Some(snapshot);
     };
     let mutability = crate::semantic::access_marker_from_type_mode(mode).mutability();

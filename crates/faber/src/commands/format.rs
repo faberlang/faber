@@ -297,7 +297,7 @@ pub(super) fn convert_single_doc(
     diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     let name = path.display().to_string();
-    let session = match format_session(path, from, source) {
+    let mut session = match format_session(path, from, source) {
         Ok(session) => session,
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
@@ -308,6 +308,12 @@ pub(super) fn convert_single_doc(
             return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
+    // Conversion remains a file-at-a-time operation: it does not claim the
+    // whole-package import contract that `check` has. Keep its established
+    // refusal for imported kernel calls whose mutability is only known from
+    // the sibling declaration. Formatter re-emission opts into those access
+    // markers separately, because it must validate and preserve source calls.
+    session.config.preserve_imported_param_access_markers = false;
     let emit_pack = match faber_cli::package::embedded_conversion_locale_pack(to) {
         Ok(pack) => pack,
         Err(diagnostic) => {
@@ -395,7 +401,7 @@ pub(super) fn format_single_doc(
     let name = path.display().to_string();
     let context_path = format_context_path(path);
     let context_name = context_path.display().to_string();
-    let session = match format_session(&context_path, None, source) {
+    let mut session = match format_session(&context_path, None, source) {
         Ok(session) => session,
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
@@ -406,6 +412,10 @@ pub(super) fn format_single_doc(
             return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
+    // Formatter re-emission checks imported calls against their producer's
+    // parameter access markers; omitting them turns valid `mut` calls into
+    // read-only refusals.
+    session.config.preserve_imported_param_access_markers = true;
     let Some(emit_pack) = session.config.locale_pack.as_ref() else {
         // format_session always installs a resolved reader pack; reaching this
         // means the session invariant broke, so fail closed as a diagnostic.
