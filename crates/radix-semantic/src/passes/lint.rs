@@ -878,6 +878,17 @@ impl HirVisitor for LintContext<'_> {
     }
 
     fn visit_expr(&mut self, expr: &HirExpression) {
+        // Namespace functions use MethodCall HIR and have no local method
+        // entry. Their checked call-site markers still prove a mutable borrow.
+        if let HirExpressionKind::Call(_, _, args, _)
+        | HirExpressionKind::MethodCall(_, _, _, args, _) = &expr.kind
+        {
+            for arg in args {
+                if arg.marker == Some(radix_hir::HirArgMarker::Mut) {
+                    self.mark_place_mutated(&arg.expr);
+                }
+            }
+        }
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
                 self.used.insert(*def_id);

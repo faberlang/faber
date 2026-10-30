@@ -29,6 +29,7 @@ fn universe_spelling(target: Target) -> &'static str {
         Target::MirWgsl => "wgsl-text",
         Target::MirSexp => "sexp",
         Target::MirBasic => "basic",
+        Target::MirEvm => "evm",
         Target::MirScena => "scena",
         Target::MirFmir => "fmir-text",
         Target::MirFmirBinary => "fmir",
@@ -66,6 +67,7 @@ fn all_is_exactly_the_variant_set() {
         "wgsl-text",
         "sexp",
         "basic",
+        "evm",
         "scena",
         "fmir-text",
         "fmir",
@@ -265,4 +267,16 @@ fn import_words_name_source_languages_only() {
     assert_eq!(Target::nearest_import_word("pyton"), Some("python"));
     assert_eq!(Target::nearest_import_word("goo"), Some("go"));
     assert_eq!(Target::nearest_import_word("zzzzzzzz"), None);
+}
+
+#[test]
+fn evm_is_an_opt_in_emit_only_target() {
+    assert_eq!(Target::from_spelling("evm"), Some(Target::MirEvm));
+    assert_eq!(Target::MirEvm.required_feature(), Some("mir-evm"));
+    assert_eq!(Target::MirEvm.is_available(), cfg!(feature = "mir-evm"));
+    assert_eq!(Target::MirEvm.availability_spellings(), &["evm"]);
+    assert!(!Target::MirEvm.is_source_language());
+    assert!(!Target::MirEvm.lowers_cli_entry());
+    assert!(!Target::MirEvm.is_device_target());
+    assert!(Target::MirEvm.supported_leaves().is_empty());
 }

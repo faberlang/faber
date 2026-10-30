@@ -11,6 +11,8 @@
 
 /// Fail-closed module compiler APIs and supporting module-owned types.
 pub mod module {
+    #[cfg(feature = "mir-evm")]
+    pub use radix_module::EvmOutput;
     #[cfg(feature = "device")]
     pub use radix_module::air;
     pub use radix_module::driver::{

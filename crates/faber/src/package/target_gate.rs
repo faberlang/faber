@@ -20,7 +20,8 @@ pub const TARGET_NOT_IN_THIS_BUILD: &str = "target_not_in_this_build";
 
 // WHY: the owner of this list is `radix-target/tests/full_targets_membership.rs`;
 // these features are default-off and not part of the official faber release.
-const EXPERIMENTAL_DEFAULT_OFF: [&str; 6] = [
+const EXPERIMENTAL_DEFAULT_OFF: [&str; 7] = [
+    "mir-evm",
     "mir-basic",
     "hir-pascal",
     "hir-cobol",
@@ -61,6 +62,7 @@ pub fn target_compiled_in(target: Target) -> bool {
         | Target::MirWgsl
         | Target::MirSexp
         | Target::MirClif
+        | Target::MirEvm
         | Target::MirBasic => target.required_feature().is_some_and(feature_compiled),
     }
 }
@@ -83,6 +85,7 @@ fn feature_compiled(feature: &str) -> bool {
         "mir-sexp" => cfg!(feature = "mir-sexp"),
         "mir-clif" => cfg!(feature = "mir-clif"),
         "mir-basic" => cfg!(feature = "mir-basic"),
+        "mir-evm" => cfg!(feature = "mir-evm"),
         "mir-metal" => cfg!(feature = "mir-metal"),
         "mir-wgsl" => cfg!(feature = "mir-wgsl"),
         "mir-llvm" => cfg!(feature = "mir-llvm"),

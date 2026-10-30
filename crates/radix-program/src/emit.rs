@@ -281,6 +281,12 @@ fn compile_package_internal(
         }
     };
 
+    if let Err(diagnostics) =
+        crate::qualify::require_contract_execution_targets(&package, config.target)
+    {
+        return compile_failure(diagnostics);
+    }
+
     if config.target == Target::HirGo {
         return compile_package_go(&package, input, seams);
     }
