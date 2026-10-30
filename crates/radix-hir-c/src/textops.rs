@@ -144,7 +144,7 @@ impl Emitter<'_> {
         let (value, helper) = call.result();
         self.support.need(helper);
         let effect = operands.iter().any(|operand| operand.effect);
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let text = wrap(&prelude, &call.text(&operands));
         // A truth operand carries its own parentheses.
         let text = if value == Value::Truth && !prelude.is_empty() {
@@ -168,7 +168,7 @@ impl Emitter<'_> {
         self.support.need(Helper::TextAlloc);
         let effect = base.effect || position.effect;
         let mut operands = [base, position];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let call = Call::At.text(&operands);
         Ok(Operand::new(wrap(&prelude, &call), Value::Text).with_effect(effect))
     }

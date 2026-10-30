@@ -363,8 +363,8 @@ impl Emitter<'_> {
             } => self.conditional(expr, cond, then_block, else_block),
             HirExpressionKind::Vacua => {
                 match expr.ty.map(|ty| classify(self.types, ty)).transpose()? {
-                    Some(Ty::Set(elem)) => Ok(self.empty_set(elem)),
-                    Some(Ty::Map(k, v)) => Ok(self.empty_map(k, v)),
+                    Some(Ty::Set(elem)) => self.empty_set(elem),
+                    Some(Ty::Map(k, v)) => self.empty_map(k, v),
                     _ => self.empty_list(expr),
                 }
             }
@@ -629,7 +629,7 @@ impl Emitter<'_> {
             }
             operands.push(operand);
         }
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let mut slots = Vec::with_capacity(operands.len() + 1);
         if self.arena {
             slots.push("faber_a".to_owned());
@@ -786,7 +786,7 @@ impl Emitter<'_> {
             let pointer = pointees.get(index).copied().unwrap_or(false);
             operands.push(self.invoke_argument(*param, pointer, expr, marker)?);
         }
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let channel = err.map(|_| {
             let name = format!("faber_t{}", self.temps);
             self.temps += 1;
@@ -817,7 +817,7 @@ impl Emitter<'_> {
             _ => {}
         }
         let has_channel = channel.is_some();
-        let text = self.invoke_channel(&prelude, call, value, channel.as_deref());
+        let text = self.invoke_channel(&prelude, call, value, channel.as_deref())?;
         // A boolean result carries its own parentheses like every truth operand.
         let text = if value == Value::Truth && prelude.is_empty() && !has_channel {
             format!("({text})")
@@ -927,7 +927,7 @@ impl Emitter<'_> {
         call: String,
         value: Value,
         channel: Option<&str>,
-    ) -> String {
+    ) -> Result<String, CodegenError> {
         if let Some(channel) = channel {
             let caller_has_channel = self
                 .current
@@ -946,20 +946,20 @@ impl Emitter<'_> {
             };
             let channel_init = format!("faber_chan {channel} = {{false, NULL}}; ");
             if value == Value::Void {
-                wrap(
+                Ok(wrap(
                     &format!("{channel_init}{prelude}"),
                     &format!("{call}; {failure}"),
-                )
+                ))
             } else {
                 let mut result = Operand::new(call, value);
-                let declaration = self.bind(&mut result);
-                wrap(
+                let declaration = self.bind(&mut result)?;
+                Ok(wrap(
                     &format!("{channel_init}{prelude}{declaration}"),
                     &format!("{failure} {}", result.text),
-                )
+                ))
             }
         } else {
-            wrap(prelude, &call)
+            Ok(wrap(prelude, &call))
         }
     }
 
@@ -970,22 +970,22 @@ impl Emitter<'_> {
     /// returned prelude declares them. A call can print, and a sibling can trap,
     /// so the order shows in stdout. Without a call no operand has an effect
     /// that order could reveal: traps all end the program with status 1.
-    pub(crate) fn sequence(&mut self, operands: &mut [Operand]) -> String {
+    pub(crate) fn sequence(&mut self, operands: &mut [Operand]) -> Result<String, CodegenError> {
         if operands.len() < 2 || !operands.iter().any(|operand| operand.effect) {
-            return String::new();
+            return Ok(String::new());
         }
         let mut prelude = String::new();
         for operand in operands.iter_mut() {
             if operand.constant.is_none() {
-                prelude.push_str(&self.bind(operand));
+                prelude.push_str(&self.bind(operand)?);
             }
         }
-        prelude
+        Ok(prelude)
     }
 
     /// Bind `operand` to a fresh temporary: returns its declaration and
     /// rewrites the operand to read the temporary.
-    pub(crate) fn bind(&mut self, operand: &mut Operand) -> String {
+    pub(crate) fn bind(&mut self, operand: &mut Operand) -> Result<String, CodegenError> {
         let c_type = match operand.value {
             Value::None => "int ".to_owned(),
             Value::Int => "int64_t ".to_owned(),
@@ -995,8 +995,8 @@ impl Emitter<'_> {
                 self.support.need_bool();
                 "bool ".to_owned()
             }
-            Value::List(elem) | Value::Set(elem) => elem.list_c_pointer().to_owned(),
-            Value::Map(k, v) => Self::map_c_type(k, v),
+            Value::List(elem) | Value::Set(elem) => self.elem_list_c_pointer(elem)?,
+            Value::Map(k, v) => self.map_c_type(k, v)?,
             Value::Float => "double ".to_owned(),
             Value::Float32 => "float ".to_owned(),
             Value::Decimal => {
@@ -1006,15 +1006,12 @@ impl Emitter<'_> {
             Value::Opt(inner) => match self.c_type(Ty::Opt(inner)) {
                 Ok(c_type) if c_type.ends_with('*') => c_type,
                 Ok(c_type) => format!("{c_type} "),
-                Err(_) => return String::new(),
+                Err(error) => return Err(error),
             },
-            Value::Genus(def_id) => match self.c_type(Ty::Genus(def_id)) {
-                Ok(c_type) => c_type,
-                Err(_) => return String::new(),
-            },
+            Value::Genus(def_id) => self.c_type(Ty::Genus(def_id))?,
             // A bare `void` has no value to bind, and a function value never
             // carries an effect, so neither is given a temporary.
-            Value::Void | Value::Func(_) => return String::new(),
+            Value::Void | Value::Func(_) => return Ok(String::new()),
         };
         let name = format!("faber_t{}", self.temps);
         self.temps += 1;
@@ -1025,7 +1022,7 @@ impl Emitter<'_> {
             name
         };
         operand.narrow = None;
-        declaration
+        Ok(declaration)
     }
 
     /// A folded integer constant. Inside `i64` it is an `int64_t` literal;
@@ -1129,7 +1126,7 @@ impl Emitter<'_> {
         let r = self.as_decimal(r)?;
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         self.support.need(Helper::Decimal);
         let name = match op {
@@ -1177,7 +1174,7 @@ impl Emitter<'_> {
     ) -> Result<Operand, CodegenError> {
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let (list, member) = if left_is_list { (l, r) } else { (r, l) };
         if member.value != Value::from(list_elem.ty()) {
@@ -1185,10 +1182,13 @@ impl Emitter<'_> {
                 "membership of a value of another element class",
             ));
         }
+        if matches!(list_elem, Elem::Genus(_)) {
+            return Err(unsupported("membership on a list of genus"));
+        }
         self.need_class(Ty::List(list_elem));
         let call = format!(
             "(faber_list_{}_contains({}, {}))",
-            list_elem.suffix(),
+            self.elem_suffix(list_elem)?,
             list.text,
             member.text
         );
@@ -1258,7 +1258,7 @@ impl Emitter<'_> {
             self.support.need(Helper::ListLift);
             let effect = l.effect || r.effect;
             let mut operands = [l, r];
-            let prelude = self.sequence(&mut operands);
+            let prelude = self.sequence(&mut operands)?;
             let [l, r] = operands;
             let call = format!("faber_list_{suffix}_equal({}, {})", l.text, r.text);
             let negate = matches!(
@@ -1289,7 +1289,7 @@ impl Emitter<'_> {
         self.support.need(Helper::ListLift);
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let call = format!(
             "faber_list_{suffix}_{op_name}_lift_{side}(faber_a, {}, {})",
@@ -1556,9 +1556,7 @@ impl Emitter<'_> {
         }
         let wide = ty.is_some_and(|t| matches!(classify(self.types, t), Ok(Ty::Modular(_))));
         match op {
-            HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => {
-                Ok(self.concat(l, r))
-            }
+            HirBinOp::Add if l.value == Value::Text && r.value == Value::Text => self.concat(l, r),
             HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div | HirBinOp::Mod => {
                 self.arithmetic(op, l, r, wide)
             }
@@ -1646,7 +1644,7 @@ impl Emitter<'_> {
         }
 
         let mut operands = [self.expr(left)?, self.expr(right)?];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let effect = operands.iter().any(|operand| operand.effect);
         let [l, r] = operands;
         let cell = int_width_of_bits(width).c_type();
@@ -1725,7 +1723,7 @@ impl Emitter<'_> {
             (helper, name)
         };
         let (Some(a), Some(b)) = (l.constant, r.constant) else {
-            return Ok(self.runtime_arithmetic(op, helper, name, l, r, wide));
+            return self.runtime_arithmetic(op, helper, name, l, r, wide);
         };
         if b == 0 {
             match op {
@@ -1772,7 +1770,7 @@ impl Emitter<'_> {
         {
             return Err(unsupported("range membership over a non-integer"));
         }
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let effect = operands.iter().any(|operand| operand.effect);
         let [x, low, high] = operands;
         let lower = format!("({} <= {})", low.text, x.text);
@@ -1825,7 +1823,7 @@ impl Emitter<'_> {
         self.support.need(Helper::Approx);
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let call = format!("{name}({}, {})", l.text, r.text);
         let text = if op == HirBinOp::FuzzyNotEq {
@@ -1867,7 +1865,7 @@ impl Emitter<'_> {
             self.support.need(Helper::Bitwise);
             let effect = l.effect || r.effect;
             let mut operands = [l, r];
-            let prelude = self.sequence(&mut operands);
+            let prelude = self.sequence(&mut operands)?;
             let [l, r] = operands;
             let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
             return Ok(Operand::new(text, Value::Exact).with_effect(effect));
@@ -1892,15 +1890,15 @@ impl Emitter<'_> {
         l: Operand,
         r: Operand,
         wide: bool,
-    ) -> Operand {
+    ) -> Result<Operand, CodegenError> {
         let effect = l.effect || r.effect;
         if wide {
             self.support.need(helper);
             let mut operands = [l, r];
-            let prelude = self.sequence(&mut operands);
+            let prelude = self.sequence(&mut operands)?;
             let [l, r] = operands;
             let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
-            return Operand::new(text, Value::Exact).with_effect(effect);
+            return Ok(Operand::new(text, Value::Exact).with_effect(effect));
         }
         let floor = match op {
             HirBinOp::Div => Some(Helper::FdivI64),
@@ -1922,7 +1920,7 @@ impl Emitter<'_> {
             };
             let mut operand = Operand::new(text, Value::Int).with_effect(effect);
             operand.narrow = narrow;
-            return operand;
+            return Ok(operand);
         }
         self.support.need(helper);
         let fast = match op {
@@ -1937,12 +1935,12 @@ impl Emitter<'_> {
             _ => None,
         };
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         let text = wrap(&prelude, &format!("{name}({}, {})", l.text, r.text));
         let mut operand = Operand::new(text, Value::Exact).with_effect(effect);
         operand.narrow = narrow;
-        operand
+        Ok(operand)
     }
 
     /// Narrow an exact runtime value into an `int64_t` cell. With a fast form
@@ -1995,10 +1993,17 @@ impl Emitter<'_> {
         let effect = value.effect;
         match value.value {
             Value::List(elem) => {
+                if matches!(elem, Elem::Genus(_)) {
+                    return Err(unsupported("copy of a list of genus"));
+                }
                 self.support.need(Helper::Arena);
                 self.support
                     .need(Helper::List(elem, crate::helpers::ListOp::Of));
-                let text = format!("faber_list_{}_copy(faber_a, {})", elem.suffix(), value.text);
+                let text = format!(
+                    "faber_list_{}_copy(faber_a, {})",
+                    self.elem_suffix(elem)?,
+                    value.text
+                );
                 Ok(Operand::new(text, Value::List(elem)).with_effect(effect))
             }
             Value::Genus(def_id) => {
@@ -2051,7 +2056,7 @@ impl Emitter<'_> {
         }
         let effect = l.effect || r.effect;
         let mut operands = [l, r];
-        let prelude = self.sequence(&mut operands);
+        let prelude = self.sequence(&mut operands)?;
         let [l, r] = operands;
         // Text orders by code point, which is the order of its UTF-8 bytes
         // read as unsigned: exactly what `strcmp` compares.

@@ -65,6 +65,8 @@ mod float32_test;
 #[cfg(test)]
 mod float_math_test;
 #[cfg(test)]
+mod genus_list_test;
+#[cfg(test)]
 mod item_test;
 #[cfg(test)]
 mod leaf_routes_test;
@@ -95,7 +97,7 @@ use crate::error::unsupported;
 use crate::helpers::Support;
 use crate::items::{Function, Returns};
 use crate::names::Namer;
-use crate::ty::Ty;
+use crate::ty::{Elem, Ty};
 use handroll::{FxHashMap, FxHashSet};
 use radix_codegen_shared::names::{DisplayTokens, NameCatalog};
 use radix_codegen_shared::{Codegen, CodegenError};
@@ -181,6 +183,7 @@ impl CCodegen<'_> {
             temps: 0,
             arena,
             genera: FxHashMap::default(),
+            genus_list_elements: FxHashSet::default(),
             shows: Vec::new(),
             copies: Vec::new(),
             generics: FxHashSet::default(),
@@ -238,6 +241,8 @@ pub(crate) struct Emitter<'a> {
     arena: bool,
     /// The genera the program declares.
     genera: FxHashMap<DefId, crate::genus::Genus>,
+    /// The genera whose list families are required by a concrete list type.
+    genus_list_elements: FxHashSet<DefId>,
     /// Genera whose show function the program asked for, in request order.
     shows: Vec<DefId>,
     /// Genera whose deep-copy function (`copy`, R7) the program asked for.
@@ -287,7 +292,7 @@ impl Emitter<'_> {
             return Err(unsupported("async entry or entry annotations"));
         }
         self.entry_args = hir.entry_args_name;
-        let items = self.items(hir)?;
+        let mut items = self.items(hir)?;
         self.scope = Namer::program_scope();
         self.loops = 0;
         self.returns = Returns::Main;
@@ -328,6 +333,8 @@ impl Emitter<'_> {
         let (show_prototypes, show_definitions) = self.show_functions()?;
         let (equal_prototypes, equal_definitions) = self.equal_functions()?;
         let (copy_prototypes, copy_definitions) = self.copy_functions()?;
+        let genus_order = items.genus_order.clone();
+        items.genera = self.genus_declarations(&genus_order)?;
         if hir.entry.is_none() {
             self.support.need(crate::helpers::Helper::Trap);
         }
@@ -401,6 +408,9 @@ impl Emitter<'_> {
                     elem,
                     crate::helpers::ListOp::Struct,
                 ));
+                if let Elem::Genus(def_id) = elem {
+                    self.genus_list_elements.insert(def_id);
+                }
                 if elem == crate::ty::Elem::Bool {
                     self.support.need_bool();
                 }
