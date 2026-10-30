@@ -507,6 +507,28 @@ impl TypeChecker<'_> {
                     arg.span,
                 );
             }
+            // A generic `copy T` parameter duplicates at entry with the
+            // concrete argument the caller echoed, so the argument decides;
+            // a concrete declared payload was refused at its declaration.
+            if matches!(
+                self.types
+                    .peel_access_marker(self.resolve_inferred_type(param.ty))
+                    .0,
+                Some(radix_types::AccessMarker::Copy)
+            ) && let Some(declared) = self.current_call_declared_params.get(argument)
+            {
+                let declared_payload = self
+                    .types
+                    .peel_access_marker(self.resolve_inferred_type(*declared))
+                    .1;
+                if self.type_is_generic_carrier(declared_payload) {
+                    let argument_payload = self
+                        .types
+                        .peel_access_marker(self.resolve_inferred_type(arg_ty))
+                        .1;
+                    self.refuse_copy_of_nonduplicable(argument_payload, arg.span);
+                }
+            }
             let errors_before_unify = self.errors.len();
             self.unify_carrier_assign(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
             if self.errors.len() == errors_before_unify {

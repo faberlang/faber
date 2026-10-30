@@ -5323,6 +5323,14 @@ help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or
 message = "`{name}` would share `{binding}`, a read-only value, as a writable name (`{fixum}` is deep)"
 help = "write `{varia} {name} ← {copy} {binding}` for an independent value, or `{varia} {name} ← {own} {binding}` to take it over"
 
+[diagnostics.SEM066]
+message = "`copy` is refused: {head} cannot be duplicated{?path| — the member path is `|`}"
+help = "{head} is a resource with identity: share the value without `{copy}`, or take the resource over with `{own}` where the consumer may own it"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` is refused: {head} cannot be duplicated{?path| — the member path is `|`}"
+help = "{head} is a resource with identity: share the value without `{copy}`, or take the resource over with `{own}` where the consumer may own it"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"

@@ -3612,6 +3612,14 @@ help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{
 message = "`{name}` 会把只读值 `{binding}` 共享为可写名称（`{fixum}` 是深层的）"
 help = "写 `{varia} {name} ← {copy} {binding}` 得到独立的值，或写 `{varia} {name} ← {own} {binding}` 接管它"
 
+[diagnostics.SEM066]
+message = "拒绝 `copy`：{head} 不可复制{?path|——成员路径为 `|`}"
+help = "{head} 是有身份的资源：请不带 `{copy}` 地共享该值，或在使用者可拥有它时用 `{own}` 接管"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "拒绝 `copy`：{head} 不可复制{?path|——成员路径为 `|`}"
+help = "{head} 是有身份的资源：请不带 `{copy}` 地共享该值，或在使用者可拥有它时用 `{own}` 接管"
+
 [diagnostics.WARN001]
 message = "未使用变量"
 help = "删除该变量，或加 '_' 前缀"
