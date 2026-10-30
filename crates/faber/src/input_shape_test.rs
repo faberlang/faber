@@ -1,5 +1,6 @@
 use crate::input_shape::{
-    locale_supports_input, locale_without_package_error, verify_input_is_package_shaped,
+    diagnostics_locale_without_package_error, locale_supports_input, locale_without_package_error,
+    verify_input_is_package_shaped,
 };
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -101,6 +102,29 @@ fn reader_locale_accepts_missing_package() {
 #[test]
 fn reader_locale_accepts_fab_entry() {
     assert!(locale_supports_input(&["main.fab".to_owned()], false));
+}
+
+#[test]
+fn diagnostics_locale_gate_accepts_stdin_and_fab_entry() {
+    assert_eq!(
+        diagnostics_locale_without_package_error(Some("th-TH"), &["-".to_owned()], false),
+        None
+    );
+    assert_eq!(
+        diagnostics_locale_without_package_error(Some("th-TH"), &["main.fab".to_owned()], false),
+        None
+    );
+}
+
+#[test]
+fn diagnostics_locale_gate_rejects_unsupported_input_shape() {
+    assert_eq!(
+        diagnostics_locale_without_package_error(Some("th-TH"), &["main.txt".to_owned()], false),
+        Some(
+            "--diagnostics-locale th-TH requires a package path or .fab entry file (or stdin)"
+                .to_owned()
+        )
+    );
 }
 
 #[test]
