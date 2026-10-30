@@ -188,6 +188,16 @@ pub struct Parser {
     /// Consumed (cleared) by `parse_func_decl` on entry, so it never reaches a
     /// nested declaration.
     nondum_function_pending: bool,
+    /// Set while a statement parses under a non-empty stack of authored
+    /// annotations (`parse_annotated_stmt` path): a kernel declaration head
+    /// claimed there is not bare, so its claim folds no synthetic boundary
+    /// newline into the statement trivia (the authored annotation line's own
+    /// terminator already rides the run, exactly as the annotation form's
+    /// combining attaches it).
+    ///
+    /// Read and cleared by the kernel-head dispatch, so a nested statement
+    /// never inherits an outer stack.
+    head_under_authored_annotations: bool,
     /// Set once either budget is exhausted; parsing then stops descending.
     ///
     /// A budget diagnostic is raised where the budget was spent, which can be a
@@ -370,6 +380,7 @@ impl Parser {
             conversio_postfix_enabled: true,
             sort_body_barred_at: None,
             nondum_function_pending: false,
+            head_under_authored_annotations: false,
             budget_exhausted: false,
             budget_diagnostic: None,
             conditionals: Vec::new(),
