@@ -89,6 +89,85 @@ incipit {
 }
 
 #[test]
+fn snapshot_of_a_later_mutated_source_is_not_its_live_alias() {
+    // An immutable local keeps the value its initializer read at declaration:
+    // `i1` is 0 forever and `i2` is 2 forever, whatever `m` is later. The
+    // proof must not reason about either snapshot as the live `m`, or the
+    // write through `i1` and the read through `i2` share one address.
+    rejected(
+        r"incipit {
+    varia tensor<numerus, [3]> row ← vacua
+    varia tensor<numerus, [3, 3]> cache ← vacua
+    varia numerus m ← 0
+    sit numerus i1 ← m
+    m ← 2
+    sit numerus i2 ← m
+    itera ex row apud [j] filum lane sit value {
+        cache[[i1, j]] ← value
+        sit numerus x ← cache.accipe([i2, j])
+    }
+}",
+        "written_storage_neighbor_read",
+    );
+    // A snapshot taken inside the lane keeps the same rule: the write through
+    // it is not a write at the live mutable's address.
+    rejected(
+        r"incipit {
+    varia tensor<numerus, [3]> row ← vacua
+    varia tensor<numerus, [3, 3]> cache ← vacua
+    varia numerus m ← 0
+    m ← 2
+    itera ex row apud [j] filum lane sit value {
+        sit numerus i ← m
+        cache[[i, j]] ← value
+    }
+}",
+        "write_not_own_coordinate",
+    );
+    // The live mutable itself still names one lane-invariant component, and
+    // a snapshot of a value-stable source keeps resolving through it.
+    accepted(
+        r"incipit {
+    varia tensor<numerus, [3]> row ← vacua
+    varia tensor<numerus, [3, 3]> cache ← vacua
+    varia numerus m ← 2
+    itera ex row apud [j] filum lane sit value {
+        cache[[m, j]] ← value
+        sit numerus jj ← j
+        sit numerus x ← cache.accipe([m, jj])
+    }
+}",
+    );
+}
+
+#[test]
+fn initializer_expansion_work_is_memoized_and_capped() {
+    // A chain that names its predecessor twice is exponential when each
+    // local is re-expanded (`a₁ ← a₀ + a₀`, …): the assert is on visited
+    // nodes, not on a timing. Memoized resolution walks each initializer
+    // once, so the whole program stays far below the bound.
+    let mut chain = String::from("sit i32 a0 ← k");
+    for index in 1..24 {
+        chain.push_str(&format!(
+            "\n sit i32 a{index} ← a{} + a{}",
+            index - 1,
+            index - 1
+        ));
+    }
+    let source = format!(
+        "incipit {{\n varia tensor<i32, [3]> lanes ← vacua\n varia tensor<i32, [64]> scratch ← vacua\n itera ex lanes apud [k] filum lane sit value {{\n {chain}\n scratch[[a23]] ← value\n }}\n }}"
+    );
+    super::filum_independence::work::take();
+    let result = analyze_source_la(&source);
+    let nodes = super::filum_independence::work::take();
+    assert!(result.success(), "{:?}", result.diagnostics);
+    assert!(
+        nodes < 10_000,
+        "initializer expansion visited {nodes} nodes; the memo or the cap regressed"
+    );
+}
+
+#[test]
 fn same_coordinate_read_write_accepted() {
     accepted(&body("grid[i] ← grid[i] + value"));
     accepted(&body("grid.ponde([i], grid.accipe([i]) + value)"));
