@@ -402,7 +402,6 @@ impl Emitter<'_> {
     /// each item is passed to the function pointer (with the hidden arena
     /// when the program allocates). `reduce`/`cumulate` carry the accumulator
     /// through the loop; `all`/`any` short-circuit.
-    #[expect(clippy::too_many_lines)]
     fn list_higher_order(
         &mut self,
         list: Operand,
