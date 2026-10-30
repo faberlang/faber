@@ -1615,7 +1615,7 @@ pub(super) fn rewrite_stmt(
                 data_member_targets,
                 namespaces,
                 diagnostics,
-            )
+            );
         }
         HirStatementKind::IncDec(inc_dec) => rewrite_expr(
             unit_path,
