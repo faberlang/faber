@@ -182,7 +182,9 @@ fn a_view_of_the_writable_argument_keeps_its_own_diagnostic() {
     // rule must not stack a second diagnostic on the same pair.
     let found = errors("    k_read_write(mut g, g.transpose())");
     assert!(
-        found.iter().any(|(_, issue)| issue == "tensor_view_read_only"),
+        found
+            .iter()
+            .any(|(_, issue)| issue == "tensor_view_read_only"),
         "{found:?}"
     );
     assert_lacks(
@@ -193,11 +195,11 @@ fn a_view_of_the_writable_argument_keeps_its_own_diagnostic() {
 
 #[test]
 fn a_view_in_the_writable_position_keeps_its_own_diagnostic() {
-    let found = errors(
-        "    let tf32[2, 2] v ← g.transpose()\n    k_read_write(mut v, fresh)",
-    );
+    let found = errors("    let tf32[2, 2] v ← g.transpose()\n    k_read_write(mut v, fresh)");
     assert!(
-        found.iter().any(|(_, issue)| issue == "tensor_view_read_only"),
+        found
+            .iter()
+            .any(|(_, issue)| issue == "tensor_view_read_only"),
         "{found:?}"
     );
 }
@@ -214,9 +216,7 @@ fn read_only_duplicates_stay_legal() {
 #[test]
 fn read_only_overlapping_views_stay_legal() {
     assert_accepts("    k_read_read(g.transpose(), g.transpose())");
-    assert_accepts(
-        "    let tf32[2, 2] v ← g.transpose()\n    k_read_read(v, g.transpose())",
-    );
+    assert_accepts("    let tf32[2, 2] v ← g.transpose()\n    k_read_read(v, g.transpose())");
 }
 
 #[test]

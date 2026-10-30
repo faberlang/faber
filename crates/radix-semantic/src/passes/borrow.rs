@@ -1110,9 +1110,7 @@ impl<'a> BorrowChecker<'a> {
             .with_arg("issue", ISSUE_KERNEL_ARGUMENT_OVERLAP)
             .with_arg("position", (position + 1).to_string())
             .with_arg("overlap", (overlap + 1).to_string());
-        if let Some(spelling) =
-            Self::root_def_id(arg).and_then(|root| self.def_spelling(root))
-        {
+        if let Some(spelling) = Self::root_def_id(arg).and_then(|root| self.def_spelling(root)) {
             error = error.with_arg("binding", spelling);
         }
         self.errors.push(error);
