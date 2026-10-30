@@ -746,10 +746,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "trap_member_type_mismatch" => {
             Some("check the member type flowing into the capta trap".to_owned())
         }
-        "trap_union_collapsed" => Some(
-            "make the success type and the error channel distinguishable, or handle the error with fac/cape instead"
-                .to_owned(),
-        ),
         "generic_type_arg_domain" => {
             Some("choose one of the allowed type arguments for this generic parameter".to_owned())
         }
