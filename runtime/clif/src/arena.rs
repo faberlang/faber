@@ -3,10 +3,9 @@
 //! `main` owns the root arena for the whole program (operator ruling, the
 //! hir-c C5 shape): the entry creates it before the incipit runs and releases
 //! it after, and every runtime symbol receives it as the hidden first
-//! argument — the generated incipit fetches it once from
-//! [`__faber_clif_v1_arena`] and passes it down, so the arena is reached
-//! through what `main` passes down, never through a global that functions
-//! switch. There is no configuration and no allocator selector. When the
+//! argument, and the entry shim passes it down from the root owner through
+//! `faber_clif_incipit`; the arena is reached through what `main` passes,
+//! never through a global that functions switch. There is no configuration and no allocator selector. When the
 //! later `arena` function regions arrive, a function passes a child arena
 //! pointer down instead of the root and nothing else changes.
 //!
@@ -17,11 +16,9 @@
 //! their addresses are stable for the program's life and the release is one
 //! sweep at exit.
 
+use radix_runtime_contract::trap::TrapKind;
 use std::alloc::{Layout, alloc, dealloc};
 use std::cell::UnsafeCell;
-use std::io::Write;
-
-use radix_runtime_contract::trap::{TrapKind, exit_status};
 
 /// One arena chunk: a fixed header followed by `capacity` bump bytes.
 struct Chunk {
@@ -47,8 +44,18 @@ fn out_of_memory() -> ! {
 /// One program-lifetime bump arena. `UnsafeCell` keeps the bump cursor behind
 /// a shared reference; Faber programs on this target are single-threaded
 /// (device steps are declined), so no locking is needed.
-pub(crate) struct Arena {
+pub struct Arena {
     current: UnsafeCell<*mut Chunk>,
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_ARENA: Arena = Arena::new();
+}
+
+#[cfg(test)]
+pub(crate) fn test_arena_ptr() -> *const Arena {
+    TEST_ARENA.with(std::ptr::from_ref)
 }
 
 impl Arena {
@@ -61,7 +68,10 @@ impl Arena {
     /// Bump-allocate `size` bytes at `align`; a new chunk when the current one
     /// cannot serve the request.
     pub(crate) fn alloc_raw(&self, size: usize, align: usize) -> *mut u8 {
-        debug_assert!(align.is_power_of_two(), "arena alignment must be a power of two");
+        debug_assert!(
+            align.is_power_of_two(),
+            "arena alignment must be a power of two"
+        );
         // SAFETY: single-threaded runtime; the cursor is only touched here.
         let current = unsafe { *self.current.get() };
         if let Some(found) = unsafe { bump(current, size, align) } {
@@ -101,6 +111,12 @@ impl Arena {
 
     /// Store one `Copy` slice and return its stable address as a fat pointer.
     pub(crate) fn put_slice<T: Copy>(&self, items: &[T]) -> *mut [T] {
+        if items.is_empty() {
+            return std::ptr::slice_from_raw_parts_mut(
+                std::ptr::NonNull::<T>::dangling().as_ptr(),
+                0,
+            );
+        }
         let bytes = size_of::<T>()
             .checked_mul(items.len())
             .unwrap_or_else(|| out_of_memory());
@@ -116,7 +132,7 @@ impl Drop for Arena {
         // SAFETY: single-threaded runtime; dropping walks the chunk chain and
         // releases each chunk with the layout it was allocated under.
         let mut chunk = unsafe { *self.current.get() };
-        while let Some(found) = (unsafe { chunk.as_mut() }) {
+        while let Some(found) = unsafe { chunk.as_mut() } {
             let previous = found.previous;
             let capacity = found.capacity;
             unsafe {
@@ -167,14 +183,14 @@ impl<T: Copy> ArenaBuf<T> {
     /// The empty buffer; the first push allocates.
     pub(crate) fn new() -> Self {
         Self {
-            items: std::ptr::without_provenance_mut(0),
+            items: std::ptr::NonNull::<T>::dangling().as_ptr(),
             length: 0,
             capacity: 0,
         }
     }
 
     /// A buffer of `count` copies of `value`.
-    pub(crate) fn filled(arena: &Arena, count: usize, value: T) -> Self {
+    pub(crate) fn filled(arena: *const Arena, count: usize, value: T) -> Self {
         let mut buffer = Self::with_capacity(arena, count);
         // SAFETY: `buffer.items` covers `count` initialized elements after the
         // fill.
@@ -188,7 +204,7 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// A buffer holding a copy of `items`, sized exactly.
-    pub(crate) fn from_slice(arena: &Arena, items: &[T]) -> Self {
+    pub(crate) fn from_slice(arena: *const Arena, items: &[T]) -> Self {
         let mut buffer = Self::with_capacity(arena, items.len());
         // SAFETY: `buffer.items` covers `items.len()` elements.
         unsafe {
@@ -199,14 +215,16 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// An uninitialized-capacity buffer; `length` is zero.
-    pub(crate) fn with_capacity(arena: &Arena, capacity: usize) -> Self {
+    pub(crate) fn with_capacity(arena: *const Arena, capacity: usize) -> Self {
         if capacity == 0 {
             return Self::new();
         }
         let bytes = size_of::<T>()
             .checked_mul(capacity)
             .unwrap_or_else(|| out_of_memory());
-        let items = arena.alloc_raw(bytes, align_of::<T>()).cast::<T>();
+        let items = arena_ref(arena)
+            .alloc_raw(bytes, align_of::<T>())
+            .cast::<T>();
         Self {
             items,
             length: 0,
@@ -250,7 +268,7 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// Append one element, growing by the C route's doubling (4 first).
-    pub(crate) fn push(&mut self, arena: &Arena, value: T) {
+    pub(crate) fn push(&mut self, arena: *const Arena, value: T) {
         if self.length == self.capacity {
             self.grow(arena);
         }
@@ -279,7 +297,7 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// Resize: shorter truncates, longer fills with `value`.
-    pub(crate) fn resize(&mut self, arena: &Arena, length: usize, value: T) {
+    pub(crate) fn resize(&mut self, arena: *const Arena, length: usize, value: T) {
         if length <= self.length {
             self.length = length;
             return;
@@ -297,21 +315,20 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// Append every element of `items`.
-    pub(crate) fn extend_from_slice(&mut self, arena: &Arena, items: &[T]) {
+    pub(crate) fn extend_from_slice(&mut self, arena: *const Arena, items: &[T]) {
         if items.is_empty() {
             return;
         }
-        let wanted = self.length.checked_add(items.len()).unwrap_or_else(|| out_of_memory());
+        let wanted = self
+            .length
+            .checked_add(items.len())
+            .unwrap_or_else(|| out_of_memory());
         if wanted > self.capacity {
             self.reserve_exact(arena, wanted);
         }
         // SAFETY: the buffer covers `wanted` elements after the reserve.
         unsafe {
-            std::ptr::copy_nonoverlapping(
-                items.as_ptr(),
-                self.items.add(self.length),
-                items.len(),
-            );
+            std::ptr::copy_nonoverlapping(items.as_ptr(), self.items.add(self.length), items.len());
         }
         self.length = wanted;
     }
@@ -322,7 +339,7 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// The next capacity: the C route's `faber_collection_next_capacity`.
-    fn grow(&mut self, arena: &Arena) {
+    fn grow(&mut self, arena: *const Arena) {
         let next = match self.capacity {
             0 => 4,
             capacity if capacity > usize::MAX / 2 => out_of_memory(),
@@ -332,7 +349,7 @@ impl<T: Copy> ArenaBuf<T> {
     }
 
     /// Move the elements into a fresh run of at least `capacity`.
-    fn reserve_exact(&mut self, arena: &Arena, capacity: usize) {
+    fn reserve_exact(&mut self, arena: *const Arena, capacity: usize) {
         let mut fresh = Self::with_capacity(arena, capacity);
         // SAFETY: both runs cover `length` live elements and do not alias.
         unsafe {
@@ -343,6 +360,75 @@ impl<T: Copy> ArenaBuf<T> {
     }
 }
 
-// Silence the unused-import lint when only one trap helper is reached.
-#[allow(unused_imports)]
-use std::io::Write as _;
+fn arena_ref(arena: *const Arena) -> &'static Arena {
+    // SAFETY: all arena pointers are supplied by the owning program entry and
+    // remain live until that entry returns.
+    unsafe { arena.as_ref() }.expect("clif runtime: null arena pointer")
+}
+
+/// Pointer-shaped counterpart of the arena's safe Rust methods for ABI
+/// entrypoints, whose hidden context travels as an opaque C pointer.
+pub(crate) trait ArenaPointer {
+    fn put<T>(self, value: T) -> *mut T;
+    fn put_slice<T: Copy>(self, value: &[T]) -> *mut [T];
+}
+
+impl ArenaPointer for *const Arena {
+    fn put<T>(self, value: T) -> *mut T {
+        arena_ref(self).put(value)
+    }
+
+    fn put_slice<T: Copy>(self, value: &[T]) -> *mut [T] {
+        arena_ref(self).put_slice(value)
+    }
+}
+
+impl<T: Copy + PartialEq> PartialEq for ArenaBuf<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl<T: Copy + PartialEq> PartialEq<Vec<T>> for ArenaBuf<T> {
+    fn eq(&self, other: &Vec<T>) -> bool {
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl<T: Copy + std::fmt::Debug> std::fmt::Debug for ArenaBuf<T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_slice().fmt(formatter)
+    }
+}
+
+impl<T: Copy> std::ops::Deref for ArenaBuf<T> {
+    type Target = [T];
+
+    fn deref(&self) -> &[T] {
+        self.as_slice()
+    }
+}
+
+impl<T: Copy> std::ops::DerefMut for ArenaBuf<T> {
+    fn deref_mut(&mut self) -> &mut [T] {
+        self.as_mut_slice()
+    }
+}
+
+impl<'a, T: Copy> IntoIterator for &'a ArenaBuf<T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
+impl<'a, T: Copy> IntoIterator for &'a mut ArenaBuf<T> {
+    type Item = &'a mut T;
+    type IntoIter = std::slice::IterMut<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_mut_slice().iter_mut()
+    }
+}

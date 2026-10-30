@@ -77,11 +77,15 @@ impl JitProgram {
     /// The program's `faber_clif_incipit`: installs the output words, runs the
     /// entry and returns the process exit status the entry hands back.
     #[must_use]
-    pub fn incipit(&self) -> unsafe extern "C" fn() -> i32 {
+    pub fn incipit(&self) -> unsafe extern "C" fn(*const std::ffi::c_void) -> i32 {
         let code = self.module.get_finalized_function(self.incipit);
         // SAFETY: `define_entry_shims` defines `faber_clif_incipit` as
-        // `() -> i32` with the host's C calling convention.
-        unsafe { std::mem::transmute::<*const u8, unsafe extern "C" fn() -> i32>(code) }
+        // `(arena pointer) -> i32` with the host's C calling convention.
+        unsafe {
+            std::mem::transmute::<*const u8, unsafe extern "C" fn(*const std::ffi::c_void) -> i32>(
+                code,
+            )
+        }
     }
 }
 
