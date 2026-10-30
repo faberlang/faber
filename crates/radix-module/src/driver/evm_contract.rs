@@ -178,3 +178,7 @@ pub(super) fn backend_error(error: radix_mir_evm::EvmError) -> codegen::CodegenE
         ],
     }
 }
+
+#[cfg(test)]
+#[path = "evm_contract_test.rs"]
+mod tests;
