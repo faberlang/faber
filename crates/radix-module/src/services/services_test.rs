@@ -2602,6 +2602,8 @@ fn evm_leaf_refusal_keeps_structured_reason_and_shape() {
             .args
             .iter()
             .any(|arg| arg.name == "target" && arg.value == "evm")
+    );
+}
 
 // ── single-file check/verify resolve frontmatter locales through the config ──
 //
