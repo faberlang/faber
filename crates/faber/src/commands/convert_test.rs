@@ -36,6 +36,8 @@ fn convert_reports_filewise_failure_for_multi_file_kernel_package() {
     assert!(!conversion.status.success());
     let stderr = String::from_utf8_lossy(&conversion.stderr);
     assert!(
+        // ALLOW_DIAGNOSTIC_RENDER_TEXT: tool output rendered diagnostic contract
+        // (`faber convert` has no structured diagnostics; this pins the code:issue).
         stderr.contains("SEM057:call_marker_on_read_only"),
         "file-at-a-time analysis loses the imported kernel call contract:\n{stderr}"
     );
