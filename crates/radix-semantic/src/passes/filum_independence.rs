@@ -146,12 +146,7 @@ impl Aliases {
             .bindings
             .iter()
             .filter(|local| !local.mutable && !local.is_await && !local.runtime_provided)
-            .filter_map(|local| {
-                local
-                    .init
-                    .clone()
-                    .map(|init| (local.def_id, init))
-            })
+            .filter_map(|local| local.init.clone().map(|init| (local.def_id, init)))
             .collect();
         let mut result = Self {
             bindings: declarations.bindings,
@@ -808,10 +803,12 @@ fn coordinate_at(aliases: &Aliases, expr: &HirExpression, depth: usize) -> Optio
             implicit: Some(_),
             ..
         } => coordinate_at(aliases, source, depth),
-        HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => coordinate_at(aliases, lhs, depth)?
-            .plus(&coordinate_at(aliases, rhs, depth)?),
-        HirExpressionKind::Binary(HirBinOp::Sub, lhs, rhs) => coordinate_at(aliases, lhs, depth)?
-            .minus(&coordinate_at(aliases, rhs, depth)?),
+        HirExpressionKind::Binary(HirBinOp::Add, lhs, rhs) => {
+            coordinate_at(aliases, lhs, depth)?.plus(&coordinate_at(aliases, rhs, depth)?)
+        }
+        HirExpressionKind::Binary(HirBinOp::Sub, lhs, rhs) => {
+            coordinate_at(aliases, lhs, depth)?.minus(&coordinate_at(aliases, rhs, depth)?)
+        }
         HirExpressionKind::Binary(HirBinOp::Mul, lhs, rhs) => {
             let lhs = coordinate_at(aliases, lhs, depth)?;
             let rhs = coordinate_at(aliases, rhs, depth)?;
@@ -1487,17 +1484,15 @@ fn prove(
             // keeps the composed-coordinate proof, as do nests and
             // multidimensional lane domains, where the leading coordinate
             // alone may not distinguish every concurrent lane.
-            let lane_variable = access
-                .composed
-                .first()
-                .and_then(Coordinate::plain_variable);
+            let lane_variable = access.composed.first().and_then(Coordinate::plain_variable);
             let leading_lane_coordinate = access.depth == 1
                 && access.composed.len() == 1
                 && physical.as_ref().and_then(|coords| coords.first()) == access.composed.first()
                 && physical.as_ref().is_some_and(|coords| {
-                    coords.iter().skip(1).all(|coord| {
-                        lane_variable.is_none_or(|lane| !coord.names(lane))
-                    })
+                    coords
+                        .iter()
+                        .skip(1)
+                        .all(|coord| lane_variable.is_none_or(|lane| !coord.names(lane)))
                 });
             // The same one-coordinate lane loop may keep that row flattened
             // into one dimension: the leading storage coordinate is then
