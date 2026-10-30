@@ -225,15 +225,15 @@ pub use types::{
     FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
     INTERVALLUM_BOUND_MSG, ISSUE_ASSIGN_THROUGH_REF, ISSUE_ASSIGN_TO_DE_PARAMETER,
     ISSUE_CALL_MARKER_MISMATCH, ISSUE_CALL_MARKER_MISSING, ISSUE_CALL_MARKER_ON_READ_ONLY,
-    ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN, ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN,
-    ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF, ISSUE_PROJECTION_INTO_OWN,
-    ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_SCALAR_ACCESS_MARKER,
-    ISSUE_SHARED_INTO_OWN, ISSUE_SIZE_MARKER_REQUIRED, ISSUE_SIZE_MARKER_UNEXPECTED,
-    ISSUE_UNMARKED_INTO_OWN, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
-    ResolvedGenericBinding, ResolvedGenericCall, SUGGESTION_COPY, SchemaColumnDef, SchemaDef,
-    SemanticGenericParamDefault, SemanticMutability, SemanticParamMode, TensorFamilyKind,
-    TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable, TypeTableSnapshot,
-    access_marker_from_type_mode, collection_type_specs, is_atomic_element_type,
+    ISSUE_COPY_NONDUPLICABLE_MEMBER, ISSUE_DEREF_INTO_OWN, ISSUE_FIELD_INTO_OWN,
+    ISSUE_INDEX_INTO_OWN, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
+    ISSUE_PROJECTION_INTO_OWN, ISSUE_REF_INTO_OWN, ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+    ISSUE_SCALAR_ACCESS_MARKER, ISSUE_SHARED_INTO_OWN, ISSUE_SIZE_MARKER_REQUIRED,
+    ISSUE_SIZE_MARKER_UNEXPECTED, ISSUE_UNMARKED_INTO_OWN, InferVar, MarkerFamily, ParamType,
+    Primitive, PrimitiveTypeSpec, ResolvedGenericBinding, ResolvedGenericCall, SUGGESTION_COPY,
+    SchemaColumnDef, SchemaDef, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint, TypeTable,
+    TypeTableSnapshot, access_marker_from_type_mode, collection_type_specs, is_atomic_element_type,
     is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
     lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
@@ -807,11 +807,21 @@ pub fn analyze_with_cli(
 
     // BRI-2: construct the sole typed-HIR fact table only after both AIR
     // passes, hand the same borrowed table to region inference, then carry it
-    // forward for the analyzed-application snapshot. Unsupported HIR shapes
-    // leave region facts unavailable rather than receiving an approximation.
+    // forward for the analyzed-application snapshot. An engine gap fails
+    // closed: the shape gets the named SEM008 `region_facts_not_built`
+    // diagnostic and region facts stay absent — the block-scope approximation
+    // is never used silently where region facts decide soundness.
     let access_facts = analyze_access_facts_with_types(&hir, &types);
     let region_facts =
-        passes::borrow_region::analyze_with_interner(&hir, &types, &access_facts, interner).ok();
+        match passes::borrow_region::analyze_with_interner(&hir, &types, &access_facts, interner) {
+            Ok(facts) => Some(facts),
+            Err(error) => {
+                if let Some(diagnostic) = passes::borrow_region::fail_closed_diagnostic(&error) {
+                    diagnostics.push(diagnostic);
+                }
+                None
+            }
+        };
 
     diagnostics
         .extend(passes::fragment_definition::check(&hir, &resolver, &types, interner).errors);

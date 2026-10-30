@@ -23,7 +23,7 @@ locale = "en"
 #     slots len..N with a real fill value — the default fill is the numeric
 #     zero of T; a `⊥` default names a different fill (element-typed)
 #   • the fill is a real value written at the conversion site, never a read of
-#     the carrier's uninitialized spare slots
+#     the carrier's spare slots
 #   • flattening the padded tensor shows the three live values followed by five
 #     fill values, with no mask
 #   • iterating the padded tensor is a plain Route T unroll (N lanes, budget 64)
@@ -41,7 +41,7 @@ main {
     let list<float> l ← [1.0, 2.0, 3.0]
 
     # Capacity padding into the bounded carrier: slots 3..8 take the zero fill.
-    let list<float, size 8> xs ← l ↦ list<float, size 8>
+    mut list<float, size 8> xs ← l ↦ list<float, size 8>
 
     # Zero-fill snapshot: 3 live values followed by 5 numeric zeros.
     let tensor<float, [8]> t ← xs ↦ tensor<float, [8]>
@@ -50,4 +50,16 @@ main {
     # A ⊥ default names a different dead-slot fill (element-typed).
     let tensor<float, [8]> u ← xs ↦ tensor<float, [8]> ⊥ 1.0
     print u.flatten()
+
+    # Length-reducing operations leave only the live prefix in the sanctioned
+    # capacity-sized snapshot; the remaining lanes take the conversion's zero fill.
+    let float ∪ none first ← xs.remove_first()
+    print first
+    let tensor<float, [8]> afterFirst ← xs ↦ tensor<float, [8]>
+    print afterFirst.flatten()
+
+    let float ∪ none last ← xs.remove_last()
+    print last
+    let tensor<float, [8]> afterLast ← xs ↦ tensor<float, [8]>
+    print afterLast.flatten()
 }

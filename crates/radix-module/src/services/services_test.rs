@@ -2602,5 +2602,106 @@ fn evm_leaf_refusal_keeps_structured_reason_and_shape() {
             .args
             .iter()
             .any(|arg| arg.name == "target" && arg.value == "evm")
+
+// ── single-file check/verify resolve frontmatter locales through the config ──
+//
+// `faber check` / `lex` / `parse` / `hir` / `cli-ir` / `verify` resolved a
+// declared `+++ locale = "…" +++` through a default config's discovered
+// workspace root only. The `_with_config` services take the
+// caller's root/loader, and declaration detection no longer depends on the
+// declared pack being loadable.
+
+fn loader_only_config() -> crate::driver::Config {
+    let en =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en")).expect("en pack");
+    let la =
+        crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la")).expect("la pack");
+    let mut config = crate::driver::Config::default();
+    config.locale_root = None;
+    config.with_locale_pack_loader(crate::driver::LocalePackLoader::new(move |locale_id| match locale_id {
+        "en" => Ok(en.clone()),
+        "la" => Ok(la.clone()),
+        other => Err(format!("no pack for locale '{other}'")),
+    }))
+}
+
+#[test]
+fn check_resolves_frontmatter_locale_through_config_loader() {
+    let source = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio salve() { }\n";
+    let result = crate::services::check_diagnostics_for_source_with_config(
+        "la.fab",
+        source,
+        false,
+        None,
+        None,
+        &loader_only_config(),
+    );
+    assert!(
+        result.success,
+        "a Latin frontmatter file must check with no workspace root: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn check_fails_closed_on_unresolvable_frontmatter_locale() {
+    let source = "+++\nlocale = \"zh-Hant\"\n+++\n@ publica\nfunctio salve() { }\n";
+    let result = crate::services::check_diagnostics_for_source_with_config(
+        "la.fab",
+        source,
+        false,
+        None,
+        None,
+        &loader_only_config(),
+    );
+    assert!(!result.success, "an unloadable declared locale must fail the check");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003") && d.issue() == Some("load_failed")),
+        "expected LOCALE003 load_failed, got {:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn source_declares_locale_is_independent_of_pack_loadability() {
+    // Declaration is a frontmatter fact: an unloadable locale id still
+    // declares, and only the absence of the key does not.
+    assert!(crate::services::source_declares_locale(
+        "a.fab",
+        "+++\nlocale = \"no-such-locale\"\n+++\nmain { }\n"
+    ));
+    assert!(crate::services::source_declares_locale(
+        "a.fab",
+        "+++\nlocale = 7\n+++\nmain { }\n"
+    ));
+    assert!(!crate::services::source_declares_locale("a.fab", "main { }\n"));
+    assert!(!crate::services::source_declares_locale(
+        "a.fab",
+        "+++\nother = \"la\"\n+++\nmain { }\n"
+    ));
+}
+
+#[test]
+fn verify_resolves_frontmatter_locale_through_config_loader() {
+    let source = "+++\nlocale = \"la\"\n+++\n@ publica\nfunctio salve() { }\n";
+    let result = crate::services::verify_source_with_config("la.fab", source, None, &loader_only_config());
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("PARSE001") || d.code == Some("LOCALE003")),
+        "verify must read the Latin source under its declared locale: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
     );
 }

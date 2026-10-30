@@ -572,9 +572,7 @@ impl FunctionBuilder<'_> {
         bounds_error: &'static str,
         coordinate_error: &'static str,
     ) -> Option<Vec<u8>> {
-        let step = step
-            .map(radix_semantic::passes::const_int_value)
-            .unwrap_or(Some(1));
+        let step = step.map_or(Some(1), radix_semantic::passes::const_int_value);
         let (Some(start), Some(end), Some(step)) = (
             radix_semantic::passes::const_int_value(start),
             radix_semantic::passes::const_int_value(end),

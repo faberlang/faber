@@ -405,6 +405,7 @@ impl<'a> BodyProof<'a> {
             interner,
             loops: Vec::new(),
             stack: Vec::new(),
+            range_stack: Vec::new(),
             frames: Vec::new(),
             accesses: Vec::new(),
             errors: Vec::new(),
@@ -587,7 +588,8 @@ impl<'a> BodyProof<'a> {
             if param_root(param, self.types, ParamRoots::PerParam, &mut shared).is_some() {
                 roots.insert(param.def_id, self.facts_of(&arg.expr));
             }
-            let coord = coordinate(&arg.expr).and_then(|coord| self.map_coords(vec![coord])?.pop());
+            let coord = coordinate(self.current(), &arg.expr)
+                .and_then(|coord| self.map_coords(vec![coord])?.pop());
             coords.insert(param.def_id, coord);
         }
         if let (Some(model), Some(receiver)) = (&helper.receiver, receiver) {
@@ -655,20 +657,17 @@ impl<'a> BodyProof<'a> {
     }
 }
 
-/// `scale * parameter + offset` with the parameter replaced by its argument.
+/// Each coordinate with its frame parameters replaced by the argument's
+/// coordinate: `c · p + rest` becomes `c · (argument) + rest`, folding
+/// constants into the offset. A parameter whose argument is not a provable
+/// address declines.
 fn substitute(frame: &Frame<'_>, coord: Coordinate) -> Option<Coordinate> {
-    let Some(parameter) = coord.variable else {
-        return Some(coord);
-    };
-    let argument = frame.coords.get(&parameter)?.as_ref()?;
-    Some(Coordinate {
-        variable: argument.variable,
-        scale: coord.scale.checked_mul(argument.scale)?,
-        offset: coord
-            .scale
-            .checked_mul(argument.offset)?
-            .checked_add(coord.offset)?,
-    })
+    let mut result = Coordinate::constant(coord.offset);
+    for (variable, coefficient) in coord.terms {
+        let argument = frame.coords.get(&variable)?.as_ref()?;
+        result = result.plus(&argument.clone().scaled(coefficient)?)?;
+    }
+    Some(result)
 }
 
 // ---------------------------------------------------------------------------

@@ -646,3 +646,238 @@ mod born_typed {
         assert_eq!(copy.borrow().data.kind(), Some(DenseKind::U8));
     }
 }
+
+// --- Deferred zeros (fresh kernel-output host twins) ---
+
+/// The zero element of a dense kind, as a deferred twin reads it.
+fn zero_of(kind: DenseKind) -> Value {
+    match kind {
+        DenseKind::F32 | DenseKind::F64 => Value::Float(0.0),
+        DenseKind::I32 | DenseKind::I64 | DenseKind::U8 | DenseKind::U32 => Value::Int(0),
+        DenseKind::U64 => Value::UInt(0),
+        DenseKind::Bool => Value::Bool(false),
+    }
+}
+
+/// A one-field genus row layout (one i32, 4 bytes a row). Returns the layout
+/// and the interned field name.
+fn one_i32_row_layout() -> (
+    std::sync::Arc<crate::dense::RecordLayout>,
+    radix_lexer::Symbol,
+) {
+    const DEF: radix_hir::DefId = radix_hir::DefId(7);
+    let mut types = radix_types::TypeTable::new();
+    let genus = types.intern(radix_types::Type::Struct(DEF));
+    let row_ty = types.sized_numeric(
+        radix_types::Primitive::Numerus,
+        radix_types::NumericWidth::I32,
+    );
+    let mut interner = radix_lexer::Interner::new();
+    let name = interner.intern("n");
+    let mut ctx = radix_mir::MirValidationContext::new(&types);
+    ctx.struct_fields.insert(
+        DEF,
+        [(name, radix_mir::MirType::semantic(row_ty))]
+            .into_iter()
+            .collect(),
+    );
+    ctx.struct_field_order.insert(DEF, vec![name]);
+    let layout = crate::dense::RecordLayout::resolve(genus, &ctx)
+        .map(std::sync::Arc::new)
+        .expect("fixed record layout");
+    (layout, name)
+}
+
+#[test]
+fn deferred_zeros_read_as_zeros_without_materializing() {
+    for kind in ALL_KINDS {
+        let cell = DenseCell::new(DenseStorage::fresh_zeros(kind, 3));
+        assert_eq!(cell.len(), 3, "{kind:?}");
+        assert_eq!(cell.kind(), Some(kind), "{kind:?}");
+        assert_eq!(cell.backing_bytes(), 0, "{kind:?} holds no array yet");
+        assert!(!cell.is_empty(), "{kind:?}");
+        for index in 0..3 {
+            assert_eq!(cell.get(index), Some(zero_of(kind)), "{kind:?} [{index}]");
+        }
+        assert_eq!(cell.get(3), None, "{kind:?} out of bounds");
+        let zeros = cell.as_le_bytes(0..3).expect("deferred byte view");
+        assert!(zeros.iter().all(|byte| *byte == 0), "{kind:?} zero bytes");
+        assert_eq!(zeros.len(), 3 * kind.width(), "{kind:?}");
+        assert_eq!(
+            cell.values_prefix(2),
+            vec![zero_of(kind), zero_of(kind)],
+            "{kind:?} prefix"
+        );
+        assert_eq!(
+            cell.backing_bytes(),
+            0,
+            "{kind:?} reads materialize nothing"
+        );
+        // A refused (out-of-bounds) store still takes the write path, which
+        // materializes; it changes no element.
+        assert!(!cell.set(3, &sample(kind)), "{kind:?} out of bounds");
+        assert_eq!(cell.get(0), Some(zero_of(kind)), "{kind:?} unchanged");
+    }
+    // The empty deferred twin (an empty scan's output) stays trivially empty.
+    let empty = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 0));
+    assert!(empty.is_empty());
+    assert_eq!(empty.backing_bytes(), 0);
+}
+
+#[test]
+fn deferred_vector_zeros_keep_each_elements_lanes_independent() {
+    use std::mem::size_of;
+    use std::rc::Rc;
+
+    let cell = DenseCell::new(DenseStorage::fresh_zeros_vector(DenseKind::F32, 2, 3));
+    assert_eq!(cell.len(), 3);
+    assert_eq!(cell.kind(), None);
+    assert_eq!(cell.backing_bytes(), 0, "no outer or lane arrays yet");
+
+    let Value::Vector(first) = cell.get(0).expect("first zero vector") else {
+        panic!("expected vector")
+    };
+    let Value::Vector(second) = cell.get(1).expect("second zero vector") else {
+        panic!("expected vector")
+    };
+    assert!(
+        !Rc::ptr_eq(&first, &second),
+        "elements have independent lanes"
+    );
+    first.borrow_mut()[0] = Value::Float(9.0);
+    assert_eq!(
+        cell.get(0),
+        Some(Value::Vector(Rc::new(std::cell::RefCell::new(vec![
+            Value::Float(0.0),
+            Value::Float(0.0),
+        ])))),
+        "a synthesized value does not mutate deferred storage"
+    );
+    assert_eq!(cell.backing_bytes(), 0, "reads stay deferred");
+
+    let written = Value::Vector(Rc::new(std::cell::RefCell::new(vec![
+        Value::Float(4.0),
+        Value::Float(5.0),
+    ])));
+    assert!(
+        cell.set(0, &written),
+        "first write materializes vector zeros"
+    );
+    assert_eq!(
+        cell.backing_bytes(),
+        3 * (1 + 2) * size_of::<Value>(),
+        "outer and per-element lane arrays are counted"
+    );
+    let Value::Vector(unread) = cell.get(1).expect("unread neighbor") else {
+        panic!("expected vector")
+    };
+    let Value::Vector(other) = cell.get(2).expect("second unread neighbor") else {
+        panic!("expected vector")
+    };
+    assert!(
+        !Rc::ptr_eq(&unread, &other),
+        "materialized lanes are independent"
+    );
+    unread.borrow_mut()[0] = Value::Float(7.0);
+    let Value::Vector(untouched) = cell.get(2).expect("untouched neighbor") else {
+        panic!("expected vector")
+    };
+    assert_eq!(
+        *untouched.borrow(),
+        vec![Value::Float(0.0), Value::Float(0.0)]
+    );
+}
+
+#[test]
+fn deferred_zeros_materialize_on_the_first_write() {
+    let cell = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 4));
+    assert!(cell.set(1, &Value::Float(7.5)), "store into deferred zeros");
+    assert_eq!(
+        cell.backing_bytes(),
+        4 * std::mem::size_of::<f32>(),
+        "array materialized"
+    );
+    assert_eq!(cell.get(1), Some(Value::Float(7.5)));
+    assert_eq!(cell.get(0), Some(Value::Float(0.0)), "the rest is zeros");
+    // A second write lands in the materialized array and grows nothing.
+    assert!(cell.set(2, &Value::Float(-1.0)));
+    assert_eq!(cell.backing_bytes(), 4 * std::mem::size_of::<f32>());
+
+    // The byte-write path (a device download landing its read) materializes too.
+    let cell = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::U8, 4));
+    assert!(cell.write_le_bytes(2..4, &[9, 200]));
+    assert_eq!(cell.backing_bytes(), 4);
+    assert_eq!(cell.get(2), Some(Value::Int(9)));
+    assert_eq!(cell.get(3), Some(Value::Int(200)));
+    assert_eq!(cell.get(0), Some(Value::Int(0)));
+    // A bad byte write materializes (the store needs an array to refuse into)
+    // but changes nothing.
+    let cell = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::Bool, 2));
+    assert!(!cell.write_le_bytes(0..2, &[0, 2]), "2 is not a bool byte");
+    assert_eq!(cell.get(1), Some(Value::Bool(false)));
+}
+
+#[test]
+fn deferred_zeros_clone_stays_deferred_and_the_typed_slice_materializes() {
+    let cell = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::I32, 3));
+    let copy = cell.clone_storage();
+    assert_eq!(copy.backing_bytes(), 0, "a deferred copy defers too");
+    assert_eq!(copy.get(1), Some(Value::Int(0)));
+    let cell = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::I32, 3));
+    let seen = cell.with_slice::<i32, _>(|items| items.to_vec());
+    assert_eq!(seen, Some(vec![0, 0, 0]), "a slice view needs real bytes");
+    assert_eq!(cell.backing_bytes(), 3 * std::mem::size_of::<i32>());
+}
+
+#[test]
+fn deferred_zeros_compare_equal_to_their_zeros_by_content() {
+    let fresh = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 2));
+    let zeros = DenseCell::zeros(DenseKind::F32, 2);
+    assert_eq!(fresh, zeros, "a deferred twin is its zeros");
+    let written = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 2));
+    assert!(written.set(0, &Value::Float(1.0)));
+    assert_ne!(written, zeros, "a stored element breaks the equality");
+    let other = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F64, 2));
+    assert_ne!(fresh, other, "kind is part of the deferral");
+    let fresh = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 2));
+    let twin = DenseCell::new(DenseStorage::fresh_zeros(DenseKind::F32, 2));
+    assert_eq!(fresh, twin, "two untouched twins are equal");
+}
+
+#[test]
+fn deferred_record_zeros_read_and_materialize_like_record_zeros() {
+    let (layout, name) = one_i32_row_layout();
+    assert_eq!(layout.size(), 4);
+    let fresh = DenseCell::new(DenseStorage::fresh_zeros_record(
+        std::sync::Arc::clone(&layout),
+        3,
+    ));
+    assert_eq!(fresh.len(), 3);
+    assert_eq!(fresh.record_size(), Some(4));
+    assert_eq!(fresh.kind(), None, "a record row is not one scalar kind");
+    assert_eq!(fresh.backing_bytes(), 0, "no row bytes yet");
+    let rows = fresh.as_le_bytes(0..3).expect("deferred row bytes");
+    assert_eq!(rows.len(), 12);
+    assert!(rows.iter().all(|byte| *byte == 0));
+    assert_eq!(fresh.backing_bytes(), 0, "row reads materialize nothing");
+    // A row stores as its genus struct value (the record layout encodes it).
+    let mut fields = handroll::FxHashMap::default();
+    fields.insert(name, Value::Int(-2));
+    let row = Value::Struct(
+        radix_hir::DefId(7),
+        std::rc::Rc::new(std::cell::RefCell::new(fields)),
+    );
+    assert!(fresh.set(1, &row), "store into row 1");
+    assert_eq!(fresh.backing_bytes(), 12, "rows materialized");
+    assert_eq!(
+        fresh.as_le_bytes(1..2).as_deref(),
+        Some(&(-2_i32).to_le_bytes()[..]),
+        "the stored row encodes little-endian"
+    );
+    let zeros = DenseCell::new(DenseStorage::zeros_record(
+        std::sync::Arc::clone(&layout),
+        3,
+    ));
+    let fresh = DenseCell::new(DenseStorage::fresh_zeros_record(layout, 3));
+    assert_eq!(fresh, zeros, "deferred record zeros equal record zeros");
+}

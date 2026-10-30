@@ -47,6 +47,7 @@ functio gemv<magnitudo N, magnitudo K>(
     de tensor<f32, [N, K]> w,
     de tensor<f32, [K]> x,
     varia tensor<f32, [N]> out,
+    varia tensor<f32, [N, K]> scratch,
     varia tensor<f32, [K]> tmp,
     varia tensor<i32, [N]> lens,
     i32 n
@@ -137,6 +138,61 @@ fn iteration_local_scratch_inside_the_range_accepted() {
             acc ← acc + term
         }
         out[[i]] ← acc",
+    ));
+}
+
+#[test]
+fn lane_owned_scratch_row_with_inner_range_accepted() {
+    accepted(&kernel(
+        "itera ab 0‥n sit j {
+            scratch[[i, j]] ← w[[i, j]]
+        }",
+    ));
+}
+
+#[test]
+fn scratch_write_with_non_lane_leading_coordinate_rejected() {
+    rejected(
+        &kernel(
+            "itera ab 0‥n sit j {
+                scratch[[j, 0]] ← w[[i, j]]
+            }",
+        ),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn owned_row_may_not_reuse_the_lane_coordinate_inside() {
+    // The lane's own coordinate owns the row only when it appears once:
+    // reusing it in an inner slot is not row ownership.
+    rejected(
+        &kernel(
+            "itera ab 0‥n sit j {
+                scratch[[i, i]] ← w[[i, j]]
+            }",
+        ),
+        "write_not_own_coordinate",
+    );
+    rejected(
+        &kernel(
+            "itera ab 0‥n sit j {
+                scratch[[i, i + 1]] ← w[[i, j]]
+            }",
+        ),
+        "write_not_own_coordinate",
+    );
+}
+
+#[test]
+fn owned_row_inner_coordinates_may_be_anything() {
+    // Inner coordinates only pick cells inside the lane's own row: a
+    // lane-local def names a cell as well as a loop binder does.
+    accepted(&kernel(
+        "itera ab 0‥n sit j {
+            sit numerus q ← j + 1
+            scratch[[i, q]] ← w[[i, j]]
+        }",
     ));
 }
 

@@ -1869,6 +1869,10 @@ help = "condiciones, limites et argumenta scalaria ad valores ante regionem noto
 message = "nucleum fractum saturatum nondum adhibere potest ({site}); nucleorum structio fractorum saturatorum nondum efficitur"
 help = "in nucleo latitudinem fractionis nudam adhibe et ad limitem hospitis per `↦` muta"
 
+[diagnostics.SEM008.issues.region_facts_not_built]
+message = "regionum mutuandi facta de '{construct}' nondum efficiuntur; censor mutuandi claudit potius quam adpropinquat"
+help = "haec forma ad suas decisiones mutuandi regionum inference indiget; nuntia ut machina regionum eam complectatur"
+
 [diagnostics.SEM008.issues.nucleum_typed_error_channel]
 message = "nucleum '{kernel}' canalem erroris typatum declarat; nucleum solum errorem textus declarare potest"
 help = "`⇥ text` declara (nuntius constans pro quovis loco defectus) et hospes lanciens eum ad suum genus erroris vertat"
@@ -4393,6 +4397,10 @@ help = "call materialize() to create an owned tensor before storing, returning, 
 message = "a borrowed tensor view is read-only and aliases its base"
 help = "pass the view as de, or call materialize() before using it as mut or own"
 
+[diagnostics.SEM057.issues.kernel_argument_overlap]
+message = "kernel argument {position}{?binding| (`|`)} is writable and shares storage with argument {overlap}"
+help = "a kernel writes its `{in}` and `{own}` arguments while every argument stays live for the whole launch, so pass disjoint tensors, or bind an independent copy with `← {copy}` / `materialize()` first"
+
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
 help = "pass a `mut` or `own` value, or bind through `copy`"
@@ -4884,6 +4892,14 @@ help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, au
 [diagnostics.SEM065.issues.const_shared_into_var]
 message = "`{name}` communicaret `{binding}`, valorem legendi tantum, ut nomen scribile (`{fixum}` est profundum)"
 help = "scribe `{varia} {name} ← {copy} {binding}` pro valore independente, aut `{varia} {name} ← {own} {binding}` ut eum suscipias"
+
+[diagnostics.SEM066]
+message = "`copy` recusatur: {head} duplicari non potest{?path| — semita membrorum est `|`}"
+help = "{head} res cum identitate est: valorem sine `{copy}` communicato, aut rem cum `{own}` suscipe ubi accipiens eam possidere potest"
+
+[diagnostics.SEM066.issues.copy_nonduplicable_member]
+message = "`copy` recusatur: {head} duplicari non potest{?path| — semita membrorum est `|`}"
+help = "{head} res cum identitate est: valorem sine `{copy}` communicato, aut rem cum `{own}` suscipe ubi accipiens eam possidere potest"
 
 [diagnostics.WARN001]
 message = "unused variable"

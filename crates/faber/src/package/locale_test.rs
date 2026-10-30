@@ -1,7 +1,7 @@
 use super::*;
 use radix::module::diagnostics::DiagnosticArg;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -84,6 +84,84 @@ fn direct_default_config_uses_english_pack() {
             .as_ref()
             .map(|pack| pack.metadata.id.as_str()),
         Some("en")
+    );
+}
+
+#[test]
+fn single_file_build_cli_locale_overrides_frontmatter_code_locale() {
+    let root = temp_dir("faber-single-file-build-locale");
+    let entry = root.join("main.fab");
+    fs::write(&entry, "+++\nlocale = \"en\"\n+++\nmain {}\n").expect("source");
+
+    // HirGo uses the single-file compiler lane for .fab inputs. Its build
+    // config must nevertheless make an explicit --locale authoritative over
+    // the source's frontmatter locale.
+    assert!(!super::super::cmd::use_package_compiler(
+        Target::HirGo,
+        &entry,
+        false
+    ));
+    let (config, diagnostic_pack) =
+        single_file_build_config_with_locale(Target::HirGo, &entry, Some("la"), Some("th-TH"))
+            .expect("single-file locale config");
+    let code_pack = config.locale_pack.expect("code pack");
+    assert_eq!(code_pack.metadata.id, "la");
+    assert!(config.locale_pack_explicit);
+    assert_eq!(
+        diagnostic_pack.expect("diagnostic pack").metadata.id,
+        "th-TH"
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn diagnostics_locale_alone_preserves_single_file_code_locale() {
+    let (root, entry) = temp_package_entry();
+    let manifest_path = root.join("faber.toml");
+    let manifest = fs::read_to_string(&manifest_path)
+        .expect("manifest")
+        .replace("[build]", "[locale]\nlocale = \"la\"\n\n[build]");
+    fs::write(manifest_path, manifest).expect("localized manifest");
+
+    let (config, diagnostic_pack) =
+        single_file_build_config_with_locale(Target::HirGo, &entry, None, Some("th-TH"))
+            .expect("diagnostics-only single-file locale config");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    assert!(!config.locale_pack_explicit);
+    assert_eq!(
+        diagnostic_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("th-TH")
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn single_file_stdin_diagnostics_locale_uses_embedded_pack() {
+    let (config, diagnostic_pack) =
+        single_file_build_config_with_locale(Target::HirGo, Path::new("-"), None, Some("th-TH"))
+            .expect("stdin diagnostics locale config");
+    assert_eq!(
+        config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    assert_eq!(
+        diagnostic_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("th-TH")
     );
 }
 
@@ -246,4 +324,126 @@ pack = "./locale/custom.toml"
     );
 
     let _ = fs::remove_dir_all(root);
+}
+
+/// `faber build -t llvm-text` on a single `.fab` file compiles through
+/// `radix::module::Compiler::compile` (the command's non-package lane) and
+/// must honour the file's `+++ locale = "…" +++` frontmatter with no workspace
+/// language-pack root beside the binary — the installed-binary condition. The
+/// published 1.17.0 lost the declared locale there, read the source with the
+/// English pack, and failed with `PARSE001 item_list_missing_separator`; the
+/// product config's embedded reader packs are the frontmatter locale's source
+/// when no root is discovered.
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn llvm_text_single_file_build_honours_frontmatter_locale_without_pack_root() {
+    let dir = temp_dir("faber-llvm-text-locale");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        "+++\nlocale = \"la\"\n+++\n\n@ publica\nfunctio identitas(bivalens valor) → bivalens {\n    redde valor\n}\n",
+    )
+    .expect("source");
+
+    let mut config = default_config_with_locale(Target::MirLlvm).expect("product config");
+    // An installed binary discovers no workspace `locale/` tree; only the
+    // embedded reader packs remain as the frontmatter locale's source.
+    config.locale_root = None;
+
+    let result = radix::module::Compiler::new(config).compile(&entry);
+
+    assert!(
+        result.success(),
+        "frontmatter Latin must reach the llvm-text parse, diagnostics: {:?}",
+        result.diagnostics
+    );
+    let Some(radix::module::Output::LlvmText(output)) = result.output else {
+        panic!("llvm-text output missing");
+    };
+    assert!(
+        output.code.contains("identitas"),
+        "emitted IR must name the Latin function"
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+/// The same build path must resolve the frontmatter locale through the
+/// session's own language-pack root. The program layer used to re-discover
+/// the workspace root instead of the configured one, so a root the caller
+/// planted (the documented custom-layout override) never reached the parse:
+/// the source fell back to the English session pack and failed with
+/// `PARSE001 item_list_missing_separator` — the same lost-locale failure the
+/// installed binary shows for the embedded packs.
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn llvm_text_single_file_build_resolves_frontmatter_locale_through_session_root() {
+    let dir = temp_dir("faber-llvm-text-locale-root");
+    // Plant a root serving an id the workspace tree does not have: the Latin
+    // pack re-identified as `test-la` (with its exemplar tree, which
+    // `from_toml_path` validates relative to the pack file), so only the
+    // session's configured root can read the source below.
+    let workspace_locale = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../locale")
+        .canonicalize()
+        .expect("workspace locale root");
+    copy_dir(&workspace_locale.join("la"), &dir.join("test-la"));
+    let pack_path = dir.join("test-la").join("pack.toml");
+    let pack_toml = fs::read_to_string(&pack_path).expect("planted pack");
+    fs::write(
+        &pack_path,
+        pack_toml.replacen("id = \"la\"", "id = \"test-la\"", 1),
+    )
+    .expect("re-identified pack");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        "+++\nlocale = \"test-la\"\n+++\n\n@ publica\nfunctio identitas(bivalens valor) → bivalens {\n    redde valor\n}\n",
+    )
+    .expect("source");
+
+    let config = default_config_with_locale(Target::MirLlvm)
+        .expect("product config")
+        .with_locale_root(dir.clone());
+
+    let result = radix::module::Compiler::new(config).compile(&entry);
+
+    assert!(
+        result.success(),
+        "the session's locale root must serve the declared locale, diagnostics: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code.as_deref() == Some("PARSE001")),
+        "must not parse the Latin source as English: {:?}",
+        result.diagnostics
+    );
+    let Some(radix::module::Output::LlvmText(output)) = result.output else {
+        panic!("llvm-text output missing");
+    };
+    assert!(
+        output.code.contains("identitas"),
+        "emitted IR must name the Latin function"
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+/// Recursive copy for planted locale roots (`from_toml_path` validates
+/// exemplar paths relative to the pack file, so a planted pack needs its
+/// exemplar tree beside it).
+fn copy_dir(source: &std::path::Path, destination: &std::path::Path) {
+    fs::create_dir_all(destination).expect("planted dir");
+    for entry in fs::read_dir(source).expect("planted source") {
+        let entry = entry.expect("planted entry").path();
+        let target = destination.join(entry.file_name().expect("name"));
+        if entry.is_dir() {
+            copy_dir(&entry, &target);
+        } else {
+            fs::copy(&entry, &target).expect("planted file");
+        }
+    }
 }

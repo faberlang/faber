@@ -1,0 +1,12 @@
+version = 1
+id = "corpus/bounded/itera-ex-bounded-lista-above-ten.fab"
+group = "language"
+input_root = "corpus"
+input = "bounded/itera-ex-bounded-lista-above-ten.fab"
+category = "list"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false

@@ -156,6 +156,10 @@ mod lint_tensor_use_test;
 mod borrow_non_null_receiver_test;
 
 #[cfg(test)]
+#[path = "kernel_arg_exclusivity_test.rs"]
+mod kernel_arg_exclusivity_test;
+
+#[cfg(test)]
 #[path = "borrow_alias_call_test.rs"]
 mod borrow_alias_call_test;
 
@@ -186,6 +190,10 @@ mod borrow_region_stress_test;
 #[cfg(test)]
 #[path = "borrow_region_parity_test.rs"]
 mod borrow_region_parity_test;
+
+#[cfg(test)]
+#[path = "borrow_region_coverage_test.rs"]
+mod borrow_region_coverage_test;
 
 #[cfg(test)]
 #[path = "collect_test.rs"]

@@ -418,13 +418,13 @@ pub fn compare_traces(reference: &[KernelTraceRecord], device: &[KernelTraceReco
                 detail,
             })
         };
-        let divergence = if want.entry != got.entry {
+        let divergence = if want.entry == got.entry {
+            compare_record(want, got, &mut conforming_elements).and_then(diverge)
+        } else {
             diverge(DivergenceDetail::Entry {
                 reference: want.entry.clone(),
                 device: got.entry.clone(),
             })
-        } else {
-            compare_record(want, got, &mut conforming_elements).and_then(diverge)
         };
         if divergence.is_some() {
             return Comparison {

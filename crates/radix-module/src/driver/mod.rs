@@ -52,7 +52,7 @@ pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 pub use praefixum::{evaluate_deferred, run_linked_function};
 pub use qualify::{evaluate_praefixum_for_importers, keeps_authored_form, qualify_for_target};
 pub use radix_types::KernelLowering;
-pub use session::{Config, Session, SessionMemos, WarnPolicy};
+pub use session::{Config, LocalePackLoader, Session, SessionMemos, WarnPolicy};
 pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
 pub use target_bindings::TargetBindings;
 
@@ -4147,12 +4147,18 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     Ok(unit)
 }
 
-/// Resolve a frontmatter `locale` id to a `LocalePack` via the language-pack root.
+/// Resolve a frontmatter `locale` id to a `LocalePack`.
+///
+/// Pack sources in order: the configured language-pack root's own
+/// `<id>/pack.toml` (dev checkouts, planted test roots), then the
+/// config's product-supplied loader ([`Config::locale_pack_loader`], faber's
+/// embedded reader packs), so an installed binary resolves a declared locale
+/// with no checkout beside it. With no loader installed the root remains the
+/// only source and keeps its `no_root` / `load_failed` diagnostics.
 ///
 /// # Errors
 ///
-/// Returns a `Diagnostic` when `locale_root` is not configured or the pack
-/// cannot be loaded.
+/// Returns a `Diagnostic` when neither source can load the pack.
 pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) -> Result<LocalePack, Box<Diagnostic>> {
     // Reject empty locale ids
     if locale_id.is_empty() {
@@ -4181,8 +4187,23 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         ));
     }
 
-    let root = config.locale_root.as_ref().ok_or_else(|| {
-        Box::new(
+    let root = config.locale_root.as_deref();
+
+    // The root serves the id only when its pack file is present; a root
+    // without the file falls through to the loader (or the root's own
+    // load-failed diagnostic when no loader is installed).
+    if let Some(root) = root.filter(|root| root.join(locale_id).join("pack.toml").is_file()) {
+        return load_frontmatter_pack_from_root(root, locale_id);
+    }
+
+    if let Some(loader) = config.locale_pack_loader.as_ref() {
+        return loader
+            .load(locale_id)
+            .map_err(|detail| frontmatter_locale_load_failed(locale_id, detail));
+    }
+
+    let Some(root) = root else {
+        return Err(Box::new(
             Diagnostic::error(format!(
                 "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
             ))
@@ -4190,9 +4211,18 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
             .with_code(locale_unknown_spec().code)
             .with_arg("locale_id", locale_id)
             .with_arg("issue", "no_root"),
-        )
-    })?;
+        ));
+    };
+    load_frontmatter_pack_from_root(root, locale_id)
+}
 
+/// Load `<root>/<locale_id>/pack.toml`, with the root's containment check.
+///
+/// # Errors
+///
+/// Returns a `Diagnostic` when the resolved path escapes the root after
+/// symlink resolution or the pack cannot be loaded.
+fn load_frontmatter_pack_from_root(root: &std::path::Path, locale_id: &str) -> Result<LocalePack, Box<Diagnostic>> {
     let pack_path = root.join(locale_id).join("pack.toml");
 
     // Defense-in-depth containment check: verify the resolved path stays within
@@ -4214,16 +4244,20 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         ));
     }
 
-    LocalePack::from_toml_path(&pack_path).map_err(|err| {
-        Box::new(
-            Diagnostic::error(format!("unknown reader locale '{locale_id}' in frontmatter: {err}"))
-                .with_phase(DiagnosticPhase::Lex)
-                .with_code(locale_unknown_spec().code)
-                .with_arg("locale_id", locale_id)
-                .with_arg("issue", "load_failed")
-                .with_arg("detail", err.to_string()),
-        )
-    })
+    LocalePack::from_toml_path(&pack_path).map_err(|err| frontmatter_locale_load_failed(locale_id, err.to_string()))
+}
+
+/// The `LOCALE003` `load_failed` diagnostic for a frontmatter locale whose
+/// pack could not be loaded from any source.
+fn frontmatter_locale_load_failed(locale_id: &str, detail: String) -> Box<Diagnostic> {
+    Box::new(
+        Diagnostic::error(format!("unknown reader locale '{locale_id}' in frontmatter: {detail}"))
+            .with_phase(DiagnosticPhase::Lex)
+            .with_code(locale_unknown_spec().code)
+            .with_arg("locale_id", locale_id)
+            .with_arg("issue", "load_failed")
+            .with_arg("detail", detail),
+    )
 }
 
 /// The reader pack a source with no declared locale is read with: `en`.

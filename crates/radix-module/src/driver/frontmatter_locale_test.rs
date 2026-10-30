@@ -5,6 +5,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::driver::Config;
+use crate::driver::LocalePackLoader;
 use crate::driver::ModuleCompileRequest;
 
 #[cfg(feature = "hir-rust")]
@@ -13,6 +14,27 @@ fn compile_uses_frontmatter_locale_for_lexing() {
     let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"zh-Hans\"\n+++\n\n函数 salve() { }";
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
+
+    assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
+}
+
+/// A config with no language-pack root still reads a source in its declared
+/// frontmatter locale when the product loader is installed (an installed
+/// `faber` embeds the reader packs): the loader is the frontmatter locale's
+/// source when the workspace `locale/` tree cannot serve the id.
+#[cfg(feature = "hir-rust")]
+#[test]
+fn compile_uses_frontmatter_locale_through_pack_loader_without_root() {
+    let loader = LocalePackLoader::new(|locale_id| match locale_id {
+        "la" => Ok(crate::locale::latin_locale_pack()),
+        other => Err(format!("no pack for locale '{other}'")),
+    });
+    let mut config = Config::default().with_target(Target::HirRust);
+    config.locale_root = None;
+    let config = config.with_locale_pack_loader(loader);
+    let session = crate::driver::Session::new(config);
+    let source = "+++\nlocale = \"la\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);

@@ -37,11 +37,16 @@ fn row_spec<'a>(specs: &'a [FaberTargetRowSpec], name: &str) -> &'a FaberTargetR
 }
 
 /// The CLI-selectable target universe: every `FaberCliTarget` variant except
-/// the deliberately hidden `scena` spelling.
+/// the deliberately hidden `scena`, `clif-jit` and `runner` spellings.
 fn selectable_cli_targets() -> Vec<Target> {
     FaberCliTarget::value_variants()
         .iter()
-        .filter(|variant| !matches!(variant, FaberCliTarget::MirScena | FaberCliTarget::ClifJit))
+        .filter(|variant| {
+            !matches!(
+                variant,
+                FaberCliTarget::MirScena | FaberCliTarget::ClifJit | FaberCliTarget::Runner
+            )
+        })
         .map(|variant| variant.to_radix())
         .collect()
 }
@@ -52,7 +57,12 @@ fn selectable_cli_targets() -> Vec<Target> {
 fn selectable_cli_names() -> BTreeSet<String> {
     FaberCliTarget::value_variants()
         .iter()
-        .filter(|variant| !matches!(variant, FaberCliTarget::MirScena | FaberCliTarget::ClifJit))
+        .filter(|variant| {
+            !matches!(
+                variant,
+                FaberCliTarget::MirScena | FaberCliTarget::ClifJit | FaberCliTarget::Runner
+            )
+        })
         .map(|variant| {
             variant
                 .to_possible_value()

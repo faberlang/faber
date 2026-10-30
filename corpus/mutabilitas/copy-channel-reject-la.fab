@@ -1,0 +1,25 @@
++++
+term = "mutabilitas"
+kind = "reject"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expression", "literal", "field_list", "field_init", "assignment", "expr_stmt"]
+category = "binding"
+summary = "A deep copy of a class holding a sermo is refused with the member path."
+syntax = "varia Capsa duplex ← copy fasciculum"
+related = ["sermo", "genus"]
+locale = "la"
+no_expected = "rejects"
+diagnostic = "SEM066:copy_nonduplicable_member"
++++
+# Duplicating this class would silently share its live `sermo`; the compile-time
+# refusal names the member that holds the identity-bearing resource.
+
+genus Capsa {
+    varia sermo payload
+}
+
+incipit {
+    sit sermo source ← ad 'runtime:echo' ("salve")
+    sit Capsa fasciculum ← Capsa { payload = source }
+    varia Capsa duplex ← copy fasciculum
+    nota duplex.payload
+}

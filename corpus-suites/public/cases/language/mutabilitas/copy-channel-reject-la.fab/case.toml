@@ -1,0 +1,26 @@
+version = 1
+id = "corpus/mutabilitas/copy-channel-reject-la.fab"
+group = "language"
+input_root = "corpus"
+input = "mutabilitas/copy-channel-reject-la.fab"
+category = "binding"
+domain = "types"
+
+
+[expect]
+check_only = true
+
+[targets.mir]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "copy_nonduplicable_member"
+
+[targets.roundtrip]
+outcome = "rejects"
+phase = "emit"
+diagnostic_contains = "copy_nonduplicable_member"
+
+[targets.runner]
+outcome = "rejects"
+phase = "run"
+diagnostic_contains = "copy_nonduplicable_member"

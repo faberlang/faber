@@ -9,6 +9,9 @@ license = "MIT OR Apache-2.0"
 # Group first at lower priority so per-lint allows below win package-wide
 # (leaf pattern; workspace lints are not inherited).
 pedantic = { level = "deny", priority = -1 }
+# Operator ruling 2026-10-30: implicit_hasher and must_use_candidate are off workspace-wide.
+implicit_hasher = "allow"
+must_use_candidate = "allow"
 # Structural (mirrors radix-module): grouped match arms name shared
 # MIR-classification invariants.
 match_same_arms = "allow"
