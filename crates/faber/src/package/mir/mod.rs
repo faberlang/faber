@@ -44,6 +44,11 @@ use radix::program::mir::DeviceSelection;
 #[cfg(feature = "runner")]
 use radix::program::mir::mir_diag;
 
+#[cfg(all(feature = "runner", feature = "device-runtime"))]
+fn elapsed_nanoseconds(duration: std::time::Duration) -> Option<u64> {
+    u64::try_from(duration.as_nanos()).ok()
+}
+
 /// The faber-supplied package-MIR seams (RP5). Every faber product input the
 /// moved compiler subset needs enters as an explicit function — no ambient
 /// reads inside `radix-program`.
@@ -535,7 +540,8 @@ pub fn run_package_on_device_session_shaped<H: radix_mir_runner::Host + ?Sized>(
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
-            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            let prepare_ns = elapsed_nanoseconds(route_start.elapsed())
+                .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
             Ok(run_admitted_device_session(
                 input,
                 admitted,
@@ -588,7 +594,8 @@ pub fn run_package_on_device_session_if_kernels<H: radix_mir_runner::Host + ?Siz
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
-            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            let prepare_ns = elapsed_nanoseconds(route_start.elapsed())
+                .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
             if !lowered_declares_kernels(lowered) {
                 return Ok(Ok(None));
             }
@@ -726,7 +733,8 @@ fn open_device_session(
     };
     let session =
         DeviceSession::from_opened(opened).map_err(|error| vec![host_error_diagnostic(&error)])?;
-    let admit_ns = admit_start.elapsed().as_nanos() as u64;
+    let admit_ns = elapsed_nanoseconds(admit_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     Ok(AdmittedDeviceSession {
         session,
         backend,
@@ -864,7 +872,8 @@ fn session_dispatcher(
     };
     let (mut image, omitted, image_timing) =
         device_image_for_lowered_with(lowered, backend, cuda_libdevice.as_deref(), true)?;
-    let image_build_ns = image_start.elapsed().as_nanos() as u64;
+    let image_build_ns = elapsed_nanoseconds(image_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     if image.kernels.is_empty() {
         let reasons = omitted
             .iter()
@@ -955,7 +964,8 @@ fn session_dispatcher(
         records,
     )
     .map_err(|error| vec![host_error_diagnostic(&error)])?;
-    let module_compile_ns = dispatcher_start.elapsed().as_nanos() as u64;
+    let module_compile_ns = elapsed_nanoseconds(dispatcher_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     dispatcher.borrow_mut().set_omissions(omissions);
     dispatcher.borrow_mut().set_refusals(refusals);
     dispatcher.borrow_mut().set_result_buffers(
@@ -1087,7 +1097,8 @@ pub(crate) fn run_admitted_device_session<H: radix_mir_runner::Host + ?Sized>(
         )
     }
     .map_err(runner_diagnostics)?;
-    let execution_ns = execution_start.elapsed().as_nanos() as u64;
+    let execution_ns = elapsed_nanoseconds(execution_start.elapsed())
+        .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
     // WHY: taken here, before the exit handling (`host.exit` panics in tests)
     // and while the dispatcher `Rc` is still alive; the receipt is dropped with
     // the dispatcher at return otherwise. A failed run keeps it too: the
@@ -1250,7 +1261,8 @@ pub fn run_package_on_cpu_device_session<H: radix_mir_runner::Host + ?Sized>(
         host,
         &faber_mir_seams(),
         |lowered, validated, exit_code, host| {
-            let prepare_ns = route_start.elapsed().as_nanos() as u64;
+            let prepare_ns = elapsed_nanoseconds(route_start.elapsed())
+                .ok_or_else(|| vec![mir_diag(input, "elapsed duration exceeds u64 nanoseconds")])?;
             if !lowered_declares_kernels(lowered) {
                 return Ok(Ok(None));
             }

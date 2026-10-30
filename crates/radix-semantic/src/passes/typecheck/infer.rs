@@ -734,7 +734,7 @@ impl TypeChecker<'_> {
                 return self.types.intervallum_with_step(inner, b_step);
             }
             (Type::Func(sig_a), Type::Func(sig_b)) => {
-                return self.unify_function_signatures(sig_a, sig_b, span, issue);
+                return self.unify_function_signatures(&sig_a, &sig_b, span, issue);
             }
             _ => match policy {
                 UnifyPolicy::Join => {
@@ -926,8 +926,8 @@ impl TypeChecker<'_> {
 
     fn unify_function_signatures(
         &mut self,
-        sig_a: FuncSig,
-        sig_b: FuncSig,
+        sig_a: &FuncSig,
+        sig_b: &FuncSig,
         span: radix_lexer::Span,
         issue: &'static str,
     ) -> TypeId {
