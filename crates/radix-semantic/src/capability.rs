@@ -281,6 +281,8 @@ enum TypeLaw {
     StrictEquality,
     /// T-CAP-05: strict equality is reflexive for every value.
     ReflexiveEquality,
+    /// T-CAP-06: hash values consistently with strict, reflexive equality.
+    CanonicalHash,
     /// T-CAP-07: the language ordering law is admitted.
     Ordering,
 }
@@ -601,6 +603,17 @@ impl<'a> DerivedCapabilityQueries<'a> {
                     | Primitive::Instans
                     | Primitive::Nihil
             ),
+            // D3.4 admits canonical hash keys only for non-floating values;
+            // the hashability walk also recurses through tuple/genus fields.
+            TypeLaw::CanonicalHash => matches!(
+                prim,
+                Primitive::Numerus
+                    | Primitive::Bivalens
+                    | Primitive::Ascii
+                    | Primitive::Textus
+                    | Primitive::Instans
+                    | Primitive::Nihil
+            ),
             TypeLaw::Ordering => matches!(
                 prim,
                 Primitive::Numerus | Primitive::Fractus | Primitive::Instans
@@ -609,6 +622,9 @@ impl<'a> DerivedCapabilityQueries<'a> {
     }
 
     fn sized_numeric_law(prim: Primitive, width: NumericWidth, law: TypeLaw) -> bool {
+        if matches!(law, TypeLaw::CanonicalHash) {
+            return prim != Primitive::Fractus;
+        }
         match prim {
             Primitive::Fractus => !matches!(law, TypeLaw::ReflexiveEquality),
             // The unbounded `inf` is a heap bignum on every carrier: duplicating
@@ -905,11 +921,10 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 TypeCapabilityProof::ReflexivelyEqual,
             ),
             TypeCapabilityKind::CanonicalHashEligibility => {
-                // No semantic hash admission exists; a Rust carrier
-                // implementing `Hash` is never evidence. Fail closed until a
-                // canonical hash law consistent with strict equality is
-                // settled upstream (delivery-card binding case).
-                CapabilityAnswer::Rejected(CapabilityReason::UnsupportedRepresentation)
+                law_proof(
+                    TypeLaw::CanonicalHash,
+                    TypeCapabilityProof::CanonicalHashEligible,
+                )
             }
             TypeCapabilityKind::Ordering => {
                 law_proof(TypeLaw::Ordering, TypeCapabilityProof::Ordered)

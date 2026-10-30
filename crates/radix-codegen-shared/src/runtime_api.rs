@@ -777,7 +777,11 @@ pub const INTERVALLUM_INTERVALLUM: RuntimeItem =
     carrier_row(Namespace::Intervallum, "Intervallum", RuntimeKind::Type);
 pub const INTERVALLUM_VALUE: RuntimeItem =
     carrier_row(Namespace::Intervallum, "value", RuntimeKind::Fn);
+/// `tuple.genus_key`: Go genus pointers are identity-comparable, but Faber genus
+/// keys compare by their hashable field values.
+pub const TUPLE_GENUS_KEY: RuntimeItem = carrier_row(Namespace::Tuple, "genus_key", RuntimeKind::Fn);
 pub const TUPLE_KEY: RuntimeItem = carrier_row(Namespace::Tuple, "key", RuntimeKind::Fn);
+/// `tuple.parts`: decode a Go composite key back to its tuple carrier.
 pub const TUPLE_PARTS: RuntimeItem = carrier_row(Namespace::Tuple, "parts", RuntimeKind::Fn);
 pub const INSTANS_PARSE: RuntimeItem = carrier_row(Namespace::Instans, "parse", RuntimeKind::Fn);
 pub const VALOR_STRUCT: RuntimeItem = carrier_row(Namespace::Valor, "struct", RuntimeKind::Fn);
@@ -1362,6 +1366,7 @@ pub const TABLE: &[RuntimeItem] = &[
     DUP_DUPLICATE,
     INTERVALLUM_INTERVALLUM,
     INTERVALLUM_VALUE,
+    TUPLE_GENUS_KEY,
     TUPLE_KEY,
     TUPLE_PARTS,
     INSTANS_PARSE,

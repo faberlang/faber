@@ -399,17 +399,25 @@ fn strict_and_reflexive_equality_stay_distinct_for_floats() {
 }
 
 #[test]
-fn canonical_hash_eligibility_fails_closed_without_a_settled_hash_law() {
-    let table = TypeTable::new();
+fn canonical_hash_eligibility_follows_the_hashable_key_law() {
+    let mut table = TypeTable::new();
     let num = table.primitive(Prim::Numerus);
+    let text = table.primitive(Prim::Textus);
+    let f32v = table.intern(Type::SizedNumeric(Prim::Fractus, NumericWidth::F32));
+    let tuple = table.intern(Type::Tuple(vec![num, text]));
     let queries = table_queries(table);
 
-    // Even a fully solved, reflexively equal type cannot claim hash
-    // eligibility: no canonical hash law consistent with strict equality
-    // exists in the authorities (binding fail-closed case).
+    assert!(matches!(
+        queries.type_capability(num, TypeCapabilityKind::CanonicalHashEligibility),
+        CapabilityAnswer::Proven(TypeCapabilityProof::CanonicalHashEligible)
+    ));
+    assert!(matches!(
+        queries.type_capability(tuple, TypeCapabilityKind::CanonicalHashEligibility),
+        CapabilityAnswer::Proven(TypeCapabilityProof::CanonicalHashEligible)
+    ));
     assert_eq!(
         queries
-            .type_capability(num, TypeCapabilityKind::CanonicalHashEligibility)
+            .type_capability(f32v, TypeCapabilityKind::CanonicalHashEligibility)
             .reason(),
         Some(CapabilityReason::UnsupportedRepresentation)
     );

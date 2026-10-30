@@ -10,11 +10,75 @@ fn target_name(target: Target) -> &'static str {
         Target::HirTypeScript => "TypeScript",
         Target::HirGo => "Go",
         Target::HirSwift => "Swift",
+        Target::MirLlvm | Target::MirLlvmHost => "LLVM",
+        Target::MirWasm => "WebAssembly",
         Target::HirHaskell => "Haskell",
         Target::HirCobol => "COBOL",
         Target::HirPython => "Python",
         _ => "target",
     }
+}
+
+/// Reject class values used as map keys or set elements on backends whose
+/// native collections compare object identity instead of Faber value equality.
+/// Rust and Go have dedicated value-key representations and do not use this
+/// guard.
+pub fn reject_genus_collection_keys(
+    types: &radix_types::TypeTable,
+    target: Target,
+) -> Result<(), CodegenError> {
+    fn contains_genus(
+        types: &radix_types::TypeTable,
+        type_id: radix_types::TypeId,
+        seen: &mut handroll::FxHashSet<radix_types::TypeId>,
+    ) -> bool {
+        if !seen.insert(type_id) {
+            return false;
+        }
+        match types.get(type_id) {
+            radix_types::Type::Struct(_) => true,
+            radix_types::Type::Option(inner)
+            | radix_types::Type::Ref(_, inner)
+            | radix_types::Type::Alias(_, inner) => contains_genus(types, *inner, seen),
+            radix_types::Type::Tuple(parts) | radix_types::Type::Union(parts) => {
+                parts.iter().any(|part| contains_genus(types, *part, seen))
+            }
+            radix_types::Type::Applied(base, args) => {
+                contains_genus(types, *base, seen)
+                    || args.iter().any(|arg| match arg {
+                        radix_types::AppliedArg::Type(inner) => contains_genus(types, *inner, seen),
+                        radix_types::AppliedArg::Size(_) => false,
+                    })
+            }
+            _ => false,
+        }
+    }
+
+    let issue = match target {
+        Target::HirTypeScript => "ts_genus_collection_key_unsupported",
+        Target::HirPython => "python_genus_collection_key_unsupported",
+        Target::HirSwift => "swift_genus_collection_key_unsupported",
+        Target::MirLlvm | Target::MirLlvmHost => "llvm_genus_collection_key_unsupported",
+        Target::MirWasm => "wasm_genus_collection_key_unsupported",
+        _ => return Ok(()),
+    };
+    for index in 0..types.type_count() {
+        let type_id = radix_types::TypeId(index as u32);
+        let key = match types.get(type_id) {
+            radix_types::Type::Map(key, _) | radix_types::Type::Set(key) => *key,
+            _ => continue,
+        };
+        if contains_genus(types, key, &mut handroll::FxHashSet::default()) {
+            return Err(CodegenError {
+                message: format!(
+                    "class map/set keys are not value-keyed on the {} target",
+                    target_name(target)
+                ),
+                args: vec![DiagnosticArg::new("issue", issue)],
+            });
+        }
+    }
+    Ok(())
 }
 
 #[must_use]
