@@ -615,6 +615,71 @@ fn tensor_view_roots(
     }
 }
 
+/// The body of an expression that runs as its own CFG component, plus the
+/// operand expressions that still evaluate in the enclosing flow.
+///
+/// WHY: a closure body runs on call and a reduction/scan/sort lane body runs
+/// per element; neither belongs to the flow around its definition, but the
+/// names they read must still count as used at the definition site.
+struct SeparateComponent<'a> {
+    operands: Vec<&'a HirExpression>,
+    body: ComponentBody<'a>,
+}
+
+enum ComponentBody<'a> {
+    Expr(&'a HirExpression),
+    Block(&'a HirBlock),
+}
+
+fn separate_component(kind: &HirExpressionKind) -> Option<SeparateComponent<'_>> {
+    match kind {
+        HirExpressionKind::Clausura(_, _, _, body) => Some(SeparateComponent {
+            operands: Vec::new(),
+            body: ComponentBody::Expr(body),
+        }),
+        HirExpressionKind::Reduction {
+            source,
+            group,
+            body: Some(body),
+            identity,
+            ..
+        } => {
+            let mut operands = vec![&**source];
+            if let Some(group) = group {
+                operands.push(group);
+            }
+            if let Some(identity) = identity {
+                operands.push(identity);
+            }
+            Some(SeparateComponent {
+                operands,
+                body: ComponentBody::Block(body),
+            })
+        }
+        HirExpressionKind::Scan {
+            source, group, body, ..
+        } => {
+            let mut operands = vec![&**source];
+            if let Some(group) = group {
+                operands.push(group);
+            }
+            Some(SeparateComponent {
+                operands,
+                body: ComponentBody::Block(body),
+            })
+        }
+        HirExpressionKind::Sort {
+            source,
+            body: Some(body),
+            ..
+        } => Some(SeparateComponent {
+            operands: vec![&**source],
+            body: ComponentBody::Block(body),
+        }),
+        _ => None,
+    }
+}
+
 struct EventCollector<'a> {
     cfg: &'a HirCfg,
     types: &'a TypeTable,
@@ -658,6 +723,41 @@ impl<'a> EventCollector<'a> {
             source_kills,
             locations: Vec::new(),
             fact_reads: access_facts.dead_source_count(),
+        }
+    }
+
+    /// Walk a separate-component body (a closure or lane body), then anchor
+    /// every name it used at the component's definition site.
+    ///
+    /// WHY: the component's uses live in a disconnected part of the CFG, so a
+    /// borrow used only inside it would look dead in the enclosing flow even
+    /// between its bind and this site.  Anchoring one use at the site where
+    /// the value escapes keeps the region live up to the creation point —
+    /// exactly the reach the block-scope approximation decided for captures.
+    fn visit_separate_component(&mut self, component: SeparateComponent<'_>, site: Option<CfgNodeId>) {
+        for operand in component.operands {
+            self.visit_expr(operand);
+        }
+        let before: Vec<(DefId, usize)> = self
+            .uses
+            .iter()
+            .map(|(def_id, nodes)| (*def_id, nodes.len()))
+            .collect();
+        match component.body {
+            ComponentBody::Expr(body) => self.visit_expr(body),
+            ComponentBody::Block(body) => self.visit_block(body),
+        }
+        let Some(site) = site else {
+            return;
+        };
+        for (def_id, count) in before {
+            if self
+                .uses
+                .get(&def_id)
+                .is_some_and(|nodes| nodes.len() > count)
+            {
+                self.uses.entry(def_id).or_default().push(site);
+            }
         }
     }
 
@@ -744,6 +844,10 @@ impl HirVisitor for EventCollector<'_> {
             .cfg
             .node_for_hir_id(expression.id)
             .or_else(|| self.locations.last().copied());
+        if let Some(component) = separate_component(&expression.kind) {
+            self.visit_separate_component(component, node);
+            return;
+        }
         if let HirExpressionKind::Path(def_id) = &expression.kind
             && let Some(node) = node
         {
