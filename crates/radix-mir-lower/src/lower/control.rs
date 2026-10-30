@@ -552,7 +552,7 @@ impl FunctionBuilder<'_> {
             depth: self.capture_depth,
             carrier,
         });
-        self.lower_block_to_destination(body, MirPlace::temp(success_temp), MirType::semantic(success_ty), span);
+        self.lower_block_to_destination(body, MirPlace::temp(success_temp), MirType::semantic(success_ty), span)?;
         let Some(trap) = self.traps.pop() else {
             self.errors.push(MirError::validation(
                 span,
@@ -561,17 +561,19 @@ impl FunctionBuilder<'_> {
             return None;
         };
 
-        let value = MirOperand::Temp(success_temp);
-        let returned_fields = self.variant_payload(returned_variant, vec![value], span);
-        let wrapped = self.construct_temp(
-            MirAggregateKind::EnumVariant(returned_variant),
-            returned_fields,
-            trapped_ty,
-            span,
-        );
-        self.assign(destination.clone(), wrapped, trapped_ty, span);
-
-        let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+        let body_reaches = self.current_is_open();
+        if body_reaches {
+            let value = MirOperand::Temp(success_temp);
+            let returned_fields = self.variant_payload(returned_variant, vec![value], span);
+            let wrapped = self.construct_temp(
+                MirAggregateKind::EnumVariant(returned_variant),
+                returned_fields,
+                trapped_ty,
+                span,
+            );
+            self.assign(destination.clone(), wrapped, trapped_ty, span);
+            self.terminate_current(MirTerminatorKind::Goto(join), span);
+        }
         if body_reaches || trap.error_paths {
             self.switch_to(join);
         } else {
