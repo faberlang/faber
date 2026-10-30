@@ -3961,16 +3961,35 @@ fn run_metal_device_kernel_fault_still_writes_the_stats_file() {
 
 /// `auto` over a kernel package that faults on the GPU ends the run once: the
 /// program ran on the device session and is never run again on another route.
-/// Mode 2 prints before the fault is delivered, so a second run would repeat
-/// the lines. Skips without a Metal device.
+/// The once-proof is the one backend-selection receipt (a re-run admits a
+/// second session) plus the stats artifact's launch count: kernel `k0`
+/// launched exactly once. Mode 2 never reads `dst` on the host, but the
+/// session reads ObservationPoint values back at the producing call, and that
+/// readback is the first host read of the launch's output: the fault is
+/// delivered there, so the body prints nothing before the run ends (the host
+/// synchronizes only at observation points and explicit host reads). Skips
+/// without a Metal device.
 #[test]
 fn run_auto_device_kernel_fault_runs_the_program_once() {
     let path = repo_root()
         .join(SINGLE_LANE_INDEX_FAULT)
         .display()
         .to_string();
-    let (stdout, stderr, status) =
-        run_faber_status(&["run", "--device", "auto", &path, "--", "1", "0", "2"]);
+    let dir = temp_dir("auto-kernel-fault-once");
+    let stats = dir.join("stats.json");
+    let stats_arg = stats.display().to_string();
+    let (stdout, stderr, status) = run_faber_status(&[
+        "run",
+        "--device",
+        "auto",
+        "--stats-file",
+        &stats_arg,
+        &path,
+        "--",
+        "1",
+        "0",
+        "2",
+    ]);
     if !cfg!(target_os = "macos")
         || !stderr
             .lines()
@@ -3980,14 +3999,17 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
         return;
     }
     assert_eq!(status.code(), Some(70), "{stderr}");
+    // The observation-point readback of `dst` at the producing call delivers
+    // the fault before the `do all` body continues, so neither print runs; a
+    // completed line here would mean the fault was deferred past the readback.
     assert_eq!(
         stdout.lines().filter(|l| *l == "completed").count(),
-        1,
+        0,
         "{stdout}"
     );
     assert_eq!(
         stdout.lines().filter(|l| *l == "done").count(),
-        1,
+        0,
         "{stdout}"
     );
     assert_eq!(
@@ -4001,6 +4023,22 @@ fn run_auto_device_kernel_fault_runs_the_program_once() {
         errors[0].starts_with("error: E_DEVICE_KERNEL_FAULT:"),
         "{stderr}"
     );
+    let artifact: serde_json::Value =
+        serde_json::from_slice(&fs::read(&stats).expect("a failed device run writes its stats"))
+            .expect("stats file is JSON");
+    assert_eq!(artifact["run"]["exit"], 70, "{artifact}");
+    assert_eq!(
+        artifact["device"]["runtime"]["launch_count"], 1,
+        "the kernel launched exactly once:\n{artifact}"
+    );
+    let launches: Vec<_> = artifact["device"]["entries"]
+        .as_array()
+        .expect("per-entry launch rows")
+        .iter()
+        .filter(|entry| entry["entry"] == "k0")
+        .collect();
+    assert_eq!(launches.len(), 1, "one entry for k0:\n{artifact}");
+    assert_eq!(launches[0]["launches"], 1, "{artifact}");
 }
 
 /// The corpus-product device tensor fragments must print exactly what their
