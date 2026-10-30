@@ -12,6 +12,169 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 #[test]
+fn convert_reports_filewise_failure_for_multi_file_kernel_package() {
+    let root = tempfile::tempdir().expect("create two-file package root");
+    let package = root.path().join("convert-kernel-package");
+    write_convert_kernel_package(&package);
+    let binary = faber_binary();
+
+    let check = Command::new(&binary)
+        .args(["check", package.to_str().expect("utf8 package path")])
+        .output()
+        .expect("check two-file package");
+    assert!(
+        check.status.success(),
+        "whole-package check must accept the fixture:\n{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+
+    let conversion = Command::new(&binary)
+        .args(["convert", "--to", "la", "--check"])
+        .arg(&package)
+        .output()
+        .expect("convert two-file package file-by-file");
+    assert!(!conversion.status.success());
+    let stderr = String::from_utf8_lossy(&conversion.stderr);
+    assert!(
+        stderr.contains("SEM057:call_marker_on_read_only"),
+        "file-at-a-time analysis loses the imported kernel call contract:\n{stderr}"
+    );
+}
+
+/// Follow-up acceptance test for whole-package conversion. This currently
+/// fails because `convert` calls the single-document analyzer for each file;
+/// remove the ignore once package analysis and per-file re-emission are wired.
+#[test]
+#[ignore = "follow-up: convert package inputs using whole-package analysis"]
+fn convert_multi_file_kernel_package_then_check_converted_package() {
+    let root = tempfile::tempdir().expect("create two-file package root");
+    let package = root.path().join("convert-kernel-package");
+    write_convert_kernel_package(&package);
+    let binary = faber_binary();
+
+    let conversion = Command::new(&binary)
+        .args(["convert", "--to", "la", "--write"])
+        .arg(&package)
+        .output()
+        .expect("convert whole package");
+    assert!(
+        conversion.status.success(),
+        "whole-package conversion must succeed:\n{}",
+        String::from_utf8_lossy(&conversion.stderr)
+    );
+    let check = Command::new(&binary)
+        .args(["check", package.to_str().expect("utf8 package path")])
+        .output()
+        .expect("check converted package");
+    assert!(
+        check.status.success(),
+        "converted package must revalidate as a package:\n{}",
+        String::from_utf8_lossy(&check.stderr)
+    );
+}
+
+fn write_convert_kernel_package(package: &Path) {
+    let source_dir = package.join("src");
+    fs::create_dir_all(&source_dir).expect("create package source directory");
+    fs::write(
+        package.join("faber.toml"),
+        r#"[package]
+name = "convert-kernel-package"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[locale]
+locale = "en"
+"#,
+    )
+    .expect("write package manifest");
+    fs::write(
+        source_dir.join("kernels.fab"),
+        r#"@ kernel
+@ public
+fn fill(mut tensor<f32, [4]> output) → void {
+    output[0] ← 1.0
+}
+"#,
+    )
+    .expect("write kernel module");
+    fs::write(
+        source_dir.join("main.fab"),
+        r#"import from "./kernels" kernels
+main {
+    mut tensor<f32, [4]> output ← tensor<f32, [4]> {}
+    do device {
+        kernels.fill(mut output)
+    }
+}
+"#,
+    )
+    .expect("write entry module");
+}
+
+#[test]
+fn convert_generic_class_revalidates_constructor_fields() {
+    let converted = convert_corpus_fixture_to_latin("generic/class.fab");
+    assert!(converted.contains("redde Pair<B, A> { a = ego.b, b = ego.a }"));
+    assert!(converted.contains("redde Box<T> { v = x }"));
+}
+
+#[test]
+fn convert_implet_orderable_revalidates_in_latin() {
+    let converted = convert_corpus_fixture_to_latin("implet/implet-orderable.fab");
+    assert!(converted.contains("genus Person implet Orderable<Person>"));
+    assert!(converted.contains("functio larger<T implet Orderable<T>>"));
+    assert!(!converted.contains("def_4099"));
+}
+
+#[test]
+fn convert_intervallum_print_revalidates_stepped_value_in_latin() {
+    let converted = convert_corpus_fixture_to_latin("intervallum/print.fab");
+    assert!(converted.contains("intervallum<numerus, 3> stepped"));
+}
+
+#[test]
+fn convert_intervallum_stepped_value_revalidates_in_latin() {
+    let converted = convert_corpus_fixture_to_latin("intervallum/stepped-value.fab");
+    assert!(converted.contains("intervallum<numerus, 2> evens"));
+}
+
+fn convert_corpus_fixture_to_latin(relative: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("corpus")
+        .join(relative);
+    let converted = run_faber_convert_stdout_with_args(&[
+        "convert",
+        "--to",
+        "la",
+        "--stdout",
+        path.to_str().expect("utf8 corpus path"),
+    ]);
+    let root = tempfile::tempdir().expect("create converted fixture directory");
+    let converted_path = root.path().join("converted.fab");
+    fs::write(&converted_path, &converted).expect("write converted fixture");
+    let checked = Command::new(faber_binary())
+        .args(["check", "--no-diagnostics"])
+        .arg(&converted_path)
+        .output()
+        .expect("check converted Latin fixture");
+    assert!(
+        checked.status.success(),
+        "converted {relative} must revalidate as Latin:\n{}\n{converted}",
+        String::from_utf8_lossy(&checked.stderr)
+    );
+    converted
+}
+
+#[test]
 fn convert_resolves_imports_in_corpus_fixture() {
     let fixture = exempla("importa/default-minimal.fab");
     let mut child = Command::new(faber_binary())

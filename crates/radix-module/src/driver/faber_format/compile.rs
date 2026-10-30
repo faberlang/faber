@@ -17,7 +17,7 @@ use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
 use handroll::FxHashMap;
-use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_function};
+use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_function, walk_item};
 use radix_hir::{
     HirExpression, HirExpressionKind, HirItem, HirItemKind, HirOwnerRef, HirTypeForm, HirTypeFormArg, HirTypeFormHead,
     HirTypeSlot,
@@ -102,6 +102,11 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
             .resolver
             .generated_companion_spellings(&analysis.interner),
     );
+    by_def.extend(imported_contract_spellings(
+        &analysis.hir,
+        &analysis.resolver,
+        &analysis.interner,
+    ));
     match crate::codegen::faber::FaberCodegen::new(&analysis.types, &analysis.interner)
         .with_imported_spellings(&imported_spellings.by_type, &by_def, &imported_spellings.by_def_pattern)
         .generate(
@@ -132,6 +137,54 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
             FaberReemitResult { output: None, diagnostics: analysis.diagnostics }
         }
     }
+}
+
+/// Collect the reader-visible spellings of imported contracts appearing in
+/// declaration bounds. Contract refs carry only definition identities, while
+/// the ordinary HIR name table contains definitions owned by this module; an
+/// imported contract would otherwise fall through to the synthetic `def_N`
+/// spelling.
+fn imported_contract_spellings(
+    hir: &radix_hir::HirModule,
+    resolver: &crate::semantic::Resolver,
+    interner: &crate::lexer::Interner,
+) -> FxHashMap<radix_hir::DefId, String> {
+    struct Collector<'a> {
+        resolver: &'a crate::semantic::Resolver,
+        interner: &'a crate::lexer::Interner,
+        spellings: FxHashMap<radix_hir::DefId, String>,
+    }
+
+    impl Collector<'_> {
+        fn add_contracts(&mut self, contracts: &[radix_types::ContractRef]) {
+            for contract in contracts {
+                if let Some(symbol) = self.resolver.get_symbol(contract.contract) {
+                    self.spellings
+                        .insert(contract.contract, self.interner.resolve(symbol.name).to_owned());
+                }
+            }
+        }
+    }
+
+    impl HirVisitor for Collector<'_> {
+        fn visit_item(&mut self, item: &HirItem) {
+            if let HirItemKind::Struct(strukt) = &item.kind {
+                self.add_contracts(&strukt.implements);
+            }
+            walk_item(self, item);
+        }
+
+        fn visit_type_param(&mut self, type_param: &radix_hir::HirTypeParam) {
+            if let radix_hir::HirTypeParamConstraint::Implet(contracts) = &type_param.constraint {
+                self.add_contracts(contracts);
+            }
+            self.visit_def(type_param.def_id, type_param.name);
+        }
+    }
+
+    let mut collector = Collector { resolver, interner, spellings: FxHashMap::default() };
+    collector.visit_program(hir);
+    collector.spellings
 }
 
 /// Refuse output that drops a source construct HIR cannot represent.
