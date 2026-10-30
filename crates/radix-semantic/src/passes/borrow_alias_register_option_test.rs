@@ -61,7 +61,10 @@ fn vector_copy_of_de_param_allows_element_write() {
 #[test]
 fn vector_lane_write_into_a_de_param_is_still_rejected() {
     let found = issues("functio f(de vector<f32, magnitudo 4> v) → vacuum { v[0] ← 9.0 }");
-    assert!(!found.is_empty(), "a lane write into a `de` parameter must be refused");
+    assert!(
+        !found.is_empty(),
+        "a lane write into a `de` parameter must be refused"
+    );
 }
 
 #[test]

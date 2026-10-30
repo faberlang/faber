@@ -903,6 +903,19 @@ impl TypeTable {
                 .is_some_and(|inner| self.is_aliasing_container_through_option(inner))
     }
 
+    /// Whether `ty` is a register-class `vector`/`matrix` value: lanes held
+    /// directly, with no storage handle, so every store copies the whole value
+    /// (operator ruling 7b25889f R1 — silent values, `b ← a` copies). Aliases
+    /// peel; an option of one is not one (the option carries the cell).
+    #[must_use]
+    pub fn is_register_class_value(&self, ty: TypeId) -> bool {
+        match self.get(ty) {
+            Type::Alias(_, inner) => self.is_register_class_value(*inner),
+            Type::Vector(..) | Type::Matrix(..) => true,
+            _ => false,
+        }
+    }
+
     /// Whether an unmarked bind of `ty` shares its source's storage instead of
     /// taking a value of its own.
     ///
@@ -917,7 +930,7 @@ impl TypeTable {
     pub fn binds_by_sharing(&self, ty: TypeId) -> bool {
         match self.get(ty) {
             Type::Alias(_, inner) => self.binds_by_sharing(*inner),
-            Type::Vector(..) | Type::Matrix(..) => false,
+            _ if self.is_register_class_value(ty) => false,
             _ => self.is_aliasing_container(ty),
         }
     }
