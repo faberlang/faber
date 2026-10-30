@@ -1992,7 +1992,7 @@ impl<'a> MirLowerer<'a> {
             lane_domain_local,
         } = self.lower_callable_body(
             body_ctx,
-            CallableLoweringConfig { error_ty, parent_function_id, device_role, target, def_id },
+            &CallableLoweringConfig { error_ty, parent_function_id, device_role, target, def_id },
         );
         self.errors.extend(errors);
         self.closure_environments.extend(closure_environments);
@@ -2084,7 +2084,7 @@ impl<'a> MirLowerer<'a> {
     fn lower_callable_body(
         &mut self,
         body_ctx: &BodyLoweringContext<'_, '_>,
-        config: CallableLoweringConfig<'_>,
+        config: &CallableLoweringConfig<'_>,
     ) -> CallableLoweringParts {
         let context = self.builder_context(body_ctx);
         let function_shape_relations = context
@@ -2123,7 +2123,7 @@ impl<'a> MirLowerer<'a> {
             }
         }
         builder.bound_methods = self.bound_method_targets(&callable.type_params);
-        let (body, cli_args) = match config.target {
+        let (body, cli_args) = match &config.target {
             CallableLoweringTarget::Function(function) => {
                 for param in &function.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
@@ -2139,7 +2139,7 @@ impl<'a> MirLowerer<'a> {
                 (function.body.as_ref(), function.cli_args.as_ref())
             }
             CallableLoweringTarget::Method { struct_item, strukt, method, receiver_ty } => {
-                builder.add_param(struct_item.def_id, strukt.name, receiver_ty, HirParamMode::Owned, method.span);
+                builder.add_param(struct_item.def_id, strukt.name, *receiver_ty, HirParamMode::Owned, method.span);
                 for param in &method.func.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
@@ -3161,7 +3161,7 @@ impl<'a> FunctionBuilder<'a> {
         }
     }
 
-    fn add_runtime_record_local(&mut self, param: &radix_hir::HirParam) -> Option<()> {
+    fn add_runtime_record_local(&mut self, param: &radix_hir::HirParam) {
         let mir_ty = MirType::semantic(param.ty);
         let id = self.next_local_id();
         self.locals
@@ -3174,7 +3174,6 @@ impl<'a> FunctionBuilder<'a> {
         }
         self.bindings
             .insert(param.def_id, LocalBinding { local: id, ty: mir_ty });
-        Some(())
     }
 
     /// S8.2: one runtime-filled temp per record field, in the record type's
@@ -4237,11 +4236,7 @@ impl<'a> FunctionBuilder<'a> {
         {
             return lowered;
         }
-        let Some(mir_op) = mir_un_op(op) else {
-            self.errors
-                .push(MirError::unsupported(expr.span, "unary operator without a MIR primitive"));
-            return None;
-        };
+        let mir_op = mir_un_op(op);
         // `-9223372036854775808`: the magnitude 2^63 has no `Int(i64)` form,
         // but its negation is exactly `i64::MIN` (d11-6 ruling 12: an untyped
         // constant is an exact value), so the negated literal is one constant.
@@ -5767,11 +5762,11 @@ pub(super) fn inf_literal_constant(digits: &str) -> MirConstant {
     }
 }
 
-fn mir_un_op(op: HirUnOp) -> Option<MirUnOp> {
+fn mir_un_op(op: HirUnOp) -> MirUnOp {
     match op {
-        HirUnOp::Neg => Some(MirUnOp::Neg),
-        HirUnOp::Not => Some(MirUnOp::Not),
-        HirUnOp::BitNot => Some(MirUnOp::BitNot),
+        HirUnOp::Neg => MirUnOp::Neg,
+        HirUnOp::Not => MirUnOp::Not,
+        HirUnOp::BitNot => MirUnOp::BitNot,
     }
 }
 
