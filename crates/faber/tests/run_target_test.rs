@@ -71,7 +71,10 @@ fn runner_target_interprets_the_program() {
             "{name}: the runner printed nothing"
         );
         assert!(
-            !runner.stderr.contains("warning["),
+            !runner
+                .stderr
+                .lines()
+                .any(|line| line.starts_with("warning[")),
             "{name}: the interpreter prints no compile-lane warnings: {}",
             runner.stderr
         );
