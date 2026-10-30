@@ -418,6 +418,27 @@ fn field_map(
 }
 
 #[test]
+fn class_value_map_keys_compare_by_fields_not_allocation() {
+    let mut interner = radix_lexer::Interner::new();
+    let name = interner.intern("name");
+    let def = radix_hir::DefId(6301);
+    let first = Value::Struct(def, field_map(&[(name, Value::Str("a".to_owned()))]));
+    let second = Value::Struct(def, field_map(&[(name, Value::Str("a".to_owned()))]));
+    let first_key = first.to_key(Span::default()).expect("hashable class key");
+    let second_key = second.to_key(Span::default()).expect("equal class key");
+    assert_eq!(first_key, second_key);
+
+    let mut map = handroll::FxHashMap::default();
+    map.insert(first_key, Value::Int(1));
+    assert_eq!(map.get(&second_key), Some(&Value::Int(1)));
+    assert!(matches!(
+        second_key.to_value(),
+        Value::Struct(found, fields)
+            if found == def && fields.borrow().get(&name) == Some(&Value::Str("a".to_owned()))
+    ));
+}
+
+#[test]
 fn record_displays_fields_in_written_order() {
     let mut interner = radix_lexer::Interner::new();
     let (zed, alpha, mid) = (

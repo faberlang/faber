@@ -1,0 +1,15 @@
+version = 1
+id = "corpus/tabula/class-map-key.fab"
+group = "language"
+input_root = "corpus"
+input = "tabula/class-map-key.fab"
+category = "map"
+domain = "collections"
+
+
+[expect]
+stdout = "stdout.expected"
+check_only = false
+
+[targets.runner]
+outcome = "pass"
