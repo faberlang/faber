@@ -281,6 +281,9 @@ fn reject_in_memory_engine(target: Option<crate::cli::FaberCliTarget>) {
 fn dispatch(command: Command) {
     let (flag, probe) = command.library_home_inputs();
     faber_cli::library::configure_library_home(flag.as_deref(), probe.as_deref());
+    if matches!(&command, Command::Format(_)) {
+        faber_cli::library::configure_embedded_library_home_if_unset();
+    }
     match command {
         Command::Build(args) => {
             reject_in_memory_engine(args.target);
