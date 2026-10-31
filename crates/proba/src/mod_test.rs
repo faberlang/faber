@@ -833,7 +833,7 @@ proba "timeout" erratur temporis 1 {
 }
 
 #[test]
-fn erratur_does_not_flip_assertion_abort() {
+fn erratur_passes_on_assertion_abort() {
     let report = run(
         r#"
 proba "assertion" erratur {
@@ -842,29 +842,39 @@ proba "assertion" erratur {
 "#,
         TestSelection::default(),
     );
-    assert_eq!(report.failed(), 1);
-    assert!(matches!(
-        report.results[0].outcome,
-        CaseOutcome::Failed { .. }
-    ));
-    assert!(!report.success());
+    assert_eq!(report.passed(), 1);
+    assert_eq!(report.failed(), 0);
+    assert!(report.success());
+    assert!(matches!(report.results[0].outcome, CaseOutcome::Passed));
 }
 
 #[test]
-fn erratur_flips_only_uncaught_error_channel_escapes() {
-    let escaped = RunnerError::internal(
-        radix::lexer::Span::default(),
-        "uncaught alternate return from call",
+fn erratur_passes_on_runtime_fault() {
+    let report = run(
+        r#"
+proba "runtime fault" erratur {
+    sit numerus result ← 1 / 0
+}
+"#,
+        TestSelection::default(),
     );
+    assert_eq!(report.passed(), 1, "report: {report:?}");
+    assert_eq!(report.failed(), 0, "report: {report:?}");
+    assert!(report.success(), "report: {report:?}");
+}
+
+#[test]
+fn erratur_flips_body_failures_but_not_blocked_outcomes() {
+    let body_failure = RunnerError::internal(radix::lexer::Span::default(), "runtime fault");
     assert!(matches!(
-        outcome_from_run_result(Err(vec![escaped]), true),
+        outcome_from_run_result(Err(vec![body_failure]), true),
         CaseOutcome::Passed
     ));
 
-    let unrelated = RunnerError::internal(radix::lexer::Span::default(), "host failed");
+    let unavailable = RunnerError::unsupported(radix::lexer::Span::default(), "host operation");
     assert!(matches!(
-        outcome_from_run_result(Err(vec![unrelated]), true),
-        CaseOutcome::Failed { .. }
+        outcome_from_run_result(Err(vec![unavailable]), true),
+        CaseOutcome::Blocked { .. }
     ));
 }
 
@@ -876,7 +886,7 @@ fn erratur_flips_before_repete_short_circuit() {
         CaseExecution::without_output(outcome_from_run_result(
             Err(vec![RunnerError::internal(
                 radix::lexer::Span::default(),
-                "uncaught alternate return from call",
+                "body failed",
             )]),
             true,
         ))

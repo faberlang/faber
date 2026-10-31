@@ -3089,15 +3089,18 @@ comment.
 
 ## Testing
 
-`测试` modifiers include `预期失败` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `跳过`,
+`测试` modifiers include `预期失败` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `预期失败`, because it does not establish that the body failed. With
+`重复 N`, every run must satisfy `预期失败`. The other modifiers are `跳过`,
 `预期`, `仅`, `仅于`, `标签`, `时限`, `计量`, `重复`, and
 `易碎`. `重复 N` runs the case N times and passes only if every run
-passes; it does not retry until a pass. `易碎 N` is rejected by `faber test`
-because flaky retries are not executed, so the case body does not run. The
-counts of `时限`, `重复` and `易碎` are non-negative integer literals;
-a float is `test_modifier_integer`.
+satisfies the case's expectations; it does not retry until a pass. `易碎 N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `时限`, `重复` and `易碎` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 

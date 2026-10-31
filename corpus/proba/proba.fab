@@ -1,11 +1,11 @@
 +++
 term = "proba"
-explains = ["proba"]
+explains = ["proba", "erratur"]
 kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "proba_stmt", "proba_modifier", "adfirma_stmt", "expression", "literal", "additive_expr", "equality", "equality_tail"]
 category = "testing"
 canonical = true
-summary = "Defines a single test case."
+summary = "Defines a single test case and its modifiers."
 syntax = "proba <name> [modifiers] <block>"
 aliases = ["test", "it"]
 related = ["probandum", "adfirma", "omitte", "futurum"]
@@ -19,6 +19,10 @@ locale = "en"
 #   • Individual test cases — `proba` declares one test with a descriptive name
 #     and optional modifiers
 #   • Tests live inside `probandum` suites and contain `adfirma` assertions
+#   • Expected failure — `erratur` passes when the body fails in a way the test
+#     runner captures (for example, a failed assertion or runtime fault); clean
+#     completion, timeouts, step-budget exhaustion and blocked outcomes do not
+#     satisfy it
 #
 # Common mistakes:
 #   • Using `adfirma` outside a `proba`/`probandum` test block — `adfirma` is deprecated in production code (WARN006).

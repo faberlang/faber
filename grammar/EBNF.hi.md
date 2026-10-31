@@ -3089,15 +3089,18 @@ comment.
 
 ## Testing
 
-`परीक्षण` modifiers include `अपेक्षित_विफलता` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `छोड़ो`,
+`परीक्षण` modifiers include `अपेक्षित_विफलता` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `अपेक्षित_विफलता`, because it does not establish that the body failed. With
+`पुनरावृत्ति N`, every run must satisfy `अपेक्षित_विफलता`. The other modifiers are `छोड़ो`,
 `लंबित`, `केवल`, `केवलमें`, `टैग`, `समय`, `मापो`, `पुनरावृत्ति`, and
 `नाज़ुक`. `पुनरावृत्ति N` runs the case N times and passes only if every run
-passes; it does not retry until a pass. `नाज़ुक N` is rejected by `faber test`
-because flaky retries are not executed, so the case body does not run. The
-counts of `समय`, `पुनरावृत्ति` and `नाज़ुक` are non-negative integer literals;
-a float is `test_modifier_integer`.
+satisfies the case's expectations; it does not retry until a pass. `नाज़ुक N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `समय`, `पुनरावृत्ति` and `नाज़ुक` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 

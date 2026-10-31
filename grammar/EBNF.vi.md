@@ -3089,15 +3089,18 @@ comment.
 
 ## Testing
 
-`kiểm_thử` modifiers include `mong_đợi_thất_bại` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `bỏ_qua`,
+`kiểm_thử` modifiers include `mong_đợi_thất_bại` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `mong_đợi_thất_bại`, because it does not establish that the body failed. With
+`lặp_lại N`, every run must satisfy `mong_đợi_thất_bại`. The other modifiers are `bỏ_qua`,
 `việc_cần_làm`, `chỉ`, `chỉ_trong`, `nhãn`, `thời_gian`, `đo_lường`, `lặp_lại`, and
 `mong_manh`. `lặp_lại N` runs the case N times and passes only if every run
-passes; it does not retry until a pass. `mong_manh N` is rejected by `faber test`
-because flaky retries are not executed, so the case body does not run. The
-counts of `thời_gian`, `lặp_lại` and `mong_manh` are non-negative integer literals;
-a float is `test_modifier_integer`.
+satisfies the case's expectations; it does not retry until a pass. `mong_manh N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `thời_gian`, `lặp_lại` and `mong_manh` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 
