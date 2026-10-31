@@ -68,6 +68,9 @@ fn intervallum_zero_length_accepts() {
     accepts(&compile(source));
 }
 
+// The file's `compile` helper targets `HirRust`, so the accept probes compile
+// out of builds without the rust leaf (the public cut), like their siblings.
+#[cfg(feature = "hir-rust")]
 #[test]
 fn intervallum_value_step_in_a_binding_accepts() {
     // A stored range carries its step in the type (operator ruling: the step
@@ -509,6 +512,9 @@ fn intervallum_step_arity_still_rejects_three_args() {
     rejects_with_issue(&compile(source), "intervallum_arity");
 }
 
+// The file's `compile` helper targets `HirRust`, so the accept probes compile
+// out of builds without the rust leaf (the public cut), like their siblings.
+#[cfg(feature = "hir-rust")]
 #[test]
 fn intervallum_step_binding_initializer_accepts() {
     // The stored step is part of the value's type, so a literal step that

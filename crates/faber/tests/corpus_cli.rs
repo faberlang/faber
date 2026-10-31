@@ -1541,12 +1541,18 @@ fn exit_class_suite() -> tempfile::TempDir {
     check_only_case(temp.path(), "alpha");
     fs::write(
         temp.path().join("cases/alpha/case.toml"),
-        "version = 1\nid = \"alpha\"\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\n\n[targets.go]\noutcome = \"pass\"\n",
+        "version = 1\nid = \"alpha\"\ninput = \"main.fab\"\n\n[expect]\ncheck_only = true\n\n[targets.runner]\noutcome = \"pass\"\n\n[targets.go]\noutcome = \"pass\"\n\n[targets.fab]\noutcome = \"pass\"\n\n[targets.rust]\noutcome = \"pass\"\n",
     )
     .expect("write case manifest");
+    // A stand-in runtime crate: the rust recipe must validate so a build
+    // without the rust leaf reaches its own target gate
+    // (`corpus_target_missing_from_the_build_exits_69`); these suites never
+    // reach a Cargo build.
+    fs::create_dir(temp.path().join("runtime")).expect("create stand-in runtime");
+    fs::write(temp.path().join("runtime/Cargo.toml"), "").expect("write stand-in runtime");
     fs::write(
         temp.path().join("corpus.toml"),
-        "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nrun = [\"sh\", \"-c\", \"exit 0\"]\n",
+        "version = 1\ncases_dir = \"cases\"\n\n[targets.go]\nemit = \"go\"\nextension = \"go\"\nrun = [\"sh\", \"-c\", \"exit 0\"]\n\n[targets.fab]\nemit = \"faber\"\nextension = \"fab\"\nrun = [\"sh\", \"-c\", \"exit 0\"]\n\n[targets.rust]\nruntime = \"runtime\"\n",
     )
     .expect("write suite manifest");
     temp
@@ -1582,8 +1588,16 @@ fn corpus_invocation_and_config_exit_classes() {
     assert_eq!(code, Some(USAGE));
     let (code, _) = corpus_exit(&["--filter", "alpha"], &smoke_case());
     assert_eq!(code, Some(USAGE));
-    let (code, _) = corpus_exit(&["--target", "go"], suite.path());
+    // A valid suite and target still exit 0. The `go` recipe needs the go
+    // leaf, so builds without it (the public cut) prove the same exit class
+    // with the `fab` recipe, whose `emit = "faber"` every build serves.
+    let (code, _) = corpus_exit(&["--target", "fab"], suite.path());
     assert_eq!(code, Some(0), "a valid suite and target still exit 0");
+    #[cfg(feature = "hir-go")]
+    {
+        let (code, _) = corpus_exit(&["--target", "go"], suite.path());
+        assert_eq!(code, Some(0), "a valid suite and target still exit 0");
+    }
 
     // A failed expectation is an outcome, not a configuration error: still 1.
     let failing = tempfile::tempdir().expect("temporary suite");

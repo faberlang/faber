@@ -2585,6 +2585,10 @@ fn output_code(output: &crate::Output) -> &str {
 /// Need: an `ordo` comparison orders by declared discriminant, and a
 /// loaded unit must carry the order rows that say so. Without them it lowered
 /// the comparison as a plain operator and gave wrong results on every target.
+// The target list carries only private leaves (rust/ts/go/swift/python), so
+// in the public cut every leg compiles out and the probe has nothing to
+// prove: it compiles out with them.
+#[cfg(feature = "hir-rust")]
 #[test]
 fn ordo_order_rows_survive_the_fhir_round_trip() {
     use crate::codegen::{Target, generate_from_analyzed};

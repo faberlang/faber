@@ -1,8 +1,9 @@
 //! Corpus-wide equivalence gate for the kernel declaration head (operator
 //! ruling 2026-10-30): every `.fab` file under `corpus/`, `corpus-product/`
-//! and `acceptance/` that authors a kernel with the `@ kernel` / `@ nucleum`
-//! annotation is rewritten to the head form (`kernel name(…) [mode] …`), and
-//! both forms must agree:
+//! and — with the device lane, whose acceptance exempla live outside the
+//! public cut — `acceptance/` that authors a kernel with the `@ kernel` /
+//! `@ nucleum` annotation is rewritten to the head form
+//! (`kernel name(…) [mode] …`), and both forms must agree:
 //!
 //! 1. `faber check --no-diagnostics` exits with the same status and the same
 //!    `CODE:issue` identity multiset (locations shift by the removed
@@ -561,8 +562,13 @@ enum Case {
 #[test]
 fn corpus_and_acceptance_kernel_cases_agree_between_both_heads() {
     let root = repo_root();
+    let mut trees = vec!["corpus", "corpus-product"];
+    // The acceptance exempla are device-lane fixtures the public cut leaves
+    // out; the gate covers them wherever the lane is compiled in.
+    #[cfg(feature = "device")]
+    trees.push("acceptance");
     let mut files = Vec::new();
-    for tree in ["corpus", "corpus-product", "acceptance"] {
+    for tree in trees {
         collect_fab_files(&root.join(tree), &mut files);
     }
 
@@ -619,8 +625,17 @@ fn corpus_and_acceptance_kernel_cases_agree_between_both_heads() {
         });
     }
 
+    // Coverage floor: with the device lane the gate must cover the corpus,
+    // corpus-product and acceptance kernel cases; a build without the lane
+    // (the public cut) still has to cover the public corpus cases, so its
+    // floor keeps the gate from passing vacuously.
+    let (floor_files, floor_sites) = if cfg!(feature = "device") {
+        (100, 380)
+    } else {
+        (20, 40)
+    };
     assert!(
-        files_rewritten >= 100 && sites >= 380,
+        files_rewritten >= floor_files && sites >= floor_sites,
         "the gate must cover the corpus and acceptance kernel cases \
          (rewrote {files_rewritten} files, {sites} sites)"
     );

@@ -1,6 +1,10 @@
 //! A size-generic `@ kernel` that carries `@ radix backward` in the caller's
 //! own package: a concrete caller instantiates the primal and its companion,
 //! and both calls reach concrete device functions.
+//!
+//! The AIR backward bundle produces the companion, so this needs the device
+//! lane; the public build has no companion to reach.
+#![cfg(feature = "device")]
 
 use super::fs;
 use super::{Config, with_interpreted_lowered_package_mir};

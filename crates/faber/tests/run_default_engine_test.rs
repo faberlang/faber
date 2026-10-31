@@ -213,6 +213,9 @@ fn device_runs_keep_the_runner_as_their_host_engine() {
 /// proves the default engine did not take it. On a Metal host the device
 /// session answers (`PKG001` no entry function); on a host with no admitted
 /// device `auto` fails closed — both nonzero, never the JIT's silent 0.
+// The device route and the `corpus/cuda` exemplum are device-lane surface,
+// so the probe compiles out of the public cut with that lane.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn kernel_declaring_inputs_keep_the_device_route() {
     let source = root().join("corpus/cuda/addita-proof.fab");

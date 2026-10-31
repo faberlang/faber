@@ -66,19 +66,25 @@ fn emit(target: Target, unit: &AnalyzedModule) -> String {
     }
 }
 
+fn assert_roundtrip_is_identical(target: Target, unit: &AnalyzedModule, loaded: &AnalyzedModule) {
+    let direct = emit(target, unit);
+    let via_fhir = emit(target, loaded);
+    assert_eq!(
+        direct, via_fhir,
+        "{target:?}: the loaded unit must emit what the direct unit emits"
+    );
+}
+
 #[test]
 fn marked_size_arguments_render_identically_through_fhir() {
     let unit = analyze_source_once();
     let loaded = load_fhir(&export_fhir(&unit)).expect("FHIR artifact should load");
 
-    for target in [Target::HirFaber, Target::HirRust] {
-        let direct = emit(target, &unit);
-        let via_fhir = emit(target, &loaded);
-        assert_eq!(
-            direct, via_fhir,
-            "{target:?}: the loaded unit must emit what the direct unit emits"
-        );
-    }
+    // The `HirRust` leg needs the private rust leaf, so it compiles out of the
+    // public cut and the `HirFaber` leg proves the seam alone there.
+    assert_roundtrip_is_identical(Target::HirFaber, &unit, &loaded);
+    #[cfg(feature = "hir-rust")]
+    assert_roundtrip_is_identical(Target::HirRust, &unit, &loaded);
 }
 
 #[test]
@@ -97,6 +103,9 @@ fn faber_emit_keeps_the_marker_and_the_whole_shape() {
     }
 }
 
+// Rust-emission probe: needs the private rust leaf, so it compiles out of
+// the public cut (the `HirFaber` probes above keep the seam covered there).
+#[cfg(feature = "hir-rust")]
 #[test]
 fn rust_emit_never_spells_a_size_or_shape_as_a_type() {
     let unit = analyze_source_once();
