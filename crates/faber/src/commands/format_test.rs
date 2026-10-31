@@ -1599,3 +1599,186 @@ fn format_resolves_import_locale_through_loader_without_root() {
     );
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// The two-file imported-`mut` fixture, as a manifest-backed package whose
+/// consumer is spelled the ordinary relative way (`src/main.fab`).
+///
+/// `main` calls the imported `bump` with the required `mut` marker (valid) or
+/// `peek`, whose parameter is read-only, with the same marker (invalid).
+fn write_imported_call_package(root: &Path, call: &str, annotation: &str) -> PathBuf {
+    let package = root.join("imported-call-package");
+    let source_dir = package.join("src");
+    fs::create_dir_all(&source_dir).expect("create package source directory");
+    fs::write(
+        package.join("faber.toml"),
+        r#"[package]
+name = "imported-call-package"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[locale]
+locale = "en"
+"#,
+    )
+    .expect("write package manifest");
+    fs::write(
+        source_dir.join("calls.fab"),
+        format!(
+            "@ public\nfn bump(mut list<int> values) → void {{\n    values.append(7)\n}}\n\n@ public\nfn peek(list<int> values) → int {{\n    return values[0]\n}}\n"
+        ),
+    )
+    .expect("write call module");
+    fs::write(
+        source_dir.join("main.fab"),
+        format!(
+            "import from \"./calls\" calls\n\nmain {{\n    {annotation}\n    calls.{call}\n    print values\n}}\n"
+        ),
+    )
+    .expect("write entry module");
+    package
+}
+
+/// Run `faber format` inside `cwd` so the input stays a plain relative path.
+fn run_format_in(cwd: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(faber_binary())
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .expect("run faber format")
+}
+
+/// Need: an imported `mut` parameter must cross the formatter's
+/// file-interface snapshot with its marker intact. The snapshot used to read
+/// only the parameter record's own mode (`mut` lives on the type expression),
+/// so the imported `bump` degraded to read-only and every mode refused the
+/// valid call with `SEM057.call_marker_on_read_only`. The whole matrix must
+/// format: check/default report, `--stdout` text, and a `--write` whose
+/// second pass is byte-idempotent.
+#[test]
+fn format_cli_formats_valid_imported_mut_call() {
+    let root = tempfile::tempdir().expect("create scratch");
+    let package = write_imported_call_package(
+        root.path(),
+        "bump(mut values)",
+        "mut list<int> values ← [1]",
+    );
+    let entry = "src/main.fab";
+
+    // Check/default: the valid call is accepted (a drift report, never a
+    // diagnostic refusal).
+    for mode in [vec!["format", "--check", entry], vec!["format", entry]] {
+        let output = run_format_in(&package, &mode);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            output.status.success(),
+            "format {} must accept the valid imported-mut call:\n{stderr}",
+            mode.join(" ")
+        );
+        assert!(
+            // ALLOW_DIAGNOSTIC_RENDER_TEXT: tool output rendered diagnostic contract
+            // (`faber format` has no structured diagnostics; this pins the code:issue).
+            !stderr.contains("SEM057"),
+            "format {} must not report a call-marker refusal:\n{stderr}",
+            mode.join(" ")
+        );
+    }
+
+    // `--stdout`: the canonical text keeps the imported marker on both sides.
+    let output = run_format_in(&package, &["format", "--stdout", entry]);
+    assert!(output.status.success(), "--stdout must succeed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("calls.bump(mut values)"),
+        "--stdout must keep the imported mut argument:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("mut list<int> values"),
+        "--stdout must keep the mut binding:\n{stdout}"
+    );
+
+    // `--write`, then a second pass that must change no byte.
+    let output = run_format_in(&package, &["format", "--write", entry]);
+    assert!(
+        output.status.success(),
+        "--write must succeed:\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let written = fs::read_to_string(package.join(entry)).expect("read written entry");
+    assert_eq!(
+        normalize_trailing_newline(&stdout),
+        written,
+        "--stdout text and --write bytes must agree"
+    );
+    let second = run_format_in(&package, &["format", "--write", entry]);
+    assert!(second.status.success(), "second --write must succeed");
+    let stdout = String::from_utf8_lossy(&second.stdout);
+    assert!(
+        stdout.contains("formatted 0 of 1 files"),
+        "the second pass must be a byte-idempotent no-op:\n{stdout}"
+    );
+    assert_eq!(
+        fs::read_to_string(package.join(entry)).expect("read entry again"),
+        written,
+        "the second pass must leave the file byte-identical"
+    );
+    let check = run_format_in(&package, &["format", "--check", entry]);
+    let stdout = String::from_utf8_lossy(&check.stdout);
+    assert!(
+        check.status.success() && stdout.contains("already formatted"),
+        "the written file must read as formatted:\n{stdout}"
+    );
+}
+
+/// The mirror refusal: a genuinely read-only imported parameter still rejects
+/// the `mut` argument in every mode, and no mode writes the refused file.
+#[test]
+fn format_cli_still_refuses_read_only_imported_argument() {
+    let root = tempfile::tempdir().expect("create scratch");
+    let package = write_imported_call_package(
+        root.path(),
+        "peek(mut values)",
+        "let list<int> values ← [1]",
+    );
+    let entry = "src/main.fab";
+    let original = fs::read_to_string(package.join(entry)).expect("read entry");
+
+    for mode in [
+        vec!["format", "--check", entry],
+        vec!["format", entry],
+        vec!["format", "--write", entry],
+    ] {
+        let output = run_format_in(&package, &mode);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            !output.status.success(),
+            "format {} must refuse the read-only imported argument:\n{stderr}",
+            mode.join(" ")
+        );
+        assert!(
+            // ALLOW_DIAGNOSTIC_RENDER_TEXT: tool output rendered diagnostic contract
+            // (`faber format` has no structured diagnostics; this pins the code:issue).
+            stderr.contains("SEM057:call_marker_on_read_only"),
+            "format {} must name the call-marker refusal:\n{stderr}",
+            mode.join(" ")
+        );
+    }
+    // Text mode prints nothing and refuses too.
+    let output = run_format_in(&package, &["format", "--stdout", entry]);
+    assert!(!output.status.success(), "--stdout must refuse");
+    assert!(
+        output.stdout.is_empty(),
+        "a refused --stdout must print no text"
+    );
+    assert_eq!(
+        fs::read_to_string(package.join(entry)).expect("read entry"),
+        original,
+        "a refused format must leave the file byte-identical"
+    );
+}

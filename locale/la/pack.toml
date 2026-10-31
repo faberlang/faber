@@ -3193,10 +3193,6 @@ help = "use '⊥' for a failable call: the optional default only covers an absen
 message = "trap member type mismatch"
 help = "check the member type flowing into the {capta} trap"
 
-[diagnostics.SEM010.issues.trap_union_collapsed]
-message = "{capta} trap union collapsed to '{type}': success and error are the same type, so the trap cannot distinguish them"
-help = "make the success type and the error channel distinguishable, or handle the error with {fac}/cape instead"
-
 [diagnostics.SEM011.issues.generic_type_arg_domain]
 message = "type argument {rejected} is not allowed for {param}; expected one of {accepted}"
 help = "choose one of the allowed type arguments for this generic parameter"
@@ -5144,6 +5140,15 @@ help = "omnia foramina numera (`§0`, `§1`, …), ut quodque argumentum quod vi
 [diagnostics.WARN035.issues.mixed_plain_numbered_template_holes]
 message = "hoc exemplar miscet foramina simplicia et numerata; simplicia legunt {reads}"
 help = "omnia foramina numera (`§0`, `§1`, …), ut quodque argumentum quod vis legat"
+
+
+[diagnostics.WARN036]
+message = "nihil intra hunc {capta} terminum falli potest: canalis erroris vacuus est"
+help = "terminum omitte, aut aliquid fallibile intus voca"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "nihil intra hunc {capta} terminum falli potest: canalis erroris vacuus est"
+help = "terminum omitte, aut aliquid fallibile intus voca"
 
 [llm]
 system_prompt_snippet = "Emit canonical Latin Faber source using the registered Latin keywords, canonical type spellings, and invariant glyph syntax. Cum textus signum citationis (\" aut ') continet, eum «…» scribe: guillemetae nullis effugiis egent."

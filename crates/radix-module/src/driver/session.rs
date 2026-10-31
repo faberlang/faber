@@ -190,6 +190,13 @@ pub struct Config {
     /// must print the author's text; every compile path leaves it `false`.
     pub keep_authored_constants: bool,
 
+    /// Keep the parameter access markers in AST-built import signatures.
+    /// Faber formatting requires these markers to validate imported mutable
+    /// calls. File-at-a-time locale conversion retains its historical
+    /// incomplete-import refusal behavior and disables this only for its
+    /// re-emission session.
+    pub preserve_imported_param_access_markers: bool,
+
     /// Leave `praefixum` bodies that reach an import for the package layer.
     /// Analysis never runs another module's code: with this set, a module
     /// with such a body keeps every `praefixum` initializer unevaluated; with
@@ -234,6 +241,7 @@ impl Default for Config {
             kernel_complexity_budget: None,
             deny_kernel_tiers: false,
             keep_authored_constants: false,
+            preserve_imported_param_access_markers: true,
             defer_imported_praefixum: false,
             target_bindings: TargetBindings::default(),
             #[cfg(feature = "mir-clif")]

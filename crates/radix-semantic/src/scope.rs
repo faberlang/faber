@@ -824,6 +824,11 @@ pub struct Resolver {
     builtin_sermo_def_id: Option<DefId>,
     builtin_meus_def_id: Option<DefId>,
     builtin_tuus_def_id: Option<DefId>,
+    /// Builtin generic genus `trapped<R, T>` (f9d8a611): definition id, plus
+    /// whether the program applied it (a `trapped<...>` type position or a
+    /// `capta` boundary, which applies it implicitly).
+    builtin_trapped_def_id: Option<DefId>,
+    builtin_trapped_applied: bool,
     /// Conversation types of `@ ad` routes served by imported files (D6.11).
     imported_ad_routes: Vec<ImportedAdRoute>,
     builtin_status_variants: Vec<(DefId, LexSymbol)>,
@@ -968,6 +973,8 @@ impl Resolver {
             builtin_sermo_def_id: None,
             builtin_meus_def_id: None,
             builtin_tuus_def_id: None,
+            builtin_trapped_def_id: None,
+            builtin_trapped_applied: false,
             imported_ad_routes: Vec::new(),
             builtin_status_variants: Vec::new(),
             variant_parents: FxHashMap::default(),
@@ -3550,6 +3557,30 @@ impl Resolver {
     #[must_use]
     pub fn builtin_tuus_def_id(&self) -> Option<DefId> {
         self.builtin_tuus_def_id
+    }
+
+    /// Builtin `trapped<R, T>` genus definition id (f9d8a611).
+    #[must_use]
+    pub fn builtin_trapped_def_id(&self) -> Option<DefId> {
+        self.builtin_trapped_def_id
+    }
+
+    /// Whether the program applied the builtin `trapped<R, T>` genus: a
+    /// `trapped<...>` type position, or a `capta` boundary (which applies it
+    /// implicitly through its re-typed result). Drives HIR item injection.
+    #[must_use]
+    pub fn builtin_trapped_applied(&self) -> bool {
+        self.builtin_trapped_applied
+    }
+
+    /// Record the builtin `trapped` genus definition id at registration.
+    pub(crate) fn register_builtin_trapped_def_id(&mut self, def_id: DefId) {
+        self.builtin_trapped_def_id = Some(def_id);
+    }
+
+    /// Record that the program applies the builtin `trapped<R, T>` genus.
+    pub(crate) fn mark_builtin_trapped_applied(&mut self) {
+        self.builtin_trapped_applied = true;
     }
 
     pub(crate) fn register_builtin_scrinium(

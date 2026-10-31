@@ -127,14 +127,12 @@ pub fn normalize_locale002_notes(
 /// declared pack being loadable from any root or loader.
 #[must_use]
 pub fn source_declares_locale(name: &str, source: &str) -> bool {
-    crate::driver::peel_raw_source(name, source)
-        .ok()
-        .is_some_and(|peeled| {
-            peeled
-                .frontmatter
-                .as_ref()
-                .is_some_and(|frontmatter| frontmatter.locale_result().is_some())
-        })
+    crate::driver::peel_raw_source(name, source).is_ok_and(|peeled| {
+        peeled
+            .frontmatter
+            .as_ref()
+            .is_some_and(|frontmatter| frontmatter.locale_result().is_some())
+    })
 }
 
 fn check_source_deferring_locale(

@@ -275,7 +275,7 @@ fn temp_homes(function: &MirFunction) -> BTreeMap<MirTempId, MirLocalId> {
             MirOperand::Temp(temp) => Some(*temp),
             MirOperand::Place(place) if place.projections.is_empty() => match place.base {
                 MirPlaceBase::Temp(temp) => Some(temp),
-                _ => None,
+                MirPlaceBase::Local(_) => None,
             },
             _ => None,
         }

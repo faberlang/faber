@@ -107,6 +107,13 @@ struct KernelLaunchPipelineBindGroupLayoutJson {
 }
 
 #[derive(Serialize)]
+struct KernelLaunchOffsetModeFlagsJson {
+    requires_dynamic_offsets: bool,
+    has_non_dynamic_offsets: bool,
+    has_mixed_offset_modes: bool,
+}
+
+#[derive(Serialize)]
 struct KernelLaunchBindGroupJson {
     bind_group_index: usize,
     group: u32,
@@ -132,9 +139,8 @@ struct KernelLaunchBindGroupJson {
     dynamic_offset_flag_count: usize,
     offset_modes: Vec<&'static str>,
     offset_mode_entry_count: usize,
-    requires_dynamic_offsets: bool,
-    has_non_dynamic_offsets: bool,
-    has_mixed_offset_modes: bool,
+    #[serde(flatten)]
+    offset_mode_flags: KernelLaunchOffsetModeFlagsJson,
     offset_mode_count: usize,
     has_only_non_dynamic_offsets: bool,
     has_only_dynamic_offsets: bool,
@@ -226,9 +232,12 @@ struct WebGpuLaunchAdapterJson {
 
 #[derive(Serialize)]
 struct WebGpuPipelineLayoutDescriptorJson {
-    bind_group_layout_count: usize,
-    bind_group_layout_indexes: Vec<usize>,
-    bind_group_layout_index_count: usize,
+    #[serde(rename = "bind_group_layout_count")]
+    layout_count: usize,
+    #[serde(rename = "bind_group_layout_indexes")]
+    layout_indexes: Vec<usize>,
+    #[serde(rename = "bind_group_layout_index_count")]
+    layout_index_count: usize,
 }
 
 #[derive(Serialize)]
@@ -593,9 +602,11 @@ fn launch_bind_group_json(group: &crate::mir::MirKernelLaunchBindGroup) -> Kerne
             .map(|mode| mode.spelling())
             .collect(),
         offset_mode_entry_count: group.offset_mode_entry_count,
-        requires_dynamic_offsets: group.requires_dynamic_offsets,
-        has_non_dynamic_offsets: group.has_non_dynamic_offsets,
-        has_mixed_offset_modes: group.has_mixed_offset_modes,
+        offset_mode_flags: KernelLaunchOffsetModeFlagsJson {
+            requires_dynamic_offsets: group.requires_dynamic_offsets,
+            has_non_dynamic_offsets: group.has_non_dynamic_offsets,
+            has_mixed_offset_modes: group.has_mixed_offset_modes,
+        },
         offset_mode_count: group.offset_mode_count,
         has_only_non_dynamic_offsets: group.has_only_non_dynamic_offsets,
         has_only_dynamic_offsets: group.has_only_dynamic_offsets,
@@ -722,9 +733,9 @@ fn webgpu_pipeline_layout_descriptor_json(
     layout: &crate::mir::MirWebGpuPipelineLayoutDescriptor,
 ) -> WebGpuPipelineLayoutDescriptorJson {
     WebGpuPipelineLayoutDescriptorJson {
-        bind_group_layout_count: layout.bind_group_layout_count,
-        bind_group_layout_indexes: layout.bind_group_layout_indexes.clone(),
-        bind_group_layout_index_count: layout.bind_group_layout_index_count,
+        layout_count: layout.bind_group_layout_count,
+        layout_indexes: layout.bind_group_layout_indexes.clone(),
+        layout_index_count: layout.bind_group_layout_index_count,
     }
 }
 

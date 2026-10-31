@@ -88,7 +88,7 @@ pub(super) enum FactKey {
 type ConditionRefinement = (Facts, Facts);
 
 pub(super) const ISSUE_TRAP_MEMBER_TYPE_MISMATCH: &str = "trap_member_type_mismatch";
-pub(super) const ISSUE_TRAP_UNION_COLLAPSED: &str = "trap_union_collapsed";
+const ISSUE_TRAP_ERROR_CHANNEL_EMPTY: &str = "trap_error_channel_empty";
 const ISSUE_CALL_DEFAULT_ON_INFALLIBLE_CALL: &str = "call_default_on_infallible_call";
 const ISSUE_CALL_DEFAULT_TYPE_MISMATCH: &str = "call_default_type_mismatch";
 
@@ -134,87 +134,92 @@ impl TypeChecker<'_> {
     }
 
     /// Check a `capta { ... }` capture boundary (UT): the error channel
-    /// reified into a value union.
+    /// reified into the tagged built-in genus `trapped<R, T>` (ruling
+    /// f9d8a611).
     ///
-    /// Typing is all reuse — no new inference: the result is a fresh
-    /// `Type::InferUnion` hole; every failable call's error type and `iace`
-    /// payload inside the body accumulates into it through the existing
-    /// U-02 arms (`ErrorSink::Trap` + the third `reject_failable_call`
-    /// answer); the body's success type unifies in the same way; finalize
-    /// solves through the existing normalization (WARN017 covers the
-    /// degenerate single-member solve).
+    /// Typing is all reuse — no new inference: the body's success type is the
+    /// `R` slot; every failable call's error type and `iace` payload inside
+    /// the body accumulates into one fresh `Type::InferUnion` hole through
+    /// the existing U-02 arms (`ErrorSink::Trap` + the third
+    /// `reject_failable_call` answer), and that solved hole is the `T` slot;
+    /// finalize solves it through the existing normalization. `R` and `T` are
+    /// separate slots, so a success and an error of the same type stay
+    /// distinguishable — the variants carry the discrimination, and the old
+    /// union-collapse guard is retired with the untagged result form.
     ///
-    /// Fail-closed guard: when the synthesized union collapses below two
-    /// members *because success and error are the same type* (T ≡ E, after
-    /// the existing dedup/alias-transparency law), the collapsed value
-    /// cannot distinguish success from failure and the trap contract is
-    /// unstateable — dedicated diagnostic. Partial overlap (shared members,
-    /// still ≥2 members) stays legal: narrowing keeps it sound.
-    pub fn check_trap(
-        &mut self,
-        body: &mut HirBlock,
-        expected: Option<TypeId>,
-        span: radix_lexer::Span,
-    ) -> TypeId {
-        // An explicit `∪` annotation hole (`let ∪ r ← capta { … }`) owns the
-        // accumulation directly; anything else gets a fresh hole.
-        let expected_var = expected
-            .map(|ty| self.resolve_inferred_type(ty))
-            .and_then(|resolved| match self.types.get(resolved) {
-                Type::InferUnion(var) => Some(*var),
-                _ => None,
-            });
-        let var = expected_var.unwrap_or_else(|| self.fresh_union_hole());
+    /// An infallible body leaves the `T` slot uninhabited: it types as
+    /// `numquam` (the `thrown` variant can never occur) and carries its own
+    /// warning (`trap_error_channel_empty`), not an inference error.
+    pub fn check_trap(&mut self, body: &mut HirBlock, span: radix_lexer::Span) -> TypeId {
+        let var = self.fresh_union_hole();
 
         let prev_error = self.current_error.replace(ErrorSink::Trap(var));
         let prev_flow = std::mem::replace(&mut self.trap_error_flow, false);
-        let body_ty = self.check_block(body, None);
+        let success_ty = self.check_block(body, None);
         self.current_error = prev_error;
         let error_flowed = std::mem::replace(&mut self.trap_error_flow, prev_flow);
 
-        // The success member rides the same accumulation arm as the errors.
-        self.accumulate_into_union_hole(var, body_ty, span, ISSUE_TRAP_MEMBER_TYPE_MISMATCH);
+        // The T slot solves to exactly the escaping error types — one member
+        // is the healthy single-error-channel case, so WARN017 never applies
+        // to it (the empty-channel warning below owns the degenerate case).
+        self.trap_error_holes.insert(var);
 
-        self.closed_trap_holes.insert(var);
-
-        let collapsed = if error_flowed {
-            self.trap_collapsed_member(var)
+        let error_ty = if error_flowed {
+            self.solve_trap_error_slot(var)
         } else {
-            None
-        };
-        if let Some(collapsed) = collapsed {
-            let member = self.format_union_constituent_type(collapsed);
-            self.invalid_operand_types_with_args(
-                ISSUE_TRAP_UNION_COLLAPSED,
+            self.push_warning(
+                WarningKind::TrapErrorChannelEmpty,
+                ISSUE_TRAP_ERROR_CHANNEL_EMPTY,
                 span,
-                &[("type", member)],
+                &[],
+            );
+            self.types.primitive(Primitive::Numquam)
+        };
+
+        let Some(trapped_def) = self.resolver.builtin_trapped_def_id() else {
+            // The genus registers before any declaration is collected, so
+            // this is a compiler-ordering bug, not a source error; recover
+            // with the error type so later phases fail closed.
+            debug_assert!(
+                false,
+                "builtin trapped genus must register before check_trap"
             );
             return self.error_type;
-        }
+        };
 
-        // `let r ← capta { ... }`: the monomorphic `_` hole binds to the
-        // trap hole so the local's type is the solved union (the U-02 arm
-        // would otherwise strand the `_` as an unbound pending member).
-        if expected_var.is_none()
-            && let Some(expected) = expected
-        {
-            let resolved = self.resolve_inferred_type(expected);
-            let mono_var = match self.types.get(resolved) {
-                Type::Infer(var) => Some(*var),
-                _ => None,
-            };
-            if let Some(mono_var) = mono_var {
-                let hole = self.union_hole_type_id(var);
-                self.bind_infer_with_diagnostic(
-                    mono_var,
-                    hole,
-                    span,
-                    ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
-                );
+        crate::builtins::trapped::applied_type(self.types, trapped_def, success_ty, error_ty)
+    }
+
+    /// Solve a closed `capta` boundary's `T` slot from its accumulated member
+    /// set.
+    ///
+    /// The set is complete when the boundary closes (`ErrorSink::Trap` is
+    /// restored), so the slot can solve before finalize: arms over the
+    /// `trapped` result then bind payloads against the solved error type,
+    /// not an open hole. Mirrors the finalize union-hole law (resolve each
+    /// member, drop error recovery, dedup via `equals`, keep accumulation
+    /// order) without touching the canonicalization cache: a still-pending
+    /// member set stays the open hole so finalize owns the
+    /// missing-annotation path.
+    fn solve_trap_error_slot(&mut self, var: InferVar) -> TypeId {
+        let members: Vec<TypeId> = {
+            let borrowed = self.union_members.borrow();
+            borrowed.get(&var).cloned().unwrap_or_default()
+        };
+        let mut distinct: Vec<TypeId> = Vec::new();
+        for member in members {
+            let member = self.resolve_inferred_type(member);
+            if member != self.error_type
+                && !distinct.iter().any(|seen| self.types.equals(*seen, member))
+            {
+                distinct.push(member);
             }
         }
-
-        self.union_hole_type_id(var)
+        match distinct.as_slice() {
+            [] => self.union_hole_type_id(var),
+            [only] => *only,
+            _ => self.types.intern(Type::Union(distinct)),
+        }
     }
 
     /// Check `call ⊥ default` (D17.7).
@@ -257,26 +262,6 @@ impl TypeChecker<'_> {
             ISSUE_CALL_DEFAULT_TYPE_MISMATCH,
         );
         body_ty
-    }
-
-    /// The single surviving member of a trap hole after the existing
-    /// canonicalization law (BO-S-4 sort/dedup over `union_member_sort_key`
-    /// + `equals`), or `None` when two or more members remain.
-    fn trap_collapsed_member(&mut self, var: InferVar) -> Option<TypeId> {
-        let members: Vec<TypeId> = {
-            let borrowed = self.union_members.borrow();
-            borrowed.get(&var).cloned().unwrap_or_default()
-        };
-        let mut cleaned: Vec<TypeId> = members
-            .into_iter()
-            .filter(|member| *member != self.error_type)
-            .collect();
-        cleaned.sort_by_key(|id| (self.types.union_member_sort_key(*id).0, id.0));
-        cleaned.dedup_by(|a, b| self.types.equals(*a, *b));
-        match cleaned.as_slice() {
-            [only] => Some(*only),
-            _ => None,
-        }
     }
 
     /// Check a `discerne` expression and merge arm result types.
@@ -839,9 +824,6 @@ impl TypeChecker<'_> {
             return (None, None);
         }
         let binding_ty = self.resolve_inferred_type(binding.ty);
-        let binding_ty = self
-            .closed_trap_hole_union(binding_ty)
-            .unwrap_or(binding_ty);
         let Some(members) = self.union_members_of(binding_ty) else {
             return (None, None);
         };
@@ -865,38 +847,6 @@ impl TypeChecker<'_> {
                 Some((FactKey::Binding(*def_id), FactValue::ty(member))),
             )
         }
-    }
-
-    /// The member set of a trap result hole, as a union type, once the trap
-    /// body has been fully checked.
-    ///
-    /// A `_` or `∪` binding of `trap { … }` keeps the open `InferUnion` hole
-    /// until finalize, so `is` narrowing would otherwise see no members and
-    /// leave the binding at the whole union. The hole's accumulated set is
-    /// complete when the trap boundary closes, so the narrowing reads it
-    /// directly. Returns `None` for any other type, and for a set that has
-    /// fewer than two distinct members (the collapse diagnostic owns that).
-    fn closed_trap_hole_union(&mut self, ty: TypeId) -> Option<TypeId> {
-        let Type::InferUnion(var) = *self.types.get(ty) else {
-            return None;
-        };
-        if !self.closed_trap_holes.contains(&var) {
-            return None;
-        }
-        let members: Vec<TypeId> = {
-            let borrowed = self.union_members.borrow();
-            borrowed.get(&var).cloned().unwrap_or_default()
-        };
-        let mut distinct: Vec<TypeId> = Vec::new();
-        for member in members {
-            let member = self.resolve_inferred_type(member);
-            if member != self.error_type
-                && !distinct.iter().any(|seen| self.types.equals(*seen, member))
-            {
-                distinct.push(member);
-            }
-        }
-        (distinct.len() >= 2).then(|| self.types.intern(Type::Union(distinct)))
     }
 
     /// WARN when a `TypeCheck` tests a member its operand union cannot hold

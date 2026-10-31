@@ -434,6 +434,11 @@ pub fn analyze_with_interner(
     let cfg = build_cfg(hir)?;
     let mut collector = EventCollector::new(&cfg, types, access_facts, interner);
     collector.visit_program(hir);
+    if let Some(error) = collector.missing_location {
+        // A borrow bound at a site the CFG builder did not cover is a named
+        // engine gap: fail closed rather than approximate.
+        return Err(error);
+    }
 
     let borrows = std::mem::take(&mut collector.borrows);
     let mut regions = Vec::with_capacity(borrows.len());
@@ -736,6 +741,9 @@ struct EventCollector<'a> {
     source_kills: FxHashMap<DefId, Vec<CfgNodeId>>,
     locations: Vec<CfgNodeId>,
     fact_reads: usize,
+    /// First borrow candidate whose start had no CFG location, kept to fail
+    /// the whole run closed (SEM008) instead of dropping the candidate.
+    missing_location: Option<RegionError>,
 }
 
 impl<'a> EventCollector<'a> {
@@ -768,6 +776,7 @@ impl<'a> EventCollector<'a> {
             source_kills,
             locations: Vec::new(),
             fact_reads: access_facts.dead_source_count(),
+            missing_location: None,
         }
     }
 
@@ -779,6 +788,10 @@ impl<'a> EventCollector<'a> {
     /// between its bind and this site.  Anchoring one use at the site where
     /// the value escapes keeps the region live up to the creation point —
     /// exactly the reach the block-scope approximation decided for captures.
+    /// The anchor applies to every name whose use count grew, including one
+    /// whose first recorded use is inside the component: without that, a
+    /// first-use-in-component borrower kept no use in the enclosing flow and
+    /// a conflicting write between its bind and the capture passed silently.
     fn visit_separate_component(
         &mut self,
         component: SeparateComponent<'_>,
@@ -787,7 +800,7 @@ impl<'a> EventCollector<'a> {
         for operand in component.operands {
             self.visit_expr(operand);
         }
-        let before: Vec<(DefId, usize)> = self
+        let before: FxHashMap<DefId, usize> = self
             .uses
             .iter()
             .map(|(def_id, nodes)| (*def_id, nodes.len()))
@@ -799,14 +812,14 @@ impl<'a> EventCollector<'a> {
         let Some(site) = site else {
             return;
         };
-        for (def_id, count) in before {
-            if self
-                .uses
-                .get(&def_id)
-                .is_some_and(|nodes| nodes.len() > count)
-            {
-                self.uses.entry(def_id).or_default().push(site);
-            }
+        let anchored: Vec<DefId> = self
+            .uses
+            .iter()
+            .filter(|(def_id, nodes)| nodes.len() > before.get(*def_id).copied().unwrap_or(0))
+            .map(|(&def_id, _)| def_id)
+            .collect();
+        for def_id in anchored {
+            self.uses.entry(def_id).or_default().push(site);
         }
     }
 
@@ -859,6 +872,17 @@ impl<'a> EventCollector<'a> {
             .node_for_hir_id(statement.id)
             .or_else(|| self.cfg.node_for_hir_id(init.id));
         let Some(start) = start else {
+            // Fail closed: a borrow the engine cannot anchor must not lose
+            // its facts silently. Recording the gap makes the whole run
+            // return `RegionError::MissingLocation`, which the driver maps
+            // to the named SEM008 `region_facts_not_built` diagnostic
+            // instead of quietly keeping the block-scope approximation.
+            if self.missing_location.is_none() {
+                self.missing_location = Some(RegionError::MissingLocation {
+                    hir_id: init.id,
+                    span: init.span,
+                });
+            }
             return;
         };
         for source in sources {

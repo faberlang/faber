@@ -395,7 +395,7 @@ impl FunctionBuilder<'_> {
         if let Some(trap) = self.take_innermost_trap() {
             let error_ty = self.expr_ty(value)?;
             let operand = self.lower_transfer_expr(value)?;
-            self.assign(trap.destination, operand, error_ty, span);
+            self.store_trapped_error(&trap, operand, error_ty, span);
             self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
             return None;
         }
@@ -514,17 +514,35 @@ impl FunctionBuilder<'_> {
 
     /// Lower a `capta { ... }` capture boundary (UT).
     ///
-    /// The trap result is the union-typed destination temp. The body lowers
-    /// into that destination (its trailing expression is the success member);
-    /// every failable call and `iace` inside wraps its payload into the same
-    /// destination through the existing `TryCall` error block and joins — a
-    /// trapped error never reaches `ReturnError`.
+    /// The trap result is the tagged `trapped<R, T>` value (ruling f9d8a611):
+    /// the body's trailing expression lowers into a success temp that wraps
+    /// into `returned { value }` in the destination, and every failable call
+    /// and `iace` inside the body wraps its payload into `thrown { error }`
+    /// in the same destination through the existing `TryCall` error blocks —
+    /// a trapped error never reaches `ReturnError`.
     pub(super) fn lower_trap_expr(&mut self, body: &HirBlock, expr: &HirExpression) -> Option<MirOperand> {
-        let ty = self.expr_ty(expr)?;
+        let mir_ty = self.expr_ty(expr)?;
         let span = expr.span;
-        let destination_temp = self.push_temp(ty, span);
+        let carrier = self.trapped_carrier(mir_ty, span)?;
+        let (trapped_ty, returned_variant) = match &carrier {
+            TrapCarrier::Tagged { ty, returned_variant, thrown_variant: _ } => (*ty, *returned_variant),
+            TrapCarrier::RawError => {
+                self.errors.push(MirError::validation(
+                    span,
+                    "trapped_carrier returns the tagged carrier for a capta boundary",
+                ));
+                return None;
+            }
+        };
+
+        let destination_temp = self.push_temp(trapped_ty, span);
         let destination = MirPlace::temp(destination_temp);
         let join = self.fresh_block(span);
+        // The body lowers into its own success temp so the wrap below reads
+        // one `R`-typed value on every success path (a vacuum body stores the
+        // unit there through the same destination lowering).
+        let success_ty = self.trapped_success_slot(mir_ty, span)?;
+        let success_temp = self.push_temp(MirType::semantic(success_ty), span);
 
         self.capture_depth += 1;
         self.traps.push(TrapContext {
@@ -532,8 +550,9 @@ impl FunctionBuilder<'_> {
             join_block: join,
             error_paths: false,
             depth: self.capture_depth,
+            carrier,
         });
-        self.lower_block_to_destination(body, destination.clone(), ty, span);
+        self.lower_block_to_destination(body, MirPlace::temp(success_temp), MirType::semantic(success_ty), span)?;
         let Some(trap) = self.traps.pop() else {
             self.errors.push(MirError::validation(
                 span,
@@ -542,13 +561,110 @@ impl FunctionBuilder<'_> {
             return None;
         };
 
-        let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+        let body_reaches = self.current_is_open();
+        if body_reaches {
+            let value = MirOperand::Temp(success_temp);
+            let returned_fields = self.variant_payload(returned_variant, vec![value], span);
+            let wrapped = self.construct_temp(
+                MirAggregateKind::EnumVariant(returned_variant),
+                returned_fields,
+                trapped_ty,
+                span,
+            );
+            self.assign(destination.clone(), wrapped, trapped_ty, span);
+            self.terminate_current(MirTerminatorKind::Goto(join), span);
+        }
         if body_reaches || trap.error_paths {
             self.switch_to(join);
         } else {
             self.seal_unreachable(join, span);
         }
         Some(MirOperand::Temp(destination_temp))
+    }
+
+    /// Resolve the `trapped<R, T>` application of a `capta` boundary into its
+    /// tagged carrier: the application type plus the builtin genus's
+    /// `returned` / `thrown` variant definitions.
+    fn trapped_carrier(&mut self, ty: MirType, span: Span) -> Option<TrapCarrier> {
+        let ty = ty.semantic_id();
+        let Type::Applied(base, _) = self.types.get(ty).clone() else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "capta trap result is not the tagged trapped<R, T> application",
+            ));
+            return None;
+        };
+        let Type::Enum(trapped_def) = self.types.get(base).clone() else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "capta trap result base is not the builtin trapped genus",
+            ));
+            return None;
+        };
+        let Some(interner) = self.context.interner else {
+            self.errors.push(MirError::missing_type(
+                span,
+                "capta trap carrier resolution requires the interner",
+            ));
+            return None;
+        };
+        let variant = |name: &'static str| {
+            interner.lookup(name).and_then(|symbol| {
+                self.context
+                    .enum_variant_by_name
+                    .get(&(trapped_def, symbol))
+                    .copied()
+            })
+        };
+        let (Some(returned_variant), Some(thrown_variant)) = (variant("returned"), variant("thrown")) else {
+            self.errors.push(MirError::unsupported(
+                span,
+                "capta trap carrier is missing the builtin trapped variant metadata",
+            ));
+            return None;
+        };
+        Some(TrapCarrier::Tagged { ty: MirType::semantic(ty), returned_variant, thrown_variant })
+    }
+
+    /// The `R` slot of a `trapped<R, T>` application.
+    fn trapped_success_slot(&mut self, ty: MirType, span: Span) -> Option<TypeId> {
+        let Type::Applied(_, args) = self.types.get(ty.semantic_id()).clone() else {
+            self.errors
+                .push(MirError::missing_type(span, "capta trap success slot"));
+            return None;
+        };
+        match args.first() {
+            Some(radix_types::AppliedArg::Type(success)) => Some(*success),
+            _ => {
+                self.errors
+                    .push(MirError::missing_type(span, "capta trap success slot"));
+                None
+            }
+        }
+    }
+
+    /// Store one captured error payload into its boundary destination: the
+    /// tagged `capta` carrier wraps it into `thrown { error }`, while the
+    /// raw-error boundaries (`call ⊥ default`, the dying `⇜` call) keep the
+    /// payload unwrapped for their own readers.
+    pub(super) fn store_trapped_error(
+        &mut self,
+        trap: &TrapContext,
+        payload: MirOperand,
+        payload_ty: MirType,
+        span: Span,
+    ) {
+        match &trap.carrier {
+            TrapCarrier::Tagged { ty, thrown_variant, returned_variant: _ } => {
+                let thrown_fields = self.variant_payload(*thrown_variant, vec![payload], span);
+                let wrapped =
+                    self.construct_temp(MirAggregateKind::EnumVariant(*thrown_variant), thrown_fields, *ty, span);
+                self.assign(trap.destination.clone(), wrapped, *ty, span);
+            }
+            TrapCarrier::RawError => {
+                self.assign(trap.destination.clone(), payload, payload_ty, span);
+            }
+        }
     }
 
     /// Lower `call ⊥ default` (D17.7) through the trap machinery.
@@ -587,6 +703,7 @@ impl FunctionBuilder<'_> {
             join_block: fail_block,
             error_paths: false,
             depth: self.capture_depth,
+            carrier: TrapCarrier::RawError,
         });
         self.lower_block_to_destination(body, destination.clone(), ty, span);
         let error_paths = self.traps.pop().is_some_and(|trap| trap.error_paths);

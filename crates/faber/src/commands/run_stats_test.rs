@@ -147,6 +147,21 @@ fn framed_artifact(stdout: &[u8]) -> (Vec<u8>, RunStatsArtifact) {
 }
 
 #[test]
+fn civil_date_converts_negative_zero_and_positive_day_counts() {
+    let cases = [
+        (-719_893, (-1, 1, 1)),
+        (-719_529, (-1, 12, 31)),
+        (-719_469, (0, 2, 29)),
+        (0, (1970, 1, 1)),
+        (11_016, (2000, 2, 29)),
+    ];
+
+    for (days, expected) in cases {
+        assert_eq!(run_stats::civil_date(days), expected, "day count {days}");
+    }
+}
+
+#[test]
 fn schema_round_trip_pins_binding_fields_and_intrinsic_surface() {
     let artifact = fixture_artifact();
     assert_eq!(artifact.kind, "faber-run-stats");
