@@ -594,7 +594,7 @@ dependencies = [
 
 [[package]]
 name = "faber"
-version = "1.18.0"
+version = "1.18.1"
 dependencies = [
  "clap",
  "faber-host-clif",
