@@ -937,12 +937,13 @@ pub enum HirBreakableKind {
     /// `fac { }` try body (not the `cape` handler).
     Fac,
     /// `fac omnia { }` try body: same breakable semantics as [`Fac`]; the
-    /// marker is surface-only and rides HIR so the re-emitter round-trips it.
+    /// marker stays in HIR for re-emission and enables deferred delivery of
+    /// recoverable kernel errors to the owning handler in runner/device code.
     FacOmnia,
     /// Marker on the synthesized loop block of `fac omnia { } … dum cond`. It
     /// is **not** a breakable scope ([`HirBreakableKind::is_scope`] is false):
-    /// the loop keeps plain `fac … dum` semantics in every backend and the
-    /// marker only lets the re-emitter print `omnia`.
+    /// host loop control remains ordinary `fac … dum`, while the marker keeps
+    /// its authored form and per-iteration delivery information for the runner.
     FacOmniaLoop,
     /// `fac machina { }` (en `do device`) try body: a checked device-resident
     /// region. It is a breakable scope like [`Fac`] and lowers exactly as
@@ -973,8 +974,9 @@ impl HirBreakableKind {
         }
     }
 
-    /// Whether launches inside the block defer their faults to the block's
-    /// exit (`omnia` and `machina` alike).
+    /// Whether this modifier defers recoverable kernel-error delivery in a
+    /// handled block (`omnia` and `machina` alike). Delivery can occur before
+    /// block exit, including when a host read synchronizes device data.
     #[must_use]
     pub fn defers_faults(self) -> bool {
         self.fac_modifier_key().is_some()

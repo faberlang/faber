@@ -1,9 +1,8 @@
 //! Emitter proofs for the `fac omnia` (en `do all`) surface marker.
 //!
-//! The marker is surface-only: `HirBreakableKind::FacOmnia` keeps the plain
-//! `fac` breakable semantics and exists so HIR→Faber emission round-trips the
-//! authored form. Each emitted shape must re-parse with the marker set — a
-//! dropped `omnia` would silently rewrite the author's source.
+//! The marker remains in HIR both for re-emission and for deferred delivery of
+//! recoverable kernel errors in handled runner/device blocks. These tests prove
+//! HIR→Faber emission preserves the authored form so re-parsing does not drop it.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
 use handroll::FxHashMap;

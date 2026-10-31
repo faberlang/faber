@@ -4,7 +4,7 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "dum_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "incipit_stmt", "nota_stmt", "expression", "literal"]
 category = "error"
 canonical = false
-summary = "fac omnia … dum: a caught error ends the loop"
+summary = "fac omnia … dum: deferred errors are delivered per iteration; a caught error ends the loop"
 syntax = "fac omnia <block> cape <name> <block> dum <cond>"
 aliases = ["do all"]
 related = ["fac", "cape", "omnia", "dum"]
@@ -15,15 +15,19 @@ locale = "la"
 # =============================================================================
 #
 # What this teaches:
-#   • `fac omnia { … } cape err { … } dum cond` is an ordinary do-while `fac … dum`
-#     loop today: the body runs, the handler wraps the whole loop, and a caught
-#     `iace` leaves it (the `dum` test is not reached)
-#   • the marker round-trips the formatter
+#   • `fac omnia { … } cape err { … } dum cond` has ordinary host loop control,
+#     but in runner/device execution deferred recoverable kernel errors are
+#     delivered to this owning handler at per-iteration delivery points
+#   • `cape` wraps the whole loop, so a delivered error transfers to its handler
+#     and the `dum` test is not reached; host reads can observe errors earlier
+#   • this example's synchronous host `iace` is caught before the test; it does
+#     not itself exercise deferred kernel-error delivery
+#   • the modifier round-trips the formatter
 #
 # Common mistakes:
-#   • expecting the loop to continue after the handler — the handler wraps the
-#     whole `fac … dum`, so a caught error ends it; to keep looping, catch
-#     inside the body of a `dum` loop (see fac-omnia-dum-continue)
+#   • expecting the loop to continue after this handler — it wraps the whole
+#     `fac … dum`, so a caught error ends it; to keep looping, catch inside the
+#     body of an outer `dum` loop (see fac-omnia-dum-continue)
 #
 # See also: fac, cape, omnia, dum
 # =============================================================================
@@ -37,7 +41,10 @@ locale = "la"
 #   iteratio 1 / iteratio 2 / iteratio 3 / interceptum / finis 3
 #
 # BACKEND:
-#   Runner: plain fac … dum; the omnia marker is surface-only here.
+#   Runner/device: deferred recoverable kernel errors are delivered at each
+#   iteration's delivery points; a handler around the whole loop ends it when
+#   it catches one. In this host-only example, `iace` is synchronous and reaches
+#   `cape` before the condition test.
 
 incipit {
     varia numerus i ← 0
