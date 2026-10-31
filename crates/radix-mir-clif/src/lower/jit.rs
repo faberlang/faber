@@ -24,6 +24,16 @@ pub(crate) enum EntryMode {
 
 /// The host ISA with the flags both routes share. An object is position
 /// independent; a JIT image is mapped at its final address and is not.
+///
+/// `enable_multi_ret_implicit_sret` lets returns that overflow the host's
+/// return-register budget — a failable function's status, result and error
+/// payload are three values, and x86-64 SystemV returns integers in two
+/// registers — pass through a hidden return-area pointer instead of failing
+/// compilation with "Too many return values to fit in registers". The hidden
+/// pointer is a Cranelift-internal convention: it applies to calls between
+/// functions this module compiles. Every signature crossing into the Rust
+/// runtime returns at most one value, which [`lower_module`](super::lower_module)
+/// refuses by name should that ever change.
 fn host_isa(position_independent: bool) -> Result<std::sync::Arc<dyn TargetIsa>, Decline> {
     let mut flags = settings::builder();
     flags.set("opt_level", "speed").map_err(cranelift_error)?;
@@ -36,6 +46,9 @@ fn host_isa(position_independent: bool) -> Result<std::sync::Arc<dyn TargetIsa>,
                 "false"
             },
         )
+        .map_err(cranelift_error)?;
+    flags
+        .set("enable_multi_ret_implicit_sret", "true")
         .map_err(cranelift_error)?;
     if !position_independent {
         flags
@@ -170,3 +183,7 @@ pub fn lower_program_jit(
         incipit,
     })
 }
+
+#[cfg(test)]
+#[path = "jit_test.rs"]
+mod jit_test;

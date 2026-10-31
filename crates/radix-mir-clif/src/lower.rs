@@ -680,7 +680,23 @@ pub(super) fn lower_module(
             break;
         }
     }
-    entry_shims::define_entry_shims(&mut state, entry, mode)
+    let incipit = entry_shims::define_entry_shims(&mut state, entry, mode)?;
+    // The implicit-sret flag moves return values beyond the host's
+    // return-register budget through a hidden return-area pointer only the
+    // Cranelift ABI defines. A signature crossing into the Rust runtime with
+    // several returns would carry that hidden pointer against a C convention
+    // that knows nothing of it, so it is refused here by name instead of
+    // miscompiled. Runtime imports return at most one value by construction
+    // and the exported entries return one status word.
+    for (id, declaration) in module.declarations().get_functions() {
+        if declaration.linkage != Linkage::Local && declaration.signature.returns.len() > 1 {
+            return Err(Decline::new(format!(
+                "runtime boundary multi-return {}",
+                declaration.linkage_name(id)
+            )));
+        }
+    }
+    Ok(incipit)
 }
 
 /// The policy family of an integer store slot.
