@@ -1,0 +1,40 @@
++++
+locale = "en"
++++
+
+# Standalone CAVLC vector emitter. Build this file directly with the package
+# modules when validating the residual writer; it is not part of the encoder's
+# normal entry path.
+
+import from "./bits" bits
+import from "./cavlc" cavlc
+
+fn emit(string name, list<int> scan, int n_c, int max_coeff) {
+    mut bits.Bits out ← bits.bits_new()
+    out.used ← out.used
+    let cavlc.CavlcResult result ← cavlc.cavlc_write(mut out, scan, n_c, max_coeff)
+    print "case § tc § t1 § tz § bits §"(name, result.total_coeff, result.trailing_ones, result.total_zeros, out.used)
+    for from bits.bits_bytes(out) let byte {
+        print byte
+    }
+}
+
+main {
+    emit("zero-tail", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0, 16)
+    emit("dc-one", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0, 16)
+    emit("high-one", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1], 0, 16)
+    emit("nC-two", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 2, 16)
+    emit("nC-four", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 4, 16)
+    emit("nC-eight", [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 16)
+    emit("chroma-dc", [1, -2, 0, 0], -1, 4)
+    emit("suffix-levels", [1, -1, 2, -2, 8, -8, 9, -9, 16, -16, 1000, -1000, 0, 0, 0, 0], 0, 16)
+    emit("escape-ends", [1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1000], 0, 16)
+    # Chroma AC scans have 15 entries because the DC coefficient is excluded.
+    # These exercise all regular nC families and the full-block omission rule.
+    emit("ac-zero", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0, 15)
+    emit("ac-final", [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1], 2, 15)
+    emit("ac-runs", [-2, 0, 0, 3, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0], 4, 15)
+    emit("ac-trailing-signs", [-2, -1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 8, 15)
+    emit("ac-signed-escapes", [17, 0, 0, 0, -1000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], 0, 15)
+    emit("ac-full", [2, -3, 4, -5, 6, -7, 8, -9, 10, -11, 12, -13, 14, -15, 1], 2, 15)
+}

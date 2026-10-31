@@ -1,0 +1,31 @@
+# Read four luma samples from the checked translation fixture and run the
+# same deterministic tensor checksum on the reference and CPU device routes.
+import from "norma:fs" fs
+
+@ kernel
+@ public
+fn scale_into(tf32[4] input, f32 factor, mut tf32[4] output) → void {
+    output ⇇ input * factor
+}
+
+fn checksum(tf32[4] values) → f32 {
+    let f32 zero ← 0.0
+    mut f32 total ← 0.0
+    for range 0‥4 let i {
+        total ← total + (values[[i]] coalesce zero) * ((i + 1) ↦ f32)
+    }
+    return total
+}
+
+main {
+    let list<b8> bytes ← fs.read_bytes("corpus-simulations/h264-encoder/fixtures/translation-16x16-2.yuv") ⊥ empty
+    if bytes.length() ≢ 768 then panic "expected the checked 16x16 two-frame YUV420 fixture"
+    let list<f32> samples ← [((bytes[0] ↦ u8) ↦ int) ↦ f32,
+                             ((bytes[1] ↦ u8) ↦ int) ↦ f32,
+                             ((bytes[2] ↦ u8) ↦ int) ↦ f32,
+                             ((bytes[3] ↦ u8) ↦ int) ↦ f32]
+    let tf32[4] input ← samples ↦ tf32[4]
+    mut tf32[4] output ← tf32[4] {}
+    scale_into(input, 1.0, mut output)
+    print "h264 fixture luma checksum §"(checksum(output))
+}

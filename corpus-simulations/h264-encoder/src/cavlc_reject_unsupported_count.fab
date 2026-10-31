@@ -1,0 +1,11 @@
++++
+locale = "en"
++++
+
+import from "./bits" bits
+import from "./cavlc" cavlc
+
+main {
+    mut bits.Bits out ← bits.bits_new()
+    cavlc.cavlc_write(mut out, [0, 0, 0, 0, 0], 0, 5)
+}

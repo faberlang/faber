@@ -1,0 +1,67 @@
++++
+locale = "en"
++++
+
+# Fixed motion-search vector emitter. This entry point exercises only the
+# diagnostic wrapper around inter.sad and inter.choose_motion; it is not used
+# by the encoder's normal package entry point.
+import from "./inter" inter
+
+fn byte(int value) → b8 {
+    return ((value ↦ u8 ⊥ 0) ↦ b8)
+}
+
+fn emit_case(string name, int width, int height, int mb_x, int mb_y, int pattern, int seed) {
+    mut list<b8> source ← empty
+    mut list<b8> reference ← empty
+    for range 0‥256 let i {
+        let int x ← i % 16
+        mut int value ← (i * 37 + seed * 19 + (i / 16) * 11 + x * (seed + 3)) % 256
+        if pattern ≡ 1 { value ← 73 }
+        if pattern ≡ 2 { value ← 255 }
+        if pattern ≡ 3 { value ← 20 + x % 2 }
+        source.append(byte(value))
+    }
+    let int reference_size ← width * height
+    for range 0‥reference_size let i {
+        let int x ← i % width
+        let int y ← i / width
+        mut int value ← (i * 17 + seed * 31 + y * 23 + x * y * 3 + x * x + seed * y) % 256
+        if pattern ≡ 1 { value ← 73 }
+        if pattern ≡ 2 { value ← 0 }
+        if pattern ≡ 3 {
+            if x ≡ 0 { value ← 200 }
+            elif x ≡ 1 { value ← 201 }
+            else { value ← 20 + x % 2 }
+        }
+        reference.append(byte(value))
+    }
+    let inter.MotionCheck result ← inter.inspect_motion(source, reference, width, height, mb_x, mb_y)
+    print "case § § § § § § § §"(name, width, height, mb_x, mb_y, pattern, seed, 25)
+    for range 0‥25 let index {
+        let int offset ← index * 3
+        print "candidate § § § § §"(name, index, result.candidates[offset], result.candidates[offset + 1], result.candidates[offset + 2])
+    }
+    print "selected § § §"(name, result.dx, result.dy)
+}
+
+main {
+    # Search boundary coverage: the block origins cover the interior, each
+    # edge, and all four corners in 64x48 non-square frames.
+    emit_case("interior", 64, 48, 1, 1, 0, 101)
+    emit_case("top-edge", 64, 48, 1, 0, 0, 102)
+    emit_case("bottom-edge", 64, 48, 1, 2, 0, 103)
+    emit_case("left-edge", 64, 48, 0, 1, 0, 104)
+    emit_case("right-edge", 64, 48, 3, 1, 0, 105)
+    emit_case("top-left", 64, 48, 0, 0, 0, 106)
+    emit_case("top-right", 64, 48, 3, 0, 0, 107)
+    emit_case("bottom-left", 64, 48, 0, 2, 0, 108)
+    emit_case("bottom-right", 64, 48, 3, 2, 0, 109)
+    emit_case("wide-nonsquare", 80, 48, 2, 1, 0, 210)
+    emit_case("tall-nonsquare", 48, 80, 1, 2, 0, 311)
+    emit_case("seeded-a", 32, 48, 1, 1, 0, 12345)
+    emit_case("seeded-b", 48, 32, 2, 0, 0, 67890)
+    emit_case("all-equal-tie", 32, 32, 1, 1, 1, 0)
+    emit_case("maximum-sad", 16, 16, 0, 0, 2, 0)
+    emit_case("shared-nonzero-minimum", 32, 32, 0, 0, 3, 0)
+}

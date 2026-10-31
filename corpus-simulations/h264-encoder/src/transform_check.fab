@@ -1,0 +1,49 @@
++++
+locale = "en"
++++
+import from "./transform" transform
+
+main {
+    # Hand-calculated nonsymmetric vector catches transposed storage.
+    let list<int> input ← [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    let list<int> want ← [136, -28, 0, -4, -112, 0, 0, 0, 0, 0, 0, 0, -16, 0, 0, 0]
+    let list<int> got ← transform.forward4(input)
+    for range 0 ‥ 16 let i {
+        assert got[i] ≡ want[i]
+    }
+    let list<int> dc ← [64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let list<int> flat ← transform.inverse4(dc)
+    for from flat let value {
+        assert value ≡ 1
+    }
+    let list<int> negative ← [-33, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let list<int> minus ← transform.inverse4(negative)
+    for from minus let value {
+        assert value ≡ -1
+    }
+
+    # Normative six-class DC inverse scales, with the sixth-to-seventh QP
+    # transition checked separately; each coefficient position is observable.
+    let list<int> units ← [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    let list<int> scale ← [10, 11, 13, 14, 16, 18]
+    for range 0 ‥ 6 let q {
+        let list<int> deq ← transform.dequantize4(units, q)
+        assert deq[0] ≡ scale[q]
+    }
+    let list<int> q6 ← transform.dequantize4(units, 6)
+    assert q6[0] ≡ 20
+    assert q6[1] ≡ 26
+    assert q6[5] ≡ 32
+    let list<int> chroma ← transform.chroma_dc_quant([160, 160, 160, 160], 0)
+    assert chroma[0] ≡ 128
+    assert chroma[1] ≡ 0
+    assert chroma[2] ≡ 0
+    assert chroma[3] ≡ 0
+    let list<int> chroma_dc ← transform.chroma_dc_inverse(chroma, 0)
+    for from chroma_dc let value {
+        assert value ≡ 640
+    }
+    assert transform.chroma_qp(30) ≡ 29
+    assert transform.chroma_qp(51) ≡ 39
+    print "transform vectors pass"
+}

@@ -1,0 +1,110 @@
++++
+locale = "la"
++++
+importa ex "./orbita" orbita
+
+# Semina diversa per gregem; producta modularia parva manent.
+@ nucleum
+@ publica
+functio semina<magnitudo N>(i32 initium, varia tensor<f32, [N, 6]> initia) {
+    itera ex initia apud [p, k] filum lane sit antiquum {
+        varia f32 distantia ← 0.001 * ((initium / 17809936) ↦ f32)
+        si p ≥ 17809936 - (initium % 17809936) ergo distantia ← distantia + 0.001
+        sit i32 a ← ((p % 16) + (initium % 16)) % 16
+        sit i32 b ← ((p % 101) + (initium % 101)) % 101
+        sit i32 c ← ((p % 103) + (initium % 103)) % 103
+        sit i32 d ← ((p % 107) + (initium % 107)) % 107
+        varia f32 valor ← 0.0
+        si k ≡ 0 ergo valor ← 2.15 + 1.7 * (a ↦ f32) / 15.0 + distantia
+        si k ≡ 3 ergo valor ← 0.4 * ((((b * 17) % 101) ↦ f32) / 50.0 - 1.0)
+        si k ≡ 4 ergo valor ← 0.4 * ((((c * 29 + 7) % 103) ↦ f32) / 51.0 - 1.0)
+        si k ≡ 5 ergo valor ← 0.4 * ((((d * 43 + 11) % 107) ↦ f32) / 53.0 - 1.0)
+        initia[[p, k]] ← valor
+    }
+}
+
+@ nucleum
+functio numerat(f32 m, f32 inferior, f32 superior) → f32 {
+    si m ≥ inferior et m ≺ superior ergo redde 1.0
+    redde 0.0
+}
+
+# Solum census et pauca exempla ad hospitem redeunt.
+@ nucleum
+@ publica
+functio census<magnitudo N>(tensor<f32, [N]> muri, f32 inferior, f32 superior, varia tensor<f32, [1]> summa) {
+    summa[0] ← reducta via summa ex muri apud [i] filum lane sit m { redde numerat(m, inferior, superior) }
+}
+
+@ nucleum
+@ publica
+functio error_maximus<magnitudo N>(tensor<f32, [N]> errores, varia tensor<f32, [1]> summa) {
+    summa[0] ← reducta via maxima ex errores apud [i] filum lane sit e { redde e } vel 0.0
+}
+
+@ nucleum
+@ publica
+functio gradus_totales<magnitudo N>(tensor<f32, [N]> gradus, varia tensor<f32, [1]> summa) {
+    summa[0] ← reducta via summa ex gradus apud [i] filum lane sit g { redde g }
+}
+
+functio campus(varia tensor<f32, [33, 33, 3]> tabula) {
+    itera ab 0‥33 sit i {
+        sit f64 r ← 2.0 + (i ↦ f64) / 16.0
+        itera ab 0‥33 sit j {
+            sit f64 z ← -1.0 + (j ↦ f64) / 16.0
+            tabula[[i, j, 0]] ← (-0.3 * z / r) ↦ f32
+            tabula[[i, j, 1]] ← (3.0 / r) ↦ f32
+            tabula[[i, j, 2]] ← (0.3 * (r - 3.0) / r) ↦ f32
+        }
+    }
+}
+
+@ cli "orbitae-magnae"
+@ operandus numerus particulae
+@ operandus numerus greges
+@ operandus numerus initium
+incipit argumenta args {
+    adfirma args.particulae ≥ 256 et args.particulae ≤ 1048576
+    adfirma args.greges ≥ 1 et args.greges ≤ 32
+    adfirma args.initium ≥ 0 et args.initium + args.particulae * args.greges ≤ 1000000000
+    fixum magnitudo N ← args.particulae
+    varia tensor<f32, [33, 33, 3]> tabula ← tf32[33, 33, 3] {}
+    campus(varia tabula)
+    sit tensor<f32, [N]> dominium ← tf32[N] {}
+    varia tensor<f32, [N, 6]> initia ← tf32[N, 6] {}
+    varia tensor<f32, [N]> muri ← tf32[N] {}
+    varia tensor<f32, [N]> gradus_ultimi ← tf32[N] {}
+    varia tensor<f32, [N]> loca_x ← tf32[N] {}
+    varia tensor<f32, [N]> loca_y ← tf32[N] {}
+    varia tensor<f32, [N]> loca_z ← tf32[N] {}
+    varia tensor<f32, [N]> velocitates_x ← tf32[N] {}
+    varia tensor<f32, [N]> velocitates_y ← tf32[N] {}
+    varia tensor<f32, [N]> velocitates_z ← tf32[N] {}
+    varia tensor<f32, [N]> errores_energiae ← tf32[N] {}
+    varia tensor<f32, [1]> summa ← tf32[1] {}
+    itera ab 0‥args.greges sit grex {
+        sit numerus initium_gregis ← args.initium + grex * args.particulae
+        semina(initium_gregis ↦ i32, varia initia)
+        orbita.integra(dominium, initia, tabula, 1000, 0.05, 0, varia muri, varia gradus_ultimi, varia loca_x, varia loca_y, varia loca_z, varia velocitates_x, varia velocitates_y, varia velocitates_z, varia errores_energiae)
+        census(muri, -0.5, 0.5, varia summa)
+        sit f32 m0 ← summa[0]
+        census(muri, 0.5, 1.5, varia summa)
+        sit f32 m1 ← summa[0]
+        census(muri, 1.5, 2.5, varia summa)
+        sit f32 m2 ← summa[0]
+        census(muri, 2.5, 3.5, varia summa)
+        sit f32 m3 ← summa[0]
+        census(muri, 3.5, 4.5, varia summa)
+        sit f32 m4 ← summa[0]
+        error_maximus(errores_energiae, varia summa)
+        sit f32 error ← summa[0]
+        gradus_totales(gradus_ultimi, varia summa)
+        sit f32 gradus ← summa[0]
+        nota "summary,§,§,1000,§,§,§,§,§,§,§"(initium_gregis, args.particulae, m0, m1, m2, m3, m4, error, gradus)
+        itera ab 0‥8 sit q {
+            sit numerus i ← q * (args.particulae - 1) / 7
+            nota "sample,§,§,§,§,§,§,§,§,§,§"(initium_gregis + i, muri[[i]], gradus_ultimi[[i]], loca_x[[i]], loca_y[[i]], loca_z[[i]], velocitates_x[[i]], velocitates_y[[i]], velocitates_z[[i]], errores_energiae[[i]])
+        }
+    }
+}

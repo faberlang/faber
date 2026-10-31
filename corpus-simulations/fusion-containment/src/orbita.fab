@@ -1,0 +1,117 @@
++++
+locale = "la"
++++
+# Quaestio finita cellae: conversione fracti ad integrum non eget.
+@ nucleum
+functio cella(f32 q) → i32 {
+    varia i32 i ← 0
+    dum i ≺ 31 et ((i + 1) ↦ f32) ≤ q {
+        i ← i + 1
+    }
+    redde i.maximus(0).minimus(31)
+}
+
+@ nucleum
+functio interpola(tensor<f32, [33, 33, 3]> tabula, i32 ir, i32 iz, i32 pars, f32 u, f32 w) → f32 {
+    sit i32 i ← ir.maximus(0).minimus(31)
+    sit i32 j ← iz.maximus(0).minimus(31)
+    sit i32 k ← pars.maximus(0).minimus(2)
+    sit f32 a ← tabula[[i, j, k]] * (1.0 - u) + tabula[[i + 1, j, k]] * u
+    sit f32 b ← tabula[[i, j + 1, k]] * (1.0 - u) + tabula[[i + 1, j + 1, k]] * u
+    redde a * (1.0 - w) + b * w
+}
+
+# Una particula per filum; velocitas tempore dimidio posita est.
+@ nucleum
+@ publica
+functio integra<magnitudo N>(tensor<f32, [N]> semina, tensor<f32, [N, 6]> initia, tensor<f32, [33, 33, 3]> tabula, i32 summa_graduum, f32 delta_t, i32 recenter, varia tensor<f32, [N]> muri, varia tensor<f32, [N]> gradus_ultimi, varia tensor<f32, [N]> loca_x, varia tensor<f32, [N]> loca_y, varia tensor<f32, [N]> loca_z, varia tensor<f32, [N]> velocitates_x, varia tensor<f32, [N]> velocitates_y, varia tensor<f32, [N]> velocitates_z, varia tensor<f32, [N]> errores_energiae) → vacuum {
+    itera ex semina apud [p] filum lane sit semen {
+        varia f32 x ← initia[[p, 0]]
+        varia f32 y ← initia[[p, 1]]
+        varia f32 z ← initia[[p, 2]]
+        varia f32 vx ← initia[[p, 3]]
+        varia f32 vy ← initia[[p, 4]]
+        varia f32 vz ← initia[[p, 5]]
+        si recenter ≡ 1 {
+            # initia contains physical v(0); rotate backward by half the
+            # Boris angle so the stored velocity is the staggered v(-dt/2).
+            sit f32 r0 ← (x * x + y * y).radix()
+            sit f32 qr0 ← ((r0 - 2.0) * 16.0).maximus(0.0).minimus(32.0)
+            sit f32 qz0 ← ((z + 1.0) * 16.0).maximus(0.0).minimus(32.0)
+            sit i32 ir0 ← cella(qr0)
+            sit i32 iz0 ← cella(qz0)
+            sit f32 ur0 ← qr0 - (ir0 ↦ f32)
+            sit f32 wz0 ← qz0 - (iz0 ↦ f32)
+            sit f32 br0 ← interpola(tabula, ir0, iz0, 0, ur0, wz0)
+            sit f32 bp0 ← interpola(tabula, ir0, iz0, 1, ur0, wz0)
+            sit f32 bz0 ← interpola(tabula, ir0, iz0, 2, ur0, wz0)
+            sit f32 bx0 ← br0 * x / r0 - bp0 * y / r0
+            sit f32 by0 ← br0 * y / r0 + bp0 * x / r0
+            sit f32 bmag0 ← (bx0 * bx0 + by0 * by0 + bz0 * bz0).radix()
+            si bmag0 ≻ 0.0 {
+                sit f32 h0 ← delta_t * bmag0 * 0.5
+                sit f32 th0 ← h0 / ((1.0 + h0 * h0).radix() + 1.0)
+                sit f32 tx0 ← -bx0 / bmag0 * th0
+                sit f32 ty0 ← -by0 / bmag0 * th0
+                sit f32 tz0 ← -bz0 / bmag0 * th0
+                sit f32 ss0 ← 2.0 / (1.0 + tx0 * tx0 + ty0 * ty0 + tz0 * tz0)
+                sit f32 ax0 ← vx + vy * tz0 - vz * ty0
+                sit f32 ay0 ← vy + vz * tx0 - vx * tz0
+                sit f32 az0 ← vz + vx * ty0 - vy * tx0
+                vx ← vx + (ay0 * tz0 - az0 * ty0) * ss0
+                vy ← vy + (az0 * tx0 - ax0 * tz0) * ss0
+                vz ← vz + (ax0 * ty0 - ay0 * tx0) * ss0
+            }
+        }
+        sit f32 vis_initia ← vx * vx + vy * vy + vz * vz
+        varia i32 gradus ← 0
+        varia f32 murus ← 0.0
+        dum gradus ≺ summa_graduum et murus ≤ 0.0 {
+            sit f32 r ← (x * x + y * y).radix()
+            sit f32 qr ← ((r - 2.0) * 16.0).maximus(0.0).minimus(32.0)
+            sit f32 qz ← ((z + 1.0) * 16.0).maximus(0.0).minimus(32.0)
+            sit i32 i ← cella(qr)
+            sit i32 j ← cella(qz)
+            sit f32 u ← qr - (i ↦ f32)
+            sit f32 w ← qz - (j ↦ f32)
+            sit f32 br ← interpola(tabula, i, j, 0, u, w)
+            sit f32 bp ← interpola(tabula, i, j, 1, u, w)
+            sit f32 bz ← interpola(tabula, i, j, 2, u, w)
+            sit f32 tx ← (br * x / r - bp * y / r) * delta_t * 0.5
+            sit f32 ty ← (br * y / r + bp * x / r) * delta_t * 0.5
+            sit f32 tz ← bz * delta_t * 0.5
+            sit f32 s ← 2.0 / (1.0 + tx * tx + ty * ty + tz * tz)
+            sit f32 ax ← vx + vy * tz - vz * ty
+            sit f32 ay ← vy + vz * tx - vx * tz
+            sit f32 az ← vz + vx * ty - vy * tx
+            sit f32 nx ← vx + (ay * tz - az * ty) * s
+            sit f32 ny ← vy + (az * tx - ax * tz) * s
+            sit f32 nz ← vz + (ax * ty - ay * tx) * s
+            vx ← nx
+            vy ← ny
+            vz ← nz
+            x ← x + vx * delta_t
+            y ← y + vy * delta_t
+            z ← z + vz * delta_t
+            gradus ← gradus + 1
+            sit f32 radius ← (x * x + y * y).radix()
+            si (radius - 3.0) * (radius - 3.0) + z * z ≥ 1.0 {
+                si z ≥ 0.0 {
+                    murus ← radius ≥ 3.0 ✓ 1.0 ✗ 2.0
+                }
+                secus {
+                    murus ← radius ≺ 3.0 ✓ 3.0 ✗ 4.0
+                }
+            }
+        }
+        muri[[p]] ← murus
+        gradus_ultimi[[p]] ← gradus ↦ f32
+        loca_x[[p]] ← x
+        loca_y[[p]] ← y
+        loca_z[[p]] ← z
+        velocitates_x[[p]] ← vx
+        velocitates_y[[p]] ← vy
+        velocitates_z[[p]] ← vz
+        errores_energiae[[p]] ← ((vx * vx + vy * vy + vz * vz) / vis_initia - 1.0).absolutum()
+    }
+}
