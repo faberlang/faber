@@ -192,11 +192,13 @@ fn map_key_order(a: &MapKey, b: &MapKey) -> std::cmp::Ordering {
             MapKey::Int(_) | MapKey::UInt(_) | MapKey::Magnus(_) => 0,
             MapKey::Bool(_) => 1,
             MapKey::Str(_) => 2,
-            MapKey::Unit => 3,
-            MapKey::Tuple(_) => 4,
-            // Variant keys tie within their own class; the `_ =>` fallthrough
-            // below keeps the ordering total and literal emission reproducible.
-            MapKey::Enum(_, _) => 5,
+            MapKey::Instans(_, _) => 3,
+            MapKey::Unit => 4,
+            MapKey::Tuple(_) => 5,
+            // Variant and genus keys tie within their own classes; the `_ =>`
+            // fallthrough keeps ordering total and reproducible.
+            MapKey::Enum(_, _) => 6,
+            MapKey::Struct(_, _) => 7,
         }
     }
     match (a, b) {
