@@ -64,14 +64,34 @@ a multi-host or multi-GPU clustering result. The headline demonstration is
 that one Faber source runs on the CPU worker device or Metal GPU, with the same
 population result—not that partitioning increases hardware count.
 
-The requested English source rendering is currently blocked by the existing
-converter refusal: `faber convert --from la --to en --stdout
-corpus-simulations/fusion-containment/src/main.fab` returns
-`SEM057.call_marker_on_read_only` at the nine mutable output arguments to the
-imported `orbita.integra`. The Latin sources are preserved; no translation was
-hand-written or substituted for the requested `faber convert` output. This is
-the same converter/formatter gap recorded in the acceptance material and needs
-a compiler-tooling follow-up, not a Faber language change.
+The primary package sources remain Latin. A converter-generated English-reader
+rendering of the canonical-momentum diagnostic, converted from
+[`src/canonical.fab`](src/canonical.fab), is available at
+[`english/canonical.fab`](english/canonical.fab). It is kept outside `src/` so
+the package continues to compile its Latin sources as the primary program; it
+was generated with `faber convert --from la --to en --stdout
+corpus-simulations/fusion-containment/src/canonical.fab`. The main package entry
+`src/main.fab` still cannot be converted by the current converter:
+`faber convert --from la --to en --stdout
+corpus-simulations/fusion-containment/src/main.fab` reports
+`SEM057.call_marker_on_read_only` at its mutable output arguments. No hand
+translation was substituted for that blocked conversion; this converter gap
+needs compiler-tooling follow-up, not a Faber language change.
+
+## Quick route smoke
+
+The small route package reads the existing `fixtures/magna-256.args` values
+and performs a deterministic four-lane device checksum. It is a cheap check of
+the reference, CPU, and Metal routes; the full 256-particle integration remains
+covered by the commands above. Run these from the repository root:
+
+```sh
+target/debug/faber run --device reference corpus-simulations/fusion-containment/smoke
+target/debug/faber run --device cpu --threads 4 corpus-simulations/fusion-containment/smoke
+target/debug/faber run --device metal corpus-simulations/fusion-containment/smoke
+```
+
+All routes print `fusion fixture workload checksum 258.2`.
 
 ---
 

@@ -32,6 +32,21 @@ frames (one I picture and one P picture). The `.264` and reconstruction files
 are the expected outputs for QP 28 and four workers. The encoder writes an
 encode-only timer to stdout; elapsed time and encode time are distinct.
 
+## Quick fixture smoke
+
+The small `smoke/` package reads the checked-in YUV fixture and passes its first
+four luma bytes through a deterministic tensor checksum. This validates cheap
+reference and CPU-device routes without requiring the released Rust emitter;
+it is not a substitute for running the encoder shown above. Run from the
+repository root:
+
+```sh
+target/debug/faber run --device reference corpus-simulations/h264-encoder/smoke
+target/debug/faber run --device cpu --threads 2 corpus-simulations/h264-encoder/smoke
+```
+
+Both routes print `h264 fixture luma checksum 1140.0`.
+
 The released Faber binary is needed for `--target rust`; the open-source build
 omits that backend. This workload is native CPU work, not a device workload. Its
 `workers` argument controls concurrent native conversation jobs; the resulting

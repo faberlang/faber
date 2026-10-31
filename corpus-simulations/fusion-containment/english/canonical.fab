@@ -1,0 +1,214 @@
++++
+locale = "en"
++++
+# Diagnostica P_phi nativa. Campus directus est instrumentum diagnosticum;
+# tabula 33x33 exercet viam productionis eiusdem.
+
+@ kernel
+fn cella(f32 q) → i32 {
+    mut i32 i ← 0
+    while i ≺ 31 and ((i + 1) ↦ f32) ≤ q {
+        i ← i + 1
+    }
+    return i.maximum(0).minimum(31)
+}
+
+@ kernel
+fn interpola(tensor<f32, [33, 33, 3]> tabula, i32 ir, i32 iz, i32 pars, f32 u, f32 w) → f32 {
+    let i32 i ← ir.maximum(0).minimum(31)
+    let i32 j ← iz.maximum(0).minimum(31)
+    let i32 k ← pars.maximum(0).minimum(2)
+    let f32 a ← tabula[[i, j, k]] * (1.0 - u) + tabula[[i + 1, j, k]] * u
+    let f32 b ← tabula[[i, j + 1, k]] * (1.0 - u) + tabula[[i + 1, j + 1, k]] * u
+    return a * (1.0 - w) + b * w
+}
+
+@ kernel
+fn pars_campi(tensor<f32, [33, 33, 3]> tabula, f32 x, f32 y, f32 z, i32 analyticus, i32 pars) → f32 {
+    let f32 radius ← (x * x + y * y).sqrt()
+    if analyticus ≡ 1 {
+        if pars ≡ 0 then return -0.25 * radius * z
+        if pars ≡ 1 then return 3.0 / radius
+        return 0.125 * (radius * radius - 9.0) + 0.25 * z * z
+    }
+    let f32 qr ← ((radius - 2.0) * 16.0).maximum(0.0).minimum(32.0)
+    let f32 qz ← ((z + 1.0) * 16.0).maximum(0.0).minimum(32.0)
+    let i32 ir ← cella(qr)
+    let i32 iz ← cella(qz)
+    let f32 u ← qr - (ir ↦ f32)
+    let f32 w ← qz - (iz ↦ f32)
+    return interpola(tabula, ir, iz, pars, u, w)
+}
+
+@ kernel
+fn momentum(f32 x, f32 y, f32 z, f32 vx, f32 vy, i32 fluxus_signum) → f32 {
+    let f32 radius2 ← x * x + y * y
+    let f32 differentia ← radius2 - 9.0
+    let f32 psi ← 0.03125 * differentia * differentia + 0.125 * radius2 * z * z
+    return x * vy - y * vx + (fluxus_signum ↦ f32) * psi
+}
+
+@ kernel
+@ public
+fn integra<size N>(tensor<f32, [N]> semina, tensor<f32, [N, 6]> initia, tensor<f32, [33, 33, 3]> tabula, f32 delta_t, i32 summa_graduum, i32 analyticus, i32 synchronizatus, i32 fluxus_signum, mut tensor<f32, [N]> maxima, mut tensor<f32, [N]> normalizata, mut tensor<f32, [N]> numeri_sample) → void {
+    for from semina at [p] thread lane let semen {
+        mut f32 x ← initia[[p, 0]]
+        mut f32 y ← initia[[p, 1]]
+        mut f32 z ← initia[[p, 2]]
+        mut f32 vx ← initia[[p, 3]]
+        mut f32 vy ← initia[[p, 4]]
+        mut f32 vz ← initia[[p, 5]]
+        let f32 radius0 ← (x * x + y * y).sqrt()
+        let f32 br0 ← pars_campi(tabula, x, y, z, analyticus, 0)
+        let f32 bp0 ← pars_campi(tabula, x, y, z, analyticus, 1)
+        let f32 bz0 ← pars_campi(tabula, x, y, z, analyticus, 2)
+        let f32 bx0 ← br0 * x / radius0 - bp0 * y / radius0
+        let f32 by0 ← br0 * y / radius0 + bp0 * x / radius0
+        let f32 bm0 ← (bx0 * bx0 + by0 * by0 + bz0 * bz0).sqrt()
+        if bm0 ≻ 0.0 {
+            let f32 h0 ← delta_t * bm0 * 0.5
+            let f32 tangent0 ← h0 / ((1.0 + h0 * h0).sqrt() + 1.0)
+            let f32 tx0 ← -bx0 / bm0 * tangent0
+            let f32 ty0 ← -by0 / bm0 * tangent0
+            let f32 tz0 ← -bz0 / bm0 * tangent0
+            let f32 ss0 ← 2.0 / (1.0 + tx0 * tx0 + ty0 * ty0 + tz0 * tz0)
+            let f32 ax0 ← vx + vy * tz0 - vz * ty0
+            let f32 ay0 ← vy + vz * tx0 - vx * tz0
+            let f32 az0 ← vz + vx * ty0 - vy * tx0
+            vx ← vx + (ay0 * tz0 - az0 * ty0) * ss0
+            vy ← vy + (az0 * tx0 - ax0 * tz0) * ss0
+            vz ← vz + (ax0 * ty0 - ay0 * tx0) * ss0
+        }
+        let f32 speed2 ← vx * vx + vy * vy + vz * vz
+        let f32 chi ← 3.0 * speed2.sqrt() + 0.25
+        mut f32 initial ← 0.0
+        mut f32 drift_max ← 0.0
+        mut i32 gradus ← 0
+        mut i32 samples ← 0
+        while gradus ≤ summa_graduum {
+            let f32 radius ← (x * x + y * y).sqrt()
+            let f32 br ← pars_campi(tabula, x, y, z, analyticus, 0)
+            let f32 bp ← pars_campi(tabula, x, y, z, analyticus, 1)
+            let f32 bz ← pars_campi(tabula, x, y, z, analyticus, 2)
+            let f32 bx ← br * x / radius - bp * y / radius
+            let f32 by ← br * y / radius + bp * x / radius
+            mut f32 dx ← vx
+            mut f32 dy ← vy
+            if synchronizatus ≡ 1 {
+                let f32 bm ← (bx * bx + by * by + bz * bz).sqrt()
+                if bm ≻ 0.0 {
+                    let f32 h ← delta_t * bm * 0.5
+                    let f32 tangent ← h / ((1.0 + h * h).sqrt() + 1.0)
+                    let f32 tx ← bx / bm * tangent
+                    let f32 ty ← by / bm * tangent
+                    let f32 tz ← bz / bm * tangent
+                    let f32 ss ← 2.0 / (1.0 + tx * tx + ty * ty + tz * tz)
+                    let f32 ax ← vx + vy * tz - vz * ty
+                    let f32 ay ← vy + vz * tx - vx * tz
+                    let f32 az ← vz + vx * ty - vy * tx
+                    dx ← vx + (ay * tz - az * ty) * ss
+                    dy ← vy + (az * tx - ax * tz) * ss
+                }
+            }
+            let f32 value ← momentum(x, y, z, dx, dy, fluxus_signum)
+            if gradus ≡ 0 {
+                initial ← value
+            }
+            else {
+                let f32 drift ← (value - initial).abs()
+                if drift ≻ drift_max {
+                    drift_max ← drift
+                }
+            }
+            samples ← samples + 1
+            if gradus ≺ summa_graduum {
+                let f32 tx ← bx * delta_t * 0.5
+                let f32 ty ← by * delta_t * 0.5
+                let f32 tz ← bz * delta_t * 0.5
+                let f32 ss ← 2.0 / (1.0 + tx * tx + ty * ty + tz * tz)
+                let f32 ax ← vx + vy * tz - vz * ty
+                let f32 ay ← vy + vz * tx - vx * tz
+                let f32 az ← vz + vx * ty - vy * tx
+                vx ← vx + (ay * tz - az * ty) * ss
+                vy ← vy + (az * tx - ax * tz) * ss
+                vz ← vz + (ax * ty - ay * tx) * ss
+                x ← x + vx * delta_t
+                y ← y + vy * delta_t
+                z ← z + vz * delta_t
+                gradus ← gradus + 1
+            }
+            else {
+                gradus ← 5001
+            }
+        }
+        maxima[[p]] ← drift_max
+        normalizata[[p]] ← drift_max / chi
+        numeri_sample[[p]] ← samples ↦ f32
+    }
+}
+
+fn campus(mut tensor<f32, [33, 33, 3]> tabula) → void {
+    for range 0 ‥ 33 let i {
+        let f64 r ← 2.0 + (i ↦ f64) / 16.0
+        for range 0 ‥ 33 let j {
+            let f64 z ← -1.0 + (j ↦ f64) / 16.0
+            tabula[[i, j, 0]] ← -0.25 * r * z ↦ f32
+            tabula[[i, j, 1]] ← 3.0 / r ↦ f32
+            tabula[[i, j, 2]] ← (0.125 * (r * r - 9.0) + 0.25 * z * z) ↦ f32
+        }
+    }
+}
+
+fn experimentum(string nomen, f32 delta_t, i32 summa_graduum, i32 analyticus, i32 synchronizatus, i32 fluxus_signum) → void {
+    mut tensor<f32, [33, 33, 3]> tabula ← tf32[33, 33, 3] {}
+    campus(mut tabula)
+    mut tensor<f32, [4]> semina ← tf32[4] {}
+    mut tensor<f32, [4, 6]> initia ← tf32[4, 6] {}
+    mut tensor<f32, [4]> maxima ← tf32[4] {}
+    mut tensor<f32, [4]> normalizata ← tf32[4] {}
+    mut tensor<f32, [4]> numeri_sample ← tf32[4] {}
+    # Launchus physici iidem sunt per totam scalam temporis.
+    initia[[0, 0]] ← 2.7
+    initia[[0, 1]] ← 0.0
+    initia[[0, 2]] ← 0.2
+    initia[[0, 3]] ← 0.1
+    initia[[0, 4]] ← -0.3
+    initia[[0, 5]] ← 0.15
+    initia[[1, 0]] ← 3.0
+    initia[[1, 1]] ← 0.0
+    initia[[1, 2]] ← 0.3
+    initia[[1, 3]] ← 0.0
+    initia[[1, 4]] ← 0.35
+    initia[[1, 5]] ← 0.2
+    initia[[2, 0]] ← 2.85
+    initia[[2, 1]] ← 0.0
+    initia[[2, 2]] ← -0.25
+    initia[[2, 3]] ← 0.3
+    initia[[2, 4]] ← 0.1
+    initia[[2, 5]] ← -0.25
+    initia[[3, 0]] ← 3.1
+    initia[[3, 1]] ← 0.0
+    initia[[3, 2]] ← -0.3
+    initia[[3, 3]] ← -0.25
+    initia[[3, 4]] ← 0.0
+    initia[[3, 5]] ← 0.1
+    for range 0 ‥ 4 let i {
+        semina[[i]] ← i ↦ f32
+    }
+    integra(semina, initia, tabula, delta_t, summa_graduum, analyticus, synchronizatus, fluxus_signum, mut maxima, mut normalizata, mut numeri_sample)
+    for range 0 ‥ 4 let i {
+        print "metric,§,§,§,§,§,§,§,§"(nomen, delta_t, i, maxima[[i]], normalizata[[i]], numeri_sample[[i]], synchronizatus, fluxus_signum)
+    }
+}
+
+main {
+    print "metric,section,dt,orbit,drift,normalized,samples,synchronized,flux_sign"
+    experimentum("analytic", 0.05, 1000, 1, 1, 1)
+    experimentum("analytic", 0.025, 2000, 1, 1, 1)
+    experimentum("analytic", 0.0125, 4000, 1, 1, 1)
+    experimentum("grid33", 0.05, 1000, 0, 1, 1)
+    experimentum("grid33", 0.025, 2000, 0, 1, 1)
+    experimentum("grid33", 0.0125, 4000, 0, 1, 1)
+    experimentum("control_unsynchronized", 0.0125, 4000, 1, 0, 1)
+    experimentum("control_flux_sign_flip", 0.0125, 4000, 1, 1, -1)
+}

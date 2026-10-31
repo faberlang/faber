@@ -14,8 +14,11 @@ source. The private Python oracle and route receipts remain under
 `acceptance/fusion-containment/`; no oracle implementation or benchmark harness
 is shipped here. Receipt paths and hashes are cited in the README.
 
-The existing Latin source has not been rewritten. The requested English source
-rendering is pending because the in-tree `faber convert --from la --to en`
-command refuses the source with `SEM057.call_marker_on_read_only` at imported
-mutable output arguments. No manual translation is represented as converter
-output, and no language/compiler change was made as part of this publication.
+The Latin package sources remain primary. `english/canonical.fab` is the
+converter-generated English-reader rendering of `src/canonical.fab`, produced
+with `faber convert --from la --to en --stdout`; it is outside `src/` and does
+not replace or duplicate the package entry. The in-tree converter still refuses
+`src/main.fab` with `SEM057.call_marker_on_read_only` at imported mutable output
+arguments. That remaining tooling gap is documented in the README; no manual
+translation is represented as converter output, and no Faber language change
+was made as part of this publication.
