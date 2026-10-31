@@ -1,0 +1,123 @@
++++
+locale = "en"
++++
+# H.264 bitstream primitives.
+#
+# Bits are written most-significant bit first. The buffer is intentionally a
+# list<u8>, rather than a host byte/string helper, so the encoder owns the
+# exact RBSP and Annex-B representation. `bits_trailing` aligns an RBSP with
+# rbsp_stop_one_bit followed by zero bits.
+
+@ public
+class Bits {
+    mut list<u8> data = []
+    mut int used = 0
+}
+
+@ public
+fn bits_new() → Bits {
+    return Bits { data = [], used = 0 }
+}
+
+@ public
+fn bits_put_bit(mut Bits out, int value) → void {
+    let int bit ← value ∧ 1
+    if out.used % 8 ≡ 0 {
+        out.data.append(0 ↦ u8 ⊥ 0)
+    }
+    let int index ← out.data.length() - 1
+    let int shift ← 7 - out.used % 8
+    let int old ← out.data[index] ↦ int
+    let int next ← old ∨ bit ⇐ shift
+    out.data[index] ← next ↦ u8 ⊥ 0
+    out.used ← out.used + 1
+}
+
+@ public
+fn bits_put_bits(mut Bits out, int value, int width) → void {
+    if width ≤ 0 {
+        return
+    }
+    mut int shift ← width - 1
+    while shift ≥ 0 {
+        bits_put_bit(mut out, value ⇒ shift ∧ 1)
+        shift ← shift - 1
+    }
+}
+
+@ public
+fn bits_put_ue(mut Bits out, int value) → void {
+    # codeNum = value + 1; ue(v) is leading zeroes, then codeNum in binary.
+    let int code ← value + 1
+    mut int width ← 0
+    mut int probe ← code
+    while probe ≻ 1 {
+        width ← width + 1
+        probe ← probe ⇒ 1
+    }
+    mut int zeros ← width
+    while zeros ≻ 0 {
+        bits_put_bit(mut out, 0)
+        zeros ← zeros - 1
+    }
+    bits_put_bits(mut out, code, width + 1)
+}
+
+@ public
+fn bits_put_se(mut Bits out, int value) → void {
+    mut int code ← 0
+    if value ≻ 0 {
+        code ← value * 2 - 1
+    }
+    else {
+        code ← value * -2
+    }
+    bits_put_ue(mut out, code)
+}
+
+@ public
+fn bits_trailing(mut Bits out) → void {
+    bits_put_bit(mut out, 1)
+    while out.used % 8 ≢ 0 {
+        bits_put_bit(mut out, 0)
+    }
+}
+
+@ public
+fn bits_bytes(Bits out) → list<u8> {
+    return out.data
+}
+
+@ public
+fn rbsp_escape(list<u8> source) → list<u8> {
+    # H.264 NAL/RBSP syntax (7.3.1): after two 00 bytes, insert 03 before a
+    # following 00, 01, 02 or 03. The inserted byte is outside the RBSP.
+    mut list<u8> result ← []
+    mut int zeros ← 0
+    for from source let byte {
+        let int value ← byte ↦ int
+        if zeros ≥ 2 and value ≤ 3 {
+            result.append(3 ↦ u8 ⊥ 0)
+            zeros ← 0
+        }
+        result.append(byte)
+        if value ≡ 0 {
+            zeros ← zeros + 1
+        }
+        else {
+            zeros ← 0
+        }
+    }
+    return result
+}
+
+@ public
+fn annex_b(u8 nal_header, Bits rbsp) → list<u8> {
+    mut list<u8> result ← [0, 0, 0, 1]
+    result.append(nal_header)
+    let list<u8> body ← rbsp_escape(bits_bytes(rbsp))
+    for from body let byte {
+        result.append(byte)
+    }
+    return result
+}

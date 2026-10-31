@@ -1,0 +1,69 @@
++++
+locale = "la"
++++
+importa ex "./orbita" orbita
+
+# Aequilibrium exatum familiae Grad-Shafranov; vide EQUILIBRIUM.md.
+# psi = a*(R^2-R0^2)^2 + b*R^2*Z^2; a = 1/32, b = 1/8, R0 = 3, F0 = 3.
+# Br = -2*b*R*Z, Bphi = F0/R, Bz = 4*a*(R^2-R0^2)+2*b*Z^2.
+# Tabula in hospite per f64 construitur et semel ad f32 rotundatur.
+# Hic campus non est campus praescriptus uniform/torus, sed aequilibrium
+# pressurae exatum; neuter casus veterum mutatur.
+functio campus(varia tensor<f32, [33, 33, 3]> tabula) {
+    sit f64 a ← 1.0 / 32.0
+    sit f64 b ← 1.0 / 8.0
+    sit f64 r0 ← 3.0
+    sit f64 f0 ← 3.0
+    itera ab 0‥33 sit i {
+        sit f64 r ← 2.0 + (i ↦ f64) / 16.0
+        itera ab 0‥33 sit j {
+            sit f64 z ← -1.0 + (j ↦ f64) / 16.0
+            tabula[[i, j, 0]] ← (-2.0 * b * r * z) ↦ f32
+            tabula[[i, j, 1]] ← (f0 / r) ↦ f32
+            tabula[[i, j, 2]] ← (4.0 * a * (r * r - r0 * r0) + 2.0 * b * z * z) ↦ f32
+        }
+    }
+}
+
+# Populatio ipsa est populatio examinationis veterum (256 particulae),
+# non distributio plasma scientifica ad machinam veram emittendam.
+functio experimentum() {
+    varia tensor<f32, [33, 33, 3]> tabula ← tf32[33, 33, 3] {}
+    campus(varia tabula)
+    itera ab 0‥33 sit i {
+        itera ab 0‥33 sit j {
+            nota "node,§,§,§,§,§"(i, j, tabula[[i, j, 0]], tabula[[i, j, 1]], tabula[[i, j, 2]])
+        }
+    }
+    varia tensor<f32, [256]> semina ← tf32[256] {}
+    varia tensor<f32, [256, 6]> initia ← tf32[256, 6] {}
+    varia tensor<f32, [256]> muri ← tf32[256] {}
+    varia tensor<f32, [256]> gradus_ultimi ← tf32[256] {}
+    varia tensor<f32, [256]> loca_x ← tf32[256] {}
+    varia tensor<f32, [256]> loca_y ← tf32[256] {}
+    varia tensor<f32, [256]> loca_z ← tf32[256] {}
+    varia tensor<f32, [256]> velocitates_x ← tf32[256] {}
+    varia tensor<f32, [256]> velocitates_y ← tf32[256] {}
+    varia tensor<f32, [256]> velocitates_z ← tf32[256] {}
+    varia tensor<f32, [256]> errores_energiae ← tf32[256] {}
+    itera ab 0‥256 sit i {
+        semina[[i]] ← i ↦ f32
+        initia[[i, 0]] ← (2.15 + 1.7 * ((i % 16) ↦ f64) / 15.0) ↦ f32
+        initia[[i, 1]] ← 0.0
+        initia[[i, 2]] ← 0.0
+        initia[[i, 3]] ← (0.4 * ((((i * 17) % 101) ↦ f64) / 50.0 - 1.0)) ↦ f32
+        initia[[i, 4]] ← (0.4 * ((((i * 29 + 7) % 103) ↦ f64) / 51.0 - 1.0)) ↦ f32
+        initia[[i, 5]] ← (0.4 * ((((i * 43 + 11) % 107) ↦ f64) / 53.0 - 1.0)) ↦ f32
+    }
+    # Initia sunt v(0) physica; converso dimidii anguli Boris nucleus
+    # v(-dt/2) pervertingit (mos operis convergence, recenter = 1).
+    orbita.integra(semina, initia, tabula, 1000, 0.05, 1, varia muri, varia gradus_ultimi, varia loca_x, varia loca_y, varia loca_z, varia velocitates_x, varia velocitates_y, varia velocitates_z, varia errores_energiae)
+    nota "case,id,wall,steps,x,y,z,vx,vy,vz,energy_error"
+    itera ab 0‥256 sit i {
+        nota "§,§,§,§,§,§,§,§,§,§,§"("aequilibrium", i, muri[[i]], gradus_ultimi[[i]], loca_x[[i]], loca_y[[i]], loca_z[[i]], velocitates_x[[i]], velocitates_y[[i]], velocitates_z[[i]], errores_energiae[[i]])
+    }
+}
+
+incipit {
+    experimentum()
+}
