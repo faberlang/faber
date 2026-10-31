@@ -1987,7 +1987,12 @@ fn collect_item_defs(items: &[radix_hir::HirItem], registry: &mut FxHashSet<radi
                 for tp in &iface.type_params {
                     registry.insert(tp.def_id);
                 }
+                // A required signature is a definition site on the wire: its
+                // def_id is the identity member trivia and a type-parameter
+                // bound call target. Struct methods register above; without
+                // this row the validator rejects those keys as dangling.
                 for method in &iface.methods {
+                    registry.insert(method.def_id);
                     for param in &method.params {
                         collect_param_defs(param, registry);
                     }
