@@ -10,9 +10,3 @@ domain = "collections"
 [expect]
 stdout = "stdout.expected"
 check_only = false
-
-[targets.roundtrip]
-outcome = "known-fail"
-phase = "emit"
-diagnostic_contains = "CODEGEN006:variant_path_spelling_reanalysis_failed"
-known_fail_why = "The roundtrip leg cannot re-read the canonical Faber it emits for this program (CODEGEN006:variant_path_spelling_reanalysis_failed)."
