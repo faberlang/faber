@@ -268,6 +268,7 @@ impl Command {
             ),
             Self::Run(args) => (args.library.library_home.clone(), Some(args.path.clone())),
             Self::Test(args) => (args.library.library_home.clone(), Some(args.path.clone())),
+            Self::Format(args) => (None, args.paths.first().cloned()),
             Self::CheckLibrary(args) => (args.library.library_home.clone(), None),
             Self::Doctor(args) => (args.library.library_home.clone(), None),
             _ => (None, None),

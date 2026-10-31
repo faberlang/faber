@@ -1600,6 +1600,132 @@ fn format_resolves_import_locale_through_loader_without_root() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// `norma:*` is resolved from the product's embedded library home for both a
+/// package-root walk and a direct source-file input. Every in-place mode must
+/// accept the issue's import and keep it in the source after formatting.
+#[test]
+fn format_resolves_norma_text_import_for_packages_and_single_files() {
+    const SOURCE: &str = r#"import from "norma:text" text
+
+main {
+    let string reversed ← text.reverse("roma")
+    print reversed
+}
+"#;
+
+    let root = tempfile::tempdir().expect("create scratch");
+    let single = root.path().join("single.fab");
+    fs::write(&single, SOURCE).expect("write single-file input");
+
+    let package = root.path().join("package");
+    let source_dir = package.join("src");
+    fs::create_dir_all(&source_dir).expect("create package source directory");
+    fs::write(
+        package.join("faber.toml"),
+        r#"[package]
+name = "norma-format-regression"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[locale]
+locale = "en"
+"#,
+    )
+    .expect("write package manifest");
+    fs::write(source_dir.join("main.fab"), SOURCE).expect("write package entry");
+
+    // First obtain the canonical text, then require report-only formatting to
+    // be clean as well as exercising --write and --check on that same text.
+    let single_output = Command::new(faber_binary())
+        .args(["format", "--stdout"])
+        .arg(&single)
+        .output()
+        .expect("format single file to stdout");
+    assert!(
+        single_output.status.success(),
+        "single-file norma:text formatting failed:\n{}",
+        String::from_utf8_lossy(&single_output.stderr)
+    );
+    let single_formatted = String::from_utf8_lossy(&single_output.stdout).into_owned();
+    assert!(
+        single_formatted.contains("import from \"norma:text\" text"),
+        "single-file output must keep the import:\n{single_formatted}"
+    );
+    fs::write(&single, &single_formatted).expect("save canonical single-file source");
+    for args in [
+        vec!["format", single.to_str().expect("utf8 single path")],
+        vec![
+            "format",
+            "--write",
+            single.to_str().expect("utf8 single path"),
+        ],
+        vec![
+            "format",
+            "--check",
+            single.to_str().expect("utf8 single path"),
+        ],
+    ] {
+        let output = Command::new(faber_binary())
+            .args(&args)
+            .output()
+            .expect("run single-file format mode");
+        assert!(
+            output.status.success(),
+            "{} failed for norma:text single-file input:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            fs::read_to_string(&single)
+                .expect("read single-file source")
+                .contains("import from \"norma:text\" text"),
+            "{} must leave the norma:text import in place",
+            args.join(" ")
+        );
+    }
+
+    let package_output = run_format_in(&package, &["format", "--stdout", "src/main.fab"]);
+    assert!(
+        package_output.status.success(),
+        "package norma:text formatting failed:\n{}",
+        String::from_utf8_lossy(&package_output.stderr)
+    );
+    let package_formatted = String::from_utf8_lossy(&package_output.stdout).into_owned();
+    assert!(
+        package_formatted.contains("import from \"norma:text\" text"),
+        "package output must keep the import:\n{package_formatted}"
+    );
+    fs::write(source_dir.join("main.fab"), &package_formatted)
+        .expect("save canonical package source");
+    for args in [
+        vec!["format"],
+        vec!["format", "--write"],
+        vec!["format", "--check"],
+    ] {
+        let output = run_format_in(&package, &args);
+        assert!(
+            output.status.success(),
+            "{} failed for norma:text package input:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            fs::read_to_string(source_dir.join("main.fab"))
+                .expect("read package entry")
+                .contains("import from \"norma:text\" text"),
+            "{} must leave the norma:text import in place",
+            args.join(" ")
+        );
+    }
+}
+
 /// The two-file imported-`mut` fixture, as a manifest-backed package whose
 /// consumer is spelled the ordinary relative way (`src/main.fab`).
 ///

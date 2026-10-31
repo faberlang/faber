@@ -116,6 +116,17 @@ pub fn configure_library_home(flag: Option<&Path>, probe: Option<&Path>) {
     }
 }
 
+/// Set the product's embedded Norma root for commands that use the standalone
+/// module import resolver when no explicit or manifest-selected library home
+/// has already been installed.
+pub fn configure_embedded_library_home_if_unset() {
+    if radix::program::configured_library_home_setting().is_none()
+        && let Some(home) = default_library_home()
+    {
+        radix::program::set_configured_library_home(Some(home));
+    }
+}
+
 fn manifest_library_home(probe: Option<&Path>) -> Option<PathBuf> {
     let start = probe_start_dir(probe)?;
     for dir in start.ancestors() {
