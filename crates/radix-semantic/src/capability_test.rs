@@ -596,15 +596,6 @@ incipit { }
     let catena = first_param_type(hir);
 
     for kind in TypeCapabilityKind::ALL {
-        if kind == TypeCapabilityKind::CanonicalHashEligibility {
-            // Hash eligibility is unconditionally fail-closed: no settled
-            // canonical hash law exists, so it rejects for every subject.
-            assert_eq!(
-                queries.type_capability(catena, kind).reason(),
-                Some(CapabilityReason::UnsupportedRepresentation)
-            );
-            continue;
-        }
         assert_eq!(
             queries.type_capability(catena, kind).reason(),
             Some(CapabilityReason::UnsupportedRecursion),
