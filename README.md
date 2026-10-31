@@ -36,8 +36,8 @@ version of what is different:
 
 ## What it looks like
 
-Every program below runs on the reference runner in this repository
-(`faber run`); the output is shown after each.
+Every program below runs with `faber run`, and the kernel example with
+`faber run --device cpu`; the output is shown after each.
 
 ### Tensors and shapes in the type
 
@@ -202,7 +202,7 @@ main {
 44
 255
 510
-error: 256 does not fit in `u8` (declaration of `y`)      (stderr, exit 1)
+error: 256 does not fit in `u8` (declaration of `y`)      (stderr, exit 70)
 ```
 
 ### Bits are not numbers
@@ -265,6 +265,30 @@ main {
 -1
 none
 0
+```
+
+### Kernels
+
+A kernel has its own declaration head, with its tier after the parameter list,
+and `@ public` makes it callable from host code. The same source runs on the
+CPU with `--device cpu`, and on a GPU with `--device metal` or `--device cuda`
+in the released binary. Writable kernel arguments must not overlap
+(`SEM057 kernel_argument_overlap`).
+
+```fab
+@ public
+kernel halve(tf32[4] a) relaxed → tf32[4] {
+    return a / 2.0
+}
+
+main {
+    let tf32[4] x ← [1.0, 2.0, 3.0, 4.0] ↦ tf32[4]
+    print halve(x)
+}
+```
+
+```text
+[0.5, 1.0, 1.5, 2.0]
 ```
 
 ## Design tenets
@@ -345,8 +369,8 @@ behaves the same in every locale. Compiler diagnostics work the same way: a
 stable code and issue name, with the text supplied by the locale pack.
 
 **Keywords are a locale, not the language.** Keywords, type names, printed
-words and diagnostics come from locale packs: English, Arabic, Hindi, Thai,
-Vietnamese, and Simplified and Traditional Chinese among them. Every pack
+words and diagnostics come from locale packs: English, Latin, Arabic, Hindi,
+Thai, Vietnamese, and Simplified and Traditional Chinese among them. Every pack
 compiles to the same program, `faber convert` translates a file between them,
 and a file is written in one pack; packs never mix.
 
@@ -355,38 +379,42 @@ and a file is written in one pack; packs never mix.
 One front end and two intermediate representations (a typed HIR and a MIR)
 feed about two dozen code generators. HIR targets emit readable source in
 another language; MIR targets lower further, to IR, kernels or native code.
-Every target is held to the same reference: the MIR runner (`faber run`). A
-generated program is correct when its output and exit status match the
-runner's; a construct a target cannot express yet is rejected by name
-(`unsupported on target <t>: <construct>`), never approximated.
+Every target is held to the same reference: the MIR runner
+(`faber run --target runner`). A generated program is correct when its output
+and exit status match the runner's; a construct a target cannot express yet is
+rejected by name (`unsupported on target <t>: <construct>`), never approximated.
+
+A plain `faber run` compiles in memory with Cranelift and uses the runner when
+Cranelift declines the program. The choice is made before anything runs, so a
+program is never run twice.
 
 <!-- target-maturity:begin -->
-How mature each target is, measured on the corpus (897 programs the suite runs, each with expected output; 302 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell have no corpus lane: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
+How mature each target is, measured on the corpus (906 programs the suite runs, each with expected output; 306 more are meant to be refused). "Suite" counts are cases that pass in `corpus-suites/full` (`faber corpus`) out of the cases the suite applies to; the rest are pinned expected failures. A library file with no entry function has nothing to run, so it counts on a compiled target when it emits and builds, and on the runner when it checks and lowers to valid MIR. C and Haskell are measured outside the suite: each single-file program the runner executes and passes was emitted, built with the real toolchain, and its output and exit status compared with the runner's.
 
 | Target | `-t` | Output | Evidence | Source |
 | --- | --- | --- | --- | --- |
 | **Reference** | | | | |
-| MIR runner | (`faber run`) | executes the program; the oracle | suite 892 / 897 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
-| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 861 / 869 | public |
+| MIR runner | (`faber run --target runner`) | executes the program; the oracle | suite 901 / 906 (the rest are pinned expected failures); 53 of the passes are library files with no entry function, which count when they check and lower to valid MIR | public |
+| Faber | `faber` | canonical Faber in the source's locale (`format`, `convert`) | round-trip 872 / 876 | public |
 | FMIR / FHIR | `fmir`, `fhir` | serialized MIR and analyzed HIR artifacts | no corpus lane (exercised by the package build and run tests) | public |
 | **Application languages** | | | | |
-| Rust | `rust` | Rust source, or a full Cargo project | suite 854 / 889 | official binary |
-| Go | `go` | Go source | suite 730 / 896 | official binary |
-| TypeScript | `ts` | TypeScript source | suite 804 / 897 | official binary |
-| Swift | `swift` | Swift source | suite 468 / 897 | official binary |
-| Python | `python` | self-contained Python | suite 640 / 871 | official binary |
-| Haskell | `haskell` | Haskell source | 85 of 704 single-file programs emit; 34 of those match the runner | official binary |
+| Rust | `rust` | Rust source, or a full Cargo project | suite 864 / 898 | official binary |
+| Go | `go` | Go source | suite 741 / 905 | official binary |
+| TypeScript | `ts` | TypeScript source | suite 812 / 905 | official binary |
+| Swift | `swift` | Swift source | suite 469 / 905 | official binary |
+| Python | `python` | self-contained Python | suite 642 / 877 | official binary |
+| Haskell | `haskell` | Haskell source | 91 of 818 single-file programs emit; 33 of those match the runner | official binary |
 | **Systems and native** | | | | |
-| C | `c` | C11 with a header-only runtime | preview: 342 of 704 single-file programs emit; 338 of those match the runner | public |
-| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 692 / 897 | official binary |
-| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 605 / 897 assemble (no host runtime yet) | official binary |
-| Cranelift | `clif` | native objects with no external toolchain | preview: suite 646 / 869 | public |
+| C | `c` | C11 with a header-only runtime | preview: 394 of 818 single-file programs emit; 359 of those match the runner | public |
+| LLVM | `llvm-text`, `llvm-host` | LLVM IR, or a native executable via clang | suite 701 / 905 | official binary |
+| WebAssembly | `wasm`, `wasm-text` | WebAssembly text | suite 611 / 905 assemble (no host runtime yet) | official binary |
+| Cranelift | `clif`, `clif-jit` | native objects with no external toolchain, or in-memory code for `faber run` | preview: suite 666 / 876 | public |
 | **GPU kernels** (kernel functions only) | | | | |
 | Metal | `metal-text` | Metal Shading Language | kernel programs only | official binary |
 | WGSL | `wgsl-text` | WebGPU compute shaders | kernel programs only | official binary |
-| CUDA | (`--device cuda`) | PTX built at run time from NVVM IR (needs `clang` with the NVPTX target) | kernel programs only: `faber run --device cuda` runs whole-tensor kernels on NVIDIA GPUs; lane-form kernels are not lowered yet and fail closed | official binary |
+| CUDA | (`--device cuda`) | PTX built at run time from NVVM IR (needs `clang` with the NVPTX target) | kernel programs only: `faber run --device cuda` runs whole-tensor and lane-form kernels on NVIDIA GPUs | official binary |
 | **Validation** | | | | |
-| Racket | `sexp` | Racket s-expressions (a validation target) | suite 673 / 878 | official binary |
+| Racket | `sexp` | Racket s-expressions (a validation target) | suite 680 / 887 | official binary |
 | **Experimental** (not in the released `faber`) | | | | |
 | Fortran, COBOL, Pascal, Odin, BASIC | `fortran`, `cobol`, `pascal`, `odin`, `basic` | historical languages, a deliberate subset | default-off features; no corpus lane | private source |
 <!-- target-maturity:end -->
@@ -397,15 +425,17 @@ Notes:
   runner's, for the single-file programs the runner passes; "emit" alone means
   source was produced, not that it built.
 - The C and Cranelift targets are previews. Both are in the default `faber`
-  build, neither runs under `faber run`, and a construct either cannot express
-  yet is rejected by name.
+  build, and a construct either cannot express yet is rejected by name.
+  `--target clif-jit` selects the in-memory Cranelift route with no fallback;
+  tensors, matrices and other device values are outside its subset, so a plain
+  `faber run` hands them to the runner.
 - The experimental historical targets (Fortran, COBOL, Pascal, Odin, BASIC)
   cover a deliberate subset (scalars, text, simple collections) and reject the
   rest by name. They exist partly as a test of the rule that targets implement
   Faber and never the reverse. They are default-off features and are not in the
   released `faber`.
 - Standard-library I/O (files, processes, clocks, network) is wired in full on
-  the Rust target and on the MIR runner (`faber run`). Go has standard I/O,
+  the Rust target and on the MIR runner. Go has standard I/O,
   clocks and randomness, WebAssembly standard I/O, and Cranelift clocks; the
   other targets reject programs that use I/O, which accounts for much of the gap
   between their counts and Rust's. `faber targets` lists each target's I/O.
@@ -428,25 +458,31 @@ This repository is the open-source core of Faber:
   directly. It is the reference every other target is checked against.
 - **The C code generator** (`crates/radix-hir-c`, `runtime/c`): readable C
   (C11 plus a few GCC/Clang extensions) whose output matches the runner, checked
-  under the undefined-behaviour sanitizer; a construct it cannot express yet is
-  rejected by name. It is a preview and covers a growing subset of the
-  language.
+  under the undefined-behaviour and address sanitizers; a construct it cannot
+  express yet is rejected by name. It is a preview and covers a growing subset
+  of the language.
 - **The Cranelift code generator** (`crates/radix-mir-clif`, `runtime/clif`):
   lowers checked MIR to a native object for the host with no external
   toolchain beyond a linker, so a build from this repository alone produces
-  executables (`faber build --target clif`). It is a preview: a fail-closed
-  subset of the language, with named gaps.
+  executables (`faber build --target clif`). It also compiles in memory
+  (`clif-jit`), which is the engine a plain `faber run` tries first. It is a
+  preview: a fail-closed subset of the language, with named gaps.
 - **The artifact formats** (`crates/radix-hir-fhir`, `crates/radix-mir-fmir`):
   serialized analyzed HIR and MIR images that `faber` can load and run.
-- **The `faber` command** (`crates/faber`): `check` (with `--lower` to also
-  compile the program without running it), `run`, `test`, `build`, `format`,
-  `convert` between locale packs, `corpus` and `targets`.
+- **The `faber` command** (`crates/faber`): `init`, `check` (with `--lower` to
+  also compile the program without running it), `run`, `repl`, `test`, `build`,
+  `format`, `doc`, `convert` between locale packs, `explain`, `corpus`, `doctor`
+  and `targets`.
 - **Norma**, the standard library (`lib/norma`): files, processes, time, text,
   JSON, TOML, HTTP and more.
 - **The grammar** (`grammar/`) and **the locale packs** (`locale/`).
-- **The corpus** (`corpus/`): several hundred small programs, each with its
-  expected output, that document and test the language, and the suites that
-  run them (`corpus-suites/`).
+- **The corpus** (`corpus/`): about 1,200 small programs, each with its
+  expected output or the refusal it must produce, that document and test the
+  language, and the suites that run them (`corpus-suites/`).
+- **The simulations** (`corpus-simulations/`): four complete programs (fusion
+  containment, drone missions, a decimal swarm and an H.264 encoder), each with
+  a README, a small smoke and its provenance. Device routes and the native Rust
+  emitter are in the released binary, and each README gives its requirements.
 
 The official `faber` release also includes the code generators that are not in
 this repository (see Targets).
@@ -479,7 +515,7 @@ faber update
 ```
 
 Every released version stays in `<prefix>/bin/faber-<version>`, and `faber
-update` moves the `faber` symlink. `faber update --version 1.15.2` switches
+update` moves the `faber` symlink. `faber update --version 1.17.0` switches
 back, and `faber versions` lists what is installed. If you installed with an
 earlier faber installer, run `install.sh` once to adopt the versioned layout;
 `faber update` manages installs that have the `faber` symlink.
