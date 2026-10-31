@@ -1,0 +1,54 @@
+# H.264 encoder acceptance entry point.
+#
+#   faber run corpus-simulations/h264-encoder -- input.yuv output.h264 recon.yuv width height frames qp workers
+#
+# Workers bound simultaneous native conversation jobs. Slices are assembled
+# in macroblock order so worker count does not change the coded stream.
+
+import from "norma:fs" fs
+
+import from "norma:time" time
+
+import from "./encode" encode
+
+fn seconds(int ns) → string {
+    return "§"((ns ↦ float) / 1000000000.0)
+}
+
+main args args {
+    if args.length() ≢ 8 and args.length() ≢ 9 {
+        panic "usage: h264-encoder input.yuv output.h264 recon.yuv width height frames qp workers [--profile]"
+    }
+    mut bool profile ← false
+    if args.length() ≡ 9 {
+        if args[8] ≢ "--profile" then panic "the only optional argument is --profile"
+        profile ← true
+    }
+    let string input_path ← args[0]
+    let string stream_path ← args[1]
+    let string recon_path ← args[2]
+    let int width ← args[3] ↦ int
+    let int height ← args[4] ↦ int
+    let int frames ← args[5] ↦ int
+    let int qp ← args[6] ↦ int
+    let int workers ← args[7] ↦ int
+    if workers ≺ 1 or workers ≻ 18 {
+        panic "workers must be between 1 and 18"
+    }
+    let list<b8> input ← fs.read_bytes(input_path)
+    let int start ← time.monotonic()
+    let encode.Encoded result ← encode.encode_frames(input, width, height, frames, qp, workers, profile)
+    let int elapsed ← time.monotonic() - start
+    do {
+        fs.write_bytes(stream_path, result.stream)
+        fs.write_bytes(recon_path, result.reconstruction)
+    }
+    catch err {
+        panic "h264-encoder output failed: §"(err)
+    }
+    print "frames § width § height § qp § workers § encode_seconds §"(frames, width, height, qp, workers, seconds(elapsed))
+    print "mode i4x4-p16x16-cavlc jobs § moving_blocks §"(result.jobs, result.moving_blocks)
+    if profile {
+        print "profile h264-v1 jobs § p_jobs § serialized_job_elements § serialized_reference_elements § received_reply_elements § job_construction_ns § conversation_submission_ns § receive_wait_ns § reply_application_ns § encode_wall_ns §"(result.jobs, result.p_jobs, result.serialized_job_elements, result.serialized_reference_elements, result.received_reply_elements, result.job_construction_ns, result.conversation_submission_ns, result.receive_wait_ns, result.reply_application_ns, elapsed)
+    }
+}
