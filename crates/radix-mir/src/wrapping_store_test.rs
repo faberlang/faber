@@ -1,7 +1,7 @@
 //! Wrapping-store region analysis proofs.
 //!
 //! The G03 fixture mirrors the real MIR lowering of
-//! `acceptance/swarm-decimal/repros/g03-wrapping-xor-then-multiply.fab`
+//! `corpus-simulations/swarm-decimal/repros/g03-wrapping-xor-then-multiply.fab`
 //! (`(z ⊻ (z ⇒ 30)) * m` stored into `wrapping<u64>`): the shift, xor and
 //! multiply temporaries carry the range-rule `numerus<u64>` type, and the
 //! store is a `Convert` node with a store site into the word cell. Every

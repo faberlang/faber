@@ -1,0 +1,7 @@
+fn g(wrapping<u64> h) → int {
+    let wrapping<u64> m ← h ⇒ 33
+    return m ↦ int ⊥ 0
+}
+main {
+    print g(18446744073709551615)
+}

@@ -1,0 +1,11 @@
+import from "norma:crypto" crypto
+
+main {
+    let list<b8> data ← |61 62 63|
+    do {
+        let list<b8> d ← crypto.digest("sha256", data)
+        print d.length()
+    } catch err {
+        print err
+    }
+}

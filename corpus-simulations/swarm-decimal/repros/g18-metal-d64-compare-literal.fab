@@ -1,0 +1,49 @@
+# G18: on Metal a `d64` compared with a decimal literal gives the wrong answer; the same
+# comparison against a `const d64`, a `d64` parameter or an element is right, and `--device cpu`
+# is right for all of them. Found porting the swarm decision step (`x ≥ 1.0` in rsqrt looped
+# forever on the device, `p ≺ 10.0` picked the wrong grid cell).
+#
+#   faber run --device cpu   repros/g18-metal-d64-compare-literal.fab
+#       1 1 1 1 1 1 / 0 0 0 0 0 1 / 0 0 0 0 0 1
+#   faber run --device metal repros/g18-metal-d64-compare-literal.fab
+#       1 1 0 0 0 1 / 0 0 0 0 0 1 / 0 0 0 0 0 1
+#
+# Columns: x ≺ y (element), x ≺ TEN (const), x ≺ 10.0, x ≤ 10.0, 10.0 ≻ x (literals), x ≻ 3.0.
+# For x = 5 columns 3 to 5 print 0 instead of 1: the literal is compared as the integer 10 (scale 0)
+# against the scale-8 mantissa 500000000. `x ≻ 3.0` prints the right 1 only because 5e8 > 3.
+# Arithmetic with literals (`x * 0.5`, `... - 1.5`) is right on Metal; only the comparison path misses
+# the scale normalisation. The swarm device package compares against named `const d64` values instead.
+const d64 TEN = 10.0
+
+@ kernel
+@ public
+fn k<size N>(tensor<d64, [N]> xs, tensor<d64, [N]> ys, mut tensor<i32, [N]> o1, mut tensor<i32, [N]> o2, mut tensor<i32, [N]> o3, mut tensor<i32, [N]> o4, mut tensor<i32, [N]> o5, mut tensor<i32, [N]> o6) → void {
+    for from xs at [i] thread lane let x {
+        let d64 y ← ys[[i]]
+        o1[[i]] ← x ≺ y ✓ 1 ✗ 0
+        o2[[i]] ← x ≺ TEN ✓ 1 ✗ 0
+        o3[[i]] ← x ≺ 10.0 ✓ 1 ✗ 0
+        o4[[i]] ← x ≤ 10.0 ✓ 1 ✗ 0
+        o5[[i]] ← 10.0 ≻ x ✓ 1 ✗ 0
+        o6[[i]] ← x ≻ 3.0 ✓ 1 ✗ 0
+    }
+}
+
+main {
+    let int n ← 3
+    const size N ← n
+    let list<d64> xl ← [5.0, 15.0, 25.0]
+    let list<d64> yl ← [10.0, 10.0, 10.0]
+    let tensor<d64, [N]> xs ← xl ↦ tensor<d64, [N]>
+    let tensor<d64, [N]> ys ← yl ↦ tensor<d64, [N]>
+    mut tensor<i32, [N]> o1 ← ti32[N] {}
+    mut tensor<i32, [N]> o2 ← ti32[N] {}
+    mut tensor<i32, [N]> o3 ← ti32[N] {}
+    mut tensor<i32, [N]> o4 ← ti32[N] {}
+    mut tensor<i32, [N]> o5 ← ti32[N] {}
+    mut tensor<i32, [N]> o6 ← ti32[N] {}
+    k(xs, ys, mut o1, mut o2, mut o3, mut o4, mut o5, mut o6)
+    for range 0‥n let i {
+        print "§ § § § § §"(o1[[i]], o2[[i]], o3[[i]], o4[[i]], o5[[i]], o6[[i]])
+    }
+}

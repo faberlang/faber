@@ -1,0 +1,12 @@
+fn inc(mut d64 p) → void {
+    p ← p + 1.0
+}
+fn scale(mut d64 p) → void {
+    p ← p * 2.0
+}
+main {
+    mut d64 c ← 2.5
+    inc(mut c)
+    scale(mut c)
+    print c
+}

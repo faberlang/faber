@@ -1,0 +1,1360 @@
+# Swarm acceptance workload, device variant (step 3a): src/main.fab of the parent package
+# with phase 2, the whole decision step (`decide_prey`, `decide_pred`), as `@ kernel` lane
+# loops (`decide_prey`, `decide_pred` below). Phases 1, 3, 4, 5 and the hash stay on the host.
+#
+#   faber run --device cpu|metal corpus-simulations/swarm-decimal/device
+#
+# Every number is a d64. Each `let`/`mut`/field/element assignment below is a
+# STORE (rounded half-even to scale 8 once, trapping outside the i64 range); the
+# stores are exactly the points of the README table. Expressions are never
+# rounded per operation, and comparisons (`dx*dx + dy*dy + dz*dz ≤ R2`) have no
+# slot, so they never round. The program prints marked sections from one run:
+#
+#   == hashes      "tick sha256" for ticks 0..TICKS   (reference/golden/hashes.txt)
+#   == summary     populations and state counts every 50 ticks (summary.csv)
+#   == snapshot_N  every entity at tick N, N in 0, 100, 500 (snapshot_N.csv)
+
+const int TICKS = 500
+const int SEED = 20261028
+const int NPREY = 800
+const int NPRED = 150
+const int NFOOD = 50
+const int PREY_MAX = 1600
+const int PRED_MAX = 400
+
+# world: box [0, W] metres, tick length, grid (cell edge 10 m)
+const d64 WX = 200.0
+const d64 WY = 200.0
+const d64 WZ = 50.0
+const d64 DT = 0.25
+const int NX = 20
+const int NY = 20
+const int NZ = 5
+const int NCELL = 2000
+const int WX_RAW = 20000000000
+const int WY_RAW = 20000000000
+const int WZ_RAW = 5000000000
+
+# rsqrt
+const d64 QUARTER = 0.25
+const d64 RS_A = 2.33333333
+const d64 RS_B = 1.33333333
+const d64 TURN = 0.4
+
+# radii (metres) and their exactly representable squares
+const d64 R_FLEE = 8.0
+const d64 R_FLOCK = 10.0
+const d64 R_FOOD = 30.0
+const d64 R_SENSE = 14.0
+const d64 R_FLEE2 = 64.0
+const d64 R_FLOCK2 = 100.0
+const d64 R_SEP2 = 9.0
+const d64 R_FOOD2 = 900.0
+const d64 R_GRAZE2 = 9.0
+const d64 R_SENSE2 = 196.0
+const d64 R_CONTACT2 = 2.25
+
+# steering weights, speeds (m/s), speed caps and their squares
+const d64 W_SEP = 1.5
+const d64 W_ALI = 1.0
+const d64 W_COH = 0.5
+const d64 W_FOOD = 1.5
+const d64 KEEP = 1.0
+const d64 JITTER = 4.0
+const d64 PREY_WANDER_V = 2.0
+const d64 PREY_FLOCK_V = 4.0
+const d64 PREY_FLEE_V = 6.0
+const d64 PREY_VMAX = 6.5
+const d64 PREY_VMAX2 = 42.25
+const d64 PRED_WANDER_V = 2.5
+const d64 PRED_CHASE_V = 7.0
+const d64 PRED_VMAX = 7.5
+const d64 PRED_VMAX2 = 56.25
+
+# energy and food
+const d64 PREY_E0 = 40.0
+const int PREY_E0_SPAN = 2000000000
+const d64 PRED_E0 = 50.0
+const int PRED_E0_SPAN = 3000000000
+const d64 PREY_COST = 0.10
+const d64 PREY_COSTV = 0.002
+const d64 E_HUNGRY = 100.0
+const d64 PREY_REPRO = 90.0
+const d64 PRED_COST = 0.22
+const d64 PRED_REST_COST = 0.10
+const d64 PRED_COSTV = 0.001
+const d64 E_SATED = 80.0
+const d64 PRED_REPRO = 100.0
+const d64 MEAL = 40.0
+const d64 FOOD_CAP = 60.0
+const d64 FOOD_REGROW = 0.8
+const d64 BITE = 2.0
+const d64 FOOD_ENERGY = 5.0
+const d64 SPREAD = 2.0
+const d64 BIRTH_V = 1.0
+
+# RNG: SplitMix64 as a counter hash keyed by (seed, tick, id, purpose)
+const wrapping<u64> GAMMA = 11400714819323198485
+const wrapping<u64> MULT1 = 13787848793156543929
+const wrapping<u64> MULT2 = 10723151780598845931
+const int P_OFFSET = 4
+const int P_BIRTHV = 7
+const int P_INIT = 10
+const int P_INIT_E = 16
+
+enum PreyState { wander, flock, flee, graze }
+enum PredState { wander, chase, eat, rest }
+
+class V3 {
+    let d64 x
+    let d64 y
+    let d64 z
+}
+
+# One kind, struct of arrays, always ascending by id. Food uses `en` as the
+# amount and ignores the velocities.
+class Pop {
+    mut list<int> ids = []
+    mut list<d64> px = []
+    mut list<d64> py = []
+    mut list<d64> pz = []
+    mut list<d64> vx = []
+    mut list<d64> vy = []
+    mut list<d64> vz = []
+    mut list<d64> en = []
+    mut list<int> st = []
+
+    fn count() → int {
+        return self.ids.length()
+    }
+
+    fn add(int id, d64 x, d64 y, d64 z, d64 ux, d64 uy, d64 uz, d64 e, int s) → void {
+        self.ids.append(id)
+        self.px.append(x)
+        self.py.append(y)
+        self.pz.append(z)
+        self.vx.append(ux)
+        self.vy.append(uy)
+        self.vz.append(uz)
+        self.en.append(e)
+        self.st.append(s)
+    }
+}
+
+# Uniform grid: count per cell, exclusive prefix sum, scatter of indices.
+class Grid {
+    mut list<int> start = []
+    mut list<int> items = []
+}
+
+# Phase 2 output: one slot per entity (state, desired velocity, claim).
+class Intent {
+    mut list<int> state = []
+    mut list<d64> dx = []
+    mut list<d64> dy = []
+    mut list<d64> dz = []
+    mut list<int> claim = []
+}
+
+class World {
+    mut int tick = 0
+    mut int next_id = 0
+    mut Pop prey = Pop {}
+    mut Pop pred = Pop {}
+    mut Pop food = Pop {}
+    mut Grid gp = Grid {}
+    mut Grid gq = Grid {}
+    mut Grid gf = Grid {}
+}
+
+# ---- RNG ----
+
+fn mix(wrapping<u64> z0) → wrapping<u64> {
+    mut wrapping<u64> z ← z0 + GAMMA
+    z ← z ⊻ (z ⇒ 30)
+    z ← z * MULT1
+    z ← z ⊻ (z ⇒ 27)
+    z ← z * MULT2
+    return z ⊻ (z ⇒ 31)
+}
+
+fn rnd(int tick, int id, int purpose) → wrapping<u64> {
+    let wrapping<u64> t ← tick ↦ wrapping<u64>
+    let wrapping<u64> i ← id ↦ wrapping<u64>
+    let wrapping<u64> p ← purpose ↦ wrapping<u64>
+    mut wrapping<u64> h ← mix(SEED ↦ wrapping<u64>)
+    h ← mix(h ⊻ t)
+    h ← mix(h ⊻ i)
+    return mix(h ⊻ p)
+}
+
+# A d64 holding the integer r * 10^-8 (r is a raw count).
+fn from_raw(int r) → d64 {
+    let d64 v ← (r ↦ d64) * 0.00000001
+    return v
+}
+
+# h mod m as an int. The remainder goes through the unbounded integer: the
+# direct `(h % m) ↦ int` on a u64 trips the TypeScript target's 2^53 operand
+# check (GAPS.md G07).
+fn wmod(wrapping<u64> h, int m) → int {
+    let inf r ← (h ↦ inf) % (m ↦ inf)
+    return r ↦ int ⊥ 0
+}
+
+# Uniform on the 2*10^8 + 1 raw values of [-1.0, 1.0].
+fn unit(wrapping<u64> h) → d64 {
+    return from_raw(wmod(h, 200000001) - 100000000)
+}
+
+fn below(wrapping<u64> h, int n) → int {
+    return wmod(h, n)
+}
+
+# ---- device kernels: the decision step of phase 2 ----
+#
+# decide_prey / decide_pred of src/main.fab as `@ kernel` lane loops, one lane per entity,
+# each writing only its own intent slots. The arithmetic and every store point are the
+# host's; what changes is spelling, forced by lanes or by the kernel checks:
+#   * no early `return` in a lane body: the first decided branch sets `st`, later branches
+#     run under `st ≺ 0` (they are pure reads, so the result is the host's);
+#   * `near()` returns a list; the kernel walks the same cells in the same order (z, y, x,
+#     then the grid's ids ascending) and reads the grid tensors directly;
+#   * the cell of a coordinate is `axis20_k` / `axis5_k`, a chain of edge comparisons equal to
+#     min(floor(p / 10), n - 1) (d64 → int is not a lane conversion), clamped with `.minimum`
+#     and `.maximum` so the range proof sees [0, n - 1]; grid starts and item indices are
+#     clamped the same way (identities on valid data);
+#   * integer cells that change inside a loop (the nearest-neighbour index, the neighbour
+#     count, rsqrt's exponent) are `wrapping<i32>` (an unbounded `i32` counter fails the
+#     store proof); "no neighbour" is the sentinel NONE = 2^31 - 1 instead of -1;
+#   * a decimal compared with a literal is compared with a named `const d64` (K_ZERO, K_ONE,
+#     K_E1 ...): Metal compares a literal unscaled (GAPS.md G18);
+#   * ids ascend with the index inside a kind, so the "lower id" tie-break compares indices;
+#   * the RNG draw is `unit_k`: u32 ids and tick, a `wrapping<u64>` seed constant, and the
+#     exact store `(r ↦ d64) * 0.00000001 - 1.0` for `from_raw(r - 10^8)`;
+#   * `aim_k` returns the scale `s` (0 when |d|² ≤ 0, which makes the vector 0, as the host's
+#     early return does); the caller stores `d_i * s` itself;
+#   * the state and the claim leave in one i32 (`state * 65536 + claim + 1`): a lane may store
+#     once per output tensor, and a Metal kernel has 31 buffer slots.
+# Inputs are columns packed per kind: Pk[k, i] = x y z vx vy vz energy of prey i (Qk likewise,
+# Fk = x y z amount of food); starts[g, c] is the grid start of kind g (0 prey, 1 predators,
+# 2 food) and gpi / gqi / gfi the scatter of indices.
+
+const wrapping<u64> SEEDW = 20261028
+const d64 K_ZERO = 0.0
+const d64 K_ONE = 1.0
+const d64 K_E1 = 10.0
+const d64 K_E2 = 20.0
+const d64 K_E3 = 30.0
+const d64 K_E4 = 40.0
+const d64 K_E5 = 50.0
+const d64 K_E6 = 60.0
+const d64 K_E7 = 70.0
+const d64 K_E8 = 80.0
+const d64 K_E9 = 90.0
+const d64 K_E10 = 100.0
+const d64 K_E11 = 110.0
+const d64 K_E12 = 120.0
+const d64 K_E13 = 130.0
+const d64 K_E14 = 140.0
+const d64 K_E15 = 150.0
+const d64 K_E16 = 160.0
+const d64 K_E17 = 170.0
+const d64 K_E18 = 180.0
+const d64 K_E19 = 190.0
+const wrapping<i32> WZERO = 0
+const wrapping<i32> NONE = 2147483647
+const i32 S_WANDER = 0
+const i32 S_FLOCK = 1
+const i32 S_FLEE = 2
+const i32 S_GRAZE = 3
+const i32 S_CHASE = 1
+const i32 S_EAT = 2
+const i32 S_REST = 3
+
+@ kernel
+fn mix_k(wrapping<u64> z0) → wrapping<u64> {
+    mut wrapping<u64> z ← z0 + GAMMA
+    z ← z ⊻ (z ⇒ 30)
+    z ← z * MULT1
+    z ← z ⊻ (z ⇒ 27)
+    z ← z * MULT2
+    return z ⊻ (z ⇒ 31)
+}
+
+@ kernel
+fn unit_k(u32 tick, u32 id, u32 purpose) → d64 {
+    let wrapping<u64> t ← tick ↦ wrapping<u64>
+    let wrapping<u64> i ← id ↦ wrapping<u64>
+    let wrapping<u64> p ← purpose ↦ wrapping<u64>
+    mut wrapping<u64> h ← mix_k(SEEDW)
+    h ← mix_k(h ⊻ t)
+    h ← mix_k(h ⊻ i)
+    h ← mix_k(h ⊻ p)
+    let wrapping<u64> r ← h % 200000001
+    let d64 v ← (r ↦ d64) * 0.00000001 - 1.0
+    return v
+}
+
+@ kernel
+fn rsqrt_k(d64 x0) → d64 {
+    mut d64 x ← x0
+    mut wrapping<i32> k ← WZERO
+    while x ≥ K_ONE {
+        x ← x * QUARTER
+        k ← k + 1
+    }
+    while x ≺ QUARTER {
+        x ← x * 4.0
+        k ← k - 1
+    }
+    mut d64 y ← RS_A - RS_B * x
+    for range 0‥3 let r {
+        let d64 h ← x * y * y
+        y ← y * (3.0 - h) * 0.5
+    }
+    while k ≻ WZERO {
+        y ← y * 0.5
+        k ← k - 1
+    }
+    while k ≺ WZERO {
+        y ← y * 2.0
+        k ← k + 1
+    }
+    return y
+}
+
+@ kernel
+fn aim_k(d64 dx, d64 dy, d64 dz, d64 speed) → d64 {
+    let d64 d2 ← dx * dx + dy * dy + dz * dz
+    if d2 ≤ K_ZERO then return 0.0
+    let d64 s ← speed * rsqrt_k(d2)
+    return s
+}
+
+# cell index along one axis: min(floor(p / 10), n - 1) for p ≥ 0 and 0 below 10, as the
+# count of cell edges 10, 20, ... not above p (a pure expression: no counter, so its range is provable)
+@ kernel
+fn axis20_k(d64 p) → i32 {
+    if p ≺ K_E1 then return 0
+    if p ≺ K_E2 then return 1
+    if p ≺ K_E3 then return 2
+    if p ≺ K_E4 then return 3
+    if p ≺ K_E5 then return 4
+    if p ≺ K_E6 then return 5
+    if p ≺ K_E7 then return 6
+    if p ≺ K_E8 then return 7
+    if p ≺ K_E9 then return 8
+    if p ≺ K_E10 then return 9
+    if p ≺ K_E11 then return 10
+    if p ≺ K_E12 then return 11
+    if p ≺ K_E13 then return 12
+    if p ≺ K_E14 then return 13
+    if p ≺ K_E15 then return 14
+    if p ≺ K_E16 then return 15
+    if p ≺ K_E17 then return 16
+    if p ≺ K_E18 then return 17
+    if p ≺ K_E19 then return 18
+    return 19
+}
+
+@ kernel
+fn axis5_k(d64 p) → i32 {
+    if p ≺ K_E1 then return 0
+    if p ≺ K_E2 then return 1
+    if p ≺ K_E3 then return 2
+    if p ≺ K_E4 then return 3
+    return 4
+}
+
+# sign of |a|² - |b|², compared exactly
+@ kernel
+fn cmp3_k(d64 ax, d64 ay, d64 az, d64 bx, d64 by, d64 bz) → i32 {
+    if ax * ax + ay * ay + az * az ≺ bx * bx + by * by + bz * bz then return -1
+    if ax * ax + ay * ay + az * az ≻ bx * bx + by * by + bz * bz then return 1
+    return 0
+}
+
+@ kernel
+@ public
+fn decide_prey<size NP, size NQ, size NF>(u32 tick, tensor<u32, [NP]> pid, tensor<d64, [7, NP]> Pk, tensor<d64, [7, NQ]> Qk, tensor<d64, [4, NF]> Fk, tensor<i32, [3, 2001]> starts, tensor<i32, [NP]> gpi, tensor<i32, [NQ]> gqi, tensor<i32, [NF]> gfi, mut tensor<i32, [NP]> Oc, mut tensor<d64, [NP]> Odx, mut tensor<d64, [NP]> Ody, mut tensor<d64, [NP]> Odz) → void {
+    for from pid at [i] thread lane let id {
+        let d64 x ← Pk[[0, i]]
+        let d64 y ← Pk[[1, i]]
+        let d64 z ← Pk[[2, i]]
+        let d64 vx ← Pk[[3, i]]
+        let d64 vy ← Pk[[4, i]]
+        let d64 vz ← Pk[[5, i]]
+        let d64 en ← Pk[[6, i]]
+        mut i32 st ← -1
+        mut i32 cl ← -1
+        mut d64 ox ← 0.0
+        mut d64 oy ← 0.0
+        mut d64 oz ← 0.0
+        # nearest predator in range: min (d2, id)
+        mut wrapping<i32> bj ← NONE
+        mut d64 bx ← 0.0
+        mut d64 by ← 0.0
+        mut d64 bz ← 0.0
+        let i32 fz0 ← axis5_k(z - R_FLEE).minimum(4).maximum(0)
+        let i32 fz1 ← axis5_k(z + R_FLEE).minimum(4).maximum(0)
+        let i32 fy0 ← axis20_k(y - R_FLEE).minimum(19).maximum(0)
+        let i32 fy1 ← axis20_k(y + R_FLEE).minimum(19).maximum(0)
+        let i32 fx0 ← axis20_k(x - R_FLEE).minimum(19).maximum(0)
+        let i32 fx1 ← axis20_k(x + R_FLEE).minimum(19).maximum(0)
+        for range fz0‥fz1 + 1 let cz {
+            for range fy0‥fy1 + 1 let cy {
+                for range fx0‥fx1 + 1 let cx {
+                    let i32 c ← (cz * 20 + cy) * 20 + cx
+                    for range starts[[1, c]]‥starts[[1, c + 1]] let s {
+                        let i32 j ← gqi[[s]].minimum(1000000).maximum(0)
+                        let wrapping<i32> jw ← j ↦ wrapping<i32>
+                        let d64 dx ← x - Qk[[0, j]]
+                        let d64 dy ← y - Qk[[1, j]]
+                        let d64 dz ← z - Qk[[2, j]]
+                        if dx * dx + dy * dy + dz * dz ≤ R_FLEE2 {
+                            if bj ≡ NONE {
+                                bj ← jw
+                                bx ← dx
+                                by ← dy
+                                bz ← dz
+                            }
+                            else {
+                                let i32 k ← cmp3_k(dx, dy, dz, bx, by, bz)
+                                if k ≺ 0 or k ≡ 0 and jw ≺ bj {
+                                    bj ← jw
+                                    bx ← dx
+                                    by ← dy
+                                    bz ← dz
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if bj ≢ NONE {
+            let d64 s ← aim_k(bx, by, bz, PREY_FLEE_V)
+            let d64 ax ← bx * s
+            let d64 ay ← by * s
+            let d64 az ← bz * s
+            st ← S_FLEE
+            ox ← ax
+            oy ← ay
+            oz ← az
+        }
+        # nearest non-depleted food in sense range (hungry only)
+        mut wrapping<i32> fj ← NONE
+        mut d64 fx ← 0.0
+        mut d64 fy ← 0.0
+        mut d64 fz ← 0.0
+        if st ≺ 0 and en ≺ E_HUNGRY {
+            let i32 gz0 ← axis5_k(z - R_FOOD).minimum(4).maximum(0)
+            let i32 gz1 ← axis5_k(z + R_FOOD).minimum(4).maximum(0)
+            let i32 gy0 ← axis20_k(y - R_FOOD).minimum(19).maximum(0)
+            let i32 gy1 ← axis20_k(y + R_FOOD).minimum(19).maximum(0)
+            let i32 gx0 ← axis20_k(x - R_FOOD).minimum(19).maximum(0)
+            let i32 gx1 ← axis20_k(x + R_FOOD).minimum(19).maximum(0)
+            for range gz0‥gz1 + 1 let cz {
+                for range gy0‥gy1 + 1 let cy {
+                    for range gx0‥gx1 + 1 let cx {
+                        let i32 c ← (cz * 20 + cy) * 20 + cx
+                        for range starts[[2, c]]‥starts[[2, c + 1]] let s {
+                            let i32 j ← gfi[[s]].minimum(1000000).maximum(0)
+                            let wrapping<i32> jw ← j ↦ wrapping<i32>
+                            let d64 dx ← Fk[[0, j]] - x
+                            let d64 dy ← Fk[[1, j]] - y
+                            let d64 dz ← Fk[[2, j]] - z
+                            if Fk[[3, j]] ≥ BITE and dx * dx + dy * dy + dz * dz ≤ R_FOOD2 {
+                                if fj ≡ NONE {
+                                    fj ← jw
+                                    fx ← dx
+                                    fy ← dy
+                                    fz ← dz
+                                }
+                                else {
+                                    let i32 k ← cmp3_k(dx, dy, dz, fx, fy, fz)
+                                    if k ≺ 0 or k ≡ 0 and jw ≺ fj {
+                                        fj ← jw
+                                        fx ← dx
+                                        fy ← dy
+                                        fz ← dz
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if fj ≢ NONE and fx * fx + fy * fy + fz * fz ≤ R_GRAZE2 {
+                st ← S_GRAZE
+                cl ← fj ↦ i32
+            }
+        }
+        if st ≺ 0 {
+            # neighbours in fixed order: cell, then id
+            mut wrapping<i32> n ← WZERO
+            mut d64 sx ← 0.0
+            mut d64 sy ← 0.0
+            mut d64 sz ← 0.0
+            mut d64 svx ← 0.0
+            mut d64 svy ← 0.0
+            mut d64 svz ← 0.0
+            mut d64 qx ← 0.0
+            mut d64 qy ← 0.0
+            mut d64 qz ← 0.0
+            let i32 kz0 ← axis5_k(z - R_FLOCK).minimum(4).maximum(0)
+            let i32 kz1 ← axis5_k(z + R_FLOCK).minimum(4).maximum(0)
+            let i32 ky0 ← axis20_k(y - R_FLOCK).minimum(19).maximum(0)
+            let i32 ky1 ← axis20_k(y + R_FLOCK).minimum(19).maximum(0)
+            let i32 kx0 ← axis20_k(x - R_FLOCK).minimum(19).maximum(0)
+            let i32 kx1 ← axis20_k(x + R_FLOCK).minimum(19).maximum(0)
+            for range kz0‥kz1 + 1 let cz {
+                for range ky0‥ky1 + 1 let cy {
+                    for range kx0‥kx1 + 1 let cx {
+                        let i32 c ← (cz * 20 + cy) * 20 + cx
+                        for range starts[[0, c]]‥starts[[0, c + 1]] let s {
+                            let i32 j ← gpi[[s]].minimum(1000000).maximum(0)
+                            let d64 dx ← x - Pk[[0, j]]
+                            let d64 dy ← y - Pk[[1, j]]
+                            let d64 dz ← z - Pk[[2, j]]
+                            if j ≢ i and dx * dx + dy * dy + dz * dz ≤ R_FLOCK2 {
+                                n ← n + 1
+                                sx ← sx + Pk[[0, j]]
+                                sy ← sy + Pk[[1, j]]
+                                sz ← sz + Pk[[2, j]]
+                                svx ← svx + Pk[[3, j]]
+                                svy ← svy + Pk[[4, j]]
+                                svz ← svz + Pk[[5, j]]
+                                if dx * dx + dy * dy + dz * dz ≤ R_SEP2 {
+                                    qx ← qx + dx
+                                    qy ← qy + dy
+                                    qz ← qz + dz
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if n ≻ WZERO {
+                let d64 nd ← n ↦ d64
+                let d64 mvx ← svx / nd
+                let d64 mvy ← svy / nd
+                let d64 mvz ← svz / nd
+                let d64 ax ← mvx - vx
+                let d64 ay ← mvy - vy
+                let d64 az ← mvz - vz
+                let d64 mx ← sx / nd
+                let d64 my ← sy / nd
+                let d64 mz ← sz / nd
+                let d64 cx ← mx - x
+                let d64 cy ← my - y
+                let d64 cz ← mz - z
+                let d64 sdx ← W_SEP * qx + W_ALI * ax + W_COH * cx + W_FOOD * fx
+                let d64 sdy ← W_SEP * qy + W_ALI * ay + W_COH * cy + W_FOOD * fy
+                let d64 sdz ← W_SEP * qz + W_ALI * az + W_COH * cz + W_FOOD * fz
+                let d64 s ← aim_k(sdx, sdy, sdz, PREY_FLOCK_V)
+                let d64 ex ← sdx * s
+                let d64 ey ← sdy * s
+                let d64 ez ← sdz * s
+                st ← S_FLOCK
+                ox ← ex
+                oy ← ey
+                oz ← ez
+            }
+            else {
+                let d64 wdx ← KEEP * vx + JITTER * unit_k(tick, id, 1) + W_FOOD * fx
+                let d64 wdy ← KEEP * vy + JITTER * unit_k(tick, id, 2) + W_FOOD * fy
+                let d64 wdz ← KEEP * vz + JITTER * unit_k(tick, id, 3) + W_FOOD * fz
+                let d64 s ← aim_k(wdx, wdy, wdz, PREY_WANDER_V)
+                let d64 ex ← wdx * s
+                let d64 ey ← wdy * s
+                let d64 ez ← wdz * s
+                st ← S_WANDER
+                ox ← ex
+                oy ← ey
+                oz ← ez
+            }
+        }
+        let i32 clc ← cl.minimum(60000).maximum(-1)
+        Oc[[i]] ← st * 65536 + (clc + 1)
+        Odx[[i]] ← ox
+        Ody[[i]] ← oy
+        Odz[[i]] ← oz
+    }
+}
+
+@ kernel
+@ public
+fn decide_pred<size NP, size NQ>(u32 tick, tensor<u32, [NQ]> qid, tensor<d64, [7, NP]> Pk, tensor<d64, [7, NQ]> Qk, tensor<i32, [3, 2001]> starts, tensor<i32, [NP]> gpi, mut tensor<i32, [NQ]> Oc, mut tensor<d64, [NQ]> Odx, mut tensor<d64, [NQ]> Ody, mut tensor<d64, [NQ]> Odz) → void {
+    for from qid at [i] thread lane let id {
+        let d64 x ← Qk[[0, i]]
+        let d64 y ← Qk[[1, i]]
+        let d64 z ← Qk[[2, i]]
+        # nearest prey in range: min (d2, id)
+        mut wrapping<i32> bj ← NONE
+        mut d64 bx ← 0.0
+        mut d64 by ← 0.0
+        mut d64 bz ← 0.0
+        let i32 sz0 ← axis5_k(z - R_SENSE).minimum(4).maximum(0)
+        let i32 sz1 ← axis5_k(z + R_SENSE).minimum(4).maximum(0)
+        let i32 sy0 ← axis20_k(y - R_SENSE).minimum(19).maximum(0)
+        let i32 sy1 ← axis20_k(y + R_SENSE).minimum(19).maximum(0)
+        let i32 sx0 ← axis20_k(x - R_SENSE).minimum(19).maximum(0)
+        let i32 sx1 ← axis20_k(x + R_SENSE).minimum(19).maximum(0)
+        for range sz0‥sz1 + 1 let cz {
+            for range sy0‥sy1 + 1 let cy {
+                for range sx0‥sx1 + 1 let cx {
+                    let i32 c ← (cz * 20 + cy) * 20 + cx
+                    for range starts[[0, c]]‥starts[[0, c + 1]] let s {
+                        let i32 j ← gpi[[s]].minimum(1000000).maximum(0)
+                        let wrapping<i32> jw ← j ↦ wrapping<i32>
+                        let d64 dx ← Pk[[0, j]] - x
+                        let d64 dy ← Pk[[1, j]] - y
+                        let d64 dz ← Pk[[2, j]] - z
+                        if dx * dx + dy * dy + dz * dz ≤ R_SENSE2 {
+                            if bj ≡ NONE {
+                                bj ← jw
+                                bx ← dx
+                                by ← dy
+                                bz ← dz
+                            }
+                            else {
+                                let i32 k ← cmp3_k(dx, dy, dz, bx, by, bz)
+                                if k ≺ 0 or k ≡ 0 and jw ≺ bj {
+                                    bj ← jw
+                                    bx ← dx
+                                    by ← dy
+                                    bz ← dz
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        mut i32 st ← -1
+        mut i32 cl ← -1
+        mut d64 ox ← 0.0
+        mut d64 oy ← 0.0
+        mut d64 oz ← 0.0
+        if bj ≢ NONE and bx * bx + by * by + bz * bz ≤ R_CONTACT2 {
+            st ← S_EAT
+            cl ← bj ↦ i32
+        }
+        if st ≺ 0 and Qk[[6, i]] ≥ E_SATED {
+            st ← S_REST
+        }
+        if st ≺ 0 and bj ≢ NONE {
+            let d64 s ← aim_k(bx, by, bz, PRED_CHASE_V)
+            let d64 ax ← bx * s
+            let d64 ay ← by * s
+            let d64 az ← bz * s
+            st ← S_CHASE
+            ox ← ax
+            oy ← ay
+            oz ← az
+        }
+        if st ≺ 0 {
+            let d64 wdx ← KEEP * Qk[[3, i]] + JITTER * unit_k(tick, id, 1)
+            let d64 wdy ← KEEP * Qk[[4, i]] + JITTER * unit_k(tick, id, 2)
+            let d64 wdz ← KEEP * Qk[[5, i]] + JITTER * unit_k(tick, id, 3)
+            let d64 s ← aim_k(wdx, wdy, wdz, PRED_WANDER_V)
+            let d64 ex ← wdx * s
+            let d64 ey ← wdy * s
+            let d64 ez ← wdz * s
+            st ← S_WANDER
+            ox ← ex
+            oy ← ey
+            oz ← ez
+        }
+        let i32 clc ← cl.minimum(60000).maximum(-1)
+        Oc[[i]] ← st * 65536 + (clc + 1)
+        Odx[[i]] ← ox
+        Ody[[i]] ← oy
+        Odz[[i]] ← oz
+    }
+}
+
+# ---- numeric kernels ----
+
+fn rsqrt(d64 x0) → d64 {
+    mut d64 x ← x0
+    mut int k ← 0
+    while x ≥ 1.0 {
+        x ← x * QUARTER
+        k ← k + 1
+    }
+    while x ≺ QUARTER {
+        x ← x * 4.0
+        k ← k - 1
+    }
+    mut d64 y ← RS_A - RS_B * x
+    for range 0‥3 let r {
+        # split in two stores: y * (3.0 - x*y*y) * 0.5 in one expression is scale
+        # 40 and passes the 128-bit carrier
+        let d64 h ← x * y * y
+        y ← y * (3.0 - h) * 0.5
+    }
+    # undo the reduction (a descending range would run backwards: use counters)
+    while k ≻ 0 {
+        y ← y * 0.5
+        k ← k - 1
+    }
+    while k ≺ 0 {
+        y ← y * 2.0
+        k ← k + 1
+    }
+    return y
+}
+
+fn cap_speed(d64 vx, d64 vy, d64 vz, d64 vmax, d64 vmax2) → V3 {
+    if vx * vx + vy * vy + vz * vz ≤ vmax2 then return V3 { x = vx, y = vy, z = vz }
+    let d64 v2 ← vx * vx + vy * vy + vz * vz
+    let d64 f ← vmax * rsqrt(v2)
+    let d64 ax ← vx * f
+    let d64 ay ← vy * f
+    let d64 az ← vz * f
+    return V3 { x = ax, y = ay, z = az }
+}
+
+# Reflect at 0 and w (exact); one reflection suffices since |v|*dt << w. The
+# position and the velocity component are two functions: a `mut d64` parameter
+# cannot take `-p` or a decimal literal operand (GAPS.md G01, G02).
+fn bounce_pos(d64 p, d64 w) → d64 {
+    if p ≺ 0.0 then return -p
+    if p ≻ w then return w + w - p
+    return p
+}
+
+fn bounce_vel(d64 p, d64 v, d64 w) → d64 {
+    if p ≺ 0.0 or p ≻ w then return -v
+    return v
+}
+
+fn clamp(d64 p, d64 w) → d64 {
+    if p ≺ 0.0 then return 0.0
+    if p ≻ w then return w
+    return p
+}
+
+# Sign of |a|^2 - |b|^2, compared exactly (no store of either square).
+fn cmp3(d64 ax, d64 ay, d64 az, d64 bx, d64 by, d64 bz) → int {
+    if ax * ax + ay * ay + az * az ≺ bx * bx + by * by + bz * bz then return -1
+    if ax * ax + ay * ay + az * az ≻ bx * bx + by * by + bz * bz then return 1
+    return 0
+}
+
+# ---- grid ----
+
+fn axis_cell(d64 p, int n) → int {
+    let int c ← (p ↦ int via Floor) / 10
+    return c ≻ n - 1 ✓ n - 1 ✗ c
+}
+
+fn cell_of(d64 x, d64 y, d64 z) → int {
+    return (axis_cell(z, NZ) * NY + axis_cell(y, NY)) * NX + axis_cell(x, NX)
+}
+
+fn grid_build(Pop pop) → Grid {
+    let int n ← pop.count()
+    mut list<int> cell ← empty
+    mut list<int> cnt ← empty
+    for range 0‥NCELL let c {
+        cnt.append(0)
+    }
+    for range 0‥n let i {
+        let int c ← cell_of(pop.px[i], pop.py[i], pop.pz[i])
+        cell.append(c)
+        cnt[c] ← cnt[c] + 1
+    }
+    mut list<int> start ← empty
+    mut list<int> cur ← empty
+    mut int sum ← 0
+    for range 0‥NCELL let c {
+        start.append(sum)
+        cur.append(sum)
+        sum ← sum + cnt[c]
+    }
+    start.append(sum)
+    mut list<int> items ← empty
+    for range 0‥n let i {
+        items.append(0)
+    }
+    for range 0‥n let i {
+        let int c ← cell[i]
+        items[cur[c]] ← i
+        cur[c] ← cur[c] + 1
+    }
+    return Grid { start = start, items = items }
+}
+
+# ---- phase 2: sense and decide (reads the snapshot, writes only slot i) ----
+
+# One launch per kind: pack the snapshot into tensors, run the decision kernels, read the
+# intent slots back. The grids are built on the host (phase 1, scans and scatters).
+class Decisions {
+    mut Intent ip = Intent {}
+    mut Intent iq = Intent {}
+}
+
+fn decide_device(World w, int t) → Decisions {
+    let int np ← w.prey.count()
+    let int nq ← w.pred.count()
+    let int nf ← w.food.count()
+    const size NP ← np
+    const size NQ ← nq
+    const size NF ← nf
+    mut tensor<u32, [NP]> pid ← tu32[NP] {}
+    mut tensor<u32, [NQ]> qid ← tu32[NQ] {}
+    mut tensor<d64, [7, NP]> Pk ← td64[7, NP] {}
+    mut tensor<d64, [7, NQ]> Qk ← td64[7, NQ] {}
+    mut tensor<d64, [4, NF]> Fk ← td64[4, NF] {}
+    mut tensor<i32, [3, 2001]> starts ← ti32[3, 2001] {}
+    mut tensor<i32, [NP]> gpi ← ti32[NP] {}
+    mut tensor<i32, [NQ]> gqi ← ti32[NQ] {}
+    mut tensor<i32, [NF]> gfi ← ti32[NF] {}
+    for range 0‥np let i {
+        pid[[i]] ← w.prey.ids[i] ↦ u32 ⊥ 0
+        Pk[[0, i]] ← w.prey.px[i]
+        Pk[[1, i]] ← w.prey.py[i]
+        Pk[[2, i]] ← w.prey.pz[i]
+        Pk[[3, i]] ← w.prey.vx[i]
+        Pk[[4, i]] ← w.prey.vy[i]
+        Pk[[5, i]] ← w.prey.vz[i]
+        Pk[[6, i]] ← w.prey.en[i]
+        gpi[[i]] ← w.gp.items[i] ↦ i32 ⊥ 0
+    }
+    for range 0‥nq let i {
+        qid[[i]] ← w.pred.ids[i] ↦ u32 ⊥ 0
+        Qk[[0, i]] ← w.pred.px[i]
+        Qk[[1, i]] ← w.pred.py[i]
+        Qk[[2, i]] ← w.pred.pz[i]
+        Qk[[3, i]] ← w.pred.vx[i]
+        Qk[[4, i]] ← w.pred.vy[i]
+        Qk[[5, i]] ← w.pred.vz[i]
+        Qk[[6, i]] ← w.pred.en[i]
+        gqi[[i]] ← w.gq.items[i] ↦ i32 ⊥ 0
+    }
+    for range 0‥nf let i {
+        Fk[[0, i]] ← w.food.px[i]
+        Fk[[1, i]] ← w.food.py[i]
+        Fk[[2, i]] ← w.food.pz[i]
+        Fk[[3, i]] ← w.food.en[i]
+        gfi[[i]] ← w.gf.items[i] ↦ i32 ⊥ 0
+    }
+    for range 0‥NCELL + 1 let c {
+        starts[[0, c]] ← w.gp.start[c] ↦ i32 ⊥ 0
+        starts[[1, c]] ← w.gq.start[c] ↦ i32 ⊥ 0
+        starts[[2, c]] ← w.gf.start[c] ↦ i32 ⊥ 0
+    }
+    mut tensor<i32, [NP]> pc ← ti32[NP] {}
+    mut tensor<d64, [NP]> pdx ← td64[NP] {}
+    mut tensor<d64, [NP]> pdy ← td64[NP] {}
+    mut tensor<d64, [NP]> pdz ← td64[NP] {}
+    mut tensor<i32, [NQ]> qc ← ti32[NQ] {}
+    mut tensor<d64, [NQ]> qdx ← td64[NQ] {}
+    mut tensor<d64, [NQ]> qdy ← td64[NQ] {}
+    mut tensor<d64, [NQ]> qdz ← td64[NQ] {}
+    let u32 tick ← t ↦ u32 ⊥ 0
+    decide_prey(tick, pid, Pk, Qk, Fk, starts, gpi, gqi, gfi, mut pc, mut pdx, mut pdy, mut pdz)
+    decide_pred(tick, qid, Pk, Qk, starts, gpi, mut qc, mut qdx, mut qdy, mut qdz)
+    mut Decisions out ← Decisions {}
+    for range 0‥np let i {
+        let int code ← pc[[i]] ↦ int
+        out.ip.state.append(code / 65536)
+        out.ip.claim.append(code % 65536 - 1)
+        out.ip.dx.append(pdx[[i]])
+        out.ip.dy.append(pdy[[i]])
+        out.ip.dz.append(pdz[[i]])
+    }
+    for range 0‥nq let i {
+        let int code ← qc[[i]] ↦ int
+        out.iq.state.append(code / 65536)
+        out.iq.claim.append(code % 65536 - 1)
+        out.iq.dx.append(qdx[[i]])
+        out.iq.dy.append(qdy[[i]])
+        out.iq.dz.append(qdz[[i]])
+    }
+    return out
+}
+
+# ---- phase 4: integrate one mover from its own intent and resolved gain ----
+
+fn move(mut Pop pop, int i, d64 dvx, d64 dvy, d64 dvz, d64 units, d64 per, d64 cost0, d64 costv, d64 vmax, d64 vmax2) → void {
+    let d64 ovx ← pop.vx[i]
+    let d64 ovy ← pop.vy[i]
+    let d64 ovz ← pop.vz[i]
+    let d64 nvx ← ovx + (dvx - ovx) * TURN
+    let d64 nvy ← ovy + (dvy - ovy) * TURN
+    let d64 nvz ← ovz + (dvz - ovz) * TURN
+    let V3 c ← cap_speed(nvx, nvy, nvz, vmax, vmax2)
+    let d64 ux ← pop.px[i] + c.x * DT
+    let d64 uy ← pop.py[i] + c.y * DT
+    let d64 uz ← pop.pz[i] + c.z * DT
+    let d64 vx ← bounce_vel(ux, c.x, WX)
+    let d64 vy ← bounce_vel(uy, c.y, WY)
+    let d64 vz ← bounce_vel(uz, c.z, WZ)
+    let d64 x ← bounce_pos(ux, WX)
+    let d64 y ← bounce_pos(uy, WY)
+    let d64 z ← bounce_pos(uz, WZ)
+    # one store: the gain (units * per) and the speed cost stay exact inside it
+    pop.en[i] ← pop.en[i] - cost0 + units * per - costv * (vx * vx + vy * vy + vz * vz)
+    pop.px[i] ← x
+    pop.py[i] ← y
+    pop.pz[i] ← z
+    pop.vx[i] ← vx
+    pop.vy[i] ← vy
+    pop.vz[i] ← vz
+}
+
+# ---- phase 5 ----
+
+# Child next to the parent; energy split half-even (parent keeps e / 2.0).
+fn birth(int t, mut Pop pop, int i, mut Pop born, int cid) → void {
+    let int pid ← pop.ids[i]
+    let d64 ox ← unit(rnd(t, pid, P_OFFSET)) * SPREAD
+    let d64 oy ← unit(rnd(t, pid, P_OFFSET + 1)) * SPREAD
+    let d64 oz ← unit(rnd(t, pid, P_OFFSET + 2)) * SPREAD
+    let d64 cx ← clamp(pop.px[i] + ox, WX)
+    let d64 cy ← clamp(pop.py[i] + oy, WY)
+    let d64 cz ← clamp(pop.pz[i] + oz, WZ)
+    let d64 cvx ← unit(rnd(t, pid, P_BIRTHV)) * BIRTH_V
+    let d64 cvy ← unit(rnd(t, pid, P_BIRTHV + 1)) * BIRTH_V
+    let d64 cvz ← unit(rnd(t, pid, P_BIRTHV + 2)) * BIRTH_V
+    let d64 half ← pop.en[i] / 2.0
+    let d64 child ← pop.en[i] - half
+    born.add(cid, cx, cy, cz, cvx, cvy, cvz, child, 0)
+    pop.en[i] ← half
+}
+
+# Order-preserving stream compaction: exclusive scan of the alive flags, then scatter.
+fn compact(Pop pop, list<int> alive) → Pop {
+    mut list<int> pos ← empty
+    mut int total ← 0
+    for from alive let a {
+        pos.append(total)
+        total ← total + a
+    }
+    mut Pop out ← Pop {}
+    for range 0‥total let k {
+        out.add(0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0)
+    }
+    for range 0‥pop.count() let i {
+        if alive[i] ≡ 1 {
+            let int d ← pos[i]
+            out.ids[d] ← pop.ids[i]
+            out.px[d] ← pop.px[i]
+            out.py[d] ← pop.py[i]
+            out.pz[d] ← pop.pz[i]
+            out.vx[d] ← pop.vx[i]
+            out.vy[d] ← pop.vy[i]
+            out.vz[d] ← pop.vz[i]
+            out.en[d] ← pop.en[i]
+            out.st[d] ← pop.st[i]
+        }
+    }
+    return out
+}
+
+# Births in parent id order, capped; returns the newborn Pop. `count` starts at
+# the number of survivors.
+fn births(int t, mut Pop pop, list<int> alive, d64 repro, int cap, mut int next_id, mut Pop born) → void {
+    mut int count ← 0
+    for from alive let a {
+        count ← count + a
+    }
+    for range 0‥pop.count() let i {
+        if alive[i] ≡ 1 and pop.en[i] ≥ repro and count ≺ cap {
+            count ← count + 1
+            birth(t, mut pop, i, mut born, next_id)
+            next_id ← next_id + 1
+        }
+    }
+}
+
+fn append_pop(mut Pop pop, Pop extra) → void {
+    for range 0‥extra.count() let i {
+        pop.add(extra.ids[i], extra.px[i], extra.py[i], extra.pz[i], extra.vx[i], extra.vy[i], extra.vz[i], extra.en[i], extra.st[i])
+    }
+}
+
+# ---- one tick ----
+
+fn step(mut World w) → void {
+    let int t ← w.tick + 1
+    # 1. grids (one per kind)
+    w.gp ← grid_build(w.prey)
+    w.gq ← grid_build(w.pred)
+    w.gf ← grid_build(w.food)
+    let int np ← w.prey.count()
+    let int nq ← w.pred.count()
+    let int nf ← w.food.count()
+    # 2. sense and decide: two device launches, each lane writes only its own intent slot
+    let Decisions dec ← decide_device(w, t)
+    let Intent ip ← dec.ip
+    let Intent iq ← dec.iq
+    # 3. resolve. Predation: a prey goes to the claimant with min (d2, predator id).
+    mut list<int> winner ← empty
+    for range 0‥np let i {
+        winner.append(-1)
+    }
+    for range 0‥nq let j {
+        let int p ← iq.claim[j]
+        if p ≥ 0 {
+            let int cur ← winner[p]
+            if cur ≺ 0 {
+                winner[p] ← j
+            }
+            else {
+                let d64 px ← w.prey.px[p]
+                let d64 py ← w.prey.py[p]
+                let d64 pz ← w.prey.pz[p]
+                let int c ← cmp3(px - w.pred.px[j], py - w.pred.py[j], pz - w.pred.pz[j], px - w.pred.px[cur], py - w.pred.py[cur], pz - w.pred.pz[cur])
+                if c ≺ 0 then winner[p] ← j
+            }
+        }
+    }
+    mut list<d64> meal ← empty
+    for range 0‥nq let j {
+        meal.append(0.0)
+    }
+    for range 0‥np let i {
+        if winner[i] ≥ 0 then meal[winner[i]] ← MEAL
+    }
+    # food units go out in prey id order; an eaten prey receives nothing
+    # (built by appends: indexing a `copy` of a list does not build on rust, GAPS.md G09)
+    mut list<d64> left ← empty
+    for from w.food.en let amount {
+        left.append(amount)
+    }
+    mut list<d64> bite ← empty
+    for range 0‥np let i {
+        bite.append(0.0)
+        let int f ← ip.claim[i]
+        if f ≥ 0 and winner[i] ≺ 0 {
+            let d64 b ← left[f] ≺ BITE ✓ left[f] ✗ BITE
+            bite[i] ← b
+            left[f] ← left[f] - b
+        }
+    }
+    # 4. integrate (own slot only), then food regrowth
+    for range 0‥np let i {
+        w.prey.st[i] ← ip.state[i]
+        move(mut w.prey, i, ip.dx[i], ip.dy[i], ip.dz[i], bite[i], FOOD_ENERGY, PREY_COST, PREY_COSTV, PREY_VMAX, PREY_VMAX2)
+    }
+    for range 0‥nq let j {
+        w.pred.st[j] ← iq.state[j]
+        let d64 cost0 ← iq.state[j] ≡ PredState.rest ↦ int ✓ PRED_REST_COST ✗ PRED_COST
+        move(mut w.pred, j, iq.dx[j], iq.dy[j], iq.dz[j], meal[j], 1.0, cost0, PRED_COSTV, PRED_VMAX, PRED_VMAX2)
+    }
+    for range 0‥nf let f {
+        let d64 grown ← left[f] + FOOD_REGROW
+        w.food.en[f] ← grown ≻ FOOD_CAP ✓ FOOD_CAP ✗ grown
+    }
+    # 5. births (parent id order: prey, then predators), deaths, compaction
+    mut list<int> alive_p ← empty
+    for range 0‥np let i {
+        alive_p.append(winner[i] ≺ 0 and w.prey.en[i] ≻ 0.0 ✓ 1 ✗ 0)
+    }
+    mut list<int> alive_q ← empty
+    for range 0‥nq let j {
+        alive_q.append(w.pred.en[j] ≻ 0.0 ✓ 1 ✗ 0)
+    }
+    mut int nid ← w.next_id
+    mut Pop kids_p ← Pop {}
+    mut Pop kids_q ← Pop {}
+    births(t, mut w.prey, alive_p, PREY_REPRO, PREY_MAX, mut nid, mut kids_p)
+    births(t, mut w.pred, alive_q, PRED_REPRO, PRED_MAX, mut nid, mut kids_q)
+    w.next_id ← nid
+    w.prey ← compact(w.prey, alive_p)
+    w.pred ← compact(w.pred, alive_q)
+    append_pop(mut w.prey, kids_p)
+    append_pop(mut w.pred, kids_q)
+    w.tick ← t
+}
+
+# ---- world ----
+
+fn world_new() → World {
+    mut World w ← World {}
+    for range 0‥NPREY + NPRED let i {
+        let bool is_prey ← i ≺ NPREY
+        let int span ← is_prey ✓ PREY_E0_SPAN ✗ PRED_E0_SPAN
+        let d64 e0 ← is_prey ✓ PREY_E0 ✗ PRED_E0
+        let d64 e ← e0 + from_raw(below(rnd(0, i, P_INIT_E), span + 1))
+        let d64 x ← from_raw(below(rnd(0, i, P_INIT), WX_RAW + 1))
+        let d64 y ← from_raw(below(rnd(0, i, P_INIT + 1), WY_RAW + 1))
+        let d64 z ← from_raw(below(rnd(0, i, P_INIT + 2), WZ_RAW + 1))
+        let d64 vx ← unit(rnd(0, i, P_INIT + 3)) * 2.0
+        let d64 vy ← unit(rnd(0, i, P_INIT + 4)) * 2.0
+        let d64 vz ← unit(rnd(0, i, P_INIT + 5)) * 2.0
+        if is_prey {
+            w.prey.add(i, x, y, z, vx, vy, vz, e, 0)
+        }
+        else {
+            w.pred.add(i, x, y, z, vx, vy, vz, e, 0)
+        }
+    }
+    w.next_id ← NPREY + NPRED
+    for range 0‥NFOOD let k {
+        let int i ← w.next_id
+        let d64 x ← from_raw(below(rnd(0, i, P_INIT), WX_RAW + 1))
+        let d64 y ← from_raw(below(rnd(0, i, P_INIT + 1), WY_RAW + 1))
+        let d64 z ← from_raw(below(rnd(0, i, P_INIT + 2), WZ_RAW + 1))
+        w.food.add(i, x, y, z, 0.0, 0.0, 0.0, FOOD_CAP, 0)
+        w.next_id ← i + 1
+    }
+    return w
+}
+
+# ---- outputs: the state hash ----
+#
+# SHA-256 is written out here rather than taken from norma:crypto (GAPS.md G04
+# to G06: that module does not build on go, ts or python). Bytes are plain ints
+# 0..255; words are wrapping<u32>, so every add and shift reduces at its store.
+
+const list<wrapping<u32>> SHA_K = [1116352408, 1899447441, 3049323471, 3921009573, 961987163, 1508970993, 2453635748, 2870763221, 3624381080, 310598401, 607225278, 1426881987, 1925078388, 2162078206, 2614888103, 3248222580, 3835390401, 4022224774, 264347078, 604807628, 770255983, 1249150122, 1555081692, 1996064986, 2554220882, 2821834349, 2952996808, 3210313671, 3336571891, 3584528711, 113926993, 338241895, 666307205, 773529912, 1294757372, 1396182291, 1695183700, 1986661051, 2177026350, 2456956037, 2730485921, 2820302411, 3259730800, 3345764771, 3516065817, 3600352804, 4094571909, 275423344, 430227734, 506948616, 659060556, 883997877, 958139571, 1322822218, 1537002063, 1747873779, 1955562222, 2024104815, 2227730452, 2361852424, 2428436474, 2756734187, 3204031479, 3329325298]
+const list<string> HEX_DIGITS = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "a", "b", "c", "d", "e", "f"]
+
+fn rotr(wrapping<u32> x, wrapping<u32> n) → wrapping<u32> {
+    return (x ⇒ n) ∨ (x ⇐ (32 - n))
+}
+
+fn small_sigma0(wrapping<u32> x) → wrapping<u32> {
+    return rotr(x, 7) ⊻ rotr(x, 18) ⊻ (x ⇒ 3)
+}
+
+fn small_sigma1(wrapping<u32> x) → wrapping<u32> {
+    return rotr(x, 17) ⊻ rotr(x, 19) ⊻ (x ⇒ 10)
+}
+
+fn big_sigma0(wrapping<u32> x) → wrapping<u32> {
+    return rotr(x, 2) ⊻ rotr(x, 13) ⊻ rotr(x, 22)
+}
+
+fn big_sigma1(wrapping<u32> x) → wrapping<u32> {
+    return rotr(x, 6) ⊻ rotr(x, 11) ⊻ rotr(x, 25)
+}
+
+# One 64-byte block of `bytes` starting at `off`, folded into `state` (8 words).
+fn sha_block(list<int> bytes, int off, mut list<wrapping<u32>> state) → void {
+    mut list<wrapping<u32>> w ← empty
+    for range 0‥16 let i {
+        let int j ← off + i * 4
+        let int word ← (bytes[j] ⇐ 24) ∨ (bytes[j + 1] ⇐ 16) ∨ (bytes[j + 2] ⇐ 8) ∨ bytes[j + 3]
+        w.append(word ↦ wrapping<u32>)
+    }
+    for range 16‥64 let i {
+        let wrapping<u32> s0 ← small_sigma0(w[i - 15])
+        let wrapping<u32> s1 ← small_sigma1(w[i - 2])
+        w.append(s1 + w[i - 7] + s0 + w[i - 16])
+    }
+    mut wrapping<u32> a ← state[0]
+    mut wrapping<u32> b ← state[1]
+    mut wrapping<u32> c ← state[2]
+    mut wrapping<u32> d ← state[3]
+    mut wrapping<u32> e ← state[4]
+    mut wrapping<u32> f ← state[5]
+    mut wrapping<u32> g ← state[6]
+    mut wrapping<u32> h ← state[7]
+    for range 0‥64 let i {
+        let wrapping<u32> s1 ← big_sigma1(e)
+        let wrapping<u32> choose ← (e ∧ f) ⊻ ((¬e) ∧ g)
+        let wrapping<u32> t1 ← h + s1 + choose + SHA_K[i] + w[i]
+        let wrapping<u32> s0 ← big_sigma0(a)
+        let wrapping<u32> majority ← (a ∧ b) ⊻ (a ∧ c) ⊻ (b ∧ c)
+        let wrapping<u32> t2 ← s0 + majority
+        h ← g
+        g ← f
+        f ← e
+        e ← d + t1
+        d ← c
+        c ← b
+        b ← a
+        a ← t1 + t2
+    }
+    state[0] ← a + state[0]
+    state[1] ← b + state[1]
+    state[2] ← c + state[2]
+    state[3] ← d + state[3]
+    state[4] ← e + state[4]
+    state[5] ← f + state[5]
+    state[6] ← g + state[6]
+    state[7] ← h + state[7]
+}
+
+fn hex_word(wrapping<u32> w) → string {
+    mut string out ← ""
+    mut int shift ← 28
+    while shift ≥ 0 {
+        let int nibble ← ((w ⇒ shift) ∧ 15) ↦ int
+        out ← out + HEX_DIGITS[nibble]
+        shift ← shift - 4
+    }
+    return out
+}
+
+# SHA-256 of the bytes, lower-case hex.
+fn sha256_hex(list<int> data) → string {
+    let int bit_len ← data.length() * 8
+    mut list<int> padded ← empty
+    for from data let b {
+        padded.append(b)
+    }
+    padded.append(128)
+    while padded.length() % 64 ≢ 56 {
+        padded.append(0)
+    }
+    mut int shift ← 56
+    while shift ≥ 0 {
+        padded.append((bit_len ⇒ shift) ∧ 255)
+        shift ← shift - 8
+    }
+    mut list<wrapping<u32>> state ← [1779033703, 3144134277, 1013904242, 2773480762, 1359893119, 2600822924, 528734635, 1541459225]
+    for range 0‥padded.length() / 64 let blk {
+        sha_block(padded, blk * 64, mut state)
+    }
+    mut string out ← ""
+    for from state let word {
+        out ← out + hex_word(word)
+    }
+    return out
+}
+
+fn put_u8(mut list<int> buf, int v) → void {
+    buf.append(v ∧ 255)
+}
+
+fn put_u32(mut list<int> buf, int v) → void {
+    mut int r ← v
+    for range 0‥4 let k {
+        buf.append(r ∧ 255)
+        r ← r ⇒ 8
+    }
+}
+
+# The d64 as its raw i64 (value * 10^8, exact), little endian two's complement.
+fn put_d64(mut list<int> buf, d64 x) → void {
+    let i64 raw ← (x * 100000000.0) ↦ i64 via HalfEven
+    mut wrapping<u64> r ← raw ↦ wrapping<u64>
+    for range 0‥8 let k {
+        buf.append((r ↦ wrapping<u8>) ↦ int)
+        r ← r ⇒ 8
+    }
+}
+
+fn put_pop(mut list<int> buf, Pop pop, int kind) → void {
+    put_u8(mut buf, kind)
+    put_u32(mut buf, pop.count())
+    for range 0‥pop.count() let i {
+        put_u32(mut buf, pop.ids[i])
+        put_u8(mut buf, kind)
+        put_u8(mut buf, pop.st[i])
+        put_d64(mut buf, pop.px[i])
+        put_d64(mut buf, pop.py[i])
+        put_d64(mut buf, pop.pz[i])
+        if kind ≺ 2 {
+            put_d64(mut buf, pop.vx[i])
+            put_d64(mut buf, pop.vy[i])
+            put_d64(mut buf, pop.vz[i])
+        }
+        put_d64(mut buf, pop.en[i])
+    }
+}
+
+fn digest(World w) → string {
+    mut list<int> buf ← empty
+    put_pop(mut buf, w.prey, 0)
+    put_pop(mut buf, w.pred, 1)
+    put_pop(mut buf, w.food, 2)
+    return sha256_hex(buf)
+}
+
+# ---- outputs: summary and snapshots ----
+
+fn count_state(Pop pop, int s) → int {
+    mut int n ← 0
+    for from pop.st let v {
+        if v ≡ s then n ← n + 1
+    }
+    return n
+}
+
+fn summary_row(World w) → string {
+    mut d64 food ← 0.0
+    for from w.food.en let a {
+        food ← food + a
+    }
+    mut string row ← "§,§,§,§"(w.tick, w.prey.count(), w.pred.count(), food)
+    for range 0‥4 let k {
+        row ← row + "," + "§"(count_state(w.prey, k))
+    }
+    for range 0‥4 let k {
+        row ← row + "," + "§"(count_state(w.pred, k))
+    }
+    return row
+}
+
+fn pop_rows(Pop pop, string kind, bool mobile, mut list<string> rows) → void {
+    for range 0‥pop.count() let i {
+        let int s ← pop.st[i]
+        mut string name ← "grown"
+        if kind ≡ "prey" {
+            let PreyState ps ← s ↦ PreyState ⊥ PreyState.wander
+            name ← ps ↦ string
+        }
+        if kind ≡ "predator" {
+            let PredState qs ← s ↦ PredState ⊥ PredState.wander
+            name ← qs ↦ string
+        }
+        mut string vel ← ",,,"
+        if mobile {
+            vel ← "§,§,§,"(pop.vx[i], pop.vy[i], pop.vz[i])
+        }
+        rows.append("§,§,§,§,§,§"(pop.ids[i], kind, name, pop.px[i], pop.py[i], pop.pz[i]) + "," + vel + "§"(pop.en[i]))
+    }
+}
+
+fn snapshot(World w) → list<string> {
+    mut list<string> rows ← empty
+    rows.append("id,kind,state,x,y,z,vx,vy,vz,energy")
+    pop_rows(w.prey, "prey", true, mut rows)
+    pop_rows(w.pred, "predator", true, mut rows)
+    pop_rows(w.food, "food", false, mut rows)
+    return rows
+}
+
+main {
+    mut World w ← world_new()
+    mut list<string> summary ← empty
+    summary.append("tick,prey,predators,food,prey_wander,prey_flock,prey_flee,prey_graze,pred_wander,pred_chase,pred_eat,pred_rest")
+    mut list<string> snap0 ← empty
+    mut list<string> snap100 ← empty
+    mut list<string> snap500 ← empty
+    print "== hashes"
+    for range 0‥TICKS + 1 let t {
+        if t ≻ 0 then step(mut w)
+        print "§ §"(w.tick, digest(w))
+        if t % 50 ≡ 0 then summary.append(summary_row(w))
+        if t ≡ 0 then snap0 ← snapshot(w)
+        if t ≡ 100 then snap100 ← snapshot(w)
+        if t ≡ 500 then snap500 ← snapshot(w)
+    }
+    print "== summary"
+    for from summary let row {
+        print row
+    }
+    print "== snapshot_0"
+    for from snap0 let row {
+        print row
+    }
+    print "== snapshot_100"
+    for from snap100 let row {
+        print row
+    }
+    print "== snapshot_500"
+    for from snap500 let row {
+        print row
+    }
+}
