@@ -234,8 +234,18 @@ fn comment_before_implendum_method_attaches_to_member_owner() {
         vec![" before method"]
     );
 
-    // Interface signatures carry no semantic back-reference.
-    assert_eq!(owner.semantic, None);
+    // Interface signatures have semantic definition ids, even though they
+    // carry no body node. The trivia owner refers to that method definition.
+    let interface = lowered
+        .hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Interface(interface) => Some(interface),
+            _ => None,
+        })
+        .expect("interface item");
+    assert_eq!(owner.semantic, Some(HirOwnerRef::Def(interface.methods[0].def_id)));
 }
 
 #[test]

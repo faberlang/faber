@@ -744,7 +744,11 @@ pub struct FunctionProvenanceTableWire {
 /// the degenerate semantic form over the body failed the validator for every
 /// collection-shaped alias (a sized list among them); schema-v60 artifacts fail
 /// closed because the serialized head enum gained a variant.
-pub const SCHEMA_VERSION: u32 = 61;
+/// Version 62 adds the `UnionSharedField` trivia-owner kind, which records the
+/// shared-field ordinal against its union definition so FHIR can retain those
+/// member comments; schema-v61 artifacts fail closed because the serialized
+/// owner-kind enum gained a variant.
+pub const SCHEMA_VERSION: u32 = 62;
 
 /// Portable boundary where a retained runtime shape equality is checked.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
