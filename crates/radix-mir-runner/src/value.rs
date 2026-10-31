@@ -36,7 +36,7 @@ use radix_mir::MirClosureEnvironmentId;
 use radix_mir::{MirBinOp, MirFunctionId};
 use radix_runtime_contract::display::{display_bivalens, display_fractus, display_text_payload};
 use radix_runtime_contract::display_tokens::DisplayTokens;
-use radix_runtime_contract::instans::Instans;
+use radix_runtime_contract::instans::{Instans, InstansPraecisio};
 use radix_runtime_contract::trap::text as trap_text;
 use radix_types::{FloatPolicy, NumericWidth, Type, TypeId, TypeTable};
 use std::cell::RefCell;
@@ -1197,12 +1197,17 @@ pub enum MapKey {
     Magnus(Magnus),
     Bool(bool),
     Str(String),
+    /// One absolute instant (nanoseconds and declared precision).
+    Instans(i64, InstansPraecisio),
     /// The `none` element of a `set<T ∪ none>` or key of a
     /// `map<K ∪ none, V>` (reads back as [`Value::Nil`]); a `unit` value keys
     /// to the same slot, since no collection type holds both.
     Unit,
     /// Composite `iuncta` key (D3.2): hashable when every part is.
     Tuple(Vec<MapKey>),
+    /// A `class` / `genus` value key: its definition plus fields sorted by
+    /// symbol, so equal instances compare independently of allocation.
+    Struct(DefId, Vec<(Symbol, MapKey)>),
     /// A `discretio` variant key (GAPS #32): the variant's `DefId` plus its
     /// payload fields as `(name, key)` pairs, sorted by symbol so hashing is
     /// order-stable.
@@ -1219,8 +1224,20 @@ impl MapKey {
             MapKey::Magnus(v) => Value::Magnus(Rc::new(v.clone())),
             MapKey::Bool(v) => Value::Bool(*v),
             MapKey::Str(v) => Value::Str(v.clone()),
+            MapKey::Instans(nanos, precision) => {
+                Value::Instans(Instans::from_nanos(*nanos, *precision))
+            }
             MapKey::Unit => Value::Nil,
             MapKey::Tuple(parts) => Value::Tuple(parts.iter().map(MapKey::to_value).collect()),
+            MapKey::Struct(def, parts) => Value::Struct(
+                *def,
+                Rc::new(RefCell::new(
+                    parts
+                        .iter()
+                        .map(|(name, key)| (*name, key.to_value()))
+                        .collect(),
+                )),
+            ),
             MapKey::Enum(def, parts) => Value::EnumVariant(
                 *def,
                 Rc::new(RefCell::new(
@@ -1239,6 +1256,9 @@ impl MapKey {
     pub fn document_key(&self) -> String {
         match self {
             MapKey::Str(value) => value.clone(),
+            MapKey::Instans(nanos, precision) => {
+                Instans::from_nanos(*nanos, *precision).to_rfc3339()
+            }
             MapKey::Int(value) => value.to_string(),
             MapKey::UInt(value) => value.to_string(),
             MapKey::Magnus(value) => value.to_string(),
@@ -1249,6 +1269,14 @@ impl MapKey {
                 .map(MapKey::document_key)
                 .collect::<Vec<_>>()
                 .join(","),
+            MapKey::Struct(def, parts) => {
+                let joined = parts
+                    .iter()
+                    .map(|(name, key)| format!("{}.{}", name.0, key.document_key()))
+                    .collect::<Vec<_>>()
+                    .join(",");
+                format!("class{}#{joined}", def.0)
+            }
             MapKey::Enum(def, parts) => {
                 let joined = parts
                     .iter()
@@ -1681,6 +1709,7 @@ impl Value {
             Value::Magnus(v) => Ok(MapKey::Magnus((**v).clone())),
             Value::Bool(v) => Ok(MapKey::Bool(*v)),
             Value::Str(v) => Ok(MapKey::Str(v.clone())),
+            Value::Instans(value) => Ok(MapKey::Instans(value.nanos(), value.praecisio())),
             Value::Ascii(b) => Ok(MapKey::Str(char::from(*b).to_string())),
             Value::Char(ch) => Ok(MapKey::Str(ch.to_string())),
             Value::Nil | Value::Unit => Ok(MapKey::Unit),
@@ -1689,6 +1718,15 @@ impl Value {
                 .map(|item| item.to_key(span))
                 .collect::<Result<Vec<_>, _>>()
                 .map(MapKey::Tuple),
+            Value::Struct(def, fields) => {
+                let mut parts: Vec<(Symbol, MapKey)> = fields
+                    .borrow()
+                    .iter()
+                    .map(|(name, value)| Ok((*name, value.to_key(span)?)))
+                    .collect::<Result<Vec<_>, RunnerError>>()?;
+                parts.sort_by_key(|(name, _)| name.0);
+                Ok(MapKey::Struct(*def, parts))
+            }
             Value::EnumVariant(def, fields) => {
                 let mut parts: Vec<(Symbol, MapKey)> = fields
                     .borrow()
@@ -1926,7 +1964,7 @@ fn render_map_rows(
             MapKey::Bool(v) => display_bivalens(*v, order.tokens).to_owned(),
             MapKey::Unit => order.tokens.none.clone(),
             MapKey::Tuple(parts) => display_tuple_key(parts, order.tokens),
-            MapKey::Enum(..) => key.document_key(),
+            MapKey::Struct(..) | MapKey::Enum(..) | MapKey::Instans(..) => key.document_key(),
         };
         let val_str = value.display_typed(interner, order, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));
