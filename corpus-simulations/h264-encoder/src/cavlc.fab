@@ -1,0 +1,296 @@
++++
+locale = "en"
++++
+
+# Baseline CAVLC writer. `coeffs` is a zig-zag scan in scan order and
+# `max_coeff` is the 4-coefficient chroma-DC block, the 15-coefficient
+# chroma-AC scan excluding DC, or a 16-coefficient 4x4 block. The implementation
+# emits coeff_token, trailing-one signs, adaptive level codes, total_zeros, and
+# run_before in normative syntax-table order.
+# nC=-1 is the 4:2:0 chroma-DC family; luma/chroma-AC contexts use all nC ranges.
+# Reference: ITU-T H.264 (08/2021), §9.2, Tables 9-5–9-12: coeff_token
+# (including the separate chroma-DC table), total_zeros (including its separate
+# chroma-DC table), and run_before. The 15-coefficient chroma-AC case uses the
+# ordinary 4x4 coeff_token/total_zeros/run_before tables, with maxNumCoeff=15;
+# total_zeros is omitted exactly when TotalCoeff == maxNumCoeff. Literal VLC
+# values were cross-checked against the normative tables and FFmpeg's public
+# h264_cavlc.c tables; this writer does not call or copy a decoder implementation.
+
+import from "./bits" bits
+
+# Table 9-5. Rows are TrailingOnes 0..3; columns are TotalCoeff 1..16.
+# The three tables are nC ranges [0,2), [2,4), and [4,8). Values are the
+# codeword read MSB first and the corresponding list gives its width. The
+# nC>=8 column is the six-bit fixed-length table and is computed below.
+const list<list<int>> TOKEN_BITS0 = [
+    [5, 7, 7, 7, 7, 15, 11, 8, 15, 11, 15, 11, 15, 11, 7, 4],
+    [1, 4, 6, 6, 6, 6, 14, 10, 14, 10, 14, 10, 1, 14, 10, 6],
+    [0, 1, 5, 5, 5, 5, 5, 13, 9, 13, 9, 13, 9, 13, 9, 5],
+    [0, 0, 3, 3, 4, 4, 4, 4, 4, 12, 12, 8, 12, 8, 12, 8]
+]
+const list<list<int>> TOKEN_LEN0 = [
+    [6, 8, 9, 10, 11, 13, 13, 13, 14, 14, 15, 15, 16, 16, 16, 16],
+    [2, 6, 8, 9, 10, 11, 13, 13, 14, 14, 15, 15, 15, 16, 16, 16],
+    [0, 3, 7, 8, 9, 10, 11, 13, 13, 14, 14, 15, 15, 16, 16, 16],
+    [0, 0, 5, 6, 7, 8, 9, 10, 11, 13, 14, 14, 15, 15, 16, 16]
+]
+const list<list<int>> TOKEN_BITS1 = [
+    [11, 7, 7, 7, 4, 7, 15, 11, 15, 11, 8, 15, 11, 7, 9, 7],
+    [2, 7, 10, 6, 6, 6, 6, 14, 10, 14, 10, 14, 10, 11, 8, 6],
+    [0, 3, 9, 5, 5, 5, 5, 13, 9, 13, 9, 13, 9, 6, 10, 5],
+    [0, 0, 5, 4, 6, 8, 4, 4, 4, 12, 8, 12, 12, 8, 1, 4]
+]
+const list<list<int>> TOKEN_LEN1 = [
+    [6, 6, 7, 8, 8, 9, 11, 11, 12, 12, 12, 13, 13, 13, 14, 14],
+    [2, 5, 6, 6, 7, 8, 9, 11, 11, 12, 12, 13, 13, 14, 14, 14],
+    [0, 3, 6, 6, 7, 8, 9, 11, 11, 12, 12, 13, 13, 13, 14, 14],
+    [0, 0, 4, 4, 5, 6, 6, 7, 9, 11, 11, 12, 13, 13, 13, 14]
+]
+const list<list<int>> TOKEN_BITS2 = [
+    [15, 11, 8, 15, 11, 9, 8, 15, 11, 15, 11, 8, 13, 9, 5, 1],
+    [14, 15, 12, 10, 8, 14, 10, 14, 14, 10, 14, 10, 7, 12, 8, 4],
+    [0, 13, 14, 11, 9, 13, 9, 13, 10, 13, 9, 13, 9, 11, 7, 3],
+    [0, 0, 12, 11, 10, 9, 8, 13, 12, 12, 12, 8, 12, 10, 6, 2]
+]
+const list<list<int>> TOKEN_LEN2 = [
+    [6, 6, 6, 7, 7, 7, 7, 8, 8, 9, 9, 9, 10, 10, 10, 10],
+    [4, 5, 5, 5, 5, 6, 6, 7, 8, 8, 9, 9, 9, 10, 10, 10],
+    [0, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 10],
+    [0, 0, 4, 4, 4, 4, 4, 5, 6, 7, 8, 8, 9, 10, 10, 10]
+]
+
+# Chroma DC (nC=-1, maxCoeff=4), Table 9-5's fifth column.
+const list<list<int>> CHROMA_TOKEN_BITS = [
+    [1, 0, 0, 0],
+    [7, 1, 0, 0],
+    [4, 6, 1, 0],
+    [3, 3, 2, 5],
+    [2, 3, 2, 0]
+]
+const list<list<int>> CHROMA_TOKEN_LEN = [
+    [2, 0, 0, 0],
+    [6, 1, 0, 0],
+    [6, 6, 3, 0],
+    [6, 7, 7, 6],
+    [6, 8, 8, 7]
+]
+
+# Table 9-10, indexed by TotalCoeff-1 and total_zeros. Rows are ragged
+# in the standard; the unused tail entries below are absent from each row.
+# For max_coeff=15 chroma AC, values are further bounded by 15-TotalCoeff.
+const list<list<int>> TOTAL_ZERO_BITS = [
+    [1, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 1],
+    [7, 6, 5, 4, 3, 5, 4, 3, 2, 3, 2, 3, 2, 1, 0],
+    [5, 7, 6, 5, 4, 3, 4, 3, 2, 3, 2, 1, 1, 0],
+    [3, 7, 5, 4, 6, 5, 4, 3, 3, 2, 2, 1, 0],
+    [5, 4, 3, 7, 6, 5, 4, 3, 2, 1, 1, 0],
+    [1, 1, 7, 6, 5, 4, 3, 2, 1, 1, 0],
+    [1, 1, 5, 4, 3, 3, 2, 1, 1, 0],
+    [1, 1, 1, 3, 3, 2, 2, 1, 0],
+    [1, 0, 1, 3, 2, 1, 1, 1],
+    [1, 0, 1, 3, 2, 1, 1],
+    [0, 1, 1, 2, 1, 3],
+    [0, 1, 1, 1, 1],
+    [0, 1, 1, 1],
+    [0, 1, 1],
+    [0, 1]
+]
+const list<list<int>> TOTAL_ZERO_LEN = [
+    [1, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 9],
+    [3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 6, 6, 6, 6],
+    [4, 3, 3, 3, 4, 4, 3, 3, 4, 5, 5, 6, 5, 6],
+    [5, 3, 4, 4, 3, 3, 3, 4, 3, 4, 5, 5, 5],
+    [4, 4, 4, 3, 3, 3, 3, 3, 4, 5, 4, 5],
+    [6, 5, 3, 3, 3, 3, 3, 3, 4, 3, 6],
+    [6, 5, 3, 3, 3, 2, 3, 4, 3, 6],
+    [6, 4, 5, 3, 2, 2, 3, 3, 6],
+    [6, 6, 4, 2, 2, 3, 2, 5],
+    [5, 5, 3, 2, 2, 2, 4],
+    [4, 4, 3, 3, 1, 3],
+    [4, 4, 2, 1, 3],
+    [3, 3, 1, 2],
+    [2, 2, 1],
+    [1, 1]
+]
+
+# Table 9-11: total_zeros for chroma DC, indexed by TotalCoeff-1.
+const list<list<int>> CHROMA_ZERO_BITS = [[1, 1, 1, 0], [1, 1, 0], [1, 0]]
+const list<list<int>> CHROMA_ZERO_LEN = [[1, 2, 3, 3], [1, 2, 2], [1, 1]]
+
+# Table 9-12: run_before; rows are zerosLeft=1..6 and zerosLeft>=7.
+const list<list<int>> RUN_BITS = [[1, 0], [1, 1, 0], [3, 2, 1, 0], [3, 2, 1, 1, 0], [3, 2, 3, 2, 1, 0], [3, 0, 1, 3, 2, 5, 4], [7, 6, 5, 4, 3, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
+const list<list<int>> RUN_LEN = [[1, 1], [1, 2, 2], [2, 2, 2, 2], [2, 2, 2, 3, 3], [2, 2, 3, 3, 3, 3], [2, 3, 3, 3, 3, 3, 3], [3, 3, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11]]
+
+@ public
+class CavlcResult {
+    let int total_coeff
+    let int trailing_ones
+    let int total_zeros
+}
+
+@ public
+fn cavlc_zero_token(mut bits.Bits out, int n_c) → void {
+    if n_c ≡ -1 {
+        bits.bits_put_bits(mut out, 1, 2)
+    } elif n_c ≺ 2 {
+        bits.bits_put_bits(mut out, 1, 1)
+    } elif n_c ≺ 4 {
+        bits.bits_put_bits(mut out, 3, 2)
+    } elif n_c ≺ 8 {
+        bits.bits_put_bits(mut out, 15, 4)
+    } else {
+        bits.bits_put_bits(mut out, 3, 6)
+    }
+}
+
+fn cavlc_token(mut bits.Bits out, int total_coeff, int trailing_ones, int n_c) → void {
+    if total_coeff ≡ 0 {
+        cavlc_zero_token(mut out, n_c)
+        return
+    }
+    if n_c ≡ -1 {
+        bits.bits_put_bits(mut out, CHROMA_TOKEN_BITS[total_coeff][trailing_ones], CHROMA_TOKEN_LEN[total_coeff][trailing_ones])
+        return
+    }
+    if n_c ≺ 0 then panic "CAVLC nC=-2 is not admitted in the 4:2:0 path"
+    if n_c ≥ 8 {
+        bits.bits_put_bits(mut out, (total_coeff - 1) * 4 + trailing_ones, 6)
+        return
+    }
+    mut int table ← 0
+    if n_c ≥ 4 then table ← 2
+    elif n_c ≥ 2 then table ← 1
+    if table ≡ 0 {
+        bits.bits_put_bits(mut out, TOKEN_BITS0[trailing_ones][total_coeff - 1], TOKEN_LEN0[trailing_ones][total_coeff - 1])
+    } elif table ≡ 1 {
+        bits.bits_put_bits(mut out, TOKEN_BITS1[trailing_ones][total_coeff - 1], TOKEN_LEN1[trailing_ones][total_coeff - 1])
+    } else {
+        bits.bits_put_bits(mut out, TOKEN_BITS2[trailing_ones][total_coeff - 1], TOKEN_LEN2[trailing_ones][total_coeff - 1])
+    }
+}
+
+@ public
+fn cavlc_write_zero(mut bits.Bits out, int n_c, int max_coeff) → CavlcResult {
+    if max_coeff ≢ 4 and max_coeff ≢ 15 and max_coeff ≢ 16 then panic "CAVLC max_coeff must be 4, 15, or 16"
+    cavlc_zero_token(mut out, n_c)
+    return CavlcResult { total_coeff = 0, trailing_ones = 0, total_zeros = 0 }
+}
+
+fn cavlc_total_zeros(mut bits.Bits out, int total_coeff, int total_zeros, int max_coeff) → void {
+    if total_coeff ≡ max_coeff then return
+    if total_zeros ≺ 0 or total_zeros ≻ max_coeff - total_coeff then panic "CAVLC total_zeros exceeds block bounds"
+    if max_coeff ≡ 4 {
+        let int row ← total_coeff - 1
+        bits.bits_put_bits(mut out, CHROMA_ZERO_BITS[row][total_zeros], CHROMA_ZERO_LEN[row][total_zeros])
+        return
+    }
+    if max_coeff ≢ 15 and max_coeff ≢ 16 then panic "CAVLC total_zeros requires max_coeff 4, 15, or 16"
+    let int row ← total_coeff - 1
+    bits.bits_put_bits(mut out, TOTAL_ZERO_BITS[row][total_zeros], TOTAL_ZERO_LEN[row][total_zeros])
+}
+
+fn cavlc_run_before(mut bits.Bits out, int zeros_left, int run) → void {
+    if zeros_left ≤ 0 then return
+    let int row ← zeros_left ≥ 7 ✓ 6 ✗ zeros_left - 1
+    bits.bits_put_bits(mut out, RUN_BITS[row][run], RUN_LEN[row][run])
+}
+
+fn cavlc_level(mut bits.Bits out, int level, bool first, int trailing_ones, mut int suffix_length) → void {
+    let int magnitude ← level ≺ 0 ✓ 0 - level ✗ level
+    let int code_base ← level ≺ 0 ✓ magnitude * 2 - 1 ✗ magnitude * 2 - 2
+    let int level_code ← first and trailing_ones ≺ 3 ✓ code_base - 2 ✗ code_base
+    # Invert the decoder's levelCode intervals. Prefix 14 has a special
+    # four-bit suffix only when suffixLength is zero; prefix >=15 carries
+    # the escape extension. Searching these short intervals avoids treating
+    # escape levels as a potentially enormous unary integer.
+    assert level_code ≥ 0
+    let int one ← 1
+    mut int prefix ← 0
+    mut int suffix_size ← 0
+    mut int suffix ← 0
+    mut bool selected ← false
+    while not selected {
+        suffix_size ← suffix_length
+        if prefix ≡ 14 and suffix_length ≡ 0 then suffix_size ← 4
+        if prefix ≥ 15 then suffix_size ← prefix - 3
+        mut int base ← prefix.minimum(15) ⇐ suffix_length
+        if prefix ≥ 15 and suffix_length ≡ 0 then base ← base + 15
+        if prefix ≥ 16 then base ← base + (one ⇐ (prefix - 3)) - 4096
+        if level_code ≥ base and level_code ≺ base + (one ⇐ suffix_size) {
+            suffix ← level_code - base
+            selected ← true
+        } else {
+            prefix ← prefix + 1
+            assert prefix ≤ 32
+        }
+    }
+    for range 0‥prefix let zero { bits.bits_put_bit(mut out, 0) }
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bits(mut out, suffix, suffix_size)
+    if suffix_length ≡ 0 then suffix_length ← 1
+    if suffix_length ≡ 1 and magnitude ≻ 3 then suffix_length ← 2
+    elif suffix_length ≡ 2 and magnitude ≻ 6 then suffix_length ← 3
+    elif suffix_length ≡ 3 and magnitude ≻ 12 then suffix_length ← 4
+    elif suffix_length ≡ 4 and magnitude ≻ 24 then suffix_length ← 5
+    elif suffix_length ≡ 5 and magnitude ≻ 48 then suffix_length ← 6
+}
+
+@ public
+fn cavlc_write(mut bits.Bits out, list<int> coeffs, int n_c, int max_coeff) → CavlcResult {
+    if max_coeff ≢ 4 and max_coeff ≢ 15 and max_coeff ≢ 16 then panic "CAVLC max_coeff must be 4, 15, or 16"
+    if coeffs.length() ≺ max_coeff then panic "CAVLC coefficient scan is short"
+    mut list<int> levels ← []
+    mut list<int> runs ← []
+    mut int run ← 0
+    for range 0‥max_coeff let i {
+        let int value ← coeffs[i]
+        if value ≡ 0 {
+            run ← run + 1
+        } else {
+            levels.append(value)
+            runs.append(run)
+            run ← 0
+        }
+    }
+    let int total_coeff ← levels.length()
+    if total_coeff ≡ 0 then return cavlc_write_zero(mut out, n_c, max_coeff)
+    mut int trailing_ones ← 0
+    mut int ti ← total_coeff - 1
+    while ti ≥ 0 and trailing_ones ≺ 3 {
+        let int magnitude ← levels[ti] ≺ 0 ✓ 0 - levels[ti] ✗ levels[ti]
+        if magnitude ≢ 1 then ti ← -1
+        else {
+            trailing_ones ← trailing_ones + 1
+            ti ← ti - 1
+        }
+    }
+    cavlc_token(mut out, total_coeff, trailing_ones, n_c)
+    mut int sign_i ← total_coeff - 1
+    while sign_i ≥ total_coeff - trailing_ones {
+        bits.bits_put_bit(mut out, levels[sign_i] ≺ 0 ✓ 1 ✗ 0)
+        sign_i ← sign_i - 1
+    }
+    mut int suffix_length ← total_coeff ≻ 10 and trailing_ones ≺ 3 ✓ 1 ✗ 0
+    mut int level_i ← total_coeff - trailing_ones - 1
+    mut bool first ← true
+    while level_i ≥ 0 {
+        cavlc_level(mut out, levels[level_i], first, trailing_ones, mut suffix_length)
+        first ← false
+        level_i ← level_i - 1
+    }
+    # `total_zeros` counts zeros before the last nonzero in scan order. Zeros
+    # after that coefficient are outside the coded residual range and must not
+    # be folded into the total (a lone DC coefficient therefore has
+    # total_zeros=0, while a lone AC coefficient carries its preceding run).
+    let int total_zeros ← runs.sum()
+    cavlc_total_zeros(mut out, total_coeff, total_zeros, max_coeff)
+    mut int zeros_left ← total_zeros
+    mut int run_i ← total_coeff - 1
+    while run_i ≻ 0 and zeros_left ≻ 0 {
+        let int before ← runs[run_i]
+        cavlc_run_before(mut out, zeros_left, before)
+        zeros_left ← zeros_left - before
+        run_i ← run_i - 1
+    }
+    return CavlcResult { total_coeff = total_coeff, trailing_ones = trailing_ones, total_zeros = total_zeros }
+}

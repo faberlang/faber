@@ -1,0 +1,6 @@
+main {
+    let wrapping<u64> z ← 8027708234668681072
+    let wrapping<u64> m ← 13787848793156543929
+    let wrapping<u64> b ← (z ⊻ (z ⇒ 30)) * m
+    print b
+}

@@ -3089,12 +3089,18 @@ comment.
 
 ## Testing
 
-`परीक्षण` modifiers include `अपेक्षित_विफलता` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `छोड़ो`,
+`परीक्षण` modifiers include `अपेक्षित_विफलता` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `अपेक्षित_विफलता`, because it does not establish that the body failed. With
+`पुनरावृत्ति N`, every run must satisfy `अपेक्षित_विफलता`. The other modifiers are `छोड़ो`,
 `लंबित`, `केवल`, `केवलमें`, `टैग`, `समय`, `मापो`, `पुनरावृत्ति`, and
-`नाज़ुक`. The counts of `समय`, `पुनरावृत्ति` and `नाज़ुक` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`नाज़ुक`. `पुनरावृत्ति N` runs the case N times and passes only if every run
+satisfies the case's expectations; it does not retry until a pass. `नाज़ुक N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `समय`, `पुनरावृत्ति` and `नाज़ुक` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 
@@ -3276,9 +3282,10 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `करो { ... }` is the explicit `do` block and executes its body once.
 - `करो { ... } जबतक condition` is the post-test loop form; postfix `जबतक` attaches only to `करो`, not arbitrary preceding blocks.
 - `पकड़ो` is an attachment shared by several structured forms, not a semantic mode owned by `करो`. A plain `करो` is often used when an otherwise unattached block needs a local handler: `करो { ... } पकड़ो err { ... }`.
-- The modifier slot directly after `करो` holds `सभी` (en `do all`) or `उपकरण` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
-- `करो सभी { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `पकड़ो` once, at the block's exit (or, with a `जबतक` tail, at each back edge).
-- `करो उपकरण { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `करो सभी` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `जबतक` / `दोहराओ सीमा` loops are unchanged. Captures are classified by writes (a captured `में` scalar or genus is device state). The block's own `पकड़ो` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `जबतक` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `करो उपकरण` (`fac_machina_nested`), a `लौटाओ` / `तोड़ो` / `जारी` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `धागा` loop or `समेटो` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `करो सभी`, so every device route is unchanged.
+- The modifier slot directly after `करो` holds `सभी` (en `do all`) or `उपकरण` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant`. Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- In runner/device execution, `करो सभी { ... } पकड़ो err { ... }` defers per-call delivery of recoverable errors from dispatched failable kernels to that handled block's owning handler. A host read that synchronizes device data can deliver an error before block exit; generated checks and block/loop delivery points can also observe it. This is not universal fault capture: fatal device faults are not made catchable, and other executors do not use the runner's device-delivery markers.
+- With a `जबतक` tail, delivery occurs per iteration. Because the `पकड़ो` on `करो सभी { ... } पकड़ो ... जबतक condition` wraps the whole loop, a delivered error handled there exits that loop; a handler inside an outer `जबतक` loop can instead let the outer loop continue.
+- `करो उपकरण { ... }` (en `do device`) is a checked device-resident region. Its defined model is the surface of a private kernel-of-kernels function called once under `करो सभी` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies); V0 checks this model but does not synthesize that expansion. Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `जबतक` / `दोहराओ सीमा` loops are unchanged. Captures are classified by writes (a captured `में` scalar or genus is device state). The block's own `पकड़ो` stays outside it and receives recoverable kernel errors through the handled-block delivery mechanism, which may observe them before block exit; a `जबतक` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `करो उपकरण` (`fac_machina_nested`), a `लौटाओ` / `तोड़ो` / `जारी` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `धागा` loop or `समेटो` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `करो सभी`, so every device route is unchanged.
 
 ---
 

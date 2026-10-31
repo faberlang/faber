@@ -76,11 +76,17 @@ mod rust_runtime_dependency;
 pub mod target_gate;
 mod temp_dir;
 mod test_route;
+// The public export removes the TypeScript backend recipe and runtime, so its
+// implementation (and its unit tests) must follow the optional target feature.
+#[cfg(feature = "hir-ts")]
 mod ts_build;
 #[cfg(feature = "hir-ts")]
 mod ts_package;
+#[cfg(feature = "hir-ts")]
 mod ts_project;
+#[cfg(feature = "hir-ts")]
 mod ts_recipe;
+#[cfg(feature = "hir-ts")]
 mod ts_runtime;
 
 #[cfg(feature = "hir-rust")]
@@ -151,6 +157,7 @@ use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibr
 use std::path::{Path, PathBuf};
 pub(crate) use temp_dir::unique_temp_sibling;
 pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
+#[cfg(feature = "hir-ts")]
 pub use ts_build::cmd_run_ts;
 
 /// Materialized repository-shaped root for the runtime embedded in this binary.

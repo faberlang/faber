@@ -3748,6 +3748,15 @@ help = "请为每个占位符编号（`§0`、`§1`……），让它们各自�
 message = "此模板混用了普通占位符和带编号占位符；普通占位符读取 {reads}"
 help = "请为每个占位符编号（`§0`、`§1`……），让它们各自读取你想要的参数"
 
+
+[diagnostics.WARN036]
+message = "此 {capta} 边界内部没有任何可能失败的东西：它的错误通道为空"
+help = "去掉该边界，或在其中调用可能失败的内容"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "此 {capta} 边界内部没有任何可能失败的东西：它的错误通道为空"
+help = "去掉该边界，或在其中调用可能失败的内容"
+
 [llm]
 system_prompt_snippet = "Emit Simplified Chinese reader-locale Faber using Chinese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged. 当字符串包含引号字符（\" 或 '）时，请用 «…» 书写：法式引号无需任何转义。"
 exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]

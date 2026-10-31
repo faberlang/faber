@@ -5,33 +5,37 @@ kind = "keyword"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "proba_stmt", "proba_modifier", "adfirma_stmt", "expression", "literal"]
 category = "testing"
 canonical = true
-summary = "Marks a test as fragile."
+summary = "Rejected by faber test because flaky retries are not executed."
 syntax = "fragilis <number>"
 locale = "en"
 +++
 # =============================================================================
-# fragilis — Marks a test as fragile
+# fragilis — Rejected flaky test modifier
 # =============================================================================
 #
 # What this teaches:
-#   • Marks a test as fragile.
+#   • `faber test` rejects a case with `fragilis <N>` before executing its body.
+#     The runner does not execute flaky retries.
+#   • `fragilis` is not an allow-failure modifier and does not retry a case.
 #
 # Common mistakes:
-#   • Marking a test as fragile without a reason — `fragilis <number>` requires a numeric identifier for the failure-tracking system.
+#   • Expecting `fragilis <N>` to allow failure or retry a test — `faber test`
+#     rejects it because flaky retries are not implemented.
 # =============================================================================
 
-# fragilis — allow-failure test modifier
+# fragilis — rejected flaky test modifier
 #
 # GRAMMAR:
 #   testModifier :← 'fragilis' integer
 #
-# EXPECTED OUTPUT:
-#   No incipit — declaration or test-runner surface only.
+# EXPECTED RUNNER OUTCOME:
+#   `faber test corpus/fragilis/fragilis.fab` rejects this case; its body is
+#   not executed. The failure explains that flaky retries are not executed.
 #
 # BACKEND:
 #   declaration-only test modifier (whitelist: fragilis/fragilis.fab).
 #
 
-test "fragile case" flaky 1 {
+test "fragilis is rejected" flaky 1 {
     assert true
 }

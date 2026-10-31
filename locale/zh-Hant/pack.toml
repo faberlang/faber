@@ -3744,6 +3744,15 @@ help = "請為每個佔位符編號（`§0`、`§1`……），讓它們各自�
 message = "此範本混用了一般佔位符與帶編號佔位符；一般佔位符讀取 {reads}"
 help = "請為每個佔位符編號（`§0`、`§1`……），讓它們各自讀取你想要的引數"
 
+
+[diagnostics.WARN036]
+message = "此 {capta} 邊界內部沒有任何可能失敗的東西：它的錯誤通道為空"
+help = "移除該邊界，或在其中呼叫可能失敗的內容"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "此 {capta} 邊界內部沒有任何可能失敗的東西：它的錯誤通道為空"
+help = "移除該邊界，或在其中呼叫可能失敗的內容"
+
 [llm]
 system_prompt_snippet = "Emit Traditional Chinese reader-locale Faber using Traditional Chinese keywords where the pack overrides Simplified Chinese rows, while preserving universal Faber glyph syntax. 當字串包含引號字元（\" 或 '）時，請用 «…» 書寫：法式引號無需任何轉義。"
 exemplars = ["./exemplars/salve-munde.zh-Hant.fab"]

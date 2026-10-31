@@ -195,7 +195,7 @@ impl FunctionBuilder<'_> {
     pub(super) fn fail_with_textus(&mut self, message: MirOperand, span: Span) {
         let textus = MirType::semantic(self.types.primitive(Primitive::Textus));
         if let Some(trap) = self.take_innermost_trap() {
-            self.assign(trap.destination, message, textus, span);
+            self.store_trapped_error(&trap, message, textus, span);
             self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
             return;
         }

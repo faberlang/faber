@@ -1,0 +1,89 @@
+# G16: the static 128-bit carrier bound (kernel_requirements.rs `d64_bound`) refuses
+# almost every multi-term `d64` expression of the swarm decision step, at check time,
+# on every device. Each kernel below is the swarm's expression verbatim (names
+# shortened) with scalar `d64` parameters; the host accepts all of them and the golden
+# hashes depend on their exact meaning.
+#
+#   faber check repros/g16-kernel-d64-carrier-bound.fab
+#   -> ok for `ok_*`; error[SEM008:nucleum_wide_intermediate] at every `bad_*` line
+#
+# The bound knows nothing about the values: every non-arithmetic `d64` operand (a
+# parameter, a literal, a constant, a call, a conversion) is worth 2^63 at scale 8. So
+#   a * b                          2^126                     passes (limit 2^127 - 1)
+#   a * b + c * d, a * b + c * d + ...   2^127 and up        refused (by exactly one)
+#   a * b * c                      2^189                     refused
+#   (a - b) * c                    2^64 * 2^63 = 2^127       refused
+#   a * b + c                      2^126 + 2^63 * 10^8       passes
+# None of these can be restated with an equal meaning: a rewrite that splits the
+# expression into stores rounds at scale 8 between the pieces, and the host rounds
+# once (README, `d64` rules and store points). The swarm's real values are far below
+# the bound (positions to 200, velocities to 7.5), but the check cannot see that.
+@ kernel
+@ public
+fn ok_one_product(d64 a, d64 b) → d64 {
+    return a * b
+}
+
+@ kernel
+@ public
+fn ok_product_plus_leaf(d64 a, d64 b, d64 c) → d64 {
+    return a * b + c
+}
+
+# aim / decide: d2 <- dx*dx + dy*dy + dz*dz (also every neighbour test and cmp3)
+@ kernel
+@ public
+fn bad_squared_length(d64 dx, d64 dy, d64 dz) → d64 {
+    return dx * dx + dy * dy + dz * dz
+}
+
+# the smallest of the family: two squares
+@ kernel
+@ public
+fn bad_two_squares(d64 dx, d64 dy) → d64 {
+    return dx * dx + dy * dy
+}
+
+# rsqrt: h <- x * y * y
+@ kernel
+@ public
+fn bad_newton_h(d64 x, d64 y) → d64 {
+    return x * y * y
+}
+
+# rsqrt: y <- y * (3.0 - h) * 0.5
+@ kernel
+@ public
+fn bad_newton_step(d64 y, d64 h) → d64 {
+    return y * (3.0 - h) * 0.5
+}
+
+# prey flock: d <- W_SEP*q + W_ALI*a + W_COH*c + W_FOOD*f
+@ kernel
+@ public
+fn bad_flock_steer(d64 q, d64 a, d64 c, d64 f) → d64 {
+    return 1.5 * q + 1.0 * a + 0.5 * c + 1.5 * f
+}
+
+# wander: d <- KEEP*v + JITTER*u + W_FOOD*f
+@ kernel
+@ public
+fn bad_wander_blend(d64 v, d64 u, d64 f) → d64 {
+    return 1.0 * v + 4.0 * u + 1.5 * f
+}
+
+# move: v <- v + (dv - v) * TURN
+@ kernel
+@ public
+fn bad_turn(d64 v, d64 dv) → d64 {
+    return v + (dv - v) * 0.4
+}
+
+# move: e <- e - cost0 + units * per - costv * (vx*vx + vy*vy + vz*vz)
+@ kernel
+@ public
+fn bad_energy(d64 e, d64 cost0, d64 units, d64 per, d64 costv, d64 vx, d64 vy, d64 vz) → d64 {
+    return e - cost0 + units * per - costv * (vx * vx + vy * vy + vz * vz)
+}
+
+main { }

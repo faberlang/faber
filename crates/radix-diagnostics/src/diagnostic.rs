@@ -280,6 +280,11 @@ pub enum WarningKind {
     /// than the author meant. Warn-only; numbering is unchanged (operator
     /// ruling 2026-10-14, template-hole rule P5).
     MixedTemplateHoles,
+    /// A `capta { … }` boundary whose body cannot fail: nothing can escape
+    /// through the error channel, so the `thrown` variant of its
+    /// `trapped<R, T>` result is uninhabited and the boundary only wraps
+    /// (f9d8a611 re-typing). Warn-only.
+    TrapErrorChannelEmpty,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

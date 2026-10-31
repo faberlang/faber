@@ -1,0 +1,238 @@
+# Restricted P16x16 inter path. Each macroblock is one independent P slice;
+# the reference is reconstructed YUV420, and motion vectors are integer-pixel
+# candidates represented as quarter-pel MVD syntax (dx*4, dy*4). Chroma uses
+# the corresponding exact half-resolution displacement because candidates are
+# even. This module is intentionally separate from the I4x4 integration path.
+
+import from "./bits" bits
+import from "./cavlc" cavlc
+import from "./transform" transform
+
+@ public
+class InterResult {
+    let list<b8> stream
+    let list<b8> reconstruction
+    let int dx
+    let int dy
+}
+
+const list<int> SEARCH = [0, -2, 2, -4, 4]
+
+fn clamp_index(int x, int n) → int {
+    return x.maximum(0).minimum(n - 1)
+}
+
+fn put_block_byte(mut list<b8> out, int index, int value) {
+    out[index] ← ((transform.clamp_byte(value) ↦ u8 ⊥ 0) ↦ b8)
+}
+
+# Search reaches four luma samples in either direction (two in chroma). The
+# replicated border lets each candidate use local indexing with the old clamps.
+fn luma_window(list<b8> reference, int width, int height, int mb_x, int mb_y) → list<b8> {
+    mut list<b8> window ← empty
+    for range 0‥24 let y {
+        for range 0‥24 let x {
+            let int rx ← clamp_index(mb_x * 16 + x - 4, width)
+            let int ry ← clamp_index(mb_y * 16 + y - 4, height)
+            window.append(reference[ry * width + rx])
+        }
+    }
+    return window
+}
+
+@ public
+fn motion_window(list<b8> reference, int width, int height, int mb_x, int mb_y) → list<b8> {
+    mut list<b8> window ← luma_window(reference, width, height, mb_x, mb_y)
+    let int cwidth ← width / 2
+    let int cheight ← height / 2
+    let int ubase ← width * height
+    let int vbase ← ubase + cwidth * cheight
+    for range 0‥2 let plane {
+        let int base ← plane ≡ 0 ✓ ubase ✗ vbase
+        for range 0‥12 let y {
+            for range 0‥12 let x {
+                let int rx ← clamp_index(mb_x * 8 + x - 2, cwidth)
+                let int ry ← clamp_index(mb_y * 8 + y - 2, cheight)
+                window.append(reference[base + ry * cwidth + rx])
+            }
+        }
+    }
+    return window
+}
+
+fn sad(list<b8> source, list<b8> reference, int dx, int dy) → int {
+    mut int total ← 0
+    for range 0‥16 let y {
+        for range 0‥16 let x {
+            let int a ← (source[y * 16 + x] ↦ u8) ↦ int
+            let int b ← (reference[(y + dy + 4) * 24 + x + dx + 4] ↦ u8) ↦ int
+            let int d ← a - b
+            total ← total + (d ≺ 0 ✓ 0 - d ✗ d)
+        }
+    }
+    return total
+}
+
+fn build_prediction(list<b8> reference, int dx, int dy) → list<b8> {
+    mut list<b8> prediction ← empty
+    for range 0‥16 let y {
+        for range 0‥16 let x {
+            prediction.append(reference[(y + dy + 4) * 24 + x + dx + 4])
+        }
+    }
+    for range 0‥2 let plane {
+        let int base ← 576 + plane * 144
+        for range 0‥8 let y {
+            for range 0‥8 let x {
+                prediction.append(reference[base + (y + dy / 2 + 2) * 12 + x + dx / 2 + 2])
+            }
+        }
+    }
+    return prediction
+}
+
+fn choose_motion(list<b8> source, list<b8> reference) → list<int> {
+    mut int best ← 2147483647
+    mut int best_dx ← 0
+    mut int best_dy ← 0
+    for from SEARCH let dy {
+        for from SEARCH let dx {
+            let int score ← sad(source, reference, dx, dy)
+            if score ≺ best {
+                best ← score
+                best_dx ← dx
+                best_dy ← dy
+            }
+        }
+    }
+    return [best_dx, best_dy]
+}
+
+@ public
+class MotionCheck {
+    let list<int> candidates
+    let int dx
+    let int dy
+}
+
+# Diagnostic-only view of the production cost function and winner. The normal
+# encoder does not call this entry point; candidate order remains SEARCH order.
+@ public
+fn inspect_motion(list<b8> source, list<b8> reference, int width, int height, int mb_x, int mb_y) → MotionCheck {
+    let list<b8> window ← luma_window(reference, width, height, mb_x, mb_y)
+    mut list<int> candidates ← empty
+    for from SEARCH let dy {
+        for from SEARCH let dx {
+            candidates.append(dy)
+            candidates.append(dx)
+            candidates.append(sad(source, window, dx, dy))
+        }
+    }
+    let list<int> selected ← choose_motion(source, window)
+    return MotionCheck { candidates = candidates, dx = selected[0], dy = selected[1] }
+}
+
+fn n_c(list<int> counts, int bx, int by) → int {
+    let bool left ← bx ≻ 0
+    let bool top ← by ≻ 0
+    if left and top then return (counts[(by / 4) * 4 + bx / 4 - 1] + counts[((by / 4) - 1) * 4 + bx / 4] + 1) / 2
+    if left then return counts[(by / 4) * 4 + bx / 4 - 1]
+    if top then return counts[((by / 4) - 1) * 4 + bx / 4]
+    return 0
+}
+
+fn encode_luma(mut bits.Bits out, list<b8> source, list<b8> prediction, mut list<b8> reconstruction, int bx, int by, int qp, mut list<int> counts) {
+    mut list<int> residual ← empty
+    for range 0‥4 let y {
+        for range 0‥4 let x {
+            let int src ← (source[(by * 4 + y) * 16 + bx * 4 + x] ↦ u8) ↦ int
+            let int pred ← (prediction[(by * 4 + y) * 16 + bx * 4 + x] ↦ u8) ↦ int
+            residual.append(src - pred)
+        }
+    }
+    let list<int> transformed ← transform.forward4(residual)
+    let list<int> quantized ← transform.quantize4(transformed, qp)
+    let list<int> scan ← transform.zigzag4(quantized)
+    let int local_x ← bx * 4
+    let int local_y ← by * 4
+    let cavlc.CavlcResult result ← cavlc.cavlc_write(mut out, scan, n_c(counts, local_x, local_y), 16)
+    counts[by * 4 + bx] ← result.total_coeff
+    let list<int> dequantized ← transform.dequantize4(quantized, qp)
+    let list<int> restored ← transform.inverse4(dequantized)
+    for range 0‥4 let y {
+        for range 0‥4 let x {
+            let int pred ← (prediction[(by * 4 + y) * 16 + bx * 4 + x] ↦ u8) ↦ int
+            put_block_byte(mut reconstruction, (by * 4 + y) * 16 + bx * 4 + x, pred + restored[y * 4 + x])
+        }
+    }
+}
+
+fn encode_chroma(mut bits.Bits out, list<b8> source, list<b8> prediction, mut list<b8> reconstruction, int plane, int qp) {
+    let int src_base ← plane ≡ 0 ✓ 256 ✗ 320
+    mut list<int> sums ← empty
+    for range 0‥2 let by {
+        for range 0‥2 let bx {
+            mut int total ← 0
+            for range 0‥4 let y {
+                for range 0‥4 let x {
+                    let int src ← ((source[src_base + (by * 4 + y) * 8 + bx * 4 + x] ↦ u8) ↦ int)
+                    let int pred ← ((prediction[src_base + (by * 4 + y) * 8 + bx * 4 + x] ↦ u8) ↦ int)
+                    total ← total + src - pred
+                }
+            }
+            sums.append(total)
+        }
+    }
+    let list<int> levels ← transform.chroma_dc_quant(sums, qp)
+    cavlc.cavlc_write(mut out, levels, -1, 4)
+    let list<int> dc ← transform.chroma_dc_inverse(levels, qp)
+    let int dst_base ← plane ≡ 0 ✓ 256 ✗ 320
+    for range 0‥2 let by {
+        for range 0‥2 let bx {
+            let int block ← by * 2 + bx
+            for range 0‥4 let y {
+                for range 0‥4 let x {
+                    let int pred ← ((prediction[dst_base + (by * 4 + y) * 8 + bx * 4 + x] ↦ u8) ↦ int)
+                    put_block_byte(mut reconstruction, dst_base + (by * 4 + y) * 8 + bx * 4 + x, pred + ((dc[block] + 32) ⇒ 6))
+                }
+            }
+        }
+    }
+}
+
+@ public
+fn encode_mb(int frame_num, int mb_index, int qp, list<b8> source, list<b8> reference) → InterResult {
+    let list<int> motion ← choose_motion(source, reference)
+    let int dx ← motion[0]
+    let int dy ← motion[1]
+    let list<b8> prediction ← build_prediction(reference, dx, dy)
+    mut bits.Bits out ← bits.bits_new()
+    bits.bits_put_ue(mut out, mb_index)
+    bits.bits_put_ue(mut out, 5)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_bits(mut out, frame_num % 16, 4)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_se(mut out, 0)
+    bits.bits_put_ue(mut out, 1)
+    # mb_skip_run=0, then mb_type=P_L0_16x16=0.
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_se(mut out, dx * 4)
+    bits.bits_put_se(mut out, dy * 4)
+    bits.bits_put_ue(mut out, 19)
+    bits.bits_put_se(mut out, 0)
+    mut list<b8> reconstruction ← empty
+    for range 0‥384 let i { reconstruction.append(((128 ↦ u8 ⊥ 0) ↦ b8)) }
+    mut list<int> counts ← [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let list<int> bx_order ← [0, 1, 0, 1, 2, 3, 2, 3, 0, 1, 0, 1, 2, 3, 2, 3]
+    let list<int> by_order ← [0, 0, 1, 1, 0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 3, 3]
+    for range 0‥16 let block {
+        encode_luma(mut out, source, prediction, mut reconstruction, bx_order[block], by_order[block], qp, mut counts)
+    }
+    encode_chroma(mut out, source, prediction, mut reconstruction, 0, qp)
+    encode_chroma(mut out, source, prediction, mut reconstruction, 1, qp)
+    bits.bits_trailing(mut out)
+    return InterResult { stream = bits.annex_b(0x41 ↦ u8, out) ↦ list<b8>, reconstruction = reconstruction, dx = dx, dy = dy }
+}

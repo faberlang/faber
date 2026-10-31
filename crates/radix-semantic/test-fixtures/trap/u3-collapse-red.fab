@@ -2,9 +2,10 @@
 locale = "en"
 +++
 
-# u3 — T ≡ E collapse: success and error are the same type, so the trap
-# cannot distinguish them. Rejected fail-closed with the dedicated
-# `trap_union_collapsed` diagnostic.
+# u3 — same success and error type: legal under the tagged form (ruling
+# f9d8a611), because `R` and `T` are separate slots and the variants carry
+# the discrimination. The `trap_union_collapsed` guard retired with the
+# untagged union result.
 
 class Payload {
     mut string message
@@ -15,6 +16,15 @@ fn same() → Payload ⇥ Payload {
 }
 
 main {
-    let ∪ r ← trap { same() }
-    print r
+    let _ r ← trap { same() }
+    match r {
+        case returned let value {
+            print "returned"
+            print value.message
+        }
+        case thrown let error {
+            print "thrown"
+            print error.message
+        }
+    }
 }

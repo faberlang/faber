@@ -3089,12 +3089,18 @@ comment.
 
 ## Testing
 
-`ทดสอบ` modifiers include `คาดหวัง_ล้มเหลว` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `ละเว้น`,
+`ทดสอบ` modifiers include `คาดหวัง_ล้มเหลว` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `คาดหวัง_ล้มเหลว`, because it does not establish that the body failed. With
+`ทำซ้ำ N`, every run must satisfy `คาดหวัง_ล้มเหลว`. The other modifiers are `ละเว้น`,
 `ค้าง`, `เฉพาะ`, `เฉพาะใน`, `แท็ก`, `เวลา`, `วัด`, `ทำซ้ำ`, and
-`เปราะบาง`. The counts of `เวลา`, `ทำซ้ำ` and `เปราะบาง` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`เปราะบาง`. `ทำซ้ำ N` runs the case N times and passes only if every run
+satisfies the case's expectations; it does not retry until a pass. `เปราะบาง N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `เวลา`, `ทำซ้ำ` and `เปราะบาง` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 
@@ -3276,9 +3282,10 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `ทำ { ... }` is the explicit `do` block and executes its body once.
 - `ทำ { ... } ขณะ condition` is the post-test loop form; postfix `ขณะ` attaches only to `ทำ`, not arbitrary preceding blocks.
 - `จับ` is an attachment shared by several structured forms, not a semantic mode owned by `ทำ`. A plain `ทำ` is often used when an otherwise unattached block needs a local handler: `ทำ { ... } จับ err { ... }`.
-- The modifier slot directly after `ทำ` holds `ทั้งหมด` (en `do all`) or `อุปกรณ์` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
-- `ทำ ทั้งหมด { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `จับ` once, at the block's exit (or, with a `ขณะ` tail, at each back edge).
-- `ทำ อุปกรณ์ { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `ทำ ทั้งหมด` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `ขณะ` / `วน ช่วง` loops are unchanged. Captures are classified by writes (a captured `ใน` scalar or genus is device state). The block's own `จับ` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `ขณะ` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `ทำ อุปกรณ์` (`fac_machina_nested`), a `คืน` / `หยุด` / `ไปต่อ` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `เส้นใย` loop or `ลดรูป` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `ทำ ทั้งหมด`, so every device route is unchanged.
+- The modifier slot directly after `ทำ` holds `ทั้งหมด` (en `do all`) or `อุปกรณ์` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant`. Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- In runner/device execution, `ทำ ทั้งหมด { ... } จับ err { ... }` defers per-call delivery of recoverable errors from dispatched failable kernels to that handled block's owning handler. A host read that synchronizes device data can deliver an error before block exit; generated checks and block/loop delivery points can also observe it. This is not universal fault capture: fatal device faults are not made catchable, and other executors do not use the runner's device-delivery markers.
+- With a `ขณะ` tail, delivery occurs per iteration. Because the `จับ` on `ทำ ทั้งหมด { ... } จับ ... ขณะ condition` wraps the whole loop, a delivered error handled there exits that loop; a handler inside an outer `ขณะ` loop can instead let the outer loop continue.
+- `ทำ อุปกรณ์ { ... }` (en `do device`) is a checked device-resident region. Its defined model is the surface of a private kernel-of-kernels function called once under `ทำ ทั้งหมด` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies); V0 checks this model but does not synthesize that expansion. Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `ขณะ` / `วน ช่วง` loops are unchanged. Captures are classified by writes (a captured `ใน` scalar or genus is device state). The block's own `จับ` stays outside it and receives recoverable kernel errors through the handled-block delivery mechanism, which may observe them before block exit; a `ขณะ` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `ทำ อุปกรณ์` (`fac_machina_nested`), a `คืน` / `หยุด` / `ไปต่อ` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `เส้นใย` loop or `ลดรูป` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `ทำ ทั้งหมด`, so every device route is unchanged.
 
 ---
 

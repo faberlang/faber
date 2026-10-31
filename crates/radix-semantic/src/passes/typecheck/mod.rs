@@ -714,9 +714,8 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Whether any alternate-exit payload flowed toward the innermost active
     /// `capta` trap sink (UT). Restored with `current_error` by `check_trap`;
-    /// drives the T ≡ E collapse guard, which needs to distinguish "one
-    /// member because success and error collapsed" from "one member because
-    /// the body never failed" (the WARN017 degenerate solve).
+    /// distinguishes "the T slot received error types" from "nothing inside
+    /// the boundary can fail" (`trap_error_channel_empty`).
     pub trap_error_flow: bool,
 
     /// Reverse map from inference variable token to its table-local `TypeId`.
@@ -743,10 +742,11 @@ pub(crate) struct TypeChecker<'a> {
     /// until finalize so later flows keep accumulating.
     pub union_members: RefCell<FxHashMap<InferVar, Vec<TypeId>>>,
 
-    /// Union holes synthesized for a `trap { … }` result whose body has been
-    /// fully checked: their accumulated member set is complete, so an `is`
-    /// test over a binding of that hole can narrow before finalize solves it.
-    pub(super) closed_trap_holes: FxHashSet<InferVar>,
+    /// Union holes synthesized as a `capta` boundary's `T` slot (the trapped
+    /// error channel). The slot solves to exactly the escaping error types, so
+    /// WARN017's single-member cross-shape warning never applies to it; the
+    /// empty channel carries `trap_error_channel_empty` instead.
+    pub(super) trap_error_holes: FxHashSet<InferVar>,
 
     /// Index shape inference state (parallel to type inference above).
     pub index_infer: IndexInferState,
@@ -1032,7 +1032,7 @@ impl<'a> TypeChecker<'a> {
             canonical_cache: FxHashMap::default(),
             occurs_cache: FxHashMap::default(),
             union_members: RefCell::new(FxHashMap::default()),
-            closed_trap_holes: FxHashSet::default(),
+            trap_error_holes: FxHashSet::default(),
             index_infer,
             shape_witnesses: FxHashMap::default(),
             static_collection_lengths: FxHashMap::default(),

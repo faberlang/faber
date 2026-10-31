@@ -2538,11 +2538,11 @@ struct HandlerContext {
 
 /// Active `capta { ... }` capture boundary (UT): failable calls and `iace`
 /// inside the body lower to `TryCall` whose error block wraps the payload
-/// into the trap carrier (the union-typed destination) instead of entering a
-/// cape body or reaching `ReturnError`.
+/// into the trap carrier instead of entering a cape body or reaching
+/// `ReturnError`.
 #[derive(Debug, Clone)]
 struct TrapContext {
-    /// Union-typed destination the wrapped result is assigned into.
+    /// Destination the captured result is assigned into.
     destination: MirPlace,
     /// Join block both arms converge on.
     join_block: MirBlockId,
@@ -2551,6 +2551,28 @@ struct TrapContext {
     error_paths: bool,
     /// DFS push order (shared counter with `HandlerContext`).
     depth: usize,
+    /// How a captured error reaches the destination: the ruled tagged form
+    /// wraps every payload into `thrown { error }` of the `trapped<R, T>`
+    /// result, while the raw-error boundaries (`call ⊥ default`, the dying
+    /// `⇜` call) store the payload unwrapped for their own readers.
+    carrier: TrapCarrier,
+}
+
+/// The carrier shape of one active capture boundary.
+#[derive(Debug, Clone)]
+enum TrapCarrier {
+    /// `capta { ... }`: the destination holds the tagged `trapped<R, T>`
+    /// result, so the success path wraps into `returned { value }` and every
+    /// error path wraps into `thrown { error }`.
+    Tagged {
+        /// The `trapped<R, T>` application — the destination's type.
+        ty: MirType,
+        returned_variant: DefId,
+        thrown_variant: DefId,
+    },
+    /// `call ⊥ default` and the dying `⇜` call: the destination is the raw
+    /// error temp; payloads store unwrapped.
+    RawError,
 }
 
 #[derive(Debug, Clone)]
@@ -2646,6 +2668,10 @@ pub struct FunctionBuilderContext<'a> {
     /// Enum declaration → ordered variant defs (local + imported file-interface
     /// enums). The no-initializer `varia` zero-init picks the first variant.
     enum_variants: Arc<FxHashMap<DefId, Vec<DefId>>>,
+    /// (enum declaration, variant name) → variant def, for compiler-
+    /// synthesized arms that resolve a variant by name (the `capta`
+    /// boundary's `returned`/`thrown` wraps).
+    enum_variant_by_name: Arc<FxHashMap<(DefId, Symbol), DefId>>,
     enum_type_params: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     pub variant_fields: Arc<FxHashMap<DefId, Vec<radix_lexer::Symbol>>>,
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<radix_lexer::Symbol, MirType>>>,
@@ -2741,6 +2767,7 @@ impl<'a> FunctionBuilderContext<'a> {
             struct_field_types: Arc::new(FxHashMap::default()),
             variant_parents: Arc::new(FxHashMap::default()),
             enum_variants: Arc::new(FxHashMap::default()),
+            enum_variant_by_name: Arc::new(FxHashMap::default()),
             enum_type_params: Arc::new(FxHashMap::default()),
             variant_fields: Arc::new(FxHashMap::default()),
             variant_field_tys: Arc::new(FxHashMap::default()),

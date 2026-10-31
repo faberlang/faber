@@ -1,0 +1,7 @@
+main {
+    let wrapping<u64> h ← 16294208416658607535
+    let int r ← (h % 200000001) ↦ int
+    print r
+    let int low ← (h ∧ 255) ↦ int
+    print low
+}

@@ -3089,12 +3089,18 @@ comment.
 
 ## Testing
 
-`測試` modifiers include `預期失敗` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `略過`,
+`測試` modifiers include `預期失敗` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `預期失敗`, because it does not establish that the body failed. With
+`重複 N`, every run must satisfy `預期失敗`. The other modifiers are `略過`,
 `預期`, `僅限`, `僅限於`, `標籤`, `時限`, `測量`, `重複`, and
-`脆弱`. The counts of `時限`, `重複` and `脆弱` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`脆弱`. `重複 N` runs the case N times and passes only if every run
+satisfies the case's expectations; it does not retry until a pass. `脆弱 N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `時限`, `重複` and `脆弱` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 
@@ -3276,9 +3282,10 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `執行 { ... }` is the explicit `do` block and executes its body once.
 - `執行 { ... } 當 condition` is the post-test loop form; postfix `當` attaches only to `執行`, not arbitrary preceding blocks.
 - `捕捉` is an attachment shared by several structured forms, not a semantic mode owned by `執行`. A plain `執行` is often used when an otherwise unattached block needs a local handler: `執行 { ... } 捕捉 err { ... }`.
-- The modifier slot directly after `執行` holds `全部` (en `do all`) or `裝置` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
-- `執行 全部 { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `捕捉` once, at the block's exit (or, with a `當` tail, at each back edge).
-- `執行 裝置 { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `執行 全部` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `當` / `遍歷 範圍` loops are unchanged. Captures are classified by writes (a captured `傳入` scalar or genus is device state). The block's own `捕捉` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `當` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `執行 裝置` (`fac_machina_nested`), a `傳回` / `中斷` / `繼續` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `執行緒` loop or `歸約` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `執行 全部`, so every device route is unchanged.
+- The modifier slot directly after `執行` holds `全部` (en `do all`) or `裝置` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant`. Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- In runner/device execution, `執行 全部 { ... } 捕捉 err { ... }` defers per-call delivery of recoverable errors from dispatched failable kernels to that handled block's owning handler. A host read that synchronizes device data can deliver an error before block exit; generated checks and block/loop delivery points can also observe it. This is not universal fault capture: fatal device faults are not made catchable, and other executors do not use the runner's device-delivery markers.
+- With a `當` tail, delivery occurs per iteration. Because the `捕捉` on `執行 全部 { ... } 捕捉 ... 當 condition` wraps the whole loop, a delivered error handled there exits that loop; a handler inside an outer `當` loop can instead let the outer loop continue.
+- `執行 裝置 { ... }` (en `do device`) is a checked device-resident region. Its defined model is the surface of a private kernel-of-kernels function called once under `執行 全部` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies); V0 checks this model but does not synthesize that expansion. Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `當` / `遍歷 範圍` loops are unchanged. Captures are classified by writes (a captured `傳入` scalar or genus is device state). The block's own `捕捉` stays outside it and receives recoverable kernel errors through the handled-block delivery mechanism, which may observe them before block exit; a `當` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `執行 裝置` (`fac_machina_nested`), a `傳回` / `中斷` / `繼續` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `執行緒` loop or `歸約` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `執行 全部`, so every device route is unchanged.
 
 ---
 

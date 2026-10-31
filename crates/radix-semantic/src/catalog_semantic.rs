@@ -93,6 +93,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnprovenKernelIndex,
     WarningKind::PreferGuillemetQuote,
     WarningKind::MixedTemplateHoles,
+    WarningKind::TrapErrorChannelEmpty,
 ];
 
 // STABLE CODES
@@ -745,10 +746,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "trap_member_type_mismatch" => {
             Some("check the member type flowing into the capta trap".to_owned())
         }
-        "trap_union_collapsed" => Some(
-            "make the success type and the error channel distinguishable, or handle the error with fac/cape instead"
-                .to_owned(),
-        ),
         "generic_type_arg_domain" => {
             Some("choose one of the allowed type arguments for this generic parameter".to_owned())
         }
@@ -1529,6 +1526,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         WarningKind::MixedTemplateHoles => DiagnosticSpec {
             code: "WARN035",
             help: Some("number every hole (`§0`, `§1`, …) so each reads the argument you mean"),
+        },
+        WarningKind::TrapErrorChannelEmpty => DiagnosticSpec {
+            code: "WARN036",
+            help: Some("drop the boundary, or call something failable inside it"),
         },
     }
 }

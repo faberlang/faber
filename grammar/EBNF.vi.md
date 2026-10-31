@@ -3089,12 +3089,18 @@ comment.
 
 ## Testing
 
-`kiểm_thử` modifiers include `mong_đợi_thất_bại` (en `expect_failure`): the case passes only
-when its body escapes through the error channel, and a case that completes
-cleanly fails (strict expected-failure). The other modifiers are `bỏ_qua`,
+`kiểm_thử` modifiers include `mong_đợi_thất_bại` (en `expect_failure`): the case passes when
+its body produces a failure captured by the test runner, including a failed
+assertion or a runtime fault/trap; it fails if the body completes cleanly. A
+wall-clock timeout, step-budget exhaustion or blocked/capability outcome does
+not satisfy `mong_đợi_thất_bại`, because it does not establish that the body failed. With
+`lặp_lại N`, every run must satisfy `mong_đợi_thất_bại`. The other modifiers are `bỏ_qua`,
 `việc_cần_làm`, `chỉ`, `chỉ_trong`, `nhãn`, `thời_gian`, `đo_lường`, `lặp_lại`, and
-`mong_manh`. The counts of `thời_gian`, `lặp_lại` and `mong_manh` are non-negative
-integer literals; a float is `test_modifier_integer`.
+`mong_manh`. `lặp_lại N` runs the case N times and passes only if every run
+satisfies the case's expectations; it does not retry until a pass. `mong_manh N`
+is rejected by `faber test` because flaky retries are not executed, so the case
+body does not run. The counts of `thời_gian`, `lặp_lại` and `mong_manh` are
+non-negative integer literals; a float is `test_modifier_integer`.
 
 ---
 
@@ -3276,9 +3282,10 @@ map key is `tabula_key_not_hashable`; a non-hashable set element is
 - `làm { ... }` is the explicit `do` block and executes its body once.
 - `làm { ... } trong_khi condition` is the post-test loop form; postfix `trong_khi` attaches only to `làm`, not arbitrary preceding blocks.
 - `bắt` is an attachment shared by several structured forms, not a semantic mode owned by `làm`. A plain `làm` is often used when an otherwise unattached block needs a local handler: `làm { ... } bắt err { ... }`.
-- The modifier slot directly after `làm` holds `tất_cả` (en `do all`) or `thiết_bị` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant` (`device` already delivers every fault once at the block's exit). Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
-- `làm tất_cả { ... }` runs its launches under deferred fault delivery: a kernel error reaches the block's `bắt` once, at the block's exit (or, with a `trong_khi` tail, at each back edge).
-- `làm thiết_bị { ... }` (en `do device`) is a checked device-resident region. It is defined as the surface of a private kernel-of-kernels function called once under `làm tất_cả` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies). Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `trong_khi` / `lặp khoảng` loops are unchanged. Captures are classified by writes (a captured `vào` scalar or genus is device state). The block's own `bắt` stays outside it and receives faults and `⇥` errors once, at the block's exit; a `trong_khi` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `làm thiết_bị` (`fac_machina_nested`), a `trả` / `dừng` / `tiếp` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `sợi` loop or `rút_gọn` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `làm tất_cả`, so every device route is unchanged.
+- The modifier slot directly after `làm` holds `tất_cả` (en `do all`) or `thiết_bị` (en `do device`), never both: a second modifier word is `PARSE020 fac_modifier_redundant`. Both words are contextual and claimed only in this slot, so `let int device ← 1` stays legal.
+- In runner/device execution, `làm tất_cả { ... } bắt err { ... }` defers per-call delivery of recoverable errors from dispatched failable kernels to that handled block's owning handler. A host read that synchronizes device data can deliver an error before block exit; generated checks and block/loop delivery points can also observe it. This is not universal fault capture: fatal device faults are not made catchable, and other executors do not use the runner's device-delivery markers.
+- With a `trong_khi` tail, delivery occurs per iteration. Because the `bắt` on `làm tất_cả { ... } bắt ... trong_khi condition` wraps the whole loop, a delivered error handled there exits that loop; a handler inside an outer `trong_khi` loop can instead let the outer loop continue.
+- `làm thiết_bị { ... }` (en `do device`) is a checked device-resident region. Its defined model is the surface of a private kernel-of-kernels function called once under `làm tất_cả` (gpu-reset rule 12.7: a kernel body may be split into sequential launches at whole-grid dependencies); V0 checks this model but does not synthesize that expansion. Inside the block the existing kernel legality applies to everything between launches: a host call is `nucleum_host_call`, a host effect `nucleum_host_effect`, a host-typed capture `nucleum_host_type`, a handler `nucleum_recovery`, and ordinary `trong_khi` / `lặp khoảng` loops are unchanged. Captures are classified by writes (a captured `vào` scalar or genus is device state). The block's own `bắt` stays outside it and receives recoverable kernel errors through the handled-block delivery mechanism, which may observe them before block exit; a `trong_khi` tail keeps host loop control with per-iteration delivery. These are refused by name: a nested `làm thiết_bị` (`fac_machina_nested`), a `trả` / `dừng` / `tiếp` leaving the block (`nucleum_block_exit_crosses_boundary`), a direct `sợi` loop or `rút_gọn` outside any kernel call (`nucleum_region_lane_loop_not_built`), a tensor allocation inside (`nucleum_region_alloc_not_built`), and a condition, bound, scalar store or kernel scalar argument that reads a value computed on the device (`nucleum_region_device_read_not_built`). `faber check --device` prints each region's inputs, in-outs, launches per iteration and its host-sync count. In V0 the region is checked, not compiled differently: it lowers exactly as `làm tất_cả`, so every device route is unchanged.
 
 ---
 

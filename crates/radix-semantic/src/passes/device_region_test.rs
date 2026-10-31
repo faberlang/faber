@@ -195,6 +195,45 @@ fn a_data_dependent_while_on_device_data_is_refused_by_name() {
 }
 
 #[test]
+fn a_while_condition_tainted_through_loop_carried_stores_is_refused() {
+    let unit = analyze(
+        r#"
+@ kernel
+@ public
+fn write_scalar(mut int value) → void {
+    value ← 1
+}
+main {
+    mut int state ← 0
+    mut int middle ← 0
+    mut int latest ← 0
+    do device {
+        while state ≺ 1 {
+            state ← middle
+            middle ← latest
+            write_scalar(mut latest)
+        }
+    }
+}
+"#,
+    );
+    let err = unit
+        .diagnostics
+        .iter()
+        .find(|err| {
+            err.issue() == Some("nucleum_region_device_read_not_built")
+                && arg(err, "construct") == Some("condition")
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "missing device-dependent while condition in {:?}",
+                unit.diagnostics
+            )
+        });
+    assert_eq!(arg(err, "construct"), Some("condition"));
+}
+
+#[test]
 fn a_device_read_as_a_kernel_scalar_argument_is_refused() {
     assert_region_rejects(
         "    do device {\n        bump(z, mut t, (⌊t[[0]]⌋ ↦ i32))\n    }",

@@ -10,8 +10,3 @@ domain = "types"
 [expect]
 stdout = "stdout.expected"
 check_only = false
-
-[targets.roundtrip]
-outcome = "known-fail"
-phase = "emit"
-diagnostic_contains = "SEM002.unknown_type"

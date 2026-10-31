@@ -77,7 +77,7 @@ pub struct ProbaCase {
 /// Resolved test-modifier view for selection and skip reporting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProbaModifierView {
-    /// Strict expected-error marker; only an error-channel escape satisfies it.
+    /// Strict expected-failure marker; a captured body failure satisfies it.
     Erratur,
 
     Omitte(String),
@@ -849,7 +849,8 @@ fn execute_case(
     // backstop via the `None` step-budget argument.
     let deadline =
         timeout_secs.and_then(|secs| Instant::now().checked_add(Duration::from_secs(secs)));
-    // Assertion failures call Host::abort which panics on BufferHost; catch as fail.
+    // Assertion failures call Host::abort which panics on BufferHost; catch as a
+    // body failure. Under erratur, this captured failure is the expected result.
     // Silence the default panic hook so failed cases do not dump a backtrace to stderr.
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
@@ -897,7 +898,9 @@ fn execute_case(
     let (run_result, stats) = match trapped {
         Ok(pair) => pair,
         Err(payload) => {
-            let outcome = if let Some(reason) = host.last_abort.clone() {
+            let outcome = if erratur {
+                CaseOutcome::Passed
+            } else if let Some(reason) = host.last_abort.clone() {
                 CaseOutcome::Failed { message: reason }
             } else {
                 let message = abort_message_from_payload(payload.as_ref())
@@ -928,33 +931,34 @@ fn captured_stdout(host: &BufferHost) -> Vec<String> {
     stdout
 }
 
-/// Runner issue emitted when a failable call reaches a statement without an
-/// enclosing error sink. `erratur` accepts this identity as the expected
-/// error-channel escape.
-const ISSUE_UNCAUGHT_ALTERNATE_RETURN: &str = "runner_uncaught_alternate_return_from_call";
-
+/// Runner issues emitted when execution cannot say whether the test body
+/// completed: limits and capability gaps do not satisfy `erratur`.
 fn outcome_from_run_result(result: Result<(), Vec<RunnerError>>, erratur: bool) -> CaseOutcome {
     match result {
         // Strict-xfail: an erratur case that completes cleanly is a suite
         // failure, not a silently accepted pass.
         Ok(()) if erratur => CaseOutcome::Failed {
-            message: "faber: erratur expected an error-channel escape, but the case passed"
+            message: "faber: erratur expected the test body to fail, but it completed cleanly"
                 .to_owned(),
         },
         Ok(()) => CaseOutcome::Passed,
-        // Flip only the runner's explicit uncaught alternate-return issue.
-        // Budget exhaustion, capability gaps, and other runner failures stay
-        // on their existing outcome paths below.
-        Err(errors) if erratur && is_error_channel_escape(&errors) => CaseOutcome::Passed,
-        Err(errors) => case_outcome_from_runner_errors(&errors),
+        Err(errors) => {
+            let outcome = case_outcome_from_runner_errors(&errors);
+            if erratur && !errors.iter().any(is_execution_limit) {
+                match outcome {
+                    CaseOutcome::Failed { .. } => CaseOutcome::Passed,
+                    other => other,
+                }
+            } else {
+                outcome
+            }
+        }
     }
 }
 
-fn is_error_channel_escape(errors: &[RunnerError]) -> bool {
-    !errors.is_empty()
-        && errors
-            .iter()
-            .all(|error| error.issue == ISSUE_UNCAUGHT_ALTERNATE_RETURN)
+fn is_execution_limit(error: &RunnerError) -> bool {
+    error.issue == RUNNER_ISSUE_WALL_CLOCK_TIMEOUT
+        || error.issue == RUNNER_ISSUE_STEP_BUDGET_EXHAUSTED
 }
 
 fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {

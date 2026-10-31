@@ -1,0 +1,403 @@
+# Native multicore H.264 encoder. A macroblock is one independent slice;
+# slice layout and output order are fixed across worker counts. Reference
+# pictures are reconstructed output, and frames execute in coding order.
+
+import from "./bits" bits
+import from "./cavlc" cavlc
+import from "./transform" transform
+import from "./inter" inter
+import from "norma:time" time
+
+@ public
+class Encoded {
+    let list<b8> stream
+    let list<b8> reconstruction
+    let int frames
+    let int width
+    let int height
+    let int jobs
+    let int moving_blocks
+    let int p_jobs
+    let int serialized_job_elements
+    let int serialized_reference_elements
+    let int received_reply_elements
+    let int job_construction_ns
+    let int conversation_submission_ns
+    let int receive_wait_ns
+    let int reply_application_ns
+}
+
+fn append_u8_list(mut list<b8> out, list<b8> values) {
+    for from values let value {
+        out.append(value)
+    }
+}
+
+fn sps(int width, int height) → list<b8> {
+    let int mb_w ← width / 16
+    let int mb_h ← height / 16
+    mut bits.Bits out ← bits.bits_new()
+    bits.bits_put_bits(mut out, 66, 8)
+    # constraint_set1_flag marks the constrained-baseline subset; remaining
+    # constraint/reserved bits are zero.
+    bits.bits_put_bits(mut out, 64, 8)
+    bits.bits_put_bits(mut out, 40, 8)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_ue(mut out, 0)
+    # pic_order_cnt_type=2: reference coding order determines picture order.
+    bits.bits_put_ue(mut out, 2)
+    bits.bits_put_ue(mut out, 1)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_ue(mut out, mb_w - 1)
+    bits.bits_put_ue(mut out, mb_h - 1)
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 1)
+    # VUI: unspecified aspect/overscan; limited-range video; 30 frames/sec.
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bits(mut out, 5, 3)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bits(mut out, 1, 32)
+    bits.bits_put_bits(mut out, 60, 32)
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_trailing(mut out)
+    return bits.annex_b(0x67 ↦ u8, out) ↦ list<b8>
+}
+
+fn pps(int qp) → list<b8> {
+    mut bits.Bits out ← bits.bits_new()
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bits(mut out, 0, 2)
+    bits.bits_put_se(mut out, qp - 26)
+    bits.bits_put_se(mut out, 0)
+    bits.bits_put_se(mut out, 0)
+    bits.bits_put_bit(mut out, 1)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_trailing(mut out)
+    return bits.annex_b(0x68 ↦ u8, out) ↦ list<b8>
+}
+
+fn put_recon(mut list<b8> recon, int index, int value) {
+    recon[index] ← ((transform.clamp_byte(value) ↦ u8 ⊥ 0) ↦ b8)
+}
+
+fn dc_predict(list<b8> recon, int width, int x, int y, int local_x, int local_y) → int {
+    let bool have_left ← local_x ≻ 0
+    let bool have_top ← local_y ≻ 0
+    if have_left and have_top {
+        mut int left ← 0
+        mut int top ← 0
+        for range 0‥4 let k {
+            left ← left + ((recon[(y + k) * width + x - 1] ↦ u8) ↦ int)
+            top ← top + ((recon[(y - 1) * width + x + k] ↦ u8) ↦ int)
+        }
+        return (left + top + 4) ⇒ 3
+    }
+    if have_left {
+        mut int left ← 0
+        for range 0‥4 let k {
+            left ← left + ((recon[(y + k) * width + x - 1] ↦ u8) ↦ int)
+        }
+        return (left + 2) ⇒ 2
+    }
+    if have_top {
+        mut int top ← 0
+        for range 0‥4 let k {
+            top ← top + ((recon[(y - 1) * width + x + k] ↦ u8) ↦ int)
+        }
+        return (top + 2) ⇒ 2
+    }
+    return 128
+}
+
+fn block_n_c(list<int> counts, int bx, int by) → int {
+    let bool left ← bx ≻ 0
+    let bool top ← by ≻ 0
+    if left and top {
+        return (counts[(by / 4) * 4 + (bx / 4) - 1] + counts[((by / 4) - 1) * 4 + (bx / 4)] + 1) / 2
+    }
+    if left then return counts[(by / 4) * 4 + (bx / 4) - 1]
+    if top then return counts[((by / 4) - 1) * 4 + (bx / 4)]
+    return 0
+}
+
+fn encode_luma_block(mut bits.Bits out, list<b8> src, mut list<b8> recon, int width, int bx, int by, int qp, mut list<int> counts) {
+    let int pred ← dc_predict(recon, width, bx, by, bx % 16, by % 16)
+    mut list<int> residual ← empty
+    for range 0‥4 let y {
+        for range 0‥4 let x {
+            residual.append(((src[(by + y) * width + bx + x] ↦ u8) ↦ int) - pred)
+        }
+    }
+    let list<int> transformed ← transform.forward4(residual)
+    let list<int> quantized ← transform.quantize4(transformed, qp)
+    let list<int> scan ← transform.zigzag4(quantized)
+    let int local_x ← bx % 16
+    let int local_y ← by % 16
+    let int n_c ← block_n_c(counts, local_x, local_y)
+    let cavlc.CavlcResult result ← cavlc.cavlc_write(mut out, scan, n_c, 16)
+    counts[(local_y / 4) * 4 + (local_x / 4)] ← result.total_coeff
+    let list<int> dequantized ← transform.dequantize4(quantized, qp)
+    let list<int> restored ← transform.inverse4(dequantized)
+    for range 0‥4 let y {
+        for range 0‥4 let x {
+            put_recon(mut recon, (by + y) * width + bx + x, pred + restored[y * 4 + x])
+        }
+    }
+}
+
+fn write_i4_mb(mut bits.Bits out, list<b8> src, mut list<b8> recon, int width, int height, int mb_x, int mb_y, int qp) {
+    let int y_size ← width * height
+    let int c_width ← width / 2
+    let int c_height ← height / 2
+    let int c_size ← c_width * c_height
+    let int u_base ← y_size
+    let int v_base ← y_size + c_size
+    bits.bits_put_ue(mut out, 0)
+    for range 0‥16 let i { bits.bits_put_bit(mut out, 1) }
+    bits.bits_put_ue(mut out, 0)
+    # Intra CBP 31 = all luma groups plus chroma DC; codeNum=1.
+    bits.bits_put_ue(mut out, 1)
+    bits.bits_put_se(mut out, 0)
+    mut list<int> counts ← [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    let list<int> bx_order ← [0, 4, 0, 4, 8, 12, 8, 12, 0, 4, 0, 4, 8, 12, 8, 12]
+    let list<int> by_order ← [0, 0, 4, 4, 0, 0, 4, 4, 8, 8, 12, 12, 8, 8, 12, 12]
+    for range 0‥16 let block {
+        encode_luma_block(mut out, src, mut recon, width, mb_x * 16 + bx_order[block], mb_y * 16 + by_order[block], qp, mut counts)
+    }
+    for range 0‥2 let plane {
+        let int base ← plane ≡ 0 ✓ u_base ✗ v_base
+        mut list<int> sums ← empty
+        for range 0‥2 let by {
+            for range 0‥2 let bx {
+                mut int sum ← 0
+                for range 0‥4 let dy {
+                    for range 0‥4 let dx {
+                        let int p ← base + (mb_y * 8 + by * 4 + dy) * c_width + mb_x * 8 + bx * 4 + dx
+                        sum ← sum + ((src[p] ↦ u8) ↦ int) - 128
+                    }
+                }
+                sums.append(sum)
+            }
+        }
+        let list<int> levels ← transform.chroma_dc_quant(sums, qp)
+        cavlc.cavlc_write(mut out, levels, -1, 4)
+        let list<int> dc ← transform.chroma_dc_inverse(levels, qp)
+        for range 0‥8 let dy {
+            for range 0‥8 let dx {
+                let int p ← base + (mb_y * 8 + dy) * c_width + mb_x * 8 + dx
+                let int block ← (dy / 4) * 2 + dx / 4
+                put_recon(mut recon, p, 128 + ((dc[block] + 32) ⇒ 6))
+            }
+        }
+    }
+}
+
+fn slice(int width, int height, int frame_num, int mb_index, int mb_x, int mb_y, int qp, list<b8> src, mut list<b8> recon) → list<b8> {
+    mut bits.Bits out ← bits.bits_new()
+    bits.bits_put_ue(mut out, mb_index)
+    bits.bits_put_ue(mut out, 7)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_bits(mut out, 0, 4)
+    bits.bits_put_ue(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_bit(mut out, 0)
+    bits.bits_put_se(mut out, 0)
+    bits.bits_put_ue(mut out, 1)
+    write_i4_mb(mut out, src, mut recon, width, height, mb_x, mb_y, qp)
+    bits.bits_trailing(mut out)
+    return bits.annex_b(0x65 ↦ u8, out) ↦ list<b8>
+}
+
+fn neutral_block() → list<b8> {
+    mut list<b8> out ← empty
+    for range 0‥384 let i { out.append(0x80) }
+    return out
+}
+
+fn job_byte(int value) → b8 {
+    do {
+        return (value ↦ u8) ↦ b8
+    }
+    catch err {
+        panic "invalid encoder task byte"
+    }
+}
+
+# One immutable job crosses the native conversation boundary. The reply has
+# NAL length, motion vector, NAL bytes, then 384 reconstructed block samples.
+@ call 'h264:encode-block'
+fn encode_job(list<int> job) → list<int> {
+    let int frame ← job[2]
+    let int mb ← job[3]
+    let int qp ← job[4]
+    mut list<b8> source ← empty
+    for range 5‥389 let i { source.append(job_byte(job[i])) }
+    mut list<b8> output ← empty
+    mut list<b8> reconstruction ← neutral_block()
+    mut int dx ← 0
+    mut int dy ← 0
+    if frame ≡ 0 {
+        output ← slice(16, 16, 0, mb, 0, 0, qp, source, mut reconstruction)
+    } else {
+        mut list<b8> reference_window ← empty
+        for range 389‥job.length() let i { reference_window.append(job_byte(job[i])) }
+        let inter.InterResult result ← inter.encode_mb(frame, mb, qp, source, reference_window)
+        output ← result.stream
+        reconstruction ← result.reconstruction
+        dx ← result.dx
+        dy ← result.dy
+    }
+    mut list<int> reply ← [output.length(), dx, dy]
+    for from output let value { reply.append((value ↦ u8) ↦ int) }
+    for from reconstruction let value { reply.append((value ↦ u8) ↦ int) }
+    return reply
+}
+
+fn job_for(list<b8> current, list<b8> reference, int width, int height, int frame, int mb, int qp) → list<int> {
+    mut list<int> job ← [width, height, frame, mb, qp]
+    let int mx ← mb % (width / 16)
+    let int my ← mb / (width / 16)
+    for range 0‥3 let plane {
+        let int stride ← plane ≡ 0 ✓ width ✗ width / 2
+        let int side ← plane ≡ 0 ✓ 16 ✗ 8
+        let int base ← plane ≡ 0 ✓ 0 ✗ width * height + (plane - 1) * (width * height / 4)
+        for range 0‥side let y {
+            for range 0‥side let x {
+                job.append((current[base + (my * side + y) * stride + mx * side + x] ↦ u8) ↦ int)
+            }
+        }
+    }
+    if frame ≢ 0 {
+        let list<b8> reference_window ← inter.motion_window(reference, width, height, mx, my)
+        for from reference_window let value { job.append((value ↦ u8) ↦ int) }
+    }
+    return job
+}
+
+fn apply_reply(mut list<b8> stream, mut list<b8> frame, list<int> reply, int width, int height, int mb) {
+    let int n ← reply[0]
+    assert reply.length() ≡ n + 387
+    for range 3‥(n + 3) let i { stream.append(job_byte(reply[i])) }
+    let int mx ← mb % (width / 16)
+    let int my ← mb / (width / 16)
+    mut int cursor ← n + 3
+    for range 0‥3 let plane {
+        let int stride ← plane ≡ 0 ✓ width ✗ width / 2
+        let int side ← plane ≡ 0 ✓ 16 ✗ 8
+        let int base ← plane ≡ 0 ✓ 0 ✗ width * height + (plane - 1) * (width * height / 4)
+        for range 0‥side let y {
+            for range 0‥side let x {
+                frame[base + (my * side + y) * stride + mx * side + x] ← job_byte(reply[cursor])
+                cursor ← cursor + 1
+            }
+        }
+    }
+}
+
+@ public
+fn encode_frames(list<b8> input, int width, int height, int count, int qp, int workers, bool profile) → Encoded ⇥ string {
+    if width ≤ 0 or height ≤ 0 then panic "dimensions must be positive"
+    if width % 16 ≢ 0 or height % 16 ≢ 0 then panic "first path requires 16-aligned dimensions"
+    if width ≻ 4096 or height ≻ 4096 then panic "dimensions exceed implementation bound"
+    if width / 16 * (height / 16) ≻ 8192 then panic "dimensions exceed level 4 macroblock bound"
+    if count ≤ 0 then panic "frame count must be positive"
+    if qp ≺ 0 or qp ≻ 51 then panic "qp must be between 0 and 51"
+    if workers ≺ 1 or workers ≻ 18 then panic "workers must be between 1 and 18"
+    let int frame_size ← width * height * 3 / 2
+    if input.length() ≢ frame_size * count then panic "input length does not match dimensions and frame count"
+    mut list<b8> stream ← empty
+    mut list<b8> recon ← empty
+    append_u8_list(mut stream, sps(width, height))
+    append_u8_list(mut stream, pps(qp))
+    mut list<b8> previous ← empty
+    mut int moving ← 0
+    mut int p_jobs ← 0
+    mut int serialized_job_elements ← 0
+    mut int serialized_reference_elements ← 0
+    mut int received_reply_elements ← 0
+    mut int job_construction_ns ← 0
+    mut int conversation_submission_ns ← 0
+    mut int receive_wait_ns ← 0
+    mut int reply_application_ns ← 0
+    mut int phase_started ← 0
+    for range 0‥count let frame {
+        let int lo ← frame * frame_size
+        let int hi ← lo + frame_size
+        let list<b8> current ← input[lo‥hi]
+        mut list<b8> recon_frame ← empty
+        for range 0‥frame_size let i { recon_frame.append(((128 ↦ u8 ⊥ 0) ↦ b8)) }
+        let int blocks ← (width / 16) * (height / 16)
+        mut int first ← 0
+        while first ≺ blocks {
+            let int end ← (first + workers).minimum(blocks)
+            mut list<channel<list<int>, list<int>>> pending ← empty
+            for range first‥end let mb {
+                if profile { phase_started ← time.monotonic() }
+                let list<int> job ← job_for(current, previous, width, height, frame % 30, mb, qp)
+                if profile {
+                    job_construction_ns ← job_construction_ns + time.monotonic() - phase_started
+                    serialized_job_elements ← serialized_job_elements + job.length()
+                    if frame % 30 ≢ 0 {
+                        p_jobs ← p_jobs + 1
+                        serialized_reference_elements ← serialized_reference_elements + job.length() - 389
+                    }
+                    phase_started ← time.monotonic()
+                }
+                let channel<list<int>, list<int>> next ← call 'h264:encode-block' (job)
+                if profile {
+                    conversation_submission_ns ← conversation_submission_ns + time.monotonic() - phase_started
+                }
+                pending.append(next)
+            }
+            for range 0‥pending.length() let slot {
+                let channel<list<int>, list<int>> item ← pending[slot]
+                if profile { phase_started ← time.monotonic() }
+                let frame<list<int>> ∪ none result ← item.recv<list<int>>().get()
+                if profile { receive_wait_ns ← receive_wait_ns + time.monotonic() - phase_started }
+                if result is none then panic "encoder task ended without a reply"
+                let list<int> reply ← result!.data
+                if profile {
+                    received_reply_elements ← received_reply_elements + reply.length()
+                    phase_started ← time.monotonic()
+                }
+                if reply[1] ≢ 0 or reply[2] ≢ 0 then moving ← moving + 1
+                apply_reply(mut stream, mut recon_frame, reply, width, height, first + slot)
+                if profile {
+                    reply_application_ns ← reply_application_ns + time.monotonic() - phase_started
+                }
+            }
+            first ← end
+        }
+        for from recon_frame let sample { recon.append(sample) }
+        previous ← copy recon_frame
+    }
+    return Encoded {
+        stream = stream, reconstruction = recon, frames = count, width = width, height = height,
+        jobs = count * (width / 16) * (height / 16), moving_blocks = moving,
+        p_jobs = p_jobs, serialized_job_elements = serialized_job_elements,
+        serialized_reference_elements = serialized_reference_elements,
+        received_reply_elements = received_reply_elements,
+        job_construction_ns = job_construction_ns,
+        conversation_submission_ns = conversation_submission_ns,
+        receive_wait_ns = receive_wait_ns, reply_application_ns = reply_application_ns
+    }
+}

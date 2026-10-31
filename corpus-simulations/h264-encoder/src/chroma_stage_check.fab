@@ -1,0 +1,68 @@
++++
+locale = "en"
++++
+# Diagnostic transcript emitter for the isolated chroma reconstruction stage.
+# Five fixed planes are run at every slice QP; this is not encoder wiring.
+import from "./chroma_stage" chroma_stage
+
+fn fixture_prediction(int fixture, int x, int y) → int {
+    if fixture ≡ 4 {
+        return (x + y) % 2 ≡ 0 ✓ 250 ✗ 5
+    }
+    return 90 + (x * 17 + y * 11 + fixture * 13) % 70
+}
+
+fn fixture_residual(int fixture, int x, int y) → int {
+    if fixture ≡ 0 {
+        let int block ← (y / 4) * 2 + x / 4
+        let list<int> values ← [7, -9, 13, -15]
+        return values[block]
+    }
+    if fixture ≡ 1 {
+        return x ≡ 1 and y ≡ 2 ✓ 31 ✗ 0
+    }
+    if fixture ≡ 2 {
+        return (x + y) % 2 ≡ 0 ✓ 17 ✗ -17
+    }
+    if fixture ≡ 3 {
+        let int block ← (y / 4) * 2 + x / 4
+        let list<int> offsets ← [12, -10, -7, 9]
+        return offsets[block] + (x * 7 + y * 11 + 3) % 17 - 8
+    }
+    return (x + y) % 2 ≡ 0 ✓ 5 ✗ -5
+}
+
+fn emit_fixture(string name, int fixture) {
+    mut list<int> source ← empty
+    mut list<int> prediction ← empty
+    for range 0 ‥ 64 let i {
+        let int x ← i % 8
+        let int y ← i / 8
+        let int pred ← fixture_prediction(fixture, x, y)
+        prediction.append(pred)
+        source.append(pred + fixture_residual(fixture, x, y))
+    }
+    for range 0 ‥ 52 let qp {
+        let chroma_stage.ChromaStageResult result ← chroma_stage.reconstruct(source, prediction, qp)
+        print "case § § §"(name, qp, result.mapped_qp)
+        for range 0 ‥ 4 let block {
+            print "dc § § § §"(name, qp, block, result.dc_levels[block])
+        }
+        for range 0 ‥ 4 let block {
+            for range 0 ‥ 15 let index {
+                print "ac § § § § §"(name, qp, block, index, result.ac_scans[block][index])
+            }
+        }
+        for range 0 ‥ 64 let index {
+            print "pixel § § § §"(name, qp, index, result.pixels[index])
+        }
+    }
+}
+
+main {
+    emit_fixture("dc-only", 0)
+    emit_fixture("impulse-asymmetric", 1)
+    emit_fixture("checkerboard", 2)
+    emit_fixture("mixed-signed", 3)
+    emit_fixture("clipping-boundary", 4)
+}

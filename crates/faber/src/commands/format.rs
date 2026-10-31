@@ -297,7 +297,7 @@ pub(super) fn convert_single_doc(
     diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     let name = path.display().to_string();
-    let session = match format_session(path, from, source) {
+    let mut session = match format_session(path, from, source) {
         Ok(session) => session,
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
@@ -308,6 +308,12 @@ pub(super) fn convert_single_doc(
             return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
+    // Conversion remains a file-at-a-time operation: it does not claim the
+    // whole-package import contract that `check` has. Keep its established
+    // refusal for imported kernel calls whose mutability is only known from
+    // the sibling declaration. Formatter re-emission opts into those access
+    // markers separately, because it must validate and preserve source calls.
+    session.config.preserve_imported_param_access_markers = false;
     let emit_pack = match faber_cli::package::embedded_conversion_locale_pack(to) {
         Ok(pack) => pack,
         Err(diagnostic) => {
@@ -393,7 +399,9 @@ pub(super) fn format_single_doc(
     diagnostic_mode: radix::services::DiagnosticMode,
 ) -> Result<String, i32> {
     let name = path.display().to_string();
-    let session = match format_session(path, None, source) {
+    let context_path = format_context_path(path);
+    let context_name = context_path.display().to_string();
+    let mut session = match format_session(&context_path, None, source) {
         Ok(session) => session,
         Err(diagnostic) => {
             faber_cli::postprocess::print_diagnostics(
@@ -404,6 +412,10 @@ pub(super) fn format_single_doc(
             return Err(exit_status::status_for_diagnostic(&diagnostic));
         }
     };
+    // Formatter re-emission checks imported calls against their producer's
+    // parameter access markers; omitting them turns valid `mut` calls into
+    // read-only refusals.
+    session.config.preserve_imported_param_access_markers = true;
     let Some(emit_pack) = session.config.locale_pack.as_ref() else {
         // format_session always installs a resolved reader pack; reaching this
         // means the session invariant broke, so fail closed as a diagnostic.
@@ -419,7 +431,7 @@ pub(super) fn format_single_doc(
         );
         return Err(exit_status::SOFTWARE);
     };
-    let result = radix::module::driver::reemit_faber(&session, emit_pack, &name, source);
+    let result = radix::module::driver::reemit_faber(&session, emit_pack, &context_name, source);
 
     let had_error = result
         .diagnostics
@@ -448,7 +460,7 @@ pub(super) fn format_single_doc(
             );
             if wrapped != output.code
                 && !wrap_preserves_program(
-                    path,
+                    &context_path,
                     source,
                     &session,
                     emit_pack,
@@ -486,12 +498,27 @@ fn wrap_preserves_program(
     canonical: &str,
     wrapped: &str,
 ) -> bool {
+    let context_path = format_context_path(path);
     let Ok(wrapped_source) = formatted_source_for_write(path, source, wrapped) else {
         return false;
     };
-    let name = path.display().to_string();
+    let name = context_path.display().to_string();
     let again = radix::module::driver::reemit_faber(session, emit_pack, &name, &wrapped_source);
     again.output.is_some_and(|output| output.code == canonical)
+}
+
+/// Resolve an existing relative input against the CLI's working directory
+/// before package/import discovery. Discovery needs an absolute path to locate
+/// the package root; passing `src/main.fab` directly loses that context and
+/// silently treats relative imports as unresolved.
+#[cfg(feature = "hir-faber")]
+fn format_context_path(path: &Path) -> PathBuf {
+    if path.is_absolute() || !path.is_file() {
+        return path.to_path_buf();
+    }
+    std::env::current_dir()
+        .map(|cwd| cwd.join(path))
+        .unwrap_or_else(|_| path.to_path_buf())
 }
 
 pub(super) fn format_session(

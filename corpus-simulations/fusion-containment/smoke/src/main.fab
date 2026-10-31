@@ -1,0 +1,32 @@
+# Route smoke for the fusion fixture's command-line workload. The checked
+# argument fixture supplies particle count, batch count, and starting ID.
+import from "norma:fs" fs
+
+@ kernel
+@ public
+fn scale_into(tf32[4] input, f32 factor, mut tf32[4] output) → void {
+    output ⇇ input * factor
+}
+
+fn checksum(tf32[4] values) → f32 {
+    let f32 zero ← 0.0
+    mut f32 total ← 0.0
+    for range 0‥4 let i {
+        total ← total + (values[[i]] coalesce zero) * ((i + 1) ↦ f32)
+    }
+    return total
+}
+
+main {
+    let string fixture ← fs.read_file("corpus-simulations/fusion-containment/fixtures/magna-256.args") ⊥ ""
+    let list<string> values ← fixture.trim().split(" ")
+    if values.length() ≢ 3 then panic "invalid magna-256.args fixture"
+    let int particles ← values[0] ↦ int
+    let int batches ← values[1] ↦ int
+    let int offset ← values[2] ↦ int
+    let list<f32> data ← [particles ↦ f32, batches ↦ f32, offset ↦ f32, 0.05]
+    let tf32[4] input ← data ↦ tf32[4]
+    mut tf32[4] output ← tf32[4] {}
+    scale_into(input, 1.0, mut output)
+    print "fusion fixture workload checksum §"(checksum(output))
+}

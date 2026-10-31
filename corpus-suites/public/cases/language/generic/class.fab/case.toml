@@ -10,9 +10,3 @@ domain = "types"
 [expect]
 stdout = "stdout.expected"
 check_only = false
-
-[targets.roundtrip]
-outcome = "known-fail"
-phase = "emit"
-diagnostic_contains = "canonical Faber output failed re-validation: SEM016.inferred_constructor_no_expected_type"
-known_fail_why = "The canonical Faber emitter writes the generic class constructions without their type arguments, so the re-emitted source no longer checks."

@@ -69,6 +69,7 @@ pub(super) fn cmd_run(args: RunArgs) {
         // back to — the code below interprets the input, so behaviour, output,
         // exit codes and trap stderr are identical to the fallback.
         Some(crate::cli::RunTarget::Runner) => {}
+        #[cfg(feature = "hir-ts")]
         Some(crate::cli::RunTarget::Ts) => package::cmd_run_ts(
             &input_path,
             args.locale.as_deref(),
@@ -76,6 +77,13 @@ pub(super) fn cmd_run(args: RunArgs) {
             &args.args,
             diagnostic_mode,
         ),
+        #[cfg(not(feature = "hir-ts"))]
+        Some(crate::cli::RunTarget::Ts) => {
+            eprintln!(
+                "error: this faber build has no TypeScript target; rebuild with feature `hir-ts`"
+            );
+            exit_status::exit_usage();
+        }
         #[cfg(feature = "hir-go")]
         Some(crate::cli::RunTarget::Go) => package::cmd_run_go(
             &input_path,

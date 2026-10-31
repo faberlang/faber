@@ -3704,6 +3704,15 @@ help = "hãy đánh số mọi chỗ trống (`§0`, `§1`, …) để mỗi ch�
 message = "mẫu này trộn lẫn chỗ trống thường và chỗ trống có số; các chỗ trống thường đọc {reads}"
 help = "hãy đánh số mọi chỗ trống (`§0`, `§1`, …) để mỗi chỗ đọc đúng đối số bạn muốn"
 
+
+[diagnostics.WARN036]
+message = "không có gì bên trong ranh giới {capta} này có thể thất bại: kênh lỗi của nó trống"
+help = "bỏ ranh giới này, hoặc gọi điều gì đó có thể thất bại bên trong"
+
+[diagnostics.WARN036.issues.trap_error_channel_empty]
+message = "không có gì bên trong ranh giới {capta} này có thể thất bại: kênh lỗi của nó trống"
+help = "bỏ ranh giới này, hoặc gọi điều gì đó có thể thất bại bên trong"
+
 [llm]
 system_prompt_snippet = "Emit Vietnamese reader-locale Faber using Vietnamese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and preserve Vietnamese tone marks. Khi một chuỗi chứa ký tự trích dẫn (\" hoặc '), hãy viết nó bằng «…»: guillemet không cần ký tự thoát nào."
 exemplars = ["./exemplars/salve-munde.vi.fab"]

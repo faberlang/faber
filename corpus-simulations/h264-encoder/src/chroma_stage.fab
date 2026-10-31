@@ -1,0 +1,101 @@
++++
+locale = "en"
++++
+# Isolated 4:2:0 chroma 8x8 DC-plus-AC reconstruction stage.
+# This diagnostic stage is deliberately not wired into the encoder.
+import from "./transform" transform
+
+const list<int> AC_ZIGZAG = [1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15]
+
+@ public
+class ChromaStageResult {
+    let int mapped_qp
+    let list<int> dc_levels
+    let list<list<int>> ac_scans
+    let list<int> pixels
+}
+
+fn transform_block(list<int> source, list<int> prediction, int block) → list<int> {
+    let int bx ← block % 2
+    let int by ← block / 2
+    mut list<int> residual ← empty
+    mut int total ← 0
+    for range 0 ‥ 4 let y {
+        for range 0 ‥ 4 let x {
+            let int index ← (by * 4 + y) * 8 + bx * 4 + x
+            let int value ← source[index] - prediction[index]
+            residual.append(value)
+            total ← total + value
+        }
+    }
+    mut list<int> result ← [total]
+    result.extend(transform.forward4(residual))
+    return result
+}
+
+fn reconstruct_block(list<int> prediction, int block, int mapped_qp, int dc, list<int> ac) → list<int> {
+    mut list<int> restored_levels ← empty
+    for range 0 ‥ 16 let i { restored_levels.append(0) }
+    for range 0 ‥ 15 let i {
+        restored_levels[AC_ZIGZAG[i]] ← ac[i]
+    }
+    mut list<int> restored ← transform.dequantize4(restored_levels, mapped_qp)
+    restored[0] ← dc
+    let list<int> residual_pixels ← transform.inverse4(restored)
+
+    let int bx ← block % 2
+    let int by ← block / 2
+    mut list<int> pixels ← empty
+    for range 0 ‥ 4 let y {
+        for range 0 ‥ 4 let x {
+            let int index ← (by * 4 + y) * 8 + bx * 4 + x
+            let int pixel ← transform.clamp_byte(prediction[index] + residual_pixels[y * 4 + x])
+            pixels.append(pixel)
+        }
+    }
+    return pixels
+}
+
+@ public
+fn reconstruct(list<int> source, list<int> prediction, int qp) → ChromaStageResult {
+    assert source.length() ≡ 64
+    assert prediction.length() ≡ 64
+    assert qp ≥ 0 and qp ≤ 51
+    let int mapped_qp ← transform.chroma_qp(qp)
+
+    mut list<int> sums ← empty
+    mut list<int> blocks ← empty
+    for range 0 ‥ 4 let block {
+        let list<int> data ← transform_block(source, prediction, block)
+        sums.append(data[0])
+        for range 0 ‥ 16 let i { blocks.append(data[i + 1]) }
+    }
+    let list<int> dc_levels ← transform.chroma_dc_quant(sums, qp)
+    let list<int> dc_coefficients ← transform.chroma_dc_inverse(dc_levels, qp)
+    mut list<list<int>> ac_scans ← empty
+    mut list<int> pixels ← empty
+    for range 0 ‥ 64 let i { pixels.append(0) }
+
+    for range 0 ‥ 4 let block {
+        mut list<int> natural ← empty
+        for range 0 ‥ 16 let i { natural.append(blocks[block * 16 + i]) }
+        let list<int> quantized ← transform.quantize4(natural, mapped_qp)
+        let list<int> scan ← transform.zigzag4(quantized)
+        mut list<int> ac ← empty
+        for range 0 ‥ 15 let i {
+            ac.append(scan[i + 1])
+        }
+        let list<int> ac_for_output ← copy ac
+        let list<int> block_pixels ← reconstruct_block(prediction, block, mapped_qp, dc_coefficients[block], ac)
+        ac_scans.append(ac_for_output)
+        let int bx ← block % 2
+        let int by ← block / 2
+        for range 0 ‥ 4 let y {
+            for range 0 ‥ 4 let x {
+                let int index ← (by * 4 + y) * 8 + bx * 4 + x
+                pixels[index] ← block_pixels[y * 4 + x]
+            }
+        }
+    }
+    return ChromaStageResult { mapped_qp = mapped_qp, dc_levels = dc_levels, ac_scans = ac_scans, pixels = pixels }
+}

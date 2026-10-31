@@ -1267,3 +1267,430 @@ fn empty_block_statement_stays_on_the_fall_through_path() {
         cfg.edges()
     );
 }
+
+// ── First-use-in-component anchoring: capture-site regions ──────────────────
+
+fn has_write_conflict(result: &crate::test_support::AnalyzedFixture) -> bool {
+    result.diagnostics.iter().any(|diagnostic| {
+        diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+            && issue(diagnostic) == Some("write_while_borrowed")
+    })
+}
+
+/// A borrower whose first recorded use sits inside a separate component (a
+/// closure or lane body) must be anchored at the component's creation site:
+/// the capture keeps the region live from the bind to that site, so a source
+/// write between them stays a `write_while_borrowed` conflict instead of
+/// silently passing because the use lives in a disconnected CFG component.
+#[test]
+fn first_use_inside_closure_keeps_write_conflict() {
+    let result = analyze_source(
+        r#"
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    xs.appende(4)
+    sit _ keeper ← () → numerus ∴ view.longitudo()
+    nota keeper()
+}
+"#,
+    );
+    assert!(
+        has_write_conflict(&result),
+        "write between bind and capture must conflict; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+/// The nested-component variant: the first use sits two components deep (a
+/// closure whose body is another closure), so both capture sites must anchor
+/// the region and the inner anchoring alone would not reach the write.
+#[test]
+fn first_use_inside_nested_closure_keeps_write_conflict() {
+    let result = analyze_source(
+        r#"
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    xs.appende(4)
+    sit _ outer ← () → () → numerus ∴ () → numerus ∴ view.longitudo()
+    nota outer()()
+}
+"#,
+    );
+    assert!(
+        has_write_conflict(&result),
+        "write before a nested capture must conflict; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+/// A reduction lane body is a separate component too: the lane's use of the
+/// borrower must anchor at the reduction site.
+#[test]
+fn first_use_inside_reduction_lane_keeps_write_conflict() {
+    let result = analyze_source(
+        r#"
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    xs.appende(4)
+    sit numerus total ← xs.reducta((numerus a, numerus b) ∴ a + view.longitudo(), 0)
+    nota total
+}
+"#,
+    );
+    assert!(
+        has_write_conflict(&result),
+        "write before the lane's use must conflict; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+// ── CFG-builder coverage: value-position control flow, conditions, args ─────
+
+/// A control expression nested inside a value expression must go through
+/// the CFG builder: its condition and branch statements carry locations, and
+/// the borrow bound inside gets a real region instead of being dropped.  The
+/// Faber surface reaches this shape through lowered forms (a guarded `iace
+/// … si`, a `⊥` default); the hand-built module pins the structural contract.
+#[test]
+fn nested_control_expression_in_value_position_gets_cfg_nodes() {
+    let borrow_local = radix_hir::HirLocal {
+        def_id: radix_hir::DefId(7),
+        name: radix_lexer::Symbol(1),
+        ty: None,
+        init: Some(hand_expression(
+            3,
+            HirExpressionKind::Ref(
+                radix_hir::HirRefKind::Mutable,
+                Box::new(hand_expression(
+                    9,
+                    HirExpressionKind::Path(radix_hir::DefId(8)),
+                )),
+            ),
+        )),
+        mutable: false,
+        is_await: false,
+        runtime_provided: false,
+        await_store: None,
+        size_decl: false,
+        size_static: false,
+    };
+    let bind = hand_statement(2, radix_hir::HirStatementKind::Local(borrow_local));
+    let use_of_borrow = hand_statement(
+        6,
+        radix_hir::HirStatementKind::Expr(hand_expression(
+            10,
+            HirExpressionKind::Path(radix_hir::DefId(7)),
+        )),
+    );
+    // `1 + (si cond { bind; use } secus { })`: the `si` is a value operand.
+    let nested_si = hand_expression(
+        30,
+        HirExpressionKind::Si {
+            cond: Box::new(hand_expression(
+                20,
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Bool(true)),
+            )),
+            then_block: HirBlock {
+                statements: vec![bind, use_of_borrow],
+                ..HirBlock::default()
+            },
+            then_catch: None,
+            else_block: Some(HirBlock::default()),
+        },
+    );
+    let sum = hand_expression(
+        40,
+        HirExpressionKind::Binary(
+            radix_hir::HirBinOp::Add,
+            Box::new(hand_expression(
+                41,
+                HirExpressionKind::Literal(radix_hir::HirLiteral::Int(1)),
+            )),
+            Box::new(nested_si),
+        ),
+    );
+    let module = module_with_entry(HirBlock {
+        statements: vec![hand_statement(50, radix_hir::HirStatementKind::Expr(sum))],
+        ..HirBlock::default()
+    });
+
+    let facts = borrow_region::analyze(
+        &module,
+        &crate::TypeTable::new(),
+        &crate::AccessFactTable::default(),
+    )
+    .expect("nested control expression must be covered");
+    let cfg = facts.cfg();
+    assert!(
+        cfg.node_for_hir_id(HirId(20)).is_some(),
+        "the nested condition must carry a node"
+    );
+    assert!(
+        cfg.node_for_hir_id(HirId(2)).is_some(),
+        "the branch-local bind must carry a node"
+    );
+    assert!(
+        facts.region_for(radix_hir::DefId(7)).is_some(),
+        "the branch-local borrow must get a region"
+    );
+}
+
+/// A closure written directly in an `si` condition is a component of the
+/// condition: the builder must give its body a component, so a borrow bound
+/// inside it keeps a real region (with located statements) instead of being
+/// silently dropped for the block-scope fallback.
+#[test]
+fn closure_in_condition_body_gets_real_regions() {
+    #[derive(Default)]
+    struct ComponentBorrows {
+        depth: usize,
+        borrowers: Vec<radix_hir::DefId>,
+        statements: Vec<HirId>,
+    }
+    impl HirVisitor for ComponentBorrows {
+        fn visit_expr(&mut self, expression: &HirExpression) {
+            if matches!(expression.kind, HirExpressionKind::Clausura(..)) {
+                self.depth += 1;
+                walk_expr(self, expression);
+                self.depth -= 1;
+                return;
+            }
+            walk_expr(self, expression);
+        }
+
+        fn visit_stmt(&mut self, statement: &radix_hir::HirStatement) {
+            if self.depth > 0 {
+                self.statements.push(statement.id);
+                if let radix_hir::HirStatementKind::Local(local) = &statement.kind {
+                    self.borrowers.push(local.def_id);
+                }
+            }
+            radix_hir::visit::walk_stmt(self, statement);
+        }
+    }
+
+    let result = analyze_source(
+        r#"
+functio usatur(() → numerus f) → numerus {
+    redde f()
+}
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    si usatur(() → numerus ∴ fac {
+        varia in lista<numerus> v ← xs
+        redde v.longitudo()
+    }) ≻ 1 {
+        nota 1
+    }
+}
+"#,
+    );
+    let hir = result.hir.as_ref().expect("HIR");
+    let mut shape = ComponentBorrows::default();
+    shape.visit_program(hir);
+    assert!(
+        !shape.borrowers.is_empty(),
+        "fixture must bind a borrow inside the condition-hosted closure"
+    );
+    let facts = borrow_region::analyze(
+        hir,
+        &result.types,
+        result.access_facts.as_ref().expect("access facts"),
+    )
+    .expect("regions");
+    for borrower in shape.borrowers {
+        assert!(
+            facts.region_for(borrower).is_some(),
+            "a borrow bound inside a condition-hosted closure must get a region"
+        );
+    }
+    for statement in shape.statements {
+        assert!(
+            facts.cfg().node_for_hir_id(statement).is_some(),
+            "every statement inside the condition-hosted closure must carry a CFG location"
+        );
+    }
+}
+
+/// The `dum` condition is re-evaluated every iteration, so a component in it
+/// belongs on the loop cycle: the capture keeps the region live around the
+/// back edge and the body write stays a conflict.
+#[test]
+fn closure_in_dum_condition_stays_live_around_the_back_edge() {
+    let result = analyze_source(
+        r#"
+functio usatur(() → numerus f) → numerus {
+    redde f()
+}
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    dum usatur(() → numerus ∴ view.longitudo()) ≺ 5 {
+        xs.appende(4)
+    }
+}
+"#,
+    );
+    assert!(
+        has_write_conflict(&result),
+        "body write while the condition-position capture is live must conflict; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+/// Chain-call arguments already run through the builder's nested-component
+/// walk: pin that a closure written directly in a call argument anchors its
+/// capture at the call site.
+#[test]
+fn chain_call_argument_closure_gets_real_regions() {
+    let result = analyze_source(
+        r#"
+functio usatur(() → numerus f) → numerus {
+    redde f()
+}
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    xs.appende(4)
+    nota usatur(() → numerus ∴ view.longitudo())
+}
+"#,
+    );
+    assert!(
+        has_write_conflict(&result),
+        "write before a call-argument capture must conflict; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
+
+/// The null-safe index payload (`xs?[…]`) evaluates in the enclosing flow:
+/// a component written inside it must get its own CFG location instead of
+/// silently keying to the ambient statement.
+#[test]
+fn null_safe_index_payload_gets_cfg_nodes() {
+    #[derive(Default)]
+    struct PayloadClosures(Vec<HirId>);
+    impl HirVisitor for PayloadClosures {
+        fn visit_expr(&mut self, expression: &HirExpression) {
+            match &expression.kind {
+                HirExpressionKind::OptionalChain(
+                    _,
+                    radix_hir::HirOptionalChainKind::Index(index),
+                ) => {
+                    let mut nested = PayloadClosures::default();
+                    nested.visit_expr(index);
+                    self.0.extend(nested.0);
+                }
+                HirExpressionKind::Clausura(_, _, _, _) => self.0.push(expression.id),
+                _ => {}
+            }
+            walk_expr(self, expression);
+        }
+    }
+
+    let result = analyze_en(
+        r#"
+fn usatur(() → int f) → int {
+    return f()
+}
+main {
+    mut list<int> ∪ none xs ← [1, 2, 3]
+    print xs?[usatur(() → int ∴ 7)]
+}
+"#,
+    );
+    let hir = result.hir.as_ref().expect("HIR");
+    let mut site = PayloadClosures::default();
+    site.visit_program(hir);
+    assert!(
+        !site.0.is_empty(),
+        "fixture must host a closure in the payload"
+    );
+    let facts = borrow_region::analyze(
+        hir,
+        &result.types,
+        result.access_facts.as_ref().expect("access facts"),
+    )
+    .expect("regions");
+    for closure in site.0 {
+        assert!(
+            facts.cfg().node_for_hir_id(closure).is_some(),
+            "a closure inside the null-safe index payload must run through the CFG builder"
+        );
+    }
+}
+
+// ── Fail-closed: an unlocated borrow start is a named SEM008 gap ────────────
+
+/// An `IncDec` lvalue operand is the one position the CFG builder does not
+/// walk. A borrow bound inside it has no start location, so the engine must
+/// fail closed with the named `region_facts_not_built` diagnostic instead of
+/// silently dropping the candidate and keeping the block-scope approximation.
+#[test]
+fn unlocated_borrow_start_fails_closed_with_the_named_diagnostic() {
+    let borrow_local = radix_hir::HirLocal {
+        def_id: radix_hir::DefId(7),
+        name: radix_lexer::Symbol(1),
+        ty: None,
+        init: Some(hand_expression(
+            3,
+            HirExpressionKind::Ref(
+                radix_hir::HirRefKind::Mutable,
+                Box::new(hand_expression(
+                    9,
+                    HirExpressionKind::Path(radix_hir::DefId(8)),
+                )),
+            ),
+        )),
+        mutable: false,
+        is_await: false,
+        runtime_provided: false,
+        await_store: None,
+        size_decl: false,
+        size_static: false,
+    };
+    let module = module_with_entry(HirBlock {
+        statements: vec![hand_statement(
+            5,
+            radix_hir::HirStatementKind::IncDec(radix_hir::HirIncDec {
+                target: hand_expression(
+                    4,
+                    HirExpressionKind::Block(HirBlock {
+                        statements: vec![hand_statement(
+                            2,
+                            radix_hir::HirStatementKind::Local(borrow_local),
+                        )],
+                        ..HirBlock::default()
+                    }),
+                ),
+                op: radix_hir::HirIncDecOp::Inc,
+            }),
+        )],
+        ..HirBlock::default()
+    });
+
+    let error = borrow_region::analyze(
+        &module,
+        &crate::TypeTable::new(),
+        &crate::AccessFactTable::default(),
+    )
+    .expect_err("an unlocated borrow start must fail closed");
+    assert!(
+        matches!(error, borrow_region::RegionError::MissingLocation { .. }),
+        "unexpected error: {error}"
+    );
+    let diagnostic = borrow_region::fail_closed_diagnostic(&error).expect("fail closed");
+    let issue_arg = diagnostic
+        .args
+        .iter()
+        .find(|arg| arg.name == "issue")
+        .expect("issue arg");
+    assert_eq!(issue_arg.value, borrow_region::ISSUE_REGION_FACTS_NOT_BUILT);
+    assert_eq!(
+        crate::catalog_semantic::semantic_spec(diagnostic.kind).code,
+        "SEM008"
+    );
+}

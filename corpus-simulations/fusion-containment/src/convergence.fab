@@ -1,0 +1,72 @@
++++
+locale = "la"
++++
+importa ex "./orbita" orbita
+
+@ cli "orbita-convergentia"
+@ operandus numerus casus
+@ operandus numerus dt_micro
+@ operandus numerus gradus
+incipit argumenta args {
+    adfirma args.casus ≥ 0 et args.casus ≤ 1
+    adfirma args.dt_micro ≥ 1 et args.dt_micro ≤ 100000
+    adfirma args.gradus ≥ 1 et args.gradus ≤ 5000
+    sit f32 delta_t ← (args.dt_micro ↦ f32) / 1000000.0
+    varia tensor<f32, [33, 33, 3]> tabula ← tf32[33, 33, 3] {}
+    itera ab 0‥33 sit i {
+        sit f64 r ← 2.0 + (i ↦ f64) / 16.0
+        itera ab 0‥33 sit j {
+            sit f64 z ← -1.0 + (j ↦ f64) / 16.0
+            si args.casus ≡ 0 {
+                tabula[[i, j, 0]] ← 0.0
+                tabula[[i, j, 1]] ← 0.0
+                tabula[[i, j, 2]] ← 1.0
+            }
+            secus {
+                tabula[[i, j, 0]] ← (-0.3 * z / r) ↦ f32
+                tabula[[i, j, 1]] ← (3.0 / r) ↦ f32
+                tabula[[i, j, 2]] ← (0.3 * (r - 3.0) / r) ↦ f32
+            }
+        }
+    }
+    varia tensor<f32, [256]> semina ← tf32[256] {}
+    varia tensor<f32, [256, 6]> initia ← tf32[256, 6] {}
+    varia tensor<f32, [256]> muri ← tf32[256] {}
+    varia tensor<f32, [256]> gradus_ultimi ← tf32[256] {}
+    varia tensor<f32, [256]> loca_x ← tf32[256] {}
+    varia tensor<f32, [256]> loca_y ← tf32[256] {}
+    varia tensor<f32, [256]> loca_z ← tf32[256] {}
+    varia tensor<f32, [256]> velocitates_x ← tf32[256] {}
+    varia tensor<f32, [256]> velocitates_y ← tf32[256] {}
+    varia tensor<f32, [256]> velocitates_z ← tf32[256] {}
+    varia tensor<f32, [256]> errores_energiae ← tf32[256] {}
+    itera ab 0‥256 sit i {
+        semina[[i]] ← i ↦ f32
+        si args.casus ≡ 0 {
+            initia[[i, 0]] ← 3.0
+            initia[[i, 1]] ← 0.0
+            initia[[i, 2]] ← 0.0
+            initia[[i, 3]] ← 0.1
+            initia[[i, 4]] ← 0.0
+            initia[[i, 5]] ← 0.2
+        }
+        secus {
+            initia[[i, 0]] ← (2.15 + 1.7 * ((i % 16) ↦ f64) / 15.0) ↦ f32
+            initia[[i, 1]] ← 0.0
+            initia[[i, 2]] ← 0.0
+            initia[[i, 3]] ← (0.4 * ((((i * 17) % 101) ↦ f64) / 50.0 - 1.0)) ↦ f32
+            initia[[i, 4]] ← (0.4 * ((((i * 29 + 7) % 103) ↦ f64) / 51.0 - 1.0)) ↦ f32
+            initia[[i, 5]] ← (0.4 * ((((i * 43 + 11) % 107) ↦ f64) / 53.0 - 1.0)) ↦ f32
+        }
+    }
+    orbita.integra(semina, initia, tabula, args.gradus ↦ i32, delta_t, 1, varia muri, varia gradus_ultimi, varia loca_x, varia loca_y, varia loca_z, varia velocitates_x, varia velocitates_y, varia velocitates_z, varia errores_energiae)
+    nota "case,id,wall,steps,x,y,z,vx,vy,vz,energy_error"
+    si args.casus ≡ 0 {
+        nota "uniform,0,§,§,§,§,§,§,§,§,§"(muri[[0]], gradus_ultimi[[0]], loca_x[[0]], loca_y[[0]], loca_z[[0]], velocitates_x[[0]], velocitates_y[[0]], velocitates_z[[0]], errores_energiae[[0]])
+    }
+    secus {
+        itera ab 0‥256 sit i {
+            nota "torus,§,§,§,§,§,§,§,§,§,§"(i, muri[[i]], gradus_ultimi[[i]], loca_x[[i]], loca_y[[i]], loca_z[[i]], velocitates_x[[i]], velocitates_y[[i]], velocitates_z[[i]], errores_energiae[[i]])
+        }
+    }
+}

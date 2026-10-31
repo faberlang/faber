@@ -1,0 +1,6 @@
+import from "norma:encoding" encoding
+
+main {
+    let list<b8> data ← |61 62 63|
+    print encoding.hex(data)
+}

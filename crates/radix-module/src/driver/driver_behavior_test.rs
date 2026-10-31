@@ -43,6 +43,57 @@ fn compile_refuses_routes_owned_by_package_or_artifact_workflows() {
 }
 
 #[test]
+fn wasm_cli_codegen_refuses_class_collection_keys_by_name() {
+    let source = r#"
+class Key { let string name }
+main {
+    mut map<Key, int> values ← empty
+    values.put(Key { name = "a" }, 1)
+    print values.get(Key { name = "a" })
+}
+"#;
+    let session = Session::new(Config::default().with_target(Target::MirWasm));
+    let result = compile(&session, "class-key.fab", source, ModuleCompileRequest::default());
+
+    assert!(result.output.is_none(), "Wasm CLI codegen must refuse unsupported genus keys");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == Some("CODEGEN001")
+                && diagnostic.issue() == Some("wasm_genus_collection_key_unsupported")),
+        "Wasm must name its class-key gap: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>(),
+    );
+}
+
+#[test]
+fn wasm_file_compile_refuses_class_collection_keys_by_name() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/tabula/class-map-key.fab");
+    let compiler = crate::Compiler::new(Config::default().with_target(Target::MirWasm));
+    let result = compiler.compile(&path);
+
+    assert!(result.output.is_none(), "Wasm file compile must refuse unsupported genus keys");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code == Some("CODEGEN001")
+                && diagnostic.issue() == Some("wasm_genus_collection_key_unsupported")),
+        "Wasm file compile must name its class-key gap: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
+            .collect::<Vec<_>>(),
+    );
+}
+
+#[test]
 fn compile_analyzed_promotes_denied_warning_before_codegen() {
     let analysis_session = Session::new(Config::default().with_latin_locale());
     let source = "functio septem() → numerus { redde 7 }";

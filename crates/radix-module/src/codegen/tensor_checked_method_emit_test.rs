@@ -100,7 +100,7 @@ fn go_tensor_method_forms_use_the_checked_carrier_call() {
         // emits the compact composite literal — pinned by radix-hir-go
         // `bounded_list_test`) passes the plain `[]int{0, 1}` instead of the
         // reserve-cells accumulator closure.
-        code.contains("v, err := p_grid.AccipeChecked([]int{0, 1}); if err != nil { panic(err) }"),
+        code.contains("v, err := p_grid.AccipeChecked([]int{0, 1}); if err != nil { panic(err) }; return v"),
         "an in-range literal call is a plain value:\n{code}"
     );
     assert!(

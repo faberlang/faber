@@ -2,15 +2,22 @@
 locale = "en"
 +++
 
-# u6 — degenerate solve: no error flow at all, the trap hole solves to one
-# member and the existing WARN017 fires (no T ≡ E collapse: nothing
-# collapsed).
+# u6 — empty error channel: nothing inside can fail, so the `T` slot types
+# as the uninhabited `never` and WARN036 (`trap_error_channel_empty`) fires
+# instead of an inference error.
 
 fn infallible() → int {
     return 42
 }
 
 main {
-    let ∪ r ← trap { infallible() }
-    print r
+    let _ r ← trap { infallible() }
+    match r {
+        case returned let value {
+            print value
+        }
+        case thrown let error {
+            print "unreachable"
+        }
+    }
 }

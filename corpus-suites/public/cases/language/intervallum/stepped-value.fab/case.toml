@@ -10,9 +10,3 @@ domain = "collections"
 [expect]
 stdout = "stdout.expected"
 check_only = false
-
-[targets.roundtrip]
-outcome = "known-fail"
-phase = "emit"
-diagnostic_contains = "canonical Faber output failed re-validation: SEM010"
-known_fail_why = "The canonical reformatter drops the step from both the declared type and the interval initializer, so the re-emitted source no longer checks."

@@ -1,0 +1,24 @@
+# Small route smoke for the simulation's device decision kernels. Its checksum
+# is exact and remains the same on the reference and CPU device routes.
+@ kernel
+@ public
+fn scale_into(tf32[4] input, f32 factor, mut tf32[4] output) → void {
+    output ⇇ input * factor
+}
+
+fn checksum(tf32[4] values) → f32 {
+    let f32 zero ← 0.0
+    mut f32 total ← 0.0
+    for range 0‥4 let i {
+        total ← total + (values[[i]] coalesce zero) * ((i + 1) ↦ f32)
+    }
+    return total
+}
+
+main {
+    let list<f32> data ← [1.0, 2.0, 4.0, 8.0]
+    let tf32[4] input ← data ↦ tf32[4]
+    mut tf32[4] output ← tf32[4] {}
+    scale_into(input, 2.0, mut output)
+    print checksum(output)
+}

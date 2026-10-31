@@ -1,0 +1,233 @@
+# Drone mission step 3: the device kernel. One lane flies one scenario, both
+# whole missions (the nominal flight, then the motor-out flight), and judges the
+# rules, with a data-dependent `while` per lane and the mission errors as int
+# codes. Port of reference/drone.py `fly` and `evaluate`, expression for
+# expression (the association order is the contract, see README.md), in f32:
+# f64 is a refused kernel value (SEM008 nucleum_f64, GAPS.md).
+#
+# Tables, as tensors:
+#   prm  [A, 16]  one row per aircraft: 0 n_rotors, 1 lost_on_motor_out, 2 fm, 3 k_prof,
+#                 4 v_tip, 5 tmax_ref, 6 cda, 7 eta, 8 p_avionics, 9 ns, 10 area (derived),
+#                 11 base_kg (derived), 12 r_pack (derived), 13 cap_ah (derived),
+#                 14 v_ref (derived), 15 i_limit (derived)
+#   ph   [10, 8]  the phase table: 0 carry, 1 ground (0 or 1), 2 quantity (the cruise
+#                 and return rows are replaced by the lane's distance), 3 rate,
+#                 4 ground speed, 5 climb rate, 6 headwind
+#   ocv_soc, ocv_volts [8]  the per-cell open-circuit-voltage curve
+#   env  [8]      0 site_alt, 1 temp_c, 2 start_soc, 3 dt_s, 4 fail_t, 5 rule tw_takeoff,
+#                 6 rule reserve_soc, 7 rule margin_fail
+#
+# Error codes (per flight): 0 ok, 1 pack_collapse, 2 pack_empty, 3 vortex_ring,
+# 4 step_limit. A flight that errs stops; its statistics are not meaningful.
+@ kernel
+@ public
+fn fly_scenarios<size N, size A>(
+    tensor<f32, [N]> payload,
+    tensor<f32, [N]> dist,
+    tensor<i32, [N]> ac,
+    tensor<f32, [A, 16]> prm,
+    tensor<f32, [10, 8]> ph,
+    tensor<f32, [8]> ocv_soc,
+    tensor<f32, [8]> ocv_volts,
+    tensor<f32, [8]> env,
+    mut tensor<i32, [N]> out_ok,
+    mut tensor<i32, [N]> out_err_nom,
+    mut tensor<i32, [N]> out_err_fail,
+    mut tensor<f32, [N]> out_takeoff,
+    mut tensor<f32, [N]> out_max_cur,
+    mut tensor<f32, [N]> out_final_soc,
+    mut tensor<f32, [N]> out_min_fail
+) → void {
+    for from payload at [i] thread lane let pay {
+        # The aircraft index is bounded before it addresses prm (the integer envelope);
+        # an index past the table still faults on the bounds guard.
+        mut i32 a ← ac[[i]]
+        if a ≺ 0 then a ← 0
+        if a ≻ 1000 then a ← 1000
+        let f32 d ← dist[[i]]
+        let f32 n_rotors ← prm[[a, 0]]
+        let f32 lost ← prm[[a, 1]]
+        let f32 fm ← prm[[a, 2]]
+        let f32 k_prof ← prm[[a, 3]]
+        let f32 v_tip ← prm[[a, 4]]
+        let f32 tmax_ref ← prm[[a, 5]]
+        let f32 cda ← prm[[a, 6]]
+        let f32 eta ← prm[[a, 7]]
+        let f32 p_av ← prm[[a, 8]]
+        let f32 ns ← prm[[a, 9]]
+        let f32 area ← prm[[a, 10]]
+        let f32 base_kg ← prm[[a, 11]]
+        let f32 r_pack ← prm[[a, 12]]
+        let f32 cap_ah ← prm[[a, 13]]
+        let f32 v_ref ← prm[[a, 14]]
+        let f32 i_limit ← prm[[a, 15]]
+        let f32 site_alt ← env[[0]]
+        let f32 temp_c ← env[[1]]
+        let f32 dts ← env[[3]]
+        let f32 fail_t ← env[[4]]
+
+        mut bool n_ok ← false
+        mut bool f_ok ← false
+        mut f32 s_take ← 0.0
+        mut f32 s_cur ← 0.0
+        mut f32 s_soc ← 0.0
+        mut f32 s_minf ← ∞
+
+        for range 0‥2 let flight {
+            mut f32 soc ← env[[2]]
+            mut f32 t ← 0.0
+            mut f32 alt ← 0.0
+            mut i32 p ← 0
+            mut f32 q ← ph[[0, 2]]
+            mut i32 err ← 0
+            mut i32 steps ← 0
+            mut f32 take ← 0.0
+            mut f32 minf ← ∞
+            mut f32 curmax ← 0.0
+
+            while p ≺ 10 and err ≡ 0 {
+                steps ← steps + 1
+                if steps ≻ 20000 {
+                    err ← 4
+                }
+                else {
+                    let f32 carry ← ph[[p, 0]]
+                    let f32 ground ← ph[[p, 1]]
+                    let f32 rate ← ph[[p, 3]]
+                    let f32 vg ← ph[[p, 4]]
+                    let f32 vc ← ph[[p, 5]]
+                    let f32 wind ← ph[[p, 6]]
+                    let bool final ← q ≤ rate * dts
+                    mut f32 dt ← dts
+                    if final then dt ← q / rate
+                    let f32 mass ← base_kg + pay * carry
+
+                    # Open-circuit voltage: first segment with soc <= s1 (clamped to 0..1).
+                    mut f32 sc ← soc
+                    if sc ≺ 0.0 then sc ← 0.0
+                    if sc ≻ 1.0 then sc ← 1.0
+                    mut f32 cell ← ocv_volts[[7]]
+                    mut i32 k ← 0
+                    mut i32 seek ← 1
+                    while k ≺ 7 and seek ≡ 1 {
+                        let f32 s0 ← ocv_soc[[k]]
+                        let f32 s1 ← ocv_soc[[k + 1]]
+                        let f32 v0 ← ocv_volts[[k]]
+                        let f32 v1 ← ocv_volts[[k + 1]]
+                        if sc ≤ s1 {
+                            cell ← v0 + (v1 - v0) * ((sc - s0) / (s1 - s0))
+                            seek ← 0
+                        }
+                        k ← k + 1
+                    }
+                    let f32 voc ← ns * cell
+                    let bool failed ← flight ≡ 1 and t ≥ fail_t
+
+                    # Air density at the step-start altitude.
+                    let f32 h_abs ← site_alt + alt
+                    let f32 x ← 1.0 - (0.0065 * h_abs) / 288.15
+                    let f32 x2 ← x * x
+                    let f32 x4 ← x2 * x2
+                    let f32 pr ← 101325.0 * (x4 * x * x.sqrt().sqrt())
+                    let f32 tk ← (temp_c + 273.15) - 0.0065 * (h_abs - site_alt)
+                    let f32 rho ← pr / (287.05 * tk)
+
+                    mut f32 n_act ← n_rotors
+                    if failed then n_act ← n_rotors - lost
+                    mut f32 weight ← 0.0
+                    mut f32 p_elec ← p_av
+                    if ground ≺ 0.5 {
+                        weight ← mass * 9.80665
+                        let f32 v_air ← vg + wind
+                        let f32 drag ← (0.5 * rho * cda) * (v_air * v_air)
+                        let f32 thrust ← (weight * weight + drag * drag).sqrt()
+                        let f32 t_r ← thrust / n_act
+                        let f32 vh ← (t_r / ((2.0 * rho) * area)).sqrt()
+                        mut f32 vi ← vh
+                        for range 0‥48 let g {
+                            let f32 f ← (vh * vh) / (v_air * v_air + (vc + vi) * (vc + vi)).sqrt()
+                            vi ← 0.5 * (vi + f)
+                        }
+                        if vc + vi ≤ 0.0 {
+                            err ← 3
+                        }
+                        else {
+                            let f32 mu ← v_air / v_tip
+                            let f32 p_ind ← n_act * ((t_r * (vc + vi)) / fm)
+                            let f32 p_prof ← n_act * (k_prof * rho * area * (v_tip * v_tip * v_tip) * (1.0 + 4.65 * (mu * mu)))
+                            let f32 p_par ← drag * v_air
+                            p_elec ← (p_ind + p_prof + p_par) / eta + p_av
+                        }
+                    }
+                    if err ≡ 0 {
+                        let f32 disc ← voc * voc - 4.0 * r_pack * p_elec
+                        if disc ≺ 0.0 {
+                            err ← 1
+                        }
+                        else {
+                            let f32 cur ← (voc - disc.sqrt()) / (2.0 * r_pack)
+                            let f32 vterm ← voc - cur * r_pack
+                            if ground ≺ 0.5 {
+                                let f32 kv ← vterm / v_ref
+                                let f32 tmax ← tmax_ref * (kv * kv) * (rho / 1.225)
+                                let f32 margin ← (n_act * tmax) / weight
+                                if steps ≡ 1 then take ← margin
+                                if failed and margin ≺ minf then minf ← margin
+                            }
+                            if cur ≻ curmax then curmax ← cur
+                            let f32 soc_n ← soc - (cur * dt) / (3600.0 * cap_ah)
+                            if soc_n ≤ 0.0 {
+                                err ← 2
+                            }
+                            else {
+                                soc ← soc_n
+                                t ← t + dt
+                                alt ← alt + vc * dt
+                                if final {
+                                    p ← p + 1
+                                    if p ≺ 10 {
+                                        q ← ph[[p, 2]]
+                                        if p ≡ 2 or p ≡ 7 then q ← d
+                                    }
+                                }
+                                else {
+                                    q ← q - rate * dt
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            # The loop-carried code is rebuilt from constants before it is stored: a store
+            # of the carried variable itself is a nucleum_trapping_store (GAPS.md).
+            mut i32 code ← 0
+            if err ≡ 1 then code ← 1
+            if err ≡ 2 then code ← 2
+            if err ≡ 3 then code ← 3
+            if err ≡ 4 then code ← 4
+            if flight ≡ 0 {
+                n_ok ← err ≡ 0
+                out_err_nom[[i]] ← code
+                s_take ← take
+                s_cur ← curmax
+                s_soc ← soc
+            }
+            else {
+                f_ok ← err ≡ 0
+                out_err_fail[[i]] ← code
+                s_minf ← minf
+            }
+        }
+
+        # The rules, as drone.evaluate: a failed flight fails the scenario.
+        mut i32 ok ← 0
+        if n_ok and f_ok and s_take ≥ env[[5]] and s_cur ≤ i_limit and s_soc ≥ env[[6]] and s_minf ≥ env[[7]] {
+            ok ← 1
+        }
+        out_ok[[i]] ← ok
+        out_takeoff[[i]] ← s_take
+        out_max_cur[[i]] ← s_cur
+        out_final_soc[[i]] ← s_soc
+        out_min_fail[[i]] ← s_minf
+    }
+}

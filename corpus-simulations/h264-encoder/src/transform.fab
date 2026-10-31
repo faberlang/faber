@@ -1,0 +1,174 @@
++++
+locale = "en"
++++
+# H.264 8-bit 4x4 residual transform, default flat scaling lists.
+# Reconstruction follows ITU-T H.264 (08/2024) 8.5.12. Encoder rounding is
+# symmetric nearest; only inverse scaling/reconstruction is decoder normative.
+# The tables have six QP classes, each in even/even, mixed, odd/odd order.
+const list<int> ZIGZAG4 = [0, 1, 4, 8, 5, 2, 3, 6, 9, 12, 13, 10, 7, 11, 14, 15]
+
+const list<int> DEQUANT = [10, 13, 16, 11, 14, 18, 13, 16, 20, 14, 18, 23, 16, 20, 25, 18, 23, 29]
+
+const list<int> QUANT = [13107, 8066, 5243, 11916, 7490, 4660, 10082, 6554, 4194, 9362, 5825, 3647, 8192, 5243, 3355, 7282, 4559, 2893]
+
+fn zeros(int n) → list<int> {
+    mut list<int> out ← empty
+    for range 0 ‥ n let i {
+        out.append(0)
+    }
+    return out
+}
+
+fn position_class(int i) → int {
+    return i % 2 + i / 4 % 2
+}
+
+@ public
+fn clamp_byte(int x) → int {
+    return x.maximum(0).minimum(255)
+}
+
+@ public
+fn forward4(list<int> src) → list<int> {
+    assert src.length() ≡ 16
+    mut list<int> t ← zeros(16)
+    mut list<int> out ← zeros(16)
+    for range 0 ‥ 4 let r {
+        let int i ← r * 4
+        let int s0 ← src[i] + src[i + 3]
+        let int s1 ← src[i + 1] + src[i + 2]
+        let int s2 ← src[i + 1] - src[i + 2]
+        let int s3 ← src[i] - src[i + 3]
+        t[i] ← s0 + s1
+        t[i + 1] ← 2 * s3 + s2
+        t[i + 2] ← s0 - s1
+        t[i + 3] ← s3 - 2 * s2
+    }
+    for range 0 ‥ 4 let c {
+        let int s0 ← t[c] + t[12 + c]
+        let int s1 ← t[4 + c] + t[8 + c]
+        let int s2 ← t[4 + c] - t[8 + c]
+        let int s3 ← t[c] - t[12 + c]
+        out[c] ← s0 + s1
+        out[4 + c] ← 2 * s3 + s2
+        out[8 + c] ← s0 - s1
+        out[12 + c] ← s3 - 2 * s2
+    }
+    return out
+}
+
+@ public
+fn inverse4(list<int> coeff) → list<int> {
+    assert coeff.length() ≡ 16
+    mut list<int> t ← zeros(16)
+    mut list<int> out ← zeros(16)
+    for range 0 ‥ 4 let r {
+        let int i ← r * 4
+        let int s0 ← coeff[i] + coeff[i + 2]
+        let int s1 ← coeff[i] - coeff[i + 2]
+        let int s2 ← (coeff[i + 1] ⇒ 1) - coeff[i + 3]
+        let int s3 ← coeff[i + 1] + (coeff[i + 3] ⇒ 1)
+        t[i] ← s0 + s3
+        t[i + 1] ← s1 + s2
+        t[i + 2] ← s1 - s2
+        t[i + 3] ← s0 - s3
+    }
+    for range 0 ‥ 4 let c {
+        let int s0 ← t[c] + t[8 + c]
+        let int s1 ← t[c] - t[8 + c]
+        let int s2 ← (t[4 + c] ⇒ 1) - t[12 + c]
+        let int s3 ← t[4 + c] + (t[12 + c] ⇒ 1)
+        out[c] ← s0 + s3 + 32 ⇒ 6
+        out[4 + c] ← s1 + s2 + 32 ⇒ 6
+        out[8 + c] ← s1 - s2 + 32 ⇒ 6
+        out[12 + c] ← s0 - s3 + 32 ⇒ 6
+    }
+    return out
+}
+
+@ public
+fn quantize4(list<int> coeff, int qp) → list<int> {
+    assert coeff.length() ≡ 16
+    assert qp ≥ 0 and qp ≤ 51
+    let int shift ← 15 + qp / 6
+    let int rounding ← 1 ⇐ shift - 1
+    mut list<int> out ← empty
+    for range 0 ‥ 16 let i {
+        let int x ← coeff[i]
+        let int magnitude ← x ≺ 0 ✓ 0 - x ✗ x
+        let int scale ← QUANT[qp % 6 * 3 + position_class(i)]
+        let int q ← magnitude * scale + rounding ⇒ shift
+        out.append(x ≺ 0 ✓ 0 - q ✗ q)
+    }
+    return out
+}
+
+@ public
+fn dequantize4(list<int> coeff, int qp) → list<int> {
+    assert coeff.length() ≡ 16
+    assert qp ≥ 0 and qp ≤ 51
+    mut list<int> out ← empty
+    for range 0 ‥ 16 let i {
+        let int scale ← DEQUANT[qp % 6 * 3 + position_class(i)]
+        out.append(coeff[i] * scale ⇐ qp / 6)
+    }
+    return out
+}
+
+@ public
+fn zigzag4(list<int> block) → list<int> {
+    assert block.length() ≡ 16
+    mut list<int> out ← empty
+    for from ZIGZAG4 let i {
+        out.append(block[i])
+    }
+    return out
+}
+
+# 4:2:0 chroma QP mapping, H.264 8.5.8. chroma_qp_index_offset is zero.
+const list<int> CHROMA_QP = [29, 30, 31, 32, 32, 33, 34, 34, 35, 35, 36, 36, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39]
+
+@ public
+fn chroma_qp(int qp) → int {
+    assert qp ≥ 0 and qp ≤ 51
+    return qp ≺ 30 ✓ qp ✗ CHROMA_QP[qp - 30]
+}
+
+fn hadamard2(list<int> values) → list<int> {
+    assert values.length() ≡ 4
+    let int a ← values[0] + values[1]
+    let int b ← values[0] - values[1]
+    let int c ← values[2] + values[3]
+    let int d ← values[2] - values[3]
+    return [a + c, b + d, a - c, b - d]
+}
+
+# Each input is the sum of sixteen untransformed residual samples in one
+# chroma 4x4 block. Only DC is retained by this restricted chroma variant.
+@ public
+fn chroma_dc_quant(list<int> sums, int qp) → list<int> {
+    let int q ← chroma_qp(qp)
+    let int shift ← 16 + q / 6
+    let int rounding ← 1 ⇐ shift - 1
+    let list<int> dc ← hadamard2(sums)
+    mut list<int> out ← empty
+    for from dc let value {
+        let int magnitude ← value ≺ 0 ✓ 0 - value ✗ value
+        let int level ← magnitude * QUANT[q % 6 * 3] + rounding ⇒ shift
+        out.append(value ≺ 0 ✓ 0 - level ✗ level)
+    }
+    return out
+}
+
+# Return the reconstructed DC coefficient for each 4x4, before inverse4.
+# A DC-only block contributes (dc + 32) >> 6 to each prediction sample.
+@ public
+fn chroma_dc_inverse(list<int> levels, int qp) → list<int> {
+    let int q ← chroma_qp(qp)
+    let list<int> dc ← hadamard2(levels)
+    mut list<int> out ← empty
+    for from dc let value {
+        out.append(value * DEQUANT[q % 6 * 3] ⇐ q / 6 ⇒ 1)
+    }
+    return out
+}

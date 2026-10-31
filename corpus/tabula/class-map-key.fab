@@ -1,0 +1,26 @@
++++
+term = "tabula"
+kind = "keyword"
+grammar = ["program", "statement", "type_annotation", "owned_type", "base_type", "type_arguments", "expression", "typed_constructor", "call_expr", "member_suffix", "nota_stmt"]
+category = "map"
+canonical = false
+summary = "A genus key compares by its hashable field values on compiled targets."
+syntax = "map<Genus, V> and set<Genus>"
+related = ["tabula", "copia", "class"]
+locale = "en"
++++
+# Genus values are structural map keys and set elements.
+
+class Key { let string name }
+
+main {
+    mut map<Key, int> values ← empty
+    values.put(Key { name = "a" }, 1)
+
+    mut set<Key> keys ← empty
+    keys.add(Key { name = "a" })
+
+    if keys.has(Key { name = "a" }) {
+        print values.get(Key { name = "a" })
+    }
+}

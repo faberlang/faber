@@ -1,0 +1,109 @@
+# Drone mission: invented aircraft, mission and rule data.
+#
+# Port of reference/scenarios.py, value for value. Faber has no native file I/O
+# today, so the data is embedded here. n_rotors, lost_on_motor_out, ns and np are
+# whole numbers held as float, because every use is a float operation and the
+# reference converts them exactly at each use.
+
+@ public
+class Aircraft {
+    let string name
+    let float n_rotors
+    let float lost_on_motor_out
+    let float rotor_radius_m
+    let float fm
+    let float k_prof
+    let float v_tip_mps
+    let float tmax_ref_n
+    let float cda_m2
+    let float eta
+    let float p_avionics_w
+    let float airframe_kg
+    let float pack_kg
+    let float ns
+    let float np
+    let float cell_ah
+    let float r_cell_ohm
+    let float c_cont
+}
+
+@ public
+class Mission {
+    let float site_alt_m
+    let float temp_c
+    let float cruise_alt_m
+    let float land_alt_m
+    let float climb_rate_mps
+    let float descent_rate_mps
+    let float land_rate_mps
+    let float hover_s
+    let float drop_s
+    let float speed_out_mps
+    let float speed_ret_mps
+    let float headwind_mps
+    let float start_soc
+    let float dt_s
+}
+
+@ public
+const list<float> OCV_SOC = [0.0, 0.05, 0.10, 0.20, 0.50, 0.80, 0.95, 1.0]
+@ public
+const list<float> OCV_VOLTS = [3.30, 3.55, 3.65, 3.72, 3.85, 4.00, 4.12, 4.20]
+@ public
+const float V_NOMINAL_CELL = 3.7
+
+@ public
+const float RULE_TW_TAKEOFF = 2.0
+@ public
+const float RULE_RESERVE_SOC = 0.20
+@ public
+const float RULE_MARGIN_FAIL = 1.3
+@ public
+const float FAIL_T_S = 25.0
+
+@ public
+const float PAYLOAD_CAP_KG = 16.0
+@ public
+const float PAYLOAD_RES_KG = 0.5
+@ public
+const float RANGE_CAP_M = 6400.0
+@ public
+const float RANGE_RES_M = 50.0
+
+@ public
+fn quad() → Aircraft {
+    return Aircraft {
+        name = "quad", n_rotors = 4.0, lost_on_motor_out = 2.0,
+        rotor_radius_m = 0.35, fm = 0.70,
+        k_prof = 1.2e-4, v_tip_mps = 110.0,
+        tmax_ref_n = 80.0,
+        cda_m2 = 0.05, eta = 0.85, p_avionics_w = 45.0,
+        airframe_kg = 6.2, pack_kg = 1.0,
+        ns = 12.0, np = 1.0, cell_ah = 3.2, r_cell_ohm = 0.005, c_cont = 15.0
+    }
+}
+
+@ public
+fn octo() → Aircraft {
+    return Aircraft {
+        name = "octo", n_rotors = 8.0, lost_on_motor_out = 2.0,
+        rotor_radius_m = 0.28, fm = 0.68,
+        k_prof = 1.3e-4, v_tip_mps = 120.0,
+        tmax_ref_n = 42.0,
+        cda_m2 = 0.08, eta = 0.85, p_avionics_w = 60.0,
+        airframe_kg = 8.5, pack_kg = 1.9,
+        ns = 12.0, np = 2.0, cell_ah = 3.2, r_cell_ohm = 0.005, c_cont = 15.0
+    }
+}
+
+@ public
+fn delivery() → Mission {
+    return Mission {
+        site_alt_m = 300.0, temp_c = 20.0,
+        cruise_alt_m = 30.0, land_alt_m = 3.0,
+        climb_rate_mps = 3.0, descent_rate_mps = 2.0, land_rate_mps = 0.5,
+        hover_s = 10.0, drop_s = 10.0,
+        speed_out_mps = 12.0, speed_ret_mps = 15.0, headwind_mps = 4.0,
+        start_soc = 1.0, dt_s = 1.0
+    }
+}

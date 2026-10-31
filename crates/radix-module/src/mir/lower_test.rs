@@ -2869,14 +2869,19 @@ main {
 #[test]
 fn lowers_trap_failable_call_to_try_call_carrier_wrap_never_return_error() {
     // UT: `capta` lowers the failable call through the existing try_call
-    // whose error block wraps the payload into the trap carrier (the
-    // union-typed destination) and joins. The trapped error must never
-    // reach return_error inside the trapping function (the callee's own
-    // return_error is its channel, not an escape).
+    // whose error block wraps the payload into the tagged `thrown` variant
+    // and joins. The trapped error must never reach return_error inside the
+    // trapping function (the callee's own return_error is its channel, not an escape).
     let dump = dump_source(
         r#"
 functio fail() → numerus ⇥ textus { iace "bad" }
-functio safe() → vacuum { sit ∪ r ← capta { fail() } nota r }
+functio safe() → vacuum {
+    sit _ r ← capta { fail() }
+    discerne r {
+        casu returned sit value { nota value }
+        casu thrown sit error { nota error }
+    }
+}
 "#,
     );
 
@@ -2901,12 +2906,16 @@ functio safe() → vacuum { sit ∪ r ← capta { fail() } nota r }
 }
 
 #[test]
-fn lowers_trap_iace_to_carrier_wrap() {
-    // An explicit `iace` inside the trap body wraps into the same carrier
-    // instead of propagating.
-    let dump = dump_source(r#"functio safe() → vacuum { sit ∪ r ← capta { iace "bad" } nota r }"#);
+fn lowers_trap_iace_to_tagged_carrier_wrap() {
+    // An explicit `iace` inside the trap body wraps into the `thrown` variant
+    // instead of propagating; its no-normal-return path still lowers cleanly.
+    let dump = dump_source(r#"functio safe() → vacuum { sit _ r ← capta { iace "bad" } nota r }"#);
 
     assert!(dump.contains("goto bb"), "trap lowering produced control flow: {dump}");
+    assert!(
+        dump.contains("construct variant def#"),
+        "the captured iace must construct a tagged variant: {dump}"
+    );
     assert!(
         !dump.contains("return_error"),
         "a trapped iace never reaches return_error: {dump}"
@@ -2914,42 +2923,48 @@ fn lowers_trap_iace_to_carrier_wrap() {
 }
 
 #[test]
-fn lowers_trap_type_narrowed_member_projection() {
-    // A trap stores each successful/error payload in the union-typed local.
-    // After `adfirma` narrows the immutable local, projection lowering must
-    // materialize a member-typed temp before adding the field projection.
+fn lowers_trap_thrown_variant_payload_projection() {
+    // `thrown` binds the error slot of `trapped<R, T>` directly. A payload
+    // projection inside that arm must use the applied error type.
     let dump = dump_source(
         r#"
         genus Errata { varia textus message }
         functio fail() → numerus ⇥ Errata { iace Errata { message = "bad" } }
-        functio inspect() → textus {
-            sit numerus ∪ Errata r ← capta { fail() }
-            adfirma r est Errata
-            redde r.message
+        functio inspect() → vacuum {
+            sit _ r ← capta { fail() }
+            discerne r {
+                casu thrown sit error { nota error.message }
+                casu returned sit value { nota "success" }
+            }
         }
         "#,
     );
-    assert!(dump.contains("return "), "narrowed projection should lower: {dump}");
+    assert!(
+        dump.contains("_1 = _0.def#") && dump.contains("runtime diagnostic nota(_1."),
+        "the thrown payload field projection should lower: {dump}"
+    );
 }
 
 #[test]
-fn runs_trap_type_narrowed_collection_member_projection() {
+fn runs_trap_returned_variant_collection_payload_projection() {
     let source = r"
         functio make() → lista<numerus> { redde [1, 2] }
         incipit {
-            sit numerus ∪ lista<numerus> r ← capta { make() }
-            adfirma r est lista<numerus>
-            nota r.longitudo()
+            sit _ r ← capta { make() }
+            discerne r {
+                casu returned sit values { nota values.longitudo() }
+                casu thrown sit error { nota -1 }
+            }
         }
         ";
     let mut host = crate::mir::BufferHost::default();
     crate::mir::run_source(
         &Session::new(la_config().with_target(Target::HirTypeScript)),
-        "trap-narrowed-list.fab",
+        "trap-returned-list.fab",
         source,
         &mut host,
     )
-    .expect("narrowed trap member projection should run");
+    .expect("tagged trap payload projection should run");
     assert_eq!(host.stdout_lines, ["2"]);
 }
 
@@ -2963,8 +2978,11 @@ fn lowers_trap_inside_fac_routes_to_innermost_boundary() {
 functio fail() → numerus ⇥ textus { iace "bad" }
 functio safe() → vacuum {
     fac {
-        sit ∪ r ← capta { fail() }
-        nota r
+        sit _ r ← capta { fail() }
+        discerne r {
+            casu returned sit value { nota value }
+            casu thrown sit error { nota error }
+        }
     } cape err {
         nota err
     }

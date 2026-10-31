@@ -1,0 +1,67 @@
+# Drone mission acceptance workload: host port of reference/drone.py.
+#
+#   faber run corpus-simulations/drone-mission
+#
+# Prints three sections, each opened by a marker line, so one run feeds all
+# three comparisons (compare.py splits them; no arguments or process leaf, so
+# every host target can run it):
+#
+#   == trace      the per-step CSV of the fixed scenario (reference/golden/trace.csv)
+#   == summary    max_payload at 1, 2 and 3 km and max_range at 1, 2 and 3 kg for
+#                 both aircraft (reference/golden/summary.csv)
+#   == rules      the rule table of the fixed scenario (drone.py rules)
+
+import from "./data" data
+import from "./model" model
+
+const float TRACE_PAYLOAD_KG = 2.0
+const float TRACE_DISTANCE_M = 2000.0
+const list<float> SUMMARY_DISTANCES_M = [1000.0, 2000.0, 3000.0]
+const list<float> SUMMARY_PAYLOADS_KG = [1.0, 2.0, 3.0]
+
+fn trace() {
+    do {
+        let model.Stats st ← model.fly(data.quad(), data.delivery(), TRACE_PAYLOAD_KG, TRACE_DISTANCE_M, data.FAIL_T_S, true)
+        print model.CSV_HEAD
+        for from st.rows let row {
+            print row
+        }
+    }
+    catch err {
+        panic "trace failed: §"(err)
+    }
+}
+
+# Summarize each aircraft's payload and range searches.
+fn summarize(data.Aircraft ac, data.Mission m) {
+    for from SUMMARY_DISTANCES_M let dist {
+        print "max_payload," + ac.name + ",," + model.num(dist) + "," + model.fmt(model.max_payload(ac, m, dist))
+    }
+    for from SUMMARY_PAYLOADS_KG let pl {
+        print "max_range," + ac.name + "," + model.num(pl) + ",," + model.fmt(model.max_range(ac, m, pl))
+    }
+}
+
+fn summary() {
+    let data.Mission m ← data.delivery()
+    let list<data.Aircraft> aircraft ← [data.quad(), data.octo()]
+    print "search,aircraft,payload_kg,distance_m,result"
+    for from aircraft let ac {
+        summarize(ac, m)
+    }
+}
+
+fn rules() {
+    for from model.evaluate(data.quad(), data.delivery(), TRACE_PAYLOAD_KG, TRACE_DISTANCE_M) let rule {
+        print rule.line()
+    }
+}
+
+main {
+    print "== trace"
+    trace()
+    print "== summary"
+    summary()
+    print "== rules"
+    rules()
+}

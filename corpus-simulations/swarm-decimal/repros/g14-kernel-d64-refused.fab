@@ -1,0 +1,28 @@
+# G14: any `d64` in an `@ kernel` is refused at check time, so the swarm decision
+# step cannot be a device kernel with its numbers as `d64`.
+#
+#   faber check repros/g14-kernel-d64-refused.fab
+#   -> error[SEM008:nucleum_d64] at the signature, the loop binder, the let and the store
+#      (the same refusal on `reference`, `cpu` and `metal`: it is a check error, not a
+#      device error)
+#
+# The same lane body over `f32` or `i64` checks. A scalar-only kernel (no tensor) is
+# refused too; the tensor form below is what the swarm needs.
+@ kernel
+@ public
+fn step(tensor<d64, [4]> x, mut tensor<d64, [4]> y) → void {
+    for from x at [i] thread lane let v {
+        let d64 w ← v * v + 1.5
+        y[[i]] ← w
+    }
+}
+
+main {
+    let list<d64> data ← [1.0, 2.0, 3.5, -0.25]
+    let tensor<d64, [4]> x ← data ↦ tensor<d64, [4]>
+    mut tensor<d64, [4]> y ← data ↦ tensor<d64, [4]>
+    do all {
+        step(x, mut y)
+    }
+    print y
+}
