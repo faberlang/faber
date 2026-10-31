@@ -739,7 +739,10 @@ mod sibling_generic_device_entry_tests;
 #[path = "generic_device_link_test.rs"]
 mod generic_device_link_tests;
 
-#[cfg(test)]
+// The primal/companion instantiation this probe asserts is produced by the
+// AIR backward bundle, so like `air_backward` the probe exists only with the
+// device lane (the public cut has no companion to reach).
+#[cfg(all(test, feature = "device"))]
 #[path = "generic_kernel_backward_test.rs"]
 mod generic_kernel_backward_tests;
 

@@ -4295,6 +4295,10 @@ fn unresolved_norma_import_is_unknown_library_module_before_emit() {
     }
 }
 
+// The positive probe compiles for `HirGo`, so like every emit-side probe in
+// this file it compiles out of builds without the go leaf (the public cut);
+// the negative probe above runs everywhere.
+#[cfg(feature = "hir-go")]
 #[test]
 fn resolvable_norma_import_is_not_unknown_library_module() {
     let (_td, home) = temp_dir("known-norma-module");
@@ -4440,6 +4444,10 @@ fn program_compile_fails_closed_on_malformed_root_pack() {
     assert_locale003_error(&result, "load_failed", "malformed root pack");
 }
 
+// The compile target is `HirRust` (the file's shared `compile*` helpers), so
+// like every emit-side probe here this one compiles out of builds without the
+// rust leaf (the public cut).
+#[cfg(feature = "hir-rust")]
 #[test]
 fn program_compile_still_honours_a_resolvable_frontmatter_locale() {
     // Declaration-over-session precedence: the loadable `la` declaration
@@ -4455,6 +4463,9 @@ fn program_compile_still_honours_a_resolvable_frontmatter_locale() {
     assert!(result.output.is_some(), "a loadable declared locale must emit output");
 }
 
+// The compile emits (the control asserts `output.is_some()`), so it needs a
+// target leaf: gated like its neighbours.
+#[cfg(feature = "hir-rust")]
 #[test]
 fn program_compile_explicit_session_pack_overrides_frontmatter_declaration() {
     // Control for driver policy: an explicitly resolved session pack (CLI

@@ -203,7 +203,9 @@ fn corpus_selection_tags_are_checked_against_the_table() {
 /// category selector selects exactly the cases tagged with it.
 #[test]
 fn corpus_selection_every_domain_of_a_committed_suite_selects_the_suite() {
-    for name in ["full", "public"] {
+    // The `full` suite is a private-tree fixture (it pins every target,
+    // device lanes included), so its leg compiles out of the public cut.
+    fn every_domain_selects_the_suite(name: &str) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../corpus-suites")
             .join(name);
@@ -221,4 +223,7 @@ fn corpus_selection_every_domain_of_a_committed_suite_selects_the_suite() {
         let picked: BTreeSet<String> = picked.iter().map(|case| case.id.clone()).collect();
         assert_eq!(picked, all, "suite {name}");
     }
+    every_domain_selects_the_suite("public");
+    #[cfg(feature = "device")]
+    every_domain_selects_the_suite("full");
 }

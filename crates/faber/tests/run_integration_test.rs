@@ -3055,6 +3055,7 @@ main {
 /// with an admitted device (Metal) runs the kernel and must print exactly the
 /// CPU device's result; a host without one refuses with exit 1 and prints no
 /// result. It never prints a different result.
+#[cfg(feature = "device-runtime")]
 fn assert_default_route_matches_cpu_or_refuses(stdout: &str, stderr: &str, code: Option<i32>) {
     match code {
         Some(0) => {
@@ -3075,6 +3076,7 @@ fn assert_default_route_matches_cpu_or_refuses(stdout: &str, stderr: &str, code:
     }
 }
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_kernel_file_default_route_matches_reference_or_refuses_and_runs_on_the_reference_route() {
     let file = write_single_file("run-kernel-cpu-device", KERNEL_SOURCE);
@@ -3097,6 +3099,7 @@ fn run_kernel_file_default_route_matches_reference_or_refuses_and_runs_on_the_re
     assert_eq!(stdout, "2.0\n");
 }
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_kernel_package_default_route_and_reference_route_by_flag_manifest_and_with_stats() {
     let package = write_basic_package("run-kernel-package-cpu-device", KERNEL_SOURCE);
@@ -3151,6 +3154,7 @@ fn run_kernel_package_default_route_and_reference_route_by_flag_manifest_and_wit
 /// The CPU device line every device session reports on stderr.
 const CPU_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `cpu` on ";
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_stdout_contains_only_program_output() {
     let package = write_basic_package("run-cpu-device-stdout", KERNEL_SOURCE);
@@ -3171,6 +3175,7 @@ fn run_cpu_device_stdout_contains_only_program_output() {
 /// single-lane kernels run through the CPU device session on one worker and
 /// on eight, and each run's stdout is exactly the sequential reference output;
 /// device-selection status is reported separately on stderr.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_eight_workers() {
     let path = repo_root().join("acceptance/a2-flood-stencil");
@@ -3202,6 +3207,7 @@ fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_eight_workers() {
 /// logical CPU device spans N core sets that split the workers, and the A2
 /// flood stencil prints exactly what the reference route prints at one
 /// partition and at three; the spanned receipt names the partition count.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_three_partitions() {
     let path = repo_root().join("acceptance/a2-flood-stencil");
@@ -3465,6 +3471,7 @@ fn run_partitions_outside_the_cpu_device_fails_closed() {
 /// `--device cpu` runs whole-grid reductions (sum, max, argmax, argmin) as one
 /// sequential fold of the reduction node and prints what the reference route
 /// prints.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_grid_reductions_match_the_reference() {
     for (package, args) in [
@@ -3501,6 +3508,7 @@ fn cpu_proba_kernels_package() -> String {
 
 /// A copy of the CPU proba package whose `[device] threads` line is
 /// `threads_line`.
+#[cfg(feature = "device-runtime")]
 fn cpu_proba_kernels_copy(label: &str, threads_line: &str) -> TempDir {
     let source = repo_root().join("acceptance/cpu-proba-kernels");
     let package = temp_dir(label);
@@ -3521,6 +3529,7 @@ fn cpu_proba_kernels_copy(label: &str, threads_line: &str) -> TempDir {
 /// `[device] threads` (gpu-reset rule 16.9): the manifest count drives `faber
 /// run --device cpu`, the `--threads` flag wins over it, the result is what
 /// the reference route prints, and `--device reference` ignores the key.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_manifest_threads_run_and_match_the_reference() {
     let path = cpu_proba_kernels_package();
@@ -3551,6 +3560,7 @@ fn run_cpu_device_manifest_threads_run_and_match_the_reference() {
 
 /// An invalid `[device] threads` fails closed with a diagnostic naming the
 /// key, before any program output.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_invalid_manifest_threads_fail_closed() {
     for (label, line) in [
@@ -3596,6 +3606,7 @@ fn without_case_times(report: &str) -> String {
 /// and reports exactly what `--device reference` reports. The kernel is
 /// dispatched, never run on the MIR runner: the runner's statistics carry a
 /// `twice` row on the reference route and none on the device.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn test_cpu_device_runs_proba_kernels_and_matches_the_reference() {
     let path = cpu_proba_kernels_package();
@@ -3686,6 +3697,7 @@ fn assert_cpu_device_matches_reference(package: &str, args: &[&str]) {
 /// form, as one whole call of the kernel body. `a1-rungs` holds the assign
 /// form of a GEMV (`o ⇇ w · x` rebinds the `mut` parameter) beside a returned
 /// result and lane kernels; it prints what the reference prints.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_matmul_kernels_match_the_reference() {
     assert_cpu_device_matches_reference("acceptance/a1-rungs", &[]);
@@ -3698,6 +3710,7 @@ fn run_cpu_device_matmul_kernels_match_the_reference() {
 /// (faults run to the block exit and reach the handler once; mode 6 is the
 /// clean run); at [9, 6] the lower lanes throw a different site than the
 /// last row, so the delivered text names the first lane in launch order.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_caught_kernel_errors_match_the_reference() {
     for mode in ["1", "2"] {
@@ -3720,6 +3733,7 @@ fn error_lines(stderr: &str) -> Vec<&str> {
 /// An unhandled kernel fault ends the run once, with the stable code first and
 /// the faulting lane in the text; the wording after the code is only the
 /// rendered diagnostic. The one-lane kernel reads past its row at `1 0 0`.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_kernel_fault_prints_one_coded_error() {
     let path = repo_root()
@@ -3758,6 +3772,7 @@ fn run_cpu_device_kernel_fault_prints_one_coded_error() {
 /// handler does not see an index fault, the faults run to the block exit and
 /// the run ends once with the stable code, as `do all` does. The in-range run
 /// (`0 0 3`) completes cleanly.
+#[cfg(feature = "device-runtime")]
 #[test]
 fn run_cpu_device_region_fault_ends_the_run_once() {
     let path = repo_root()
@@ -4082,6 +4097,7 @@ fn assert_prints_reference_fixture(package: &str, route: &str, printed: &str) {
     }
 }
 
+#[cfg(feature = "device-runtime")]
 fn assert_reference_route_matches_reference_fixture(package: &str) {
     let path = repo_root()
         .join("corpus-product/tensor-fragment")
@@ -4156,16 +4172,19 @@ fn assert_cuda_route_matches_reference_fixture(package: &str) {
     assert_prints_reference_fixture(package, "cuda route", program);
 }
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn tiny_linear_device_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device");
 }
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn tiny_linear_device_relu_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device-relu");
 }
 
+#[cfg(feature = "device-runtime")]
 #[test]
 fn tiny_linear_device_two_matmul_reference_route_prints_the_reference_fixture() {
     assert_reference_route_matches_reference_fixture("tiny-linear-device-two-matmul");

@@ -88,8 +88,17 @@ fn success_and_warnings_alone_exit_zero() {
 fn source_with_error_diagnostics_exits_65_on_every_source_command() {
     let dir = tempfile::tempdir().expect("scratch");
     let bad = source(dir.path(), "bad.fab", BAD_SOURCE);
-    for args in [
+    let mut commands = vec![
         vec!["check", &bad],
+        vec!["run", &bad],
+        vec!["test", &bad],
+        vec!["format", &bad],
+        vec!["verify", &bad],
+    ];
+    // The rust-target legs need the private rust leaf: a build without it
+    // (the public cut) refuses them with PKG001 before reading the source.
+    #[cfg(feature = "hir-rust")]
+    commands.extend([
         vec!["emit", "--target", "rust", &bad],
         vec![
             "build",
@@ -97,12 +106,9 @@ fn source_with_error_diagnostics_exits_65_on_every_source_command() {
             dir.path().to_str().expect("utf8"),
             &bad,
         ],
-        vec!["run", &bad],
-        vec!["test", &bad],
-        vec!["format", &bad],
-        vec!["verify", &bad],
-    ] {
-        let (code, stderr) = faber(&args);
+    ]);
+    for args in &commands {
+        let (code, stderr) = faber(args);
         assert_eq!(code, Some(DATA_ERROR), "{args:?}:\n{stderr}");
     }
 }
@@ -205,19 +211,24 @@ fn missing_input_file_or_path_exits_66() {
     let missing = missing.to_str().expect("utf8");
     let missing_package = dir.path().join("no-such-package");
     let missing_package = missing_package.to_str().expect("utf8");
-    for args in [
+    let mut commands = vec![
         vec!["check", missing],
         vec!["check", missing_package],
         vec!["lex", missing],
         vec!["parse", missing],
         vec!["hir", missing],
-        vec!["emit", "-t", "rust", missing],
         vec!["run", missing],
         vec!["format", "--stdout", missing],
         vec!["convert", "--to", "la", "--stdout", missing],
         vec!["model", "inspect", missing],
-    ] {
-        let (code, stderr) = faber(&args);
+    ];
+    // The rust-target leg needs the private rust leaf: a build without it
+    // (the public cut) refuses `emit -t rust` with PKG001 before the missing
+    // input is ever read.
+    #[cfg(feature = "hir-rust")]
+    commands.push(vec!["emit", "-t", "rust", missing]);
+    for args in &commands {
+        let (code, stderr) = faber(args);
         assert_eq!(code, Some(NO_INPUT), "{args:?}:\n{stderr}");
     }
 }
@@ -264,19 +275,31 @@ fn write_failures_exit_73() {
     let good = source(dir.path(), "good.fab", GOOD);
     let blocker = source(dir.path(), "blocker", "not a directory");
     // A parent that is a file cannot become a directory.
-    let under_file = format!("{blocker}/out.rs");
-    // A directory cannot be written as a file.
-    let as_dir = dir.path().display().to_string();
-    for output in [&under_file, &as_dir] {
-        let (code, stderr) = faber(&["emit", "-t", "rust", "-o", output, &good]);
-        assert_eq!(code, Some(CANT_CREATE), "emit -o {output}:\n{stderr}");
+    // The rust- and ts-target legs need those private leaves: a build without
+    // them (the public cut) refuses with PKG001 before any output is written.
+    #[cfg(feature = "hir-rust")]
+    {
+        let under_file = format!("{blocker}/out.rs");
+        // A directory cannot be written as a file.
+        let as_dir = dir.path().display().to_string();
+        for output in [&under_file, &as_dir] {
+            let (code, stderr) = faber(&["emit", "-t", "rust", "-o", output, &good]);
+            assert_eq!(code, Some(CANT_CREATE), "emit -o {output}:\n{stderr}");
+        }
     }
-    let (code, stderr) = faber(&["build", "-t", "ts", "-o", &under_file, &good]);
-    assert_eq!(code, Some(CANT_CREATE), "build -o:\n{stderr}");
+    #[cfg(feature = "hir-ts")]
+    {
+        let under_file = format!("{blocker}/out.rs");
+        let (code, stderr) = faber(&["build", "-t", "ts", "-o", &under_file, &good]);
+        assert_eq!(code, Some(CANT_CREATE), "build -o:\n{stderr}");
+    }
     let (code, stderr) = faber(&["init", &format!("{blocker}/pkg")]);
     assert_eq!(code, Some(CANT_CREATE), "init:\n{stderr}");
 }
 
+// The probe succeeds through `emit -t rust`, so like the other rust-target
+// probes it compiles out of builds without the rust leaf (the public cut).
+#[cfg(feature = "hir-rust")]
 #[test]
 fn successful_output_file_is_unchanged() {
     let dir = tempfile::tempdir().expect("scratch");

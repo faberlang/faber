@@ -1,4 +1,8 @@
 //! N3: a missing leaf fails at compile time with `leaf_unsupported_on_target`.
+//!
+//! Every case here compiles for a target leaf (`hir-rust`/`hir-go`), so the
+//! whole module compiles out of builds without those leaves (the public cut).
+#![cfg(any(feature = "hir-rust", feature = "hir-go"))]
 
 use crate::codegen::Target;
 use crate::driver::{Config, ModuleCompileRequest, Session};
@@ -87,6 +91,7 @@ incipit {
     assert!(result.success(), "go must declare process: {:?}", issue_values(&result));
 }
 
+#[cfg(feature = "hir-go")]
 #[test]
 fn go_declares_inline_fs_leaf() {
     let result = compile(Target::HirGo, INLINE_FS);

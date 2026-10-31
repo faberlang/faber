@@ -157,9 +157,13 @@ fn jit_specific_pins_preserve_correct_display_and_air_support() {
             assert!(!runner.status.success(), "runner's AIR lane restriction");
             assert!(String::from_utf8_lossy(&runner.stderr).contains("TARGETLANE001"));
         }
-        for suite in ["full", "public"] {
+        // The `full` suite is a private-tree fixture (it pins every target,
+        // device lanes included), so its leg compiles out of the public cut;
+        // the `public` suite leg runs everywhere.
+        #[cfg(feature = "device")]
+        {
             let manifest = root().join(format!(
-                "corpus-suites/{suite}/cases/language/{case}.fab/case.toml"
+                "corpus-suites/full/cases/language/{case}.fab/case.toml"
             ));
             let pin: toml::Value =
                 toml::from_str(&fs::read_to_string(manifest).expect("case pin")).expect("TOML");
@@ -169,6 +173,16 @@ fn jit_specific_pins_preserve_correct_display_and_air_support() {
                 Some("known-fail")
             );
         }
+        let manifest = root().join(format!(
+            "corpus-suites/public/cases/language/{case}.fab/case.toml"
+        ));
+        let pin: toml::Value =
+            toml::from_str(&fs::read_to_string(manifest).expect("case pin")).expect("TOML");
+        assert_eq!(pin["targets"]["clif-jit"]["outcome"].as_str(), Some("pass"));
+        assert_eq!(
+            pin["targets"]["runner"]["outcome"].as_str(),
+            Some("known-fail")
+        );
     }
 }
 
