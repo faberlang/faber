@@ -1,0 +1,29 @@
+# G17b: an integer constant converted to a wrapping<u64> in a lane kernel (the swarm RNG seed,
+# `SEED ↦ wrapping<u64>`) is accepted by check and `--device cpu` (prints 20261028.5) but not by Metal:
+#
+#   faber run --device metal repros/g17b-metal-int-constant-to-wrapping-u64.fab
+#   -> E_DEVICE_NONE_ADMITTED ... MIR-to-Metal unsupported: lane kernel conversion other than a
+#      32/64-bit number to f32 or an integer widening
+#
+# A wrapping<u64> constant (`const wrapping<u64> SEEDW = 20261028`) runs on Metal; the port uses it.
+@ kernel
+@ public
+fn k<size N>(tensor<u32, [N]> xs, mut tensor<d64, [N]> o) → void {
+    for from xs at [i] thread lane let x {
+        let wrapping<u64> w ← 20261028 ↦ wrapping<u64>
+        o[[i]] ← (w ↦ d64) + 0.5
+    }
+}
+
+main {
+    let int n ← 3
+    const size N ← n
+    let list<u32> xl ← [1, 2, 99999]
+    let tensor<u32, [N]> xs ← xl ↦ tensor<u32, [N]>
+    let list<d64> ol ← [0.0, 0.0, 0.0]
+    mut tensor<d64, [N]> o ← ol ↦ tensor<d64, [N]>
+    k(xs, mut o)
+    for range 0‥n let i {
+        print o[[i]]
+    }
+}

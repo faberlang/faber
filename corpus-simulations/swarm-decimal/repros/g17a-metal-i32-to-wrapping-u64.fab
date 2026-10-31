@@ -1,0 +1,31 @@
+# G17a: a signed 32-bit integer converted to a wrapping<u64> in a lane kernel is accepted by check
+# and by `--device cpu` (prints 0.5 1 49999.5) but not by Metal:
+#
+#   faber run --device metal repros/g17a-metal-i32-to-wrapping-u64.fab
+#   -> E_DEVICE_NONE_ADMITTED ... MIR-to-Metal unsupported: lane kernel conversion other than a
+#      32/64-bit number to f32 or an integer widening
+#
+# The same conversion from a u32 element (`tensor<u32, [N]>`) runs on Metal, so the signed
+# widening to an unsigned 64-bit word is the unsupported case. The swarm port passes ids and the
+# tick as u32 instead.
+@ kernel
+@ public
+fn k<size N>(tensor<i32, [N]> xs, mut tensor<d64, [N]> o) → void {
+    for from xs at [i] thread lane let x {
+        let wrapping<u64> w ← x ↦ wrapping<u64>
+        o[[i]] ← (w ↦ d64) * 0.5
+    }
+}
+
+main {
+    let int n ← 3
+    const size N ← n
+    let list<i32> xl ← [1, 2, 99999]
+    let tensor<i32, [N]> xs ← xl ↦ tensor<i32, [N]>
+    let list<d64> ol ← [0.0, 0.0, 0.0]
+    mut tensor<d64, [N]> o ← ol ↦ tensor<d64, [N]>
+    k(xs, mut o)
+    for range 0‥n let i {
+        print o[[i]]
+    }
+}

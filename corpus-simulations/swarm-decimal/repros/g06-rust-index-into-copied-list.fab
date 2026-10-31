@@ -1,0 +1,6 @@
+main {
+    let list<d64> a ← [1.0, 2.0]
+    mut list<d64> left ← copy a
+    let int f ← 1
+    print left[f]
+}

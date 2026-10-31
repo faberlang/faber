@@ -1,0 +1,369 @@
+# Drone mission: scalar multirotor delivery-mission model.
+#
+# Port of reference/drone.py, expression for expression. Only + - * / and
+# sqrt are used, so every result is correctly rounded and the association
+# order below is the contract (see README.md). Floats print in the language's
+# shortest round-trip form.
+
+import from "./data" data
+
+const float PI = 3.141592653589793
+const float G = 9.80665
+const float P0 = 101325.0
+const float T0 = 288.15
+const float LAPSE = 0.0065
+const float R_AIR = 287.05
+const float RHO0 = 1.225
+const int GLAUERT_ITERS = 48
+const int MAX_STEPS = 20000
+
+@ public
+const string CSV_HEAD = "t_s,phase,alt_m,speed_mps,mass_kg,thrust_n,power_w,current_a,vterm_v,soc,tw_margin"
+
+# One row of the phase table: quantity is in rate units (m for climb, cruise,
+# descend and land; s for hover and drop).
+class Phase {
+    let string name
+    let float carry
+    let bool ground
+    let float qty
+    let float rate
+    let float vg
+    let float vc
+    let float wind
+}
+
+# The pack and rotor-disc constants derived from an aircraft, computed once in
+# the reference's order.
+class Pack {
+    let float area
+    let float base_kg
+    let float r_pack
+    let float cap_ah
+    let float v_ref
+    let float i_limit
+}
+
+class Load {
+    let float thrust
+    let float p_elec
+}
+
+# The evolving flight state.
+class State {
+    mut float soc
+    mut float t
+    mut float alt
+    mut int p
+    mut float q
+
+    # Close the step: the phase ends (and the next phase's quantity loads) or
+    # its remaining quantity shrinks.
+    fn close(bool final, float dt, float rate, list<Phase> phases) → void {
+        self.t ← self.t + dt
+        if final {
+            self.p ← self.p + 1
+            if self.p ≺ phases.length() {
+                let Phase nxt ← phases[self.p]
+                self.q ← nxt.qty
+            }
+        }
+        else {
+            self.q ← self.q - rate * dt
+        }
+    }
+}
+
+@ public
+class Stats {
+    mut float takeoff_margin = 0.0
+    mut float min_margin = ∞
+    mut float min_margin_fail = ∞
+    mut float max_current = 0.0
+    mut float final_soc = 0.0
+    mut int steps = 0
+    mut list<string> rows = []
+
+    # Fold one step into the running statistics.
+    fn observe(bool ground, bool failed, float margin, float cur) → void {
+        if not ground {
+            if self.steps ≡ 1 then self.takeoff_margin ← margin
+            if margin ≺ self.min_margin then self.min_margin ← margin
+            if failed and margin ≺ self.min_margin_fail then self.min_margin_fail ← margin
+        }
+        if cur ≻ self.max_current then self.max_current ← cur
+    }
+}
+
+@ public
+class RuleResult {
+    let string name
+    let bool ok
+    let string why
+
+    fn line() → string {
+        if self.ok then return self.name + " pass"
+        return self.name + " FAIL " + self.why
+    }
+}
+
+fn make_pack(data.Aircraft ac) → Pack {
+    let float area ← PI * ac.rotor_radius_m * ac.rotor_radius_m
+    let float cap ← ac.np * ac.cell_ah
+    return Pack {
+        area = area,
+        base_kg = ac.airframe_kg + ac.pack_kg,
+        r_pack = (ac.ns * ac.r_cell_ohm) / ac.np,
+        cap_ah = cap,
+        v_ref = ac.ns * data.V_NOMINAL_CELL,
+        i_limit = ac.c_cont * cap
+    }
+}
+
+fn air_density(float h_abs, float temp_c, float site_alt) → float {
+    let float x ← 1.0 - (LAPSE * h_abs) / T0
+    let float x2 ← x * x
+    let float x4 ← x2 * x2
+    let float p ← P0 * (x4 * x * x.sqrt().sqrt())
+    let float t ← (temp_c + 273.15) - LAPSE * (h_abs - site_alt)
+    return p / (R_AIR * t)
+}
+
+# Per-cell open-circuit voltage: piecewise linear in SoC, first segment with soc <= s1.
+fn ocv(float soc_in) → float {
+    mut float soc ← soc_in
+    if soc ≺ 0.0 then soc ← 0.0
+    if soc ≻ 1.0 then soc ← 1.0
+    for range 0‥7 let i {
+        let float s0 ← data.OCV_SOC[i]
+        let float s1 ← data.OCV_SOC[i + 1]
+        let float v0 ← data.OCV_VOLTS[i]
+        let float v1 ← data.OCV_VOLTS[i + 1]
+        if soc ≤ s1 {
+            return v0 + (v1 - v0) * ((soc - s0) / (s1 - s0))
+        }
+    }
+    return data.OCV_VOLTS[7]
+}
+
+# Glauert fixed point v = vh^2 / sqrt(Va^2 + (Vc + v)^2): fixed count, damped 0.5, start at vh.
+fn induced_velocity(float vh, float v_air, float vc) → float {
+    mut float vi ← vh
+    for range 0‥GLAUERT_ITERS let k {
+        let float f ← (vh * vh) / (v_air * v_air + (vc + vi) * (vc + vi)).sqrt()
+        vi ← 0.5 * (vi + f)
+    }
+    return vi
+}
+
+# What the rotors draw in one step: total thrust (carrying the drag) and
+# electrical power. Raises vortex_ring on a descent that stalls the induced flow.
+fn rotor_load(data.Aircraft ac, Pack d, Phase ph, float rho, float weight, float n_act) → Load ⇥ string {
+    let float v_air ← ph.vg + ph.wind
+    let float drag ← (0.5 * rho * ac.cda_m2) * (v_air * v_air)
+    let float thrust ← (weight * weight + drag * drag).sqrt()
+    let float t_r ← thrust / n_act
+    let float vh ← (t_r / ((2.0 * rho) * d.area)).sqrt()
+    let float vi ← induced_velocity(vh, v_air, ph.vc)
+    if ph.vc + vi ≤ 0.0 {
+        throw "vortex_ring"
+    }
+    let float mu ← v_air / ac.v_tip_mps
+    let float p_ind ← n_act * ((t_r * (ph.vc + vi)) / ac.fm)
+    let float p_prof ← n_act * (ac.k_prof * rho * d.area * (ac.v_tip_mps * ac.v_tip_mps * ac.v_tip_mps) * (1.0 + 4.65 * (mu * mu)))
+    let float p_par ← drag * v_air
+    return Load { thrust = thrust, p_elec = (p_ind + p_prof + p_par) / ac.eta + ac.p_avionics_w }
+}
+
+# Current for a power draw: P = (Voc - I R) I solved for I. A negative
+# discriminant means the pack cannot deliver the power (pack_collapse).
+fn pack_current(Pack d, float voc, float p_elec) → float ⇥ string {
+    let float disc ← voc * voc - 4.0 * d.r_pack * p_elec
+    if disc ≺ 0.0 {
+        throw "pack_collapse"
+    }
+    return (voc - disc.sqrt()) / (2.0 * d.r_pack)
+}
+
+fn phase(string name, float carry, bool ground, float qty, float rate, float vg, float vc, float wind) → Phase {
+    return Phase { name = name, carry = carry, ground = ground, qty = qty, rate = rate, vg = vg, vc = vc, wind = wind }
+}
+
+# The mission's phase table, returned as one list of records.
+fn phase_table(data.Mission m, float dist) → list<Phase> {
+    return [
+        phase("takeoff_climb", 1.0, false, m.cruise_alt_m, m.climb_rate_mps, 0.0, m.climb_rate_mps, 0.0),
+        phase("hover", 1.0, false, m.hover_s, 1.0, 0.0, 0.0, 0.0),
+        phase("cruise", 1.0, false, dist, m.speed_out_mps, m.speed_out_mps, 0.0, m.headwind_mps),
+        phase("descend", 1.0, false, m.cruise_alt_m - m.land_alt_m, m.descent_rate_mps, 0.0, -m.descent_rate_mps, 0.0),
+        phase("land", 1.0, false, m.land_alt_m, m.land_rate_mps, 0.0, -m.land_rate_mps, 0.0),
+        phase("drop_payload", 1.0, true, m.drop_s, 1.0, 0.0, 0.0, 0.0),
+        phase("return_climb", 0.0, false, m.cruise_alt_m, m.climb_rate_mps, 0.0, m.climb_rate_mps, 0.0),
+        phase("return", 0.0, false, dist, m.speed_ret_mps, m.speed_ret_mps, 0.0, 0.0 - m.headwind_mps),
+        phase("return_descend", 0.0, false, m.cruise_alt_m - m.land_alt_m, m.descent_rate_mps, 0.0, -m.descent_rate_mps, 0.0),
+        phase("return_land", 0.0, false, m.land_alt_m, m.land_rate_mps, 0.0, -m.land_rate_mps, 0.0)
+    ]
+}
+
+# One float in the language's shortest round-trip text. Rows and reasons join
+# single-hole formats with + because llvm-host and wasm have no multi-hole f64
+# format yet (GAPS.md).
+@ public
+fn num(float x) → string {
+    return "§"(x)
+}
+
+# The phase loop of one mission, advancing s and st in place.
+fn run_phases(data.Aircraft ac, data.Mission m, Pack d, list<Phase> phases, float payload, float fail_at, bool record, mut State s, mut Stats st) → void ⇥ string {
+    let float dt_s ← m.dt_s
+    while s.p ≺ phases.length() {
+        let Phase ph ← phases[s.p]
+        st.steps ← st.steps + 1
+        if st.steps ≻ MAX_STEPS {
+            throw "step_limit"
+        }
+        let bool final ← s.q ≤ ph.rate * dt_s
+        let float dt ← final ✓ s.q / ph.rate ✗ dt_s
+        let float mass ← d.base_kg + payload * ph.carry
+        let float voc ← ac.ns * ocv(s.soc)
+        let bool failed ← s.t ≥ fail_at
+        let float h_abs ← m.site_alt_m + s.alt
+        let float rho ← air_density(h_abs, m.temp_c, m.site_alt_m)
+        mut float thrust ← 0.0
+        mut float margin ← 0.0
+        mut float p_elec ← ac.p_avionics_w
+        mut float n_act ← ac.n_rotors
+        mut float weight ← 0.0
+        if not ph.ground {
+            n_act ← failed ✓ ac.n_rotors - ac.lost_on_motor_out ✗ ac.n_rotors
+            weight ← mass * G
+            let Load ld ← rotor_load(ac, d, ph, rho, weight, n_act)
+            thrust ← ld.thrust
+            p_elec ← ld.p_elec
+        }
+        let float cur ← pack_current(d, voc, p_elec)
+        let float vterm ← voc - cur * d.r_pack
+        if not ph.ground {
+            let float kv ← vterm / d.v_ref
+            let float tmax ← ac.tmax_ref_n * (kv * kv) * (rho / RHO0)
+            margin ← (n_act * tmax) / weight
+        }
+        st.observe(ph.ground, failed, margin, cur)
+        s.soc ← s.soc - (cur * dt) / (3600.0 * d.cap_ah)
+        if s.soc ≤ 0.0 {
+            throw "pack_empty"
+        }
+        s.alt ← s.alt + ph.vc * dt
+        s.close(final, dt, ph.rate, phases)
+        if record {
+            st.rows.append(num(s.t) + "," + ph.name + "," + num(s.alt) + "," + num(ph.vg) + "," + num(mass) + "," + num(thrust) + "," + num(p_elec) + "," + num(cur) + "," + num(vterm) + "," + num(s.soc) + "," + num(margin))
+        }
+    }
+}
+
+# Fly one mission. fail_t is the motor-out time or none; record asks for the
+# per-step CSV rows in Stats.rows. Raises a reason string on pack collapse, empty
+# pack, vortex ring or the step limit.
+@ public
+fn fly(data.Aircraft ac, data.Mission m, float payload, float dist, float ∪ none fail_t, bool record) → Stats ⇥ string {
+    let Pack d ← make_pack(ac)
+    let list<Phase> phases ← phase_table(m, dist)
+    let Phase first ← phases[0]
+    mut State s ← State { soc = m.start_soc, t = 0.0, alt = 0.0, p = 0, q = first.qty }
+    mut Stats st ← Stats {}
+    st.final_soc ← s.soc
+    run_phases(ac, m, d, phases, payload, fail_t coalesce ∞, record, mut s, mut st)
+    st.final_soc ← s.soc
+    return st
+}
+
+# Motor-out flight (FAIL_T_S): margin after failure. A failed flight fails the rule.
+fn failure_rule(data.Aircraft ac, data.Mission m, float payload, float dist) → RuleResult {
+    do {
+        let Stats f ← fly(ac, m, payload, dist, data.FAIL_T_S, false)
+        return RuleResult { name = "margin_fail", ok = f.min_margin_fail ≥ data.RULE_MARGIN_FAIL,
+            why = "margin after failure " + num(f.min_margin_fail) + " < " + num(data.RULE_MARGIN_FAIL) }
+    }
+    catch err {
+        return RuleResult { name = "margin_fail", ok = false, why = "motor-out flight: " + err }
+    }
+}
+
+# Nominal flight: takeoff T/W, continuous current, reserve SoC; then the motor-out rule.
+fn nominal_rules(data.Aircraft ac, data.Mission m, float payload, float dist) → list<RuleResult> ⇥ string {
+    let Pack d ← make_pack(ac)
+    let Stats a ← fly(ac, m, payload, dist, null, false)
+    return [
+        RuleResult { name = "tw_takeoff", ok = a.takeoff_margin ≥ data.RULE_TW_TAKEOFF,
+            why = "takeoff T/W " + num(a.takeoff_margin) + " < " + num(data.RULE_TW_TAKEOFF) },
+        RuleResult { name = "current_cont", ok = a.max_current ≤ d.i_limit,
+            why = "peak current " + num(a.max_current) + " A > " + num(d.i_limit) },
+        RuleResult { name = "reserve_soc", ok = a.final_soc ≥ data.RULE_RESERVE_SOC,
+            why = "landing SoC " + num(a.final_soc) + " < " + num(data.RULE_RESERVE_SOC) },
+        failure_rule(ac, m, payload, dist)
+    ]
+}
+
+# Run the rules. A failed flight fails its rule with the reason; a failed
+# nominal flight ends the evaluation there.
+@ public
+fn evaluate(data.Aircraft ac, data.Mission m, float payload, float dist) → list<RuleResult> {
+    do {
+        return nominal_rules(ac, m, payload, dist)
+    }
+    catch err {
+        return [RuleResult { name = "mission", ok = false, why = "nominal flight: " + err }]
+    }
+}
+
+@ public
+fn passes(data.Aircraft ac, data.Mission m, float payload, float dist) → bool {
+    for from evaluate(ac, m, payload, dist) let rule {
+        if not rule.ok then return false
+    }
+    return true
+}
+
+# Largest payload (to PAYLOAD_RES_KG) passing every rule; none if even 0 kg fails.
+@ public
+fn max_payload(data.Aircraft ac, data.Mission m, float dist) → float ∪ none {
+    mut float lo ← 0.0
+    mut float hi ← data.PAYLOAD_CAP_KG
+    if not passes(ac, m, lo, dist) then return null
+    if passes(ac, m, hi, dist) then return hi
+    while hi - lo ≻ data.PAYLOAD_RES_KG {
+        let float mid ← 0.5 * (lo + hi)
+        if passes(ac, m, mid, dist) {
+            lo ← mid
+        }
+        else {
+            hi ← mid
+        }
+    }
+    return lo
+}
+
+# Largest one-way distance (to RANGE_RES_M) passing every rule; none if 0 m fails.
+@ public
+fn max_range(data.Aircraft ac, data.Mission m, float payload) → float ∪ none {
+    mut float lo ← 0.0
+    mut float hi ← data.RANGE_CAP_M
+    if not passes(ac, m, payload, lo) then return null
+    if passes(ac, m, payload, hi) then return hi
+    while hi - lo ≻ data.RANGE_RES_M {
+        let float mid ← 0.5 * (lo + hi)
+        if passes(ac, m, payload, mid) {
+            lo ← mid
+        }
+        else {
+            hi ← mid
+        }
+    }
+    return lo
+}
+
+@ public
+fn fmt(float ∪ none x) → string {
+    if x ≡ null then return "none"
+    return num(x coalesce 0.0)
+}

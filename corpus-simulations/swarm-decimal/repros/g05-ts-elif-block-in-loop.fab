@@ -1,0 +1,22 @@
+fn names(list<int> xs, string k) → list<string> {
+    mut list<string> out ← empty
+    for from xs let x {
+        mut string name ← "none"
+        if k ≡ "a" {
+            let string t ← "A"
+            name ← t
+        }
+        elif k ≡ "b" {
+            let string t ← "B"
+            name ← t
+        }
+        out.append(name)
+    }
+    return out
+}
+main {
+    let list<string> r ← names([1, 2, 3], "a")
+    print r.length()
+    let list<string> s ← names([1, 2, 3], "b")
+    print s.length()
+}

@@ -1,0 +1,42 @@
+# G15: 64-bit integers (`i64`, `u64`, `wrapping<u64>`) are refused in an `@ kernel`
+# at check time, so a raw-integer emulation of `d64` (value x 10^8 in an i64) and the
+# SplitMix64 counter RNG (`wrapping<u64>`) cannot be written as device code either.
+#
+#   faber check repros/g15-kernel-wide-integer-refused.fab
+#   -> error[SEM008:nucleum_wide_integer] on the i64 `mut`, its stores and the
+#      `wrapping<u64>` arithmetic (the issue text is "an integer carrier wider than
+#      the portable 32-bit kernel envelope"; a kernel integer is i32/u32)
+#
+# Check error, so identical on `reference`, `cpu` and `metal`. The kernel envelope is
+# a language rule (crates/radix-semantic/src/passes/kernel_requirements.rs), not a
+# device limit, so this is a finding for the design, not a defect to patch around.
+@ kernel
+@ public
+fn blocks(tensor<i64, [4]> x, mut tensor<i64, [4]> y) → void {
+    for from x at [i] thread lane let v {
+        mut i64 acc ← v
+        acc ← acc / 100000000
+        y[[i]] ← acc
+    }
+}
+
+@ kernel
+@ public
+fn rng(tensor<u32, [4]> x, mut tensor<u32, [4]> y) → void {
+    for from x at [i] thread lane let v {
+        mut wrapping<u64> z ← v ↦ wrapping<u64>
+        z ← z + 0x9E3779B97F4A7C15
+        z ← z * 0xBF58476D1CE4E5B9
+        y[[i]] ← (z ⇒ 32) ↦ u32 ⊥ 0
+    }
+}
+
+main {
+    let list<i64> data ← [123456789, 20000000000, 7, -300000000]
+    let tensor<i64, [4]> x ← data ↦ tensor<i64, [4]>
+    mut tensor<i64, [4]> y ← data ↦ tensor<i64, [4]>
+    do all {
+        blocks(x, mut y)
+    }
+    print y
+}

@@ -1,0 +1,344 @@
+# Drone mission step 3: device sweep. Each lane of `sweep_kernel.fly_scenarios`
+# flies one scenario (nominal plus motor-out mission) and judges the rules.
+#
+#   faber run --device cpu|reference|metal|cuda corpus-simulations/drone-mission/src/sweep.fab -- <mode> <reps>
+#
+#   mode 0  the payload x distance x aircraft grid (payload 0..16 step 0.5 at 1/2/3 km) plus
+#           the range grid (distance 0..6400 step 50 at 1/2/3 kg): 972 scenarios, one
+#           launch; prints every scenario, then the 12 search answers read off the grid
+#   mode 1  the 12 searches as one batched bisection: a host loop of launches, one probe
+#           per search per round
+#   reps    how many times to repeat the launch (mode 0) or the whole bisection (mode 1) for timing (at least 1)
+#
+# Output sections (marked lines): `== scenarios` (CSV), `== summary` (the format of
+# reference/golden/summary.csv), `== time` (seconds, not part of the comparison).
+# The kernel is f32 (f64 is a refused kernel value, GAPS.md); the host holds the
+# search state in f64 as the host port does.
+import from "norma:time" time
+import from "./data" data
+import from "./sweep_kernel" kernel
+
+const float PI = 3.141592653589793
+const list<float> SUMMARY_DISTANCES_M = [1000.0, 2000.0, 3000.0]
+const list<float> SUMMARY_PAYLOADS_KG = [1.0, 2.0, 3.0]
+
+fn num(float x) → string {
+    return "§"(x)
+}
+
+fn num32(f32 x) → string {
+    return "§"(x)
+}
+
+# One aircraft row of the kernel's parameter tensor: the raw fields, then the
+# derived constants in the order of drone.derived, rounded to f32 once.
+fn aircraft_row(data.Aircraft ac, int r, mut tensor<f32, [2, 16]> prm) → void {
+    let float area ← PI * ac.rotor_radius_m * ac.rotor_radius_m
+    let float cap ← ac.np * ac.cell_ah
+    prm[[r, 0]] ← ac.n_rotors ↦ f32
+    prm[[r, 1]] ← ac.lost_on_motor_out ↦ f32
+    prm[[r, 2]] ← ac.fm ↦ f32
+    prm[[r, 3]] ← ac.k_prof ↦ f32
+    prm[[r, 4]] ← ac.v_tip_mps ↦ f32
+    prm[[r, 5]] ← ac.tmax_ref_n ↦ f32
+    prm[[r, 6]] ← ac.cda_m2 ↦ f32
+    prm[[r, 7]] ← ac.eta ↦ f32
+    prm[[r, 8]] ← ac.p_avionics_w ↦ f32
+    prm[[r, 9]] ← ac.ns ↦ f32
+    prm[[r, 10]] ← area ↦ f32
+    prm[[r, 11]] ← (ac.airframe_kg + ac.pack_kg) ↦ f32
+    prm[[r, 12]] ← ((ac.ns * ac.r_cell_ohm) / ac.np) ↦ f32
+    prm[[r, 13]] ← cap ↦ f32
+    prm[[r, 14]] ← (ac.ns * data.V_NOMINAL_CELL) ↦ f32
+    prm[[r, 15]] ← (ac.c_cont * cap) ↦ f32
+}
+
+fn phase_row(int r, float carry, float ground, float qty, float rate, float vg, float vc, float wind, mut tensor<f32, [10, 8]> ph) → void {
+    ph[[r, 0]] ← carry ↦ f32
+    ph[[r, 1]] ← ground ↦ f32
+    ph[[r, 2]] ← qty ↦ f32
+    ph[[r, 3]] ← rate ↦ f32
+    ph[[r, 4]] ← vg ↦ f32
+    ph[[r, 5]] ← vc ↦ f32
+    ph[[r, 6]] ← wind ↦ f32
+}
+
+# The phase table of drone.phase_table; the cruise and return quantities are the
+# lane's distance, so those two rows hold 0 here.
+fn phase_table(data.Mission m, mut tensor<f32, [10, 8]> ph) → void {
+    let float h ← m.cruise_alt_m
+    let float la ← m.land_alt_m
+    let float cr ← m.climb_rate_mps
+    let float dr ← m.descent_rate_mps
+    let float lr ← m.land_rate_mps
+    let float so ← m.speed_out_mps
+    let float sr ← m.speed_ret_mps
+    let float w ← m.headwind_mps
+    phase_row(0, 1.0, 0.0, h, cr, 0.0, cr, 0.0, mut ph)
+    phase_row(1, 1.0, 0.0, m.hover_s, 1.0, 0.0, 0.0, 0.0, mut ph)
+    phase_row(2, 1.0, 0.0, 0.0, so, so, 0.0, w, mut ph)
+    phase_row(3, 1.0, 0.0, h - la, dr, 0.0, -dr, 0.0, mut ph)
+    phase_row(4, 1.0, 0.0, la, lr, 0.0, -lr, 0.0, mut ph)
+    phase_row(5, 1.0, 1.0, m.drop_s, 1.0, 0.0, 0.0, 0.0, mut ph)
+    phase_row(6, 0.0, 0.0, h, cr, 0.0, cr, 0.0, mut ph)
+    phase_row(7, 0.0, 0.0, 0.0, sr, sr, 0.0, 0.0 - w, mut ph)
+    phase_row(8, 0.0, 0.0, h - la, dr, 0.0, -dr, 0.0, mut ph)
+    phase_row(9, 0.0, 0.0, la, lr, 0.0, -lr, 0.0, mut ph)
+}
+
+fn tables(mut tensor<f32, [2, 16]> prm, mut tensor<f32, [10, 8]> ph, mut tensor<f32, [8]> ocv_soc, mut tensor<f32, [8]> ocv_volts, mut tensor<f32, [8]> env) → void {
+    let data.Mission m ← data.delivery()
+    aircraft_row(data.quad(), 0, mut prm)
+    aircraft_row(data.octo(), 1, mut prm)
+    phase_table(m, mut ph)
+    for range 0‥8 let k {
+        ocv_soc[[k]] ← data.OCV_SOC[k] ↦ f32
+        ocv_volts[[k]] ← data.OCV_VOLTS[k] ↦ f32
+    }
+    env[[0]] ← m.site_alt_m ↦ f32
+    env[[1]] ← m.temp_c ↦ f32
+    env[[2]] ← m.start_soc ↦ f32
+    env[[3]] ← m.dt_s ↦ f32
+    env[[4]] ← data.FAIL_T_S ↦ f32
+    env[[5]] ← data.RULE_TW_TAKEOFF ↦ f32
+    env[[6]] ← data.RULE_RESERVE_SOC ↦ f32
+    env[[7]] ← data.RULE_MARGIN_FAIL ↦ f32
+}
+
+fn fmt(float ∪ none x) → string {
+    if x ≡ null then return "none"
+    return num(x coalesce 0.0)
+}
+
+fn aircraft_name(int a) → string {
+    if a ≡ 0 then return "quad"
+    return "octo"
+}
+
+# One probe batch of the bisection: pass flags (1 or 0) of the given scenarios.
+# Only the pass flags are read back here.
+fn probe(list<int> ac, list<float> pay, list<float> dist, tensor<f32, [2, 16]> prm, tensor<f32, [10, 8]> ph, tensor<f32, [8]> ocv_soc, tensor<f32, [8]> ocv_volts, tensor<f32, [8]> env) → list<int> {
+    let int n ← ac.length()
+    const size N ← n
+    mut tensor<f32, [N]> t_pay ← tf32[N] {}
+    mut tensor<f32, [N]> t_dist ← tf32[N] {}
+    mut tensor<i32, [N]> t_ac ← ti32[N] {}
+    for range 0‥n let i {
+        t_pay[[i]] ← pay[i] ↦ f32
+        t_dist[[i]] ← dist[i] ↦ f32
+        t_ac[[i]] ← ac[i] ↦ i32 ⊥ 0
+    }
+    mut tensor<i32, [N]> o_ok ← ti32[N] {}
+    mut tensor<i32, [N]> o_en ← ti32[N] {}
+    mut tensor<i32, [N]> o_ef ← ti32[N] {}
+    mut tensor<f32, [N]> o_tk ← tf32[N] {}
+    mut tensor<f32, [N]> o_cu ← tf32[N] {}
+    mut tensor<f32, [N]> o_so ← tf32[N] {}
+    mut tensor<f32, [N]> o_mf ← tf32[N] {}
+    kernel.fly_scenarios(t_pay, t_dist, t_ac, prm, ph, ocv_soc, ocv_volts, env, mut o_ok, mut o_en, mut o_ef, mut o_tk, mut o_cu, mut o_so, mut o_mf)
+    mut list<int> flags ← []
+    for range 0‥n let i {
+        flags.append(o_ok[[i]] ↦ int)
+    }
+    return flags
+}
+
+# All 12 summary searches at once, as the batched bisection of sweep_torch: task
+# t = 6 * aircraft + (0..2 max_payload at the 3 distances | 3..5 max_range at the 3
+# payloads). Each round is one launch of 12 probes; the first launch probes every
+# lower and upper bound (24 lanes).
+fn bisect(tensor<f32, [2, 16]> prm, tensor<f32, [10, 8]> ph, tensor<f32, [8]> ocv_soc, tensor<f32, [8]> ocv_volts, tensor<f32, [8]> env) → list<float ∪ none> {
+    mut list<int> t_ac ← []
+    mut list<bool> t_pay ← []
+    mut list<float> fixed ← []
+    mut list<float> lo ← []
+    mut list<float> hi ← []
+    mut list<float> res ← []
+    for range 0‥2 let a {
+        for from SUMMARY_DISTANCES_M let d {
+            t_ac.append(a)
+            t_pay.append(true)
+            fixed.append(d)
+            lo.append(0.0)
+            hi.append(data.PAYLOAD_CAP_KG)
+            res.append(data.PAYLOAD_RES_KG)
+        }
+        for from SUMMARY_PAYLOADS_KG let p {
+            t_ac.append(a)
+            t_pay.append(false)
+            fixed.append(p)
+            lo.append(0.0)
+            hi.append(data.RANGE_CAP_M)
+            res.append(data.RANGE_RES_M)
+        }
+    }
+    let int n ← t_ac.length()
+    # Round 0: the lower bound and the upper bound of every search.
+    mut list<int> a0 ← []
+    mut list<float> p0 ← []
+    mut list<float> d0 ← []
+    for range 0‥2 let side {
+        for range 0‥n let t {
+            let float x ← side ≡ 0 ✓ lo[t] ✗ hi[t]
+            a0.append(t_ac[t])
+            p0.append(t_pay[t] ✓ x ✗ fixed[t])
+            d0.append(t_pay[t] ✓ fixed[t] ✗ x)
+        }
+    }
+    let list<int> f0 ← probe(a0, p0, d0, prm, ph, ocv_soc, ocv_volts, env)
+    mut bool searching ← true
+    while searching {
+        mut list<float> mids ← []
+        mut list<int> pa ← []
+        mut list<float> pp ← []
+        mut list<float> pd ← []
+        mut bool any ← false
+        for range 0‥n let t {
+            let float mid ← 0.5 * (lo[t] + hi[t])
+            mids.append(mid)
+            pa.append(t_ac[t])
+            pp.append(t_pay[t] ✓ mid ✗ fixed[t])
+            pd.append(t_pay[t] ✓ fixed[t] ✗ mid)
+            if hi[t] - lo[t] ≻ res[t] then any ← true
+        }
+        if any {
+            let list<int> fl ← probe(pa, pp, pd, prm, ph, ocv_soc, ocv_volts, env)
+            for range 0‥n let t {
+                if hi[t] - lo[t] ≻ res[t] {
+                    if fl[t] ≡ 1 {
+                        lo[t] ← mids[t]
+                    }
+                    else {
+                        hi[t] ← mids[t]
+                    }
+                }
+            }
+        }
+        else {
+            searching ← false
+        }
+    }
+    mut list<float ∪ none> out ← []
+    for range 0‥n let t {
+        if f0[t] ≡ 0 {
+            out.append(null)
+        }
+        else {
+            out.append(f0[n + t] ≡ 1 ✓ hi[t] ✗ lo[t])
+        }
+    }
+    return out
+}
+
+fn print_summary(list<float ∪ none> answers) → void {
+    print "search,aircraft,payload_kg,distance_m,result"
+    for range 0‥2 let a {
+        for range 0‥3 let k {
+            print "max_payload," + aircraft_name(a) + ",," + num(SUMMARY_DISTANCES_M[k]) + "," + fmt(answers[a * 6 + k])
+        }
+        for range 0‥3 let k {
+            print "max_range," + aircraft_name(a) + "," + num(SUMMARY_PAYLOADS_KG[k]) + ",," + fmt(answers[a * 6 + 3 + k])
+        }
+    }
+}
+
+@ cli "drone-sweep"
+@ operand int mode
+@ operand int reps
+main args args {
+    mut tensor<f32, [2, 16]> prm ← tf32[2, 16] {}
+    mut tensor<f32, [10, 8]> ph ← tf32[10, 8] {}
+    mut tensor<f32, [8]> ocv_soc ← tf32[8] {}
+    mut tensor<f32, [8]> ocv_volts ← tf32[8] {}
+    mut tensor<f32, [8]> env ← tf32[8] {}
+    tables(mut prm, mut ph, mut ocv_soc, mut ocv_volts, mut env)
+
+    if args.mode ≡ 1 {
+        # The whole bisection, repeated `reps` times for timing (step 4); the answers
+        # printed are those of the last repeat.
+        let int breps ← args.reps ≺ 1 ✓ 1 ✗ args.reps
+        mut list<float ∪ none> answers ← []
+        mut list<string> btimes ← []
+        for range 0‥breps let r {
+            let int t0 ← time.monotonic()
+            answers ← bisect(prm, ph, ocv_soc, ocv_volts, env)
+            let int t1 ← time.monotonic()
+            btimes.append("bisect," + "§"(r) + "," + num(((t1 - t0) ↦ float) / 1.0e9))
+        }
+        print "== summary"
+        print_summary(answers)
+        print "== time"
+        for from btimes let line {
+            print line
+        }
+    }
+    else {
+
+        # The grid: for each aircraft, the payload grid at each distance, then the
+        # range grid at each payload (the order of sweep_torch.grid_scenarios).
+        const size N ← 972
+        mut tensor<f32, [N]> pay ← tf32[N] {}
+        mut tensor<f32, [N]> dist ← tf32[N] {}
+        mut tensor<i32, [N]> acx ← ti32[N] {}
+        mut list<int> task ← []
+        mut int n ← 0
+        for range 0‥2 let a {
+            for range 0‥3 let di {
+                for range 0‥33 let k {
+                    pay[[n]] ← ((k ↦ float) * 0.5) ↦ f32
+                    dist[[n]] ← SUMMARY_DISTANCES_M[di] ↦ f32
+                    acx[[n]] ← a ↦ i32 ⊥ 0
+                    task.append(a * 6 + di)
+                    n ← n + 1
+                }
+            }
+            for range 0‥3 let pi {
+                for range 0‥129 let k {
+                    pay[[n]] ← SUMMARY_PAYLOADS_KG[pi] ↦ f32
+                    dist[[n]] ← ((k ↦ float) * 50.0) ↦ f32
+                    acx[[n]] ← a ↦ i32 ⊥ 0
+                    task.append(a * 6 + 3 + pi)
+                    n ← n + 1
+                }
+            }
+        }
+        mut tensor<i32, [N]> o_ok ← ti32[N] {}
+        mut tensor<i32, [N]> o_en ← ti32[N] {}
+        mut tensor<i32, [N]> o_ef ← ti32[N] {}
+        mut tensor<f32, [N]> o_tk ← tf32[N] {}
+        mut tensor<f32, [N]> o_cu ← tf32[N] {}
+        mut tensor<f32, [N]> o_so ← tf32[N] {}
+        mut tensor<f32, [N]> o_mf ← tf32[N] {}
+        mut list<string> times ← []
+        let int reps ← args.reps ≺ 1 ✓ 1 ✗ args.reps
+        for range 0‥reps let r {
+            let int t0 ← time.monotonic()
+            kernel.fly_scenarios(pay, dist, acx, prm, ph, ocv_soc, ocv_volts, env, mut o_ok, mut o_en, mut o_ef, mut o_tk, mut o_cu, mut o_so, mut o_mf)
+            let int landed ← o_ok[[N - 1]] ↦ int
+            let int t1 ← time.monotonic()
+            times.append("sweep," + "§"(r) + "," + num(((t1 - t0) ↦ float) / 1.0e9))
+        }
+
+        print "== scenarios"
+        print "scenario,aircraft,payload_kg,distance_m,ok,err_nom,err_fail,takeoff_margin,max_current,final_soc,min_margin_fail"
+        mut list<float ∪ none> best ← []
+        for range 0‥12 let t {
+            best.append(null)
+        }
+        for range 0‥N let i {
+            print "§,§,§,§,§,§,§,"(i, aircraft_name(acx[[i]] ↦ int), num32(pay[[i]]), num32(dist[[i]]), o_ok[[i]], o_en[[i]], o_ef[[i]]) + num32(o_tk[[i]]) + "," + num32(o_cu[[i]]) + "," + num32(o_so[[i]]) + "," + num32(o_mf[[i]])
+            if o_ok[[i]] ≡ 1 {
+                let int t ← task[i]
+                let float x ← t % 6 ≺ 3 ✓ pay[[i]] ↦ float ✗ dist[[i]] ↦ float
+                let float cur ← best[t] coalesce -1.0
+                if x ≻ cur then best[t] ← x
+            }
+        }
+        print "== summary"
+        print_summary(best)
+        print "== time"
+        for from times let line {
+            print line
+        }
+    }
+}

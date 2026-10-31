@@ -1,0 +1,7 @@
+fn f(int tick) → wrapping<u64> {
+    let wrapping<u64> t ↤ tick
+    return t + 5
+}
+main {
+    print f(3)
+}

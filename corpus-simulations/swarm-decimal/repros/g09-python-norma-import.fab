@@ -1,0 +1,11 @@
+import from "norma:crypto" crypto
+import from "norma:encoding" encoding
+
+main {
+    let list<b8> data ← |61 62 63|
+    do {
+        print encoding.hex(crypto.digest("sha256", data))
+    } catch err {
+        print err
+    }
+}
