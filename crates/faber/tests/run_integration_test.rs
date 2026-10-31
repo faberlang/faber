@@ -3236,10 +3236,9 @@ fn run_cpu_device_a2_stencil_matches_the_reference_at_one_and_three_partitions()
 }
 
 /// The Metal device line every Metal device session reports on stderr.
-#[cfg(target_os = "macos")]
 const METAL_DEVICE_RECEIPT_PREFIX: &str = "device: selected backend `metal` on ";
 
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "device-runtime"))]
 fn run_metal_with_partition_memory(
     package: &Path,
     args: &[&str],
@@ -3286,7 +3285,7 @@ fn run_metal_with_partition_memory(
 /// prints at one partition and at three; private copies produce the same full
 /// program output. The spanned receipt names the partition count and no kernel
 /// falls back to one partition. A macOS host without Metal fails this test.
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "device-runtime"))]
 #[test]
 fn run_metal_device_a2_stencil_matches_plain_metal_at_one_and_three_partitions() {
     let package = repo_root().join("acceptance/a2-flood-stencil");
@@ -3371,7 +3370,7 @@ fn run_metal_device_a2_stencil_matches_plain_metal_at_one_and_three_partitions()
 /// reduction falls back to one partition. The Rust API also compares the
 /// private-copy mode against plain Metal. A macOS host without Metal fails
 /// this test.
-#[cfg(target_os = "macos")]
+#[cfg(all(target_os = "macos", feature = "device-runtime"))]
 #[test]
 fn run_metal_device_grid_reduce_matches_plain_metal_over_partitions() {
     let package = repo_root().join("acceptance/c4-grid-reduce");
