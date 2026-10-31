@@ -41,6 +41,29 @@ fn unset_home_records_embedded_provenance() {
 }
 
 #[test]
+fn emit_gate_installs_an_embedded_home_that_serves_norma_text() {
+    // The relocated-binary refusal: with no in-tree `lib/` and no configured
+    // home, the single-file emit lanes refused `norma:*` imports with PKG001
+    // `unknown_library_module`. The dispatch gate must install the embedded
+    // home as the configured setting, and that home must hold the refused
+    // module surface.
+    let _guard = env_guard();
+    let embedded = resolved_library_home().expect("embedded home");
+    assert_eq!(embedded.source, LibraryHomeSource::Embedded);
+
+    let _configured = ConfiguredHomeReset::clear();
+    configure_embedded_library_home_if_unset();
+
+    let installed = radix::program::configured_library_home_setting()
+        .expect("the emit gate installs the embedded home");
+    assert_eq!(installed, embedded.path);
+    assert!(
+        installed.join("norma/src/text.fab").is_file(),
+        "the installed home must hold the norma:text module"
+    );
+}
+
+#[test]
 fn configure_library_home_flag_wins_over_manifest() {
     let _guard = env_guard();
     let _configured = ConfiguredHomeReset::clear();

@@ -1214,6 +1214,79 @@ fn cli_parses_check_library_subcommand() {
 }
 
 #[test]
+fn emit_installs_the_embedded_library_fallback_for_every_target() {
+    // The single-file emit lanes (go, ts, python, c, llvm-text, clif) resolve
+    // imports through the standalone module resolver; on a released or
+    // relocated binary that resolver has no in-tree `lib/` to fall back to, so
+    // dispatch must install the embedded Norma home for Emit exactly as it
+    // already does for Format. A missing gate refused `norma:*` single-file
+    // emits with PKG001 `unknown_library_module` while the package-routed
+    // targets (rust, fmir, …) and `faber check` passed.
+    for target in ["go", "ts", "python", "c", "llvm-text", "clif"] {
+        let cli = Cli::try_parse_from(["faber", "emit", "--target", target, "main.fab"])
+            .unwrap_or_else(|err| panic!("parse emit --target {target}: {err}"));
+        let command = cli.command.expect("emit subcommand");
+        assert!(
+            command.installs_embedded_library_fallback(),
+            "emit --target {target} must install the embedded library fallback"
+        );
+    }
+    let cli = Cli::try_parse_from(["faber", "emit", "main.fab"]).expect("parse emit default");
+    assert!(
+        cli.command
+            .expect("emit subcommand")
+            .installs_embedded_library_fallback()
+    );
+    let cli = Cli::try_parse_from(["faber", "format"]).expect("parse format");
+    assert!(
+        cli.command
+            .expect("format subcommand")
+            .installs_embedded_library_fallback()
+    );
+}
+
+#[test]
+fn test_and_verify_install_the_embedded_library_fallback() {
+    // The single-file `test` and `verify` lanes lower the input through the
+    // standalone module resolver; on a released or relocated binary with no
+    // in-tree `lib/` they refused `norma:*` imports with PKG001
+    // `unknown_library_module` while `run`, `check`, `doc` and `cost` passed.
+    // Dispatch must install the embedded Norma home for them exactly as it
+    // already does for Emit and Format.
+    for argv in [
+        vec!["faber", "test", "main.fab"],
+        vec!["faber", "verify", "main.fab"],
+    ] {
+        let cli = Cli::try_parse_from(argv.clone()).unwrap_or_else(|err| {
+            panic!("parse {}: {err}", argv.join(" "));
+        });
+        let command = cli.command.expect("subcommand");
+        assert!(
+            command.installs_embedded_library_fallback(),
+            "{command:?} must install the embedded library fallback"
+        );
+    }
+}
+
+#[test]
+fn provenance_reporting_commands_never_install_the_embedded_fallback() {
+    // `doctor` and `check-library` report the resolved library home's
+    // provenance themselves; a pre-installed home would misreport the
+    // embedded home as configured.
+    for argv in [
+        vec!["faber", "doctor"],
+        vec!["faber", "check-library", "norma"],
+    ] {
+        let cli = Cli::try_parse_from(argv).expect("parse provenance command");
+        let command = cli.command.expect("subcommand");
+        assert!(
+            !command.installs_embedded_library_fallback(),
+            "{command:?} must not pre-install the embedded home"
+        );
+    }
+}
+
+#[test]
 fn check_long_help_discloses_library_resolution() {
     let mut command = Cli::command();
     let check = command

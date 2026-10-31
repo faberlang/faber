@@ -274,6 +274,23 @@ impl Command {
             _ => (None, None),
         }
     }
+
+    /// Whether dispatch installs the embedded Norma home when no explicit or
+    /// manifest-selected library home is configured. The single-file lanes of
+    /// these commands resolve imports through the standalone module resolver
+    /// (`library_homes`), which on a released or relocated binary has no
+    /// in-tree `lib/` to fall back to: without the embedded home a lone file
+    /// importing `norma:*` refuses with PKG001 `unknown_library_module` while
+    /// the package-routed targets pass. Commands that report home provenance
+    /// (`doctor`, `check-library`) are excluded on purpose: they read the
+    /// ambient resolution themselves and must not observe a pre-installed
+    /// home, or their embedded provenance would misreport as configured.
+    pub fn installs_embedded_library_fallback(&self) -> bool {
+        matches!(
+            self,
+            Self::Emit(_) | Self::Format(_) | Self::Test(_) | Self::Verify(_)
+        )
+    }
 }
 
 /// Arguments for `faber doctor`.
