@@ -357,7 +357,12 @@ fn run_build_and_format_print_help_by_default_and_omit_it_when_disabled() {
     )
     .expect("write source");
 
-    for command in ["run", "build", "format"] {
+    // `build` defaults to the Rust target, which the public build does not have.
+    let mut commands = vec!["run", "format"];
+    if cfg!(feature = "hir-rust") {
+        commands.push("build");
+    }
+    for command in commands {
         let default = run_faber_stderr(&[command], &file);
         assert!(
             default.contains("\nhelp:"),
