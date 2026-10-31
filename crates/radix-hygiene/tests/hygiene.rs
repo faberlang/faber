@@ -551,6 +551,10 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // in default `faber check` output; the machine identity is asserted via
         // issue() in the same test.
         || rel == "crates/radix-program/src/bounded_param_pkg001_test.rs"
+        // Renderer contract (PKG001 empty-message regression): pins that the
+        // target gate's message and help reach the terminal; the structured
+        // identity is asserted in the same test.
+        || rel == "crates/faber/tests/target_gate_message_test.rs"
         // Renderer contract (locale-pack surface): these tests render
         // diagnostics through an installed pack via `render_diagnostic_text`
         // and pin the resolved prose (keyword binding substituted for the
