@@ -28,13 +28,6 @@ use super::read_manifest;
 use super::{LlvmHostProfile, build_host_program_in};
 use super::{MANIFEST_FILE, config_with_locale};
 
-#[cfg(any(
-    feature = "hir-rust",
-    feature = "hir-go",
-    feature = "hir-ts",
-    feature = "mir-wasm",
-    feature = "mir-llvm"
-))]
 pub(super) mod build_layout {
     use std::path::Path;
 
@@ -76,13 +69,6 @@ pub(super) mod build_layout {
                 .any(|dir| dir.join(MANIFEST_FILE).exists())
     }
 }
-#[cfg(any(
-    feature = "hir-rust",
-    feature = "hir-go",
-    feature = "hir-ts",
-    feature = "mir-wasm",
-    feature = "mir-llvm"
-))]
 pub(super) use build_layout::discover_build_layout;
 
 /// Print `message` and terminate with the internal-failure class: the caller
