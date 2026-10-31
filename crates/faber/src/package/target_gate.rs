@@ -13,7 +13,7 @@
 //!   the help text is the only prose that differs by target class.
 
 use radix::module::codegen::Target;
-use radix::module::diagnostics::{Diagnostic, render_plain};
+use radix::module::diagnostics::Diagnostic;
 
 /// Diagnostic issue name for a target that this faber build does not contain.
 pub const TARGET_NOT_IN_THIS_BUILD: &str = "target_not_in_this_build";
@@ -101,11 +101,11 @@ pub fn target_not_in_this_build(target: Target) -> Diagnostic {
     let feature = target.required_feature().unwrap_or(RUNNER_FEATURE);
     let help = if EXPERIMENTAL_DEFAULT_OFF.contains(&feature) {
         format!(
-            "target `{name}` is experimental and is not part of the official faber release; rebuild faber from source with feature `{feature}`"
+            "target `{name}` is experimental and is not part of the official faber release; rebuild faber from source with feature `{feature}`, or run `faber targets` to list the targets this build has"
         )
     } else {
         format!(
-            "target `{name}` ships in the official faber release; use the official faber release to build or emit it"
+            "target `{name}` ships in the official faber release; use the official faber release to build or emit it, or run `faber targets` to list the targets this build has"
         )
     };
     crate::package_diagnostic_error(format!(
@@ -130,11 +130,31 @@ pub fn require_target_compiled_in(target: Target) -> Result<(), Diagnostic> {
     }
 }
 
+/// Render the gate refusal for terminal output: the compact identity, the
+/// message and the help.
+///
+/// WHY not `render_plain`: the plain renderer keeps a `PKG001` diagnostic that
+/// carries an issue compact — its prose renders only through a reader-pack row
+/// (the reader-locale contract on issue'd PKG001), and this gate fires before
+/// any reader pack is loaded and has no pack row, so `render_plain` dropped the
+/// message and help and the refusal printed as
+/// `error[PKG001:target_not_in_this_build]: ` with nothing after it. The
+/// gate's prose is build guidance (feature names, rebuild steps), not reader
+/// surface, so the exit prints the diagnostic's own text directly.
+fn render_gate_refusal(diag: &Diagnostic) -> String {
+    let label = diag.display_label().unwrap_or_else(|| "PKG001".to_owned());
+    let mut out = format!("error[{label}]: {}", diag.message);
+    if let Some(help) = &diag.help {
+        out.push_str(&format!("\n  = help: {help}"));
+    }
+    out
+}
+
 /// Print the gate diagnostic for `target` to stderr and exit with
 /// [`UNAVAILABLE`](crate::exit_status::UNAVAILABLE).
 pub fn exit_target_not_in_this_build(target: Target) -> ! {
     let diag = target_not_in_this_build(target);
-    eprintln!("{}", render_plain(&diag));
+    eprintln!("{}", render_gate_refusal(&diag));
     crate::exit_status::exit_unavailable()
 }
 
